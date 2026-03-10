@@ -1,0 +1,32 @@
+# Node
+node_modules/
+
+# Build
+backend/dist/
+frontend/dist/
+mobile/.expo/
+mobile/.expo-shared/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.local
+backend/.env
+frontend/.env
+mobile/.env
+
+# Prisma
+backend/prisma/dev.db
+
+# Generated assets
+backend/generated/
+
+# Uploads
+backend/uploads/
+
+# OS
+.DS_Store
+Thumbs.db

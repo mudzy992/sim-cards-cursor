@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "SIM Tracker",
+    "slug": "sim-tracker",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "simtracker",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "SIM Tracker koristi kameru za skeniranje ICCID barkoda."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SIM Tracker koristi lokaciju za automatski unos GPS koordinata pri kreiranju zapisnika ugradnje."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SIM Tracker koristi pristup fotografijama za prilog slika uz zapisnik ugradnje.",
+          "cameraPermission": "SIM Tracker koristi kameru za snimanje fotografija uz zapisnik ugradnje."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sim_cards_codex
+      MYSQL_USER: sim_app
+      MYSQL_PASSWORD: sim_app
+    ports:
+      - '3306:3306'
+    volumes:
+      - db_data:/var/lib/mysql
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql://sim_app:sim_app@db:3306/sim_cards_codex
+      NODE_ENV: production
+    depends_on:
+      - db
+    ports:
+      - '3000:3000'
+    volumes:
+      - /mnt/shared-app-files/sim-cards-codex:/usr/app/uploads
+
+volumes:
+  db_data:
+
