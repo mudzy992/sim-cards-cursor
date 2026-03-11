@@ -38,7 +38,7 @@ export class ShipmentsService {
         name: dto.name,
         provider: dto.provider,
         receivedDate: new Date(dto.receivedDate),
-        totalCards: dto.totalCards,
+        totalCards: dto.totalCards ?? 0,
         notes: dto.notes,
         originalFileName: dto.originalFileName,
         distributionId: distributionId ?? undefined,

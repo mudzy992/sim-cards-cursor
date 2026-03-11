@@ -16,8 +16,8 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [emailOrUsername, setEmailOrUsername] = useState('system.admin');
-  const [password, setPassword] = useState('ChangeMe123!');
+  const [emailOrUsername, setEmailOrUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

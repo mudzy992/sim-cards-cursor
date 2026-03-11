@@ -122,7 +122,7 @@ model Shipment {
   name             String
   provider         String
   receivedDate     DateTime       @map("received_date")
-  totalCards       Int            @map("total_cards")
+  totalCards       Int            @default(0) @map("total_cards")
   status           ShipmentStatus @default(RECEIVED)
   notes            String?        @db.Text
   originalFileName String?        @map("original_file_name")

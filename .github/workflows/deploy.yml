@@ -68,6 +68,7 @@ jobs:
           cd "$APP_PATH"
 
           echo "Pulling latest code..."
+          git reset --hard origin/main
           git pull origin main
 
           echo "Checking existing containers..."

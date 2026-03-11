@@ -62,7 +62,8 @@ export type CreateShipmentInput = {
   name: string;
   provider: string;
   receivedDate: string;
-  totalCards: number;
+  /** Pri kreiranju se ne šalje; postavlja se pri Excel importu na broj uvezenih kartica */
+  totalCards?: number;
   notes?: string;
   distributionId: string;
 };

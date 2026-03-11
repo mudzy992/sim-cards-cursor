@@ -14,10 +14,11 @@ export class CreateShipmentDto {
   @IsDateString()
   receivedDate!: string;
 
-  @ApiProperty({ minimum: 0 })
+  @ApiPropertyOptional({ minimum: 0, description: 'Opciono pri kreiranju; postavlja se pri Excel importu na broj uvezenih kartica' })
+  @IsOptional()
   @IsInt()
   @Min(0)
-  totalCards!: number;
+  totalCards?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

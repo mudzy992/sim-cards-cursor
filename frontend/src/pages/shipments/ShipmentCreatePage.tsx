@@ -6,7 +6,6 @@ import {
   DatePicker,
   Form,
   Input,
-  InputNumber,
   Select,
   Space,
   Table,
@@ -44,7 +43,6 @@ export default function ShipmentCreatePage() {
     name: string;
     provider: string;
     receivedDate: dayjs.Dayjs;
-    totalCards: number;
     notes?: string;
     distributionId: string;
   }>();
@@ -169,7 +167,6 @@ export default function ShipmentCreatePage() {
               name: values.name,
               provider: values.provider,
               receivedDate: values.receivedDate.toISOString(),
-              totalCards: values.totalCards,
               notes: values.notes,
               distributionId: values.distributionId,
             });
@@ -203,13 +200,6 @@ export default function ShipmentCreatePage() {
               rules={[{ required: true, message: 'Obavezno' }]}
             >
               <DatePicker style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item
-              name="totalCards"
-              label="Ukupno kartica"
-              rules={[{ required: true, message: 'Obavezno' }]}
-            >
-              <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="notes" label="Napomena">
               <Input placeholder="Opcionalno" />
