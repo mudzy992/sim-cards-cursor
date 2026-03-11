@@ -7,6 +7,16 @@ import { dashboardApi } from '@/api/dashboard.api';
 import { notificationsApi } from '@/api/notifications.api';
 import { useMiniTour } from '@/hooks/useMiniTour';
 
+const statusLabels: Record<string, string> = {
+  DRAFT: 'Nacrt',
+  PENDING: 'Čeka odobrenje',
+  SUBMIT_FAILED: 'Greška pri slanju',
+  REJECTED: 'Odbijen',
+  WAITING_SEP_ACTIVATION: 'Čeka aktivaciju SEP',
+  ACTIVATED_IN_SEP: 'Aktivirano u SEP',
+  SENT: 'Poslano',
+};
+
 function StatCard({
   title,
   value,
@@ -140,21 +150,24 @@ export default function HomeScreen() {
                   Zapisnici po statusu
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {Object.entries(stats.installationRecords.byStatus).map(([status, count]) => (
-                    <View
-                      key={status}
-                      style={{
-                        backgroundColor: '#e2e8f0',
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text style={{ fontSize: 12, color: '#475569' }}>
-                        {status}: {count}
-                      </Text>
-                    </View>
-                  ))}
+                  {Object.entries(stats.installationRecords.byStatus).map(([status, count]) => {
+                    const label = statusLabels[status] ?? status;
+                    return (
+                      <View
+                        key={status}
+                        style={{
+                          backgroundColor: '#e2e8f0',
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, color: '#475569' }}>
+                          {label}: {count}
+                        </Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             )}
@@ -201,35 +214,6 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
-
-      <Pressable
-        onPress={() => router.push('/notifications')}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: 16,
-          backgroundColor: '#f0fdf4',
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: '#bbf7d0',
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Ionicons name="notifications" size={24} color="#0f766e" />
-          <View>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#0f172a' }}>
-              Notifikacije
-            </Text>
-            <Text style={{ fontSize: 12, color: '#64748b' }}>
-              {unreadCount > 0
-                ? `${unreadCount} nepročitanih`
-                : 'Nema novih notifikacija'}
-            </Text>
-          </View>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-      </Pressable>
     </ScrollView>
   );
 }

@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { simCardsApi } from '@/api/sim-cards.api';
+import { simCardsApi, type MobileSimCard } from '@/api/sim-cards.api';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function ScanResultScreen() {
@@ -16,7 +16,7 @@ export default function ScanResultScreen() {
 
   const query = useQuery({
     queryKey: ['scan-result', iccid],
-    queryFn: () => simCardsApi.scanByIccid(iccid),
+    queryFn: () => simCardsApi.scanByIccidWithOffline(iccid),
     enabled: Boolean(iccid),
   });
 
@@ -41,7 +41,8 @@ export default function ScanResultScreen() {
     },
   });
 
-  const result = query.data;
+  const result = query.data as (MobileSimCard & { fromOfflineCache?: boolean }) | undefined;
+  const isFromOfflineCache = result?.fromOfflineCache === true;
   const isAssignedToMe =
     result?.status === 'ASSIGNED' && result.assignedTo?.id === currentUserId;
   const isAssignedToAnother =
@@ -71,7 +72,10 @@ export default function ScanResultScreen() {
 
       if (axios.isAxiosError(error) && !error.response) {
         return (
-          <Text style={{ color: '#dc2626' }}>Backend nije dostupan sa mobilnog uređaja.</Text>
+          <Text style={{ color: '#dc2626' }}>
+            Backend nije dostupan sa mobilnog uređaja i nema lokalno sačuvanih podataka za ovu
+            karticu.
+          </Text>
         );
       }
 
@@ -141,6 +145,39 @@ export default function ScanResultScreen() {
     <View style={{ flex: 1, padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 20, fontWeight: '700' }}>Rezultat skena</Text>
       <Text style={{ color: '#64748b' }}>ICCID: {iccid || '-'}</Text>
+
+      {isFromOfflineCache && (
+        <View
+          style={{
+            backgroundColor: '#fef3c7',
+            borderColor: '#f59e0b',
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: 10,
+          }}
+        >
+          <Text style={{ color: '#92400e', fontSize: 13 }}>
+            Prikazani su podaci sačuvani lokalno za rad u offline režimu. Neki statusi kartice
+            mogu biti zastarjeli.
+          </Text>
+        </View>
+      )}
+
+      {result && !isFromOfflineCache && (
+        <View
+          style={{
+            backgroundColor: '#ecfdf3',
+            borderColor: '#4ade80',
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: 10,
+          }}
+        >
+          <Text style={{ color: '#166534', fontSize: 13 }}>
+            Podaci o kartici su uspješno učitani i sačuvani za kasniji rad u offline režimu.
+          </Text>
+        </View>
+      )}
 
       {renderBody()}
 

@@ -1,8 +1,9 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
+import { useAudioPlayer } from 'expo-audio';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View, Vibration } from 'react-native';
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -10,6 +11,7 @@ export default function ScanScreen() {
   const [manualIccid, setManualIccid] = useState('');
   const [scanError, setScanError] = useState<string | null>(null);
   const [hasScanned, setHasScanned] = useState(false);
+  const beepPlayer = useAudioPlayer(require('../../../assets/scan-beep.mp3'));
 
   useFocusEffect(
     useCallback(() => {
@@ -41,9 +43,16 @@ export default function ScanScreen() {
         return;
       }
 
+      Vibration.vibrate(50);
+      try {
+        beepPlayer.seekTo(0);
+        void beepPlayer.play();
+      } catch {
+        // fallback samo na vibraciju
+      }
       openResult(String(data));
     },
-    [hasScanned, openResult],
+    [beepPlayer, hasScanned, openResult],
   );
 
   const hasPermission = permission?.granted === true;
@@ -53,6 +62,9 @@ export default function ScanScreen() {
       <Text style={{ fontSize: 20, fontWeight: '700' }}>Scan SIM</Text>
       <Text style={{ color: '#64748b' }}>
         Skeniraj barkod kamerom ili unesi ICCID ručno kao fallback.
+      </Text>
+      <Text style={{ color: '#64748b', marginTop: 2 }}>
+        Poravnaj barkod unutar označenog okvira za najpreciznije skeniranje.
       </Text>
 
       {!permission ? (
@@ -92,6 +104,7 @@ export default function ScanScreen() {
             borderRadius: 12,
             overflow: 'hidden',
             height: 280,
+            position: 'relative',
           }}
         >
           <CameraView
@@ -99,6 +112,29 @@ export default function ScanScreen() {
             facing="back"
             onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
           />
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{
+                width: '80%',
+                height: 180,
+                borderWidth: 2,
+                borderColor: '#0f766e',
+                borderRadius: 16,
+                backgroundColor: 'rgba(15,118,110,0.08)',
+              }}
+            />
+          </View>
         </View>
       ) : null}
 
