@@ -26,7 +26,7 @@ export class AuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'Prijava korisnika' })
-  @Throttle(5, 60_000)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   login(@Body() dto: LoginDto, @Ip() ipAddress: string) {
     return this.authService.login(dto, ipAddress);
   }
@@ -42,7 +42,7 @@ export class AuthController {
 
   @Post('refresh')
   @ApiOperation({ summary: 'Rotacija refresh tokena' })
-  @Throttle(10, 60_000)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto.refreshToken);
   }

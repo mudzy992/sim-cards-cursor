@@ -66,7 +66,7 @@ export class SimCardsController {
   @Get('scan/:iccid')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
   @ApiOperation({ summary: 'Skeniranje SIM kartice po ICCID' })
-  @Throttle(30, 60_000)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   scan(
     @Param('iccid') iccid: string,
     @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null },

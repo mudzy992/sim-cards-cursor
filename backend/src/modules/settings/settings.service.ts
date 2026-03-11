@@ -77,7 +77,6 @@ export class SettingsService {
   ): UserTourState {
     return {
       ...current,
-      ...(patch.tour ? { ...current } : current),
       web: patch.web
         ? {
             ...current.web,

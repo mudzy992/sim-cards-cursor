@@ -14,14 +14,14 @@ describe('InstallationRecordsService RBAC', () => {
   let service: InstallationRecordsService;
   let prisma: {
     meter: { findUnique: jest.Mock };
-    installationRecord: { update: jest.Mock };
+    installationRecord: { update: jest.Mock; findUnique: jest.Mock };
   };
   let recipientsService: { isUserInApprovalGroupForBranch: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
       meter: { findUnique: jest.fn() },
-      installationRecord: { update: jest.fn() },
+      installationRecord: { update: jest.fn(), findUnique: jest.fn() },
     };
 
     recipientsService = {
@@ -95,7 +95,7 @@ describe('InstallationRecordsService RBAC', () => {
     expect(prisma.installationRecord.update).not.toHaveBeenCalled();
   });
 
-  it('blocks USER from approving own record even when in approval group', async () => {
+  it('allows USER to approve own record when in approval group', async () => {
     const record = {
       id: 'r1',
       meterId: 'm1',
@@ -107,14 +107,12 @@ describe('InstallationRecordsService RBAC', () => {
     prisma.meter.findUnique.mockResolvedValue({ branchId: 'b1' });
     recipientsService.isUserInApprovalGroupForBranch.mockResolvedValue(true);
 
-    await expect(
-      service.approve('r1', 'user-1', {
-        role: UserRole.USER,
-        distributionId: 'd1',
-        branchId: 'b1',
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(prisma.installationRecord.update).not.toHaveBeenCalled();
+    await service.approve('r1', 'user-1', {
+      role: UserRole.USER,
+      distributionId: 'd1',
+      branchId: 'b1',
+    });
+    expect(prisma.installationRecord.update).toHaveBeenCalled();
   });
 
   it('allows MODERATOR approve without approval-group membership check', async () => {

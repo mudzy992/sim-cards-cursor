@@ -100,7 +100,7 @@ export class ShipmentsController {
     }),
   )
   @ApiOperation({ summary: 'Import Excel/CSV fajla (preview ili apply)' })
-  @Throttle(10, 600_000)
+  @Throttle({ default: { limit: 10, ttl: 600_000 } })
   importExcel(
     @Param('id') id: string,
     @Body() dto: ImportExcelDto,

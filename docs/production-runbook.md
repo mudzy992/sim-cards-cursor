@@ -30,5 +30,18 @@ Manualno ili automatizovano provjeriti:
   - Pokretanje `npm test` unutar backend kontejnera.
   - Opcionalno pokretanje `k6 run scripts/perf-smoke.k6.js` prema produkcijskoj API adresi sa malim opterećenjem.
 
+## Sigurna nadogradnja dependencyja
+
+- **Backend**:
+  - Zadržati se na trenutnim major verzijama (npr. NestJS 10, Prisma 5).
+  - Prije deploya pokrenuti `npm outdated` u `backend` i po potrebi ažurirati samo minor/patch verzije (bez prelaska na novi major).
+  - Nakon nadogradnje obavezno pokrenuti `npm run lint` i `npm test`.
+- **Frontend**:
+  - Zadržati se na trenutnim major verzijama (npr. React 18, Vite 5, AntD 5).
+  - Prije deploya pokrenuti `npm outdated` u `frontend` i po potrebi ažurirati samo minor/patch verzije.
+  - Nakon nadogradnje pokrenuti `npm run typecheck` i `npm run build`.
+
+Ako `npm outdated` pokazuje samo nove **majore**, odgoditi nadogradnju za posebnu migracijsku fazu i NE raditi je u sklopu redovnog produkcijskog deploya.
+
 Ako bilo koji smoke test ne prođe, izvršiti rollback na prethodnu verziju Docker image-a i ponoviti korake nakon popravke.
 

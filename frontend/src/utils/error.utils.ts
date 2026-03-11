@@ -2,6 +2,7 @@ import type { AxiosError } from 'axios';
 import type { ApiEnvelope } from '@/types/common.types';
 
 type ApiErrorEnvelope<T = unknown> = ApiEnvelope<T> & {
+  message?: string;
   errorCode?: string;
   details?: unknown;
 };

@@ -18,6 +18,12 @@ import { useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
 import { useTourStore } from '@/store/tour.store';
 
+type SettingRow = {
+  key: string;
+  value: string;
+  description?: string;
+};
+
 export default function SettingsPage() {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
@@ -27,7 +33,7 @@ export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const { tour, resetWebTourForRole, currentVersion } = useTourStore();
 
-  const { data: settings = [], isLoading } = useQuery({
+  const { data: settings = [], isLoading } = useQuery<SettingRow[]>({
     queryKey: ['settings'],
     queryFn: () => settingsApi.list(),
   });
@@ -100,7 +106,7 @@ export default function SettingsPage() {
         Postavke aplikacije
       </Typography.Title>
       <Card>
-        <Table
+        <Table<SettingRow>
           dataSource={settings}
           rowKey="key"
           loading={isLoading}
@@ -109,7 +115,7 @@ export default function SettingsPage() {
             {
               title: 'Postavka',
               dataIndex: 'description',
-              render: (_: string, record: { key: string; description?: string }) => (
+              render: (_: string, record: SettingRow) => (
                 <div>
                   <Typography.Text strong>
                     {record.description || record.key}
@@ -123,7 +129,7 @@ export default function SettingsPage() {
             {
               title: 'Trenutna vrijednost',
               dataIndex: 'value',
-              render: (v: string) => {
+              render: (v: SettingRow['value']) => {
                 if (v === 'true' || v === 'false') {
                   return (
                     <Typography.Text className="font-mono text-sm">
@@ -141,7 +147,7 @@ export default function SettingsPage() {
             {
               title: 'Akcije',
               width: 100,
-              render: (_: unknown, record: { key: string; value: string; description?: string }) => (
+              render: (_: unknown, record: SettingRow) => (
                 <Button size="small" onClick={() => handleEdit(record)}>
                   Uredi
                 </Button>

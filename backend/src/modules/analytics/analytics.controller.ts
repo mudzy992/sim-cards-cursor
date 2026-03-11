@@ -43,7 +43,7 @@ export class AnalyticsController {
   @Get('overview')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
   @ApiOperation({ summary: 'Pregled ključnih KPI-jeva (overview)' })
-  @Throttle(60, 60_000)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   getOverview(
     @CurrentUser()
     user: { role: string; distributionId?: string | null; branchId?: string | null },
@@ -61,7 +61,7 @@ export class AnalyticsController {
   @Get('installation-records')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
   @ApiOperation({ summary: 'Analitika zapisnika (funnel + timeline)' })
-  @Throttle(60, 60_000)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   getInstallationRecordsAnalytics(
     @CurrentUser()
     user: { role: string; distributionId?: string | null; branchId?: string | null },
@@ -79,7 +79,7 @@ export class AnalyticsController {
   @Get('sim-cards')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
   @ApiOperation({ summary: 'Analitika SIM kartica po statusima' })
-  @Throttle(60, 60_000)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   getSimCardsAnalytics(
     @CurrentUser()
     user: { role: string; distributionId?: string | null; branchId?: string | null },
@@ -97,7 +97,7 @@ export class AnalyticsController {
   @Get('users')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
   @ApiOperation({ summary: 'Analitika aktivnosti po korisnicima' })
-  @Throttle(60, 60_000)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   getUsersAnalytics(
     @CurrentUser()
     user: { role: string; distributionId?: string | null; branchId?: string | null },
@@ -115,7 +115,7 @@ export class AnalyticsController {
   @Get('exports/:report.csv')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
   @ApiOperation({ summary: 'CSV export analitičkih izvještaja' })
-  @Throttle(20, 60_000)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async exportCsv(
     @Param('report') report: 'overview' | 'sim-cards' | 'installation-records' | 'users',
     @CurrentUser()
