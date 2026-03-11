@@ -16,8 +16,8 @@ services:
       - /mnt/shared-files/sim-card-tracker:/usr/app/uploads
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.simtracker-backend.rule=Host(`sim-tracker.hopto.org`) && PathPrefix(`/backend`)'
       - 'traefik.http.routers.simtracker-backend.entrypoints=websecure'
+      - 'traefik.http.routers.simtracker-backend.rule=Host(`sim-tracker.hopto.org`) && PathPrefix(`/backend`)'
       - 'traefik.http.routers.simtracker-backend.tls=true'
       - 'traefik.http.routers.simtracker-backend.tls.certresolver=le'
       - 'traefik.http.services.simtracker-backend.loadbalancer.server.port=3003'
@@ -31,8 +31,8 @@ services:
       - web
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.simtracker-frontend.rule=Host(`sim-tracker.hopto.org`) && PathPrefix(`/`)'
       - 'traefik.http.routers.simtracker-frontend.entrypoints=websecure'
+      - 'traefik.http.routers.simtracker-frontend.rule=Host(`sim-tracker.hopto.org`)'
       - 'traefik.http.routers.simtracker-frontend.tls=true'
       - 'traefik.http.routers.simtracker-frontend.tls.certresolver=le'
       - 'traefik.http.services.simtracker-frontend.loadbalancer.server.port=3004'
