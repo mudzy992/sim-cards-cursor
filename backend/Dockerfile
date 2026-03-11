@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:20 AS build
 
 WORKDIR /usr/app
 
@@ -7,15 +7,13 @@ RUN npm ci
 
 COPY tsconfig*.json nest-cli.json ./
 COPY prisma ./prisma
-
-# Generate Prisma client (needed so enums poput UserRole/UserStatus postoje u @prisma/client)
 RUN npx prisma generate
 
 COPY src ./src
 
 RUN npm run build
 
-FROM node:20-alpine AS runtime
+FROM node:20 AS runtime
 
 WORKDIR /usr/app
 
