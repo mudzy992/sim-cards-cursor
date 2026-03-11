@@ -5,9 +5,8 @@ WORKDIR /usr/app
 COPY package*.json ./
 RUN npm ci
 
-COPY tsconfig*.json vite.config.ts index.html ./ 
+COPY tsconfig*.json vite.config.ts index.html ./
 COPY src ./src
-COPY public ./public
 
 RUN npm run build
 
