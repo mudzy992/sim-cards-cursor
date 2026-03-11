@@ -17,7 +17,7 @@ services:
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.simtracker-backend.rule=Host(`sim-tracker.hopto.org`) && PathPrefix(`/backend`)'
-      - 'traefik.http.routers.simtracker-backend.entrypoints=websecure'
+      - 'traefik.http.routers.simtracker-backend.entrypoints=web'
       - 'traefik.http.routers.simtracker-backend.tls=true'
       - 'traefik.http.routers.simtracker-backend.tls.certresolver=letsencrypt'
       - 'traefik.http.services.simtracker-backend.loadbalancer.server.port=3003'
@@ -32,7 +32,7 @@ services:
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.simtracker-frontend.rule=Host(`sim-tracker.hopto.org`) && PathPrefix(`/`)'
-      - 'traefik.http.routers.simtracker-frontend.entrypoints=websecure'
+      - 'traefik.http.routers.simtracker-frontend.entrypoints=web'
       - 'traefik.http.routers.simtracker-frontend.tls=true'
       - 'traefik.http.routers.simtracker-frontend.tls.certresolver=letsencrypt'
       - 'traefik.http.services.simtracker-frontend.loadbalancer.server.port=3004'
@@ -40,4 +40,3 @@ services:
 networks:
   web:
     external: true
-
