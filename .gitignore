@@ -11,13 +11,6 @@ mobile/.expo-shared/
 *.log
 npm-debug.log*
 
-# Env
-.env
-.env.local
-backend/.env
-frontend/.env
-mobile/.env
-
 # Prisma
 backend/prisma/dev.db
 
