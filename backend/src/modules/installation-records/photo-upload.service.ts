@@ -1,19 +1,19 @@
-import {
-  Injectable,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { ConfigService } from '@nestjs/config';
 
 const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/jpg'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 @Injectable()
 export class PhotoUploadService {
-  private readonly uploadDir = path.join(process.cwd(), 'uploads', 'installation-records');
+  private readonly uploadDir: string;
 
-  constructor() {
+  constructor(private readonly config: ConfigService) {
+    const root = this.config.get<string>('UPLOAD_ROOT_PATH', path.join(process.cwd(), 'uploads'));
+    this.uploadDir = path.join(root, 'installation-records');
     if (!fs.existsSync(this.uploadDir)) {
       fs.mkdirSync(this.uploadDir, { recursive: true });
     }

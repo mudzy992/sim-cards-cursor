@@ -1,6 +1,6 @@
 FROM node:20-alpine AS build
 
-WORKDIR /usr/src/app
+WORKDIR /usr/app
 
 COPY package*.json ./
 RUN npm ci
@@ -13,19 +13,19 @@ RUN npm run build
 
 FROM node:20-alpine AS runtime
 
-WORKDIR /usr/src/app
+WORKDIR /usr/app
 
 ENV NODE_ENV=production
 
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/app/dist ./dist
 COPY prisma ./prisma
 
 VOLUME ["/usr/app/uploads"]
 
-EXPOSE 3000
+EXPOSE 3003
 
 CMD ["node", "dist/main.js"]
 

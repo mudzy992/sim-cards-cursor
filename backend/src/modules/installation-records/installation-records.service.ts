@@ -599,11 +599,12 @@ export class InstallationRecordsService {
         }
       : null;
     const photos = (record.photos as string[] | undefined) ?? [];
-    const uploadsDir = path.join(process.cwd(), 'uploads');
+    const uploadsRoot =
+      (this as any).config?.get?.('UPLOAD_ROOT_PATH') ?? path.join(process.cwd(), 'uploads');
     const photoDataUrls: string[] = [];
     for (const p of photos) {
       if (typeof p !== 'string' || !p.startsWith('installation-records/')) continue;
-      const fullPath = path.join(uploadsDir, p);
+      const fullPath = path.join(uploadsRoot, p);
       try {
         if (fs.existsSync(fullPath)) {
           const buf = fs.readFileSync(fullPath);

@@ -3,11 +3,17 @@ import { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('files')
 @UseGuards(JwtAuthGuard)
 export class FilesController {
-  private readonly uploadsDir = path.join(process.cwd(), 'uploads');
+  private readonly uploadsDir: string;
+
+  constructor(private readonly config: ConfigService) {
+    const root = this.config.get<string>('UPLOAD_ROOT_PATH', path.join(process.cwd(), 'uploads'));
+    this.uploadsDir = root;
+  }
 
   @Get('photo')
   async servePhoto(@Query('path') filePath: string, @Res() res: Response) {

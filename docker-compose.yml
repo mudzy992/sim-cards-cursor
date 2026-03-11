@@ -1,33 +1,41 @@
 version: '3.9'
 
 services:
-  db:
-    image: mysql:8.4
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: sim_cards_codex
-      MYSQL_USER: sim_app
-      MYSQL_PASSWORD: sim_app
-    ports:
-      - '3306:3306'
-    volumes:
-      - db_data:/var/lib/mysql
-
   backend:
     build:
       context: ./backend
     restart: unless-stopped
+    env_file:
+      - ./backend/.env
     environment:
-      DATABASE_URL: mysql://sim_app:sim_app@db:3306/sim_cards_codex
       NODE_ENV: production
-    depends_on:
-      - db
-    ports:
-      - '3000:3000'
+    networks:
+      - web
     volumes:
-      - /mnt/shared-app-files/sim-cards-codex:/usr/app/uploads
+      - /mnt/shared-files/sim-card-tracker:/usr/app/uploads
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.simtracker-backend.rule=Host(`sim-tracker.hopto.org`) && PathPrefix(`/backend`)'
+      - 'traefik.http.routers.simtracker-backend.entrypoints=websecure'
+      - 'traefik.http.routers.simtracker-backend.tls=true'
+      - 'traefik.http.routers.simtracker-backend.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.simtracker-backend.loadbalancer.server.port=3003'
 
-volumes:
-  db_data:
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    networks:
+      - web
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.simtracker-frontend.rule=Host(`sim-tracker.hopto.org`) && PathPrefix(`/`)'
+      - 'traefik.http.routers.simtracker-frontend.entrypoints=websecure'
+      - 'traefik.http.routers.simtracker-frontend.tls=true'
+      - 'traefik.http.routers.simtracker-frontend.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.simtracker-frontend.loadbalancer.server.port=3004'
+
+networks:
+  web:
+    external: true
 

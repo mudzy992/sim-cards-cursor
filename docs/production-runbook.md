@@ -21,11 +21,12 @@ Manualno ili automatizovano provjeriti:
 
 - Web:
   - Prijava kao SYSTEM_ADMIN.
-  - Kreiranje zapisnika (WF-01) i provjera statusa.
-  - Kreiranje i pregled zadatka demontaže (WF-02).
+- Excel import (WF-01) – preview/apply i verifikacija da su SIM kartice uvezene.
+- Tok zapisnika (WF-03) – approve → PDF → send i provjera statusa.
+- Kreiranje i pregled zadatka demontaže (mobile tok / demount tasks).
   - Pregled dashboarda i analitike.
 - Mobile:
-  - Prijava, kreiranje zapisnika i offline queue (ako nema mreže).
+  - Prijava, WF-02 (scan → claim → create record) i offline queue (ako nema mreže).
 - Backend:
   - Pokretanje `npm test` unutar backend kontejnera.
   - Opcionalno pokretanje `k6 run scripts/perf-smoke.k6.js` prema produkcijskoj API adresi sa malim opterećenjem.
