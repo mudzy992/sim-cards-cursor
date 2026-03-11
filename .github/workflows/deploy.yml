@@ -63,7 +63,7 @@ jobs:
           echo "Backend changed: $BACKEND_CHANGED"
           echo "Frontend changed: $FRONTEND_CHANGED"
 
-          ssh -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_IP" bash << 'EOF'
+          ssh -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_IP" bash << EOF
           set -e
           cd "$APP_PATH"
           echo $APP_PATH
