@@ -70,20 +70,39 @@ jobs:
           echo "Pulling latest code..."
           git pull origin main
 
-          echo "Deploying services based on changes..."
-          if [ "$BACKEND_CHANGED" = "true" ]; then
+          echo "Checking existing containers..."
+          BACKEND_RUNNING_ID=\$(docker compose ps -q backend || true)
+          FRONTEND_RUNNING_ID=\$(docker compose ps -q frontend || true)
+
+          NEED_BACKEND_BOOTSTRAP=false
+          NEED_FRONTEND_BOOTSTRAP=false
+
+          if [ -z "\$BACKEND_RUNNING_ID" ]; then
+            echo "Backend container is not running or does not exist yet. Will bootstrap backend."
+            NEED_BACKEND_BOOTSTRAP=true
+          fi
+
+          if [ -z "\$FRONTEND_RUNNING_ID" ]; then
+            echo "Frontend container is not running or does not exist yet. Will bootstrap frontend."
+            NEED_FRONTEND_BOOTSTRAP=true
+          fi
+
+          echo "Deploying services based on changes and container state..."
+
+          if [ "\$BACKEND_CHANGED" = "true" ] || [ "\$NEED_BACKEND_BOOTSTRAP" = "true" ]; then
             echo "Rebuilding and restarting backend..."
             docker compose build backend
             docker compose up -d backend
           fi
 
-          if [ "$FRONTEND_CHANGED" = "true" ]; then
+          if [ "\$FRONTEND_CHANGED" = "true" ] || [ "\$NEED_FRONTEND_BOOTSTRAP" = "true" ]; then
             echo "Rebuilding and restarting frontend..."
             docker compose build frontend
             docker compose up -d frontend
           fi
 
-          if [ "$BACKEND_CHANGED" != "true" ] && [ "$FRONTEND_CHANGED" != "true" ]; then
-            echo "No changes in backend/ or frontend/ directories; nothing to redeploy."
+          if [ "\$BACKEND_CHANGED" != "true" ] && [ "\$FRONTEND_CHANGED" != "true" ] && \
+             [ "\$NEED_BACKEND_BOOTSTRAP" != "true" ] && [ "\$NEED_FRONTEND_BOOTSTRAP" != "true" ]; then
+            echo "No changes in backend/ or frontend/ directories and both containers already running; nothing to redeploy."
           fi
           EOF

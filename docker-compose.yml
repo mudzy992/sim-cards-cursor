@@ -2,6 +2,7 @@ version: '3.9'
 
 services:
   backend:
+    container_name: sim-tracker-backend
     build:
       context: ./backend
     restart: unless-stopped
@@ -22,6 +23,7 @@ services:
       - 'traefik.http.services.simtracker-backend.loadbalancer.server.port=3003'
 
   frontend:
+    container_name: sim-tracker-frontend
     build:
       context: ./frontend
     restart: unless-stopped

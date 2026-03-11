@@ -6,8 +6,12 @@ COPY package*.json ./
 RUN npm ci
 
 COPY tsconfig*.json nest-cli.json ./
-COPY src ./src
 COPY prisma ./prisma
+
+# Generate Prisma client (needed so enums poput UserRole/UserStatus postoje u @prisma/client)
+RUN npx prisma generate
+
+COPY src ./src
 
 RUN npm run build
 
