@@ -21,6 +21,8 @@ services:
       - 'traefik.http.routers.simtracker-backend.tls=true'
       - 'traefik.http.routers.simtracker-backend.tls.certresolver=le'
       - 'traefik.http.services.simtracker-backend.loadbalancer.server.port=3003'
+      - 'traefik.http.middlewares.simtracker-backend-stripbackend.stripprefix.prefixes=/backend'
+      - 'traefik.http.routers.simtracker-backend.middlewares=simtracker-backend-stripbackend'
 
   frontend:
     container_name: sim-tracker-frontend
