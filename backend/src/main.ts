@@ -60,7 +60,7 @@ async function bootstrap() {
 
   await app.get(PrismaService).enableShutdownHooks(app);
 
-  const port = Number(config.get('PORT', 3000));
+  const port = Number(config.get('PORT', 3003));
   await app.listen(port);
   logger.log(`API running at http://localhost:${port}/api`);
   logger.log(`Swagger at http://localhost:${port}/api/docs`);

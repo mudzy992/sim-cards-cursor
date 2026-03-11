@@ -66,8 +66,6 @@ jobs:
           ssh -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_IP" bash << EOF
           set -e
           cd "$APP_PATH"
-          echo $APP_PATH
-          ls -la $APP_PATH
 
           echo "Pulling latest code..."
           git pull origin main
