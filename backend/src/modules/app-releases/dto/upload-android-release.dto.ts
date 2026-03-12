@@ -19,5 +19,12 @@ export class UploadAndroidReleaseDto {
   @IsOptional()
   @IsString()
   releaseNotes?: string;
+
+  // Prisutan u multipart form-data, ali stvarni fajl čitamo kroz @UploadedFile.
+  // Ovo je ovdje samo da whitelist validacija ne baca grešku za nepoznato polje.
+  @ApiPropertyOptional({ type: 'string', format: 'binary' })
+  @IsOptional()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  file?: any;
 }
 
