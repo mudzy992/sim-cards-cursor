@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { UploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { appReleasesApi, type MobileAppRelease } from '@/api/app-releases.api';
+import { API_BASE_URL } from '@/api/axios.instance';
 
 export default function AppReleasesPage() {
   const queryClient = useQueryClient();
@@ -76,6 +77,19 @@ export default function AppReleasesPage() {
           {v}
         </Typography.Text>
       ),
+    },
+    {
+      title: 'Download',
+      key: 'download',
+      width: 140,
+      render: (_, record) => {
+        const href = `${API_BASE_URL}/app-releases/android/download/${record.id}`;
+        return (
+          <a href={href} target="_blank" rel="noreferrer">
+            Preuzmi .apk
+          </a>
+        );
+      },
     },
   ];
 

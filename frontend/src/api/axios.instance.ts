@@ -5,10 +5,11 @@ import type { LoginResponse } from '@/types/auth.types';
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
 
 export const axiosInstance = axios.create({
-  baseURL: apiBaseUrl,
+  baseURL: API_BASE_URL,
   withCredentials: false,
 });
 
@@ -43,7 +44,7 @@ axiosInstance.interceptors.response.use(
 
     try {
       const refreshResponse = await axios.post<ApiEnvelope<LoginResponse>>(
-        `${apiBaseUrl}/auth/refresh`,
+        `${API_BASE_URL}/auth/refresh`,
         { refreshToken },
       );
 

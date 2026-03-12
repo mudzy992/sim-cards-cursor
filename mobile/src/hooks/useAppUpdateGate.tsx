@@ -133,9 +133,13 @@ export function useAppUpdateGate() {
             },
           },
           (p) => {
-            const progress = p.totalBytesExpectedToWrite
-              ? p.totalBytesWritten / p.totalBytesExpectedToWrite
-              : undefined;
+            let progress: number | undefined;
+            if (p.totalBytesExpectedToWrite && p.totalBytesExpectedToWrite > 0) {
+              const ratio = p.totalBytesWritten / p.totalBytesExpectedToWrite;
+              if (Number.isFinite(ratio) && ratio >= 0 && ratio <= 1.5) {
+                progress = Math.max(0, Math.min(1, ratio));
+              }
+            }
             setState({ kind: 'downloading', latest, progress });
           },
         );

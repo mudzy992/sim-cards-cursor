@@ -51,6 +51,13 @@ export class AppReleasesController {
     });
   }
 
+  @Get('android')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Lista svih Android release-ova' })
+  listAndroid() {
+    return this.service.listAndroidReleases();
+  }
+
   @Get('android/latest')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
   @ApiOperation({ summary: 'Get latest Android release metadata (auth required)' })

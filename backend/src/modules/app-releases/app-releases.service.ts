@@ -95,6 +95,13 @@ export class AppReleasesService {
     };
   }
 
+  async listAndroidReleases() {
+    return this.prisma.mobileAppRelease.findMany({
+      where: { platform: MobileAppPlatform.ANDROID },
+      orderBy: [{ versionCode: 'desc' }, { publishedAt: 'desc' }],
+    });
+  }
+
   async getAndroidApkStream(id: string) {
     const release = await this.prisma.mobileAppRelease.findUnique({ where: { id } });
     if (!release || release.platform !== MobileAppPlatform.ANDROID) {
