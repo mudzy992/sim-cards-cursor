@@ -46,9 +46,7 @@ export const appReleasesApi = {
 
     const response = await axiosInstance.post<
       ApiEnvelope<MobileAppRelease>
-    >('/app-releases/android', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    >('/app-releases/android', form);
     return response.data.data;
   },
 
