@@ -28,6 +28,9 @@ COPY --from=build /usr/app/node_modules ./node_modules
 COPY --from=build /usr/app/dist ./dist
 COPY --from=build /usr/app/prisma ./prisma
 
+# Instaliramo Chrome za Puppeteer (managed browser)
+RUN npx puppeteer browsers install chrome
+
 # Volumen za upload datoteka
 VOLUME ["/usr/app/uploads"]
 
