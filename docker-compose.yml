@@ -6,8 +6,6 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env
-    environment:
-      NODE_ENV: production
     networks:
       - web
     volumes:

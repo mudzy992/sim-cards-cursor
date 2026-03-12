@@ -35,12 +35,9 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(helmet());
-  const nodeEnv = process.env.NODE_ENV || 'development';
-  // Ako je NODE_ENV=production (Docker / server), forsiramo production bez obzira na APP_ENV u .env
-  const appEnv =
-    nodeEnv === 'production'
-      ? 'production'
-      : config.get<string>('APP_ENV', nodeEnv || 'development');
+  // APP_ENV je jedina istina za okruženje (development / production) – čita se iz .env
+  // Ako APP_ENV nije postavljen, fallback je na NODE_ENV ili 'development'
+  const appEnv = config.get<string>('APP_ENV', process.env.NODE_ENV || 'development');
   const isDev = appEnv === 'development';
 
   const devOrigins = ['http://localhost:3004'];

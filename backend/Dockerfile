@@ -1,4 +1,4 @@
-FROM node:20 AS build
+FROM node:20-slim AS build
 
 WORKDIR /usr/app
 
@@ -13,7 +13,7 @@ COPY src ./src
 
 RUN npm run build
 
-FROM node:20 AS runtime
+FROM node:20-slim AS runtime
 
 WORKDIR /usr/app
 
