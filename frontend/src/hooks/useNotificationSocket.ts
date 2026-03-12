@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/auth.store';
 
 const getSocketUrl = () => {
   const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
-  // API base je npr. http://localhost:3000/api -> socket server je http://localhost:3000
+  // API basa je npr. http://localhost:3000/api -> socket server je http://localhost:3000
   const url = base.replace(/\/api\/?$/, '') || 'http://localhost:3000';
   return url;
 };

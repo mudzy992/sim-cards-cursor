@@ -71,7 +71,7 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('SIM Tracker API')
-    .setDescription('Phase 1 foundation endpoints')
+    .setDescription('V1 - 12.03.2026')
     .setVersion('0.1.0')
     .addBearerAuth()
     .build();
