@@ -50,6 +50,32 @@ enum ShipmentStatus {
   COMPLETED
 }
 
+enum PushCampaignAudienceType {
+  ALL
+  FILTER
+  USER
+}
+
+enum PushCampaignStatus {
+  DRAFT
+  SENDING
+  SENT
+  PARTIAL
+  FAILED
+}
+
+enum PushDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  INVALID_TOKEN
+}
+
+enum MobileAppPlatform {
+  ANDROID
+}
+
 model Distribution {
   id             String          @id @default(uuid())
   name           String
@@ -61,6 +87,7 @@ model Distribution {
   users          User[]          @relation("UserDistribution")
   shipments      Shipment[]
   recipientGroups RecipientGroup[]
+  pushCampaignsScoped PushCampaign[]
 
   @@map("distributions")
 }
@@ -77,6 +104,7 @@ model Branch {
   users              User[]                @relation("UserBranch")
   meters             Meter[]
   approvalGroupMapping BranchApprovalGroup?
+  pushCampaignsScoped PushCampaign[]
 
   @@unique([distributionId, code])
   @@index([distributionId])
@@ -113,6 +141,9 @@ model User {
   demountTasksCreated  DemountTask[]     @relation("DemountTasksCreated")
   recipientGroups   RecipientGroupUser[]
   pushTokens        PushToken[]
+  pushCampaignsCreated PushCampaign[]    @relation("PushCampaignCreatedBy")
+  mobileReleasesCreated MobileAppRelease[] @relation("MobileAppReleaseCreatedBy")
+  pushDeliveries    PushDelivery[]
 
   @@map("users")
 }
@@ -340,10 +371,92 @@ model PushToken {
   lastUsedAt  DateTime? @map("last_used_at")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  deliveries  PushDelivery[]
 
   @@index([userId])
   @@unique([token])
   @@map("push_tokens")
+}
+
+model PushCampaign {
+  id                  String                   @id @default(uuid())
+  createdById         String                   @map("created_by_id")
+  createdBy           User                     @relation("PushCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  scopeDistributionId String?                  @map("scope_distribution_id")
+  scopeDistribution   Distribution?            @relation(fields: [scopeDistributionId], references: [id], onDelete: SetNull)
+  scopeBranchId       String?                  @map("scope_branch_id")
+  scopeBranch         Branch?                  @relation(fields: [scopeBranchId], references: [id], onDelete: SetNull)
+
+  title               String
+  message             String                   @db.Text
+  deepLink            String?                  @map("deep_link")
+  audienceType        PushCampaignAudienceType @map("audience_type")
+  filters             Json?
+  targetUserId        String?                  @map("target_user_id")
+  status              PushCampaignStatus       @default(DRAFT)
+
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  sentAt              DateTime?                @map("sent_at")
+
+  deliveries          PushDelivery[]
+
+  @@index([createdById])
+  @@index([scopeDistributionId])
+  @@index([scopeBranchId])
+  @@index([status, createdAt])
+  @@map("push_campaigns")
+}
+
+model PushDelivery {
+  id               String             @id @default(uuid())
+  campaignId       String             @map("campaign_id")
+  campaign         PushCampaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId           String             @map("user_id")
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushTokenId      String             @map("push_token_id")
+  pushToken        PushToken          @relation(fields: [pushTokenId], references: [id], onDelete: Cascade)
+
+  expoTicketId     String?            @map("expo_ticket_id")
+  status           PushDeliveryStatus @default(QUEUED)
+  errorCode        String?            @map("error_code")
+  errorMessage     String?            @map("error_message") @db.Text
+  receiptCheckedAt DateTime?          @map("receipt_checked_at")
+  deliveredAt      DateTime?          @map("delivered_at")
+
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  @@index([campaignId])
+  @@index([userId])
+  @@index([pushTokenId])
+  @@index([status, createdAt])
+  @@unique([campaignId, pushTokenId])
+  @@map("push_deliveries")
+}
+
+model MobileAppRelease {
+  id               String            @id @default(uuid())
+  platform         MobileAppPlatform @default(ANDROID)
+  versionName      String            @map("version_name")
+  versionCode      Int               @map("version_code")
+  apkPath          String            @map("apk_path") @db.Text
+  apkFileName      String            @map("apk_file_name")
+  apkSha256        String            @map("apk_sha256")
+  releaseNotes     String?           @map("release_notes") @db.Text
+
+  publishedAt      DateTime          @default(now()) @map("published_at")
+  mandatoryAfterAt DateTime          @map("mandatory_after_at")
+
+  createdById      String            @map("created_by_id")
+  createdBy        User              @relation("MobileAppReleaseCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  @@unique([platform, versionCode])
+  @@index([platform, publishedAt])
+  @@map("mobile_app_releases")
 }
 
 model SimEvent {

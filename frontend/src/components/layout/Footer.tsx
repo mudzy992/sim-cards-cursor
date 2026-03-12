@@ -6,7 +6,7 @@ export function Footer() {
   return (
     <AntFooter className="!bg-transparent !text-center">
       <Typography.Text type="secondary">
-        SIM Tracker - Phase 1 Foundation
+        SIM Tracker - V1 - 12.03.2026.
       </Typography.Text>
     </AntFooter>
   );

@@ -19,30 +19,31 @@ import { MailService } from './mail.service';
           host?.includes('gmail.com') && smtpUser
             ? smtpUser
             : smtpFrom || '"SIM Tracker" <noreply@simtracker.local>';
+        const templatesDir = path.join(__dirname, '..', '..', 'templates', 'email');
         return {
-        transport: {
-          host,
-          port: config.get<number>('SMTP_PORT', 587),
-          secure: config.get<string>('SMTP_SECURE') === 'true',
-          auth:
-            config.get('SMTP_USER') && config.get('SMTP_PASS')
-              ? {
-                  user: config.get('SMTP_USER'),
-                  pass: config.get('SMTP_PASS'),
-                }
-              : undefined,
-        },
-        defaults: {
-          from,
-        },
-        template: {
-          dir: path.join(process.cwd(), 'src', 'templates', 'email'),
-          adapter: new HandlebarsAdapter(),
-          options: {
-            strict: true,
+          transport: {
+            host,
+            port: config.get<number>('SMTP_PORT', 587),
+            secure: config.get<string>('SMTP_SECURE') === 'true',
+            auth:
+              config.get('SMTP_USER') && config.get('SMTP_PASS')
+                ? {
+                    user: config.get('SMTP_USER'),
+                    pass: config.get('SMTP_PASS'),
+                  }
+                : undefined,
           },
-        },
-      };
+          defaults: {
+            from,
+          },
+          template: {
+            dir: templatesDir,
+            adapter: new HandlebarsAdapter(),
+            options: {
+              strict: true,
+            },
+          },
+        };
       },
     }),
   ],

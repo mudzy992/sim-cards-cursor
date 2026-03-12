@@ -11,7 +11,7 @@ services:
     networks:
       - web
     volumes:
-      - /mnt/shared-files/sim-card-tracker:/usr/app/uploads
+      - /mnt/shared-app-files/sim-cards-codex:/usr/app/uploads
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.simtracker-backend.entrypoints=websecure'

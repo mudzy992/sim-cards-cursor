@@ -19,6 +19,8 @@ import RecipientsPage from '@/pages/recipients/RecipientsPage';
 import ActivityLogPage from '@/pages/activity-log/ActivityLogPage';
 import SettingsPage from '@/pages/settings/SettingsPage';
 import AnalyticsPage from '@/pages/analytics/AnalyticsPage';
+import AppReleasesPage from '@/pages/app-releases/AppReleasesPage';
+import PushCampaignsPage from '@/pages/push-campaigns/PushCampaignsPage';
 
 export const router = createBrowserRouter([
   {
@@ -128,6 +130,14 @@ export const router = createBrowserRouter([
             ),
           },
           {
+            path: '/push-campaigns',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
+                <PushCampaignsPage />
+              </RoleGuard>
+            ),
+          },
+          {
             path: '/activity-log',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
@@ -140,6 +150,14 @@ export const router = createBrowserRouter([
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN']}>
                 <SettingsPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: '/app-releases',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN']}>
+                <AppReleasesPage />
               </RoleGuard>
             ),
           },

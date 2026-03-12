@@ -10,7 +10,18 @@ export class PdfGeneratorService {
   async generatePdf(templateName: string, data: any): Promise<Buffer> {
     let templatePath = path.resolve(__dirname, '..', '..', 'templates', `${templateName}.hbs`);
     if (!fs.existsSync(templatePath)) {
-      templatePath = path.join(process.cwd(), 'src', 'templates', `${templateName}.hbs`);
+      const distPath = path.join(
+        process.cwd(),
+        'dist',
+        'src',
+        'templates',
+        `${templateName}.hbs`,
+      );
+      if (fs.existsSync(distPath)) {
+        templatePath = distPath;
+      } else {
+        templatePath = path.join(process.cwd(), 'src', 'templates', `${templateName}.hbs`);
+      }
     }
     const templateContent = fs.readFileSync(templatePath, 'utf8');
     const compiledTemplate = handlebars.compile(templateContent);

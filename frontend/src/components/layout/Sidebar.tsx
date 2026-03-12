@@ -5,6 +5,7 @@ import {
   ThunderboltOutlined,
   FileTextOutlined,
   MailOutlined,
+  NotificationOutlined,
   UnorderedListOutlined,
   SettingOutlined,
   AreaChartOutlined,
@@ -58,6 +59,11 @@ export function Sidebar() {
             label: <Link to="/recipients">Primaoci</Link>,
           },
           {
+            key: '/push-campaigns',
+            icon: <NotificationOutlined />,
+            label: <Link to="/push-campaigns">Push kampanje</Link>,
+          },
+          {
             key: '/activity-log',
             icon: <UnorderedListOutlined />,
             label: <Link to="/activity-log">Dnevnik aktivnosti</Link>,
@@ -79,6 +85,11 @@ export function Sidebar() {
             key: '/settings',
             icon: <SettingOutlined />,
             label: <Link to="/settings">Postavke</Link>,
+          },
+          {
+            key: '/app-releases',
+            icon: <SettingOutlined />,
+            label: <Link to="/app-releases">App verzije</Link>,
           },
         ]
       : []),

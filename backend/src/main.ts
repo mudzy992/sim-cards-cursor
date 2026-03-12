@@ -35,8 +35,32 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(helmet());
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  // Ako je NODE_ENV=production (Docker / server), forsiramo production bez obzira na APP_ENV u .env
+  const appEnv =
+    nodeEnv === 'production'
+      ? 'production'
+      : config.get<string>('APP_ENV', nodeEnv || 'development');
+  const isDev = appEnv === 'development';
+
+  const devOrigins = ['http://localhost:3004'];
+  const prodOrigins = [config.get<string>('FRONTEND_URL', 'https://sim-tracker.hopto.org')];
+  const allowedOrigins = isDev ? devOrigins : prodOrigins;
+
   app.enableCors({
-    origin: config.get<string>('FRONTEND_URL', 'http://localhost:5173'),
+    origin: (origin, callback) => {
+      // Dozvoli zahtjeve bez Origin headera (npr. Postman, backend-2-backend)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      logger.warn(`CORS blocked for origin: ${origin} (env=${appEnv})`);
+      return callback(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
   });
 
