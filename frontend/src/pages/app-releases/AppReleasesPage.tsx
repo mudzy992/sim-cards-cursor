@@ -122,7 +122,9 @@ export default function AppReleasesPage() {
           form={form}
           layout="vertical"
           onFinish={(values) => {
-            if (!values.file) {
+            const fileList = (values as any).file as { originFileObj?: File }[] | undefined;
+            const first = fileList && fileList[0]?.originFileObj;
+            if (!first) {
               message.error('Odaberite .apk fajl.');
               return;
             }
@@ -130,7 +132,7 @@ export default function AppReleasesPage() {
               versionName: values.versionName,
               versionCode: values.versionCode,
               releaseNotes: values.releaseNotes,
-              file: values.file,
+              file: first,
             });
           }}
         >
@@ -154,7 +156,7 @@ export default function AppReleasesPage() {
           <Form.Item
             name="file"
             label="APK fajl"
-            valuePropName="file"
+            valuePropName="fileList"
             rules={[{ required: true, message: 'Potrebno je uploadovati .apk fajl.' }]}
           >
             <Upload
@@ -163,12 +165,11 @@ export default function AppReleasesPage() {
                   message.error('Dozvoljeni su samo .apk fajlovi.');
                   return Upload.LIST_IGNORE;
                 }
-                form.setFieldsValue({ file });
+                // Vrati false da spriječimo automatski upload; fajl ide kroz FormData u onFinish.
                 return false;
               }}
               maxCount={1}
               showUploadList={{ showRemoveIcon: true }}
-              onRemove={() => form.setFieldsValue({ file: undefined as any })}
             >
               <Button icon={<UploadOutlined />}>Odaberi .apk fajl</Button>
             </Upload>
