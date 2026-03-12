@@ -13,6 +13,7 @@ import {
   Table,
   Typography,
   Tour,
+  Switch,
 } from 'antd';
 import type { TourProps } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
@@ -196,6 +197,32 @@ export default function RecipientsPage() {
     },
   });
 
+  const updateUserPermissionsMutation = useMutation({
+    mutationFn: ({
+      groupId,
+      userId,
+      data,
+    }: {
+      groupId: string;
+      userId: string;
+      data: {
+        canApproveFromPending?: boolean;
+        canRejectFromPending?: boolean;
+        canActivateSep?: boolean;
+      };
+    }) => recipientsApi.updateGroupUserPermissions(groupId, userId, data),
+    onSuccess: () => {
+      messageApi.success('Dozvole su ažurirane.');
+      void queryClient.invalidateQueries({ queryKey: ['recipient-groups'] });
+    },
+    onError: (e: unknown) => {
+      messageApi.error(
+        (e as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? 'Greška pri ažuriranju dozvola.',
+      );
+    },
+  });
+
   const handleGroupSubmit = (values: {
     name: string;
     description?: string;
@@ -315,19 +342,21 @@ export default function RecipientsPage() {
                     Obriši
                   </Button>
                 </Popconfirm>
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => {
-                    setEditingRecipient(null);
-                    form.resetFields();
-                    form.setFieldValue('groupId', group.id);
-                    setModalOpen(true);
-                  }}
-                >
-                  Dodaj primaoca
-                </Button>
+                {group.type !== 'APPROVAL' && (
+                  <Button
+                    size="small"
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      setEditingRecipient(null);
+                      form.resetFields();
+                      form.setFieldValue('groupId', group.id);
+                      setModalOpen(true);
+                    }}
+                  >
+                    Dodaj primaoca
+                  </Button>
+                )}
               </Space>
             </div>
           ),
@@ -339,53 +368,53 @@ export default function RecipientsPage() {
                 size="small"
                 pagination={false}
                 columns={[
-                { title: 'Email', dataIndex: 'email' },
-                {
-                  title: 'Ime',
-                  render: (_: unknown, r: Recipient) =>
-                    `${r.firstName} ${r.lastName}`,
-                },
-                { title: 'Pozicija', dataIndex: 'position' },
-                {
-                  title: 'Aktivan',
-                  dataIndex: 'isActive',
-                  render: (v: boolean) => (v ? 'Da' : 'Ne'),
-                },
-                {
-                  title: 'Akcije',
-                  render: (_: unknown, r: Recipient) => (
-                    <Space>
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          setEditingRecipient(r);
-                          form.setFieldsValue({
-                            email: r.email,
-                            firstName: r.firstName,
-                            lastName: r.lastName,
-                            position: r.position,
-                            groupId: r.groupId,
-                          });
-                          setModalOpen(true);
-                        }}
-                      >
-                        Uredi
-                      </Button>
-                      <Popconfirm
-                        title="Obriši primaoca?"
-                        onConfirm={() =>
-                          deleteRecipientMutation.mutate(r.id)
-                        }
-                      >
-                        <Button size="small" danger>
-                          Obriši
+                  { title: 'Email', dataIndex: 'email' },
+                  {
+                    title: 'Ime',
+                    render: (_: unknown, r: Recipient) =>
+                      `${r.firstName} ${r.lastName}`,
+                  },
+                  { title: 'Pozicija', dataIndex: 'position' },
+                  {
+                    title: 'Aktivan',
+                    dataIndex: 'isActive',
+                    render: (v: boolean) => (v ? 'Da' : 'Ne'),
+                  },
+                  {
+                    title: 'Akcije',
+                    render: (_: unknown, r: Recipient) => (
+                      <Space>
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            setEditingRecipient(r);
+                            form.setFieldsValue({
+                              email: r.email,
+                              firstName: r.firstName,
+                              lastName: r.lastName,
+                              position: r.position,
+                              groupId: r.groupId,
+                            });
+                            setModalOpen(true);
+                          }}
+                        >
+                          Uredi
                         </Button>
-                      </Popconfirm>
-                    </Space>
-                  ),
-                },
-              ]}
-            />
+                        <Popconfirm
+                          title="Obriši primaoca?"
+                          onConfirm={() =>
+                            deleteRecipientMutation.mutate(r.id)
+                          }
+                        >
+                          <Button size="small" danger>
+                            Obriši
+                          </Button>
+                        </Popconfirm>
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
               {group.type === 'APPROVAL' && (
                 <div>
                   <Typography.Text strong className="block mb-2">
@@ -469,6 +498,60 @@ export default function RecipientsPage() {
                         {
                           title: 'Rola',
                           dataIndex: ['user', 'role'],
+                        },
+                        {
+                          title: 'Odobri',
+                          dataIndex: 'canApproveFromPending',
+                          render: (_: unknown, r: RecipientGroupUser) => (
+                            <Switch
+                              size="small"
+                              checked={r.canApproveFromPending}
+                              loading={updateUserPermissionsMutation.isPending}
+                              onChange={(checked) =>
+                                updateUserPermissionsMutation.mutate({
+                                  groupId: group.id,
+                                  userId: r.userId,
+                                  data: { canApproveFromPending: checked },
+                                })
+                              }
+                            />
+                          ),
+                        },
+                        {
+                          title: 'Odbij',
+                          dataIndex: 'canRejectFromPending',
+                          render: (_: unknown, r: RecipientGroupUser) => (
+                            <Switch
+                              size="small"
+                              checked={r.canRejectFromPending}
+                              loading={updateUserPermissionsMutation.isPending}
+                              onChange={(checked) =>
+                                updateUserPermissionsMutation.mutate({
+                                  groupId: group.id,
+                                  userId: r.userId,
+                                  data: { canRejectFromPending: checked },
+                                })
+                              }
+                            />
+                          ),
+                        },
+                        {
+                          title: 'Aktiviraj SEP',
+                          dataIndex: 'canActivateSep',
+                          render: (_: unknown, r: RecipientGroupUser) => (
+                            <Switch
+                              size="small"
+                              checked={r.canActivateSep}
+                              loading={updateUserPermissionsMutation.isPending}
+                              onChange={(checked) =>
+                                updateUserPermissionsMutation.mutate({
+                                  groupId: group.id,
+                                  userId: r.userId,
+                                  data: { canActivateSep: checked },
+                                })
+                              }
+                            />
+                          ),
                         },
                         {
                           title: 'Akcije',

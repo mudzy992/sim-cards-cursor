@@ -319,15 +319,25 @@ export class InstallationRecordsService {
     const record = await this.findOne(id, scope);
     const isUserRole = scope?.role === 'USER';
     let isApprovalOperator = false;
+    let approvalPerms:
+      | {
+          canApproveFromPending: boolean;
+          canRejectFromPending: boolean;
+          canActivateSep: boolean;
+          canSendPdf: boolean;
+        }
+      | null = null;
     if (isUserRole) {
       const meter = await this.prisma.meter.findUnique({
         where: { id: record.meterId },
         select: { branchId: true },
       });
       const branchId = meter?.branchId ?? null;
-      isApprovalOperator = !!branchId
-        ? await this.recipientsService.isUserInApprovalGroupForBranch(userId, branchId)
-        : false;
+      approvalPerms = await this.recipientsService.getUserApprovalPermissionsForBranch(
+        userId,
+        branchId ?? null,
+      );
+      isApprovalOperator = !!approvalPerms;
     }
 
     return {
@@ -336,10 +346,12 @@ export class InstallationRecordsService {
         (record.installedById === userId || scope?.role === 'SYSTEM_ADMIN' || scope?.role === 'MODERATOR'),
       canApproveReject:
         record.status === RecordStatus.PENDING &&
-        (!isUserRole || isApprovalOperator),
+          (!isUserRole ||
+            (isApprovalOperator && !!approvalPerms?.canApproveFromPending)),
       canActivateSep:
         record.status === RecordStatus.WAITING_SEP_ACTIVATION &&
-        (!isUserRole || isApprovalOperator),
+          (!isUserRole ||
+            (isApprovalOperator && !!approvalPerms?.canActivateSep)),
       isApprovalOperator,
     };
   }
@@ -443,10 +455,13 @@ export class InstallationRecordsService {
           'Zapisnik nema povezanu podružnicu. Samo moderator ili admin mogu odobriti.',
         );
       }
-      const canApprove = await this.recipientsService.isUserInApprovalGroupForBranch(approvedById, branchId);
-      if (!canApprove) {
+      const perms = await this.recipientsService.getUserApprovalPermissionsForBranch(
+        approvedById,
+        branchId,
+      );
+      if (!perms || !perms.canApproveFromPending) {
         throw new ForbiddenException(
-          'Niste u grupi odobravatelja za ovu podružnicu. Samo članovi grupe mogu odobravati zapisnike.',
+          'Niste u grupi odobravatelja za ovu podružnicu ili nemate pravo odobravanja zapisnika.',
         );
       }
     }
@@ -503,10 +518,13 @@ export class InstallationRecordsService {
           'Zapisnik nema povezanu podružnicu. Samo moderator ili admin mogu odbiti.',
         );
       }
-      const canReject = await this.recipientsService.isUserInApprovalGroupForBranch(ctx.userId, branchId);
-      if (!canReject) {
+      const perms = await this.recipientsService.getUserApprovalPermissionsForBranch(
+        ctx.userId,
+        branchId,
+      );
+      if (!perms || !perms.canRejectFromPending) {
         throw new ForbiddenException(
-          'Niste u grupi odobravatelja za ovu podružnicu. Samo članovi grupe mogu odbijati zapisnike.',
+          'Niste u grupi odobravatelja za ovu podružnicu ili nemate pravo odbijanja zapisnika.',
         );
       }
     }
@@ -853,10 +871,13 @@ export class InstallationRecordsService {
           'Zapisnik nema povezanu podružnicu. Samo moderator ili admin mogu aktivirati u SEP.',
         );
       }
-      const canActivate = await this.recipientsService.isUserInApprovalGroupForBranch(ctx.userId, branchId);
-      if (!canActivate) {
+      const perms = await this.recipientsService.getUserApprovalPermissionsForBranch(
+        ctx.userId,
+        branchId,
+      );
+      if (!perms || !perms.canActivateSep) {
         throw new ForbiddenException(
-          'Niste u grupi odobravatelja za ovu podružnicu. Samo članovi grupe mogu aktivirati zapisnik u SEP.',
+          'Niste u grupi odobravatelja za ovu podružnicu ili nemate pravo aktivirati zapisnik u SEP.',
         );
       }
     }

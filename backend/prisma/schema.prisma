@@ -291,6 +291,10 @@ model RecipientGroupUser {
   recipientGroup   RecipientGroup @relation(fields: [recipientGroupId], references: [id], onDelete: Cascade)
   userId           String         @map("user_id")
   user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canApproveFromPending Boolean   @default(true) @map("can_approve_from_pending")
+  canRejectFromPending  Boolean   @default(true) @map("can_reject_from_pending")
+  canActivateSep        Boolean   @default(true) @map("can_activate_sep")
+  canSendPdf            Boolean   @default(false) @map("can_send_pdf")
   createdAt        DateTime       @default(now()) @map("created_at")
 
   @@unique([recipientGroupId, userId])

@@ -23,6 +23,10 @@ export interface RecipientGroupUser {
     lastName: string;
     role: string;
   };
+  canApproveFromPending: boolean;
+  canRejectFromPending: boolean;
+  canActivateSep: boolean;
+  canSendPdf: boolean;
 }
 
 export interface RecipientGroup {
@@ -172,6 +176,22 @@ export const recipientsApi = {
     const response = await axiosInstance.get<
       ApiEnvelope<RecipientGroupUser[]>
     >(`/recipients/groups/${recipientGroupId}/users`);
+    return response.data.data;
+  },
+
+  updateGroupUserPermissions: async (
+    recipientGroupId: string,
+    userId: string,
+    data: {
+      canApproveFromPending?: boolean;
+      canRejectFromPending?: boolean;
+      canActivateSep?: boolean;
+      canSendPdf?: boolean;
+    },
+  ): Promise<RecipientGroupUser> => {
+    const response = await axiosInstance.patch<
+      ApiEnvelope<RecipientGroupUser>
+    >(`/recipients/groups/${recipientGroupId}/users/${userId}/permissions`, data);
     return response.data.data;
   },
 

@@ -16,7 +16,10 @@ describe('InstallationRecordsService RBAC', () => {
     meter: { findUnique: jest.Mock };
     installationRecord: { update: jest.Mock; findUnique: jest.Mock };
   };
-  let recipientsService: { isUserInApprovalGroupForBranch: jest.Mock };
+  let recipientsService: {
+    isUserInApprovalGroupForBranch: jest.Mock;
+    getUserApprovalPermissionsForBranch: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -26,6 +29,7 @@ describe('InstallationRecordsService RBAC', () => {
 
     recipientsService = {
       isUserInApprovalGroupForBranch: jest.fn(),
+      getUserApprovalPermissionsForBranch: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -54,7 +58,12 @@ describe('InstallationRecordsService RBAC', () => {
     };
     jest.spyOn(service, 'findOne').mockResolvedValue(record as never);
     prisma.meter.findUnique.mockResolvedValue({ branchId: 'b1' });
-    recipientsService.isUserInApprovalGroupForBranch.mockResolvedValue(true);
+    recipientsService.getUserApprovalPermissionsForBranch.mockResolvedValue({
+      canApproveFromPending: true,
+      canRejectFromPending: true,
+      canActivateSep: true,
+      canSendPdf: false,
+    });
     prisma.installationRecord.update.mockResolvedValue({
       ...record,
       status: RecordStatus.WAITING_SEP_ACTIVATION,
@@ -67,7 +76,7 @@ describe('InstallationRecordsService RBAC', () => {
     });
 
     expect(result.status).toBe(RecordStatus.WAITING_SEP_ACTIVATION);
-    expect(recipientsService.isUserInApprovalGroupForBranch).toHaveBeenCalledWith(
+    expect(recipientsService.getUserApprovalPermissionsForBranch).toHaveBeenCalledWith(
       'user-1',
       'b1',
     );
@@ -83,7 +92,7 @@ describe('InstallationRecordsService RBAC', () => {
     };
     jest.spyOn(service, 'findOne').mockResolvedValue(record as never);
     prisma.meter.findUnique.mockResolvedValue({ branchId: 'b1' });
-    recipientsService.isUserInApprovalGroupForBranch.mockResolvedValue(false);
+    recipientsService.getUserApprovalPermissionsForBranch.mockResolvedValue(null);
 
     await expect(
       service.approve('r1', 'user-1', {
@@ -105,7 +114,12 @@ describe('InstallationRecordsService RBAC', () => {
     };
     jest.spyOn(service, 'findOne').mockResolvedValue(record as never);
     prisma.meter.findUnique.mockResolvedValue({ branchId: 'b1' });
-    recipientsService.isUserInApprovalGroupForBranch.mockResolvedValue(true);
+    recipientsService.getUserApprovalPermissionsForBranch.mockResolvedValue({
+      canApproveFromPending: true,
+      canRejectFromPending: true,
+      canActivateSep: true,
+      canSendPdf: false,
+    });
 
     await service.approve('r1', 'user-1', {
       role: UserRole.USER,
@@ -135,7 +149,7 @@ describe('InstallationRecordsService RBAC', () => {
       branchId: null,
     });
 
-    expect(recipientsService.isUserInApprovalGroupForBranch).not.toHaveBeenCalled();
+    expect(recipientsService.getUserApprovalPermissionsForBranch).not.toHaveBeenCalled();
   });
 
   it('blocks USER list access when user has no branch scope', async () => {

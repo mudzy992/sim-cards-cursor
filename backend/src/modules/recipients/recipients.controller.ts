@@ -22,6 +22,7 @@ import { UpdateRecipientGroupDto } from './dto/update-recipient-group.dto';
 import { CreateRecipientDto } from './dto/create-recipient.dto';
 import { UpdateRecipientDto } from './dto/update-recipient.dto';
 import { AddUserToGroupDto } from './dto/add-user-to-group.dto';
+import { UpdateGroupUserPermissionsDto } from './dto/update-group-user-permissions.dto';
 import { RecipientsService } from './recipients.service';
 
 @ApiTags('recipients')
@@ -131,6 +132,26 @@ export class RecipientsController {
       role: user?.role as UserRole,
       distributionId: user?.distributionId ?? null,
     });
+  }
+
+  @Patch('groups/:id/users/:userId/permissions')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @ApiOperation({ summary: 'Ažuriranje granularnih permisija korisnika u APPROVAL grupi' })
+  updateGroupUserPermissions(
+    @Param('id', ParseUUIDPipe) recipientGroupId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: UpdateGroupUserPermissionsDto,
+    @CurrentUser() user?: { role: string; distributionId?: string | null },
+  ) {
+    return this.recipientsService.updateGroupUserPermissions(
+      recipientGroupId,
+      userId,
+      dto,
+      {
+        role: user?.role as UserRole,
+        distributionId: user?.distributionId ?? null,
+      },
+    );
   }
 
   @Get('groups/:id/users')

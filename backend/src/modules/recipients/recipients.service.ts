@@ -196,6 +196,49 @@ export class RecipientsService {
     return count > 0;
   }
 
+  async getUserApprovalPermissionsForBranch(
+    userId: string,
+    branchId: string | null,
+  ): Promise<{
+    canApproveFromPending: boolean;
+    canRejectFromPending: boolean;
+    canActivateSep: boolean;
+    canSendPdf: boolean;
+  } | null> {
+    if (!branchId) return null;
+    const mapping = await this.prisma.branchApprovalGroup.findFirst({
+      where: {
+        branchId,
+        recipientGroup: {
+          type: RecipientGroupType.APPROVAL,
+          groupUsers: {
+            some: { userId },
+          },
+        },
+      },
+      include: {
+        recipientGroup: {
+          include: {
+            groupUsers: {
+              where: { userId },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    const gu = mapping?.recipientGroup.groupUsers[0];
+    if (!gu) return null;
+
+    return {
+      canApproveFromPending: gu.canApproveFromPending,
+      canRejectFromPending: gu.canRejectFromPending,
+      canActivateSep: gu.canActivateSep,
+      canSendPdf: gu.canSendPdf,
+    };
+  }
+
   async findGroupById(
     id: string,
     actor?: { role: UserRole; distributionId?: string | null },
@@ -253,7 +296,12 @@ export class RecipientsService {
     dto: CreateRecipientDto,
     actor?: { role: UserRole; distributionId?: string | null },
   ): Promise<Recipient> {
-    await this.assertGroupAccess(dto.groupId, actor);
+    const group = await this.assertGroupAccess(dto.groupId, actor);
+    if (group.type === RecipientGroupType.APPROVAL) {
+      throw new BadRequestException(
+        'APPROVAL grupe ne mogu imati ručno unesene email primaoce. Dodajte korisnike aplikacije u grupu.',
+      );
+    }
     return this.prisma.recipient.create({
       data: {
         email: dto.email,
@@ -278,7 +326,14 @@ export class RecipientsService {
       throw new NotFoundException(`Recipient with ID ${id} not found`);
     }
     await this.assertGroupAccess(recipient.groupId, actor);
-    if (dto.groupId) await this.assertGroupAccess(dto.groupId, actor);
+    if (dto.groupId) {
+      const targetGroup = await this.assertGroupAccess(dto.groupId, actor);
+      if (targetGroup.type === RecipientGroupType.APPROVAL) {
+        throw new BadRequestException(
+          'APPROVAL grupe ne mogu imati ručno unesene email primaoce. Dodajte korisnike aplikacije u grupu.',
+        );
+      }
+    }
     return this.prisma.recipient.update({
       where: { id },
       data: dto,
@@ -390,5 +445,53 @@ export class RecipientsService {
       ...recipients.map((r) => r.email),
       ...groupUsers.map((gu) => gu.user.email),
     ])];
+  }
+
+  async updateGroupUserPermissions(
+    recipientGroupId: string,
+    userId: string,
+    permissions: {
+      canApproveFromPending?: boolean;
+      canRejectFromPending?: boolean;
+      canActivateSep?: boolean;
+      canSendPdf?: boolean;
+    },
+    actor?: { role: UserRole; distributionId?: string | null },
+  ) {
+    const group = await this.assertGroupAccess(recipientGroupId, actor);
+    if (group.type !== RecipientGroupType.APPROVAL) {
+      throw new BadRequestException(
+        'Granularne permisije su podržane samo za APPROVAL grupe.',
+      );
+    }
+
+    const existing = await this.prisma.recipientGroupUser.findUnique({
+      where: {
+        recipientGroupId_userId: { recipientGroupId, userId },
+      },
+    });
+    if (!existing) {
+      throw new BadRequestException('Korisnik nije član ove grupe.');
+    }
+
+    return this.prisma.recipientGroupUser.update({
+      where: {
+        recipientGroupId_userId: { recipientGroupId, userId },
+      },
+      data: {
+        ...(permissions.canApproveFromPending !== undefined && {
+          canApproveFromPending: permissions.canApproveFromPending,
+        }),
+        ...(permissions.canRejectFromPending !== undefined && {
+          canRejectFromPending: permissions.canRejectFromPending,
+        }),
+        ...(permissions.canActivateSep !== undefined && {
+          canActivateSep: permissions.canActivateSep,
+        }),
+        ...(permissions.canSendPdf !== undefined && {
+          canSendPdf: permissions.canSendPdf,
+        }),
+      },
+    });
   }
 }

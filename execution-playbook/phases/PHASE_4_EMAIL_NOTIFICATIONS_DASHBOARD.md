@@ -126,6 +126,24 @@ Settings modul postoji, ali mora imati jasno definisan set opcija koje SYSTEM_AD
 - Svaka promjena postavke mora biti auditovana u Dnevniku aktivnosti (ko/šta/stara vrijednost/nova vrijednost).
 - UI mora prikazati “last updated by / at”.
 
+### Recipient grupe – obavijesti vs. odobrenje
+
+Postoje **dva konceptualna tipa grupa primaoca**, sa različitim pravilima:
+
+- **Grupa za obavijesti (npr. slanje zapisnika)**  
+  - Služi za slanje emailova (npr. PDF zapisnika) i općih informacija.  
+  - U jednoj grupi je dozvoljeno kombinovati:  
+    - **korisnike aplikacije** (User) dodane preko pickera (`RecipientGroupUser`), i  
+    - **ručno unesene email adrese** koje nisu nužno vezane za korisnički nalog (`Recipient`).  
+  - Ove grupe **nemaju uticaj na pravo odobravanja zapisnika** – one su samo lista primaoca email poruka.
+
+- **Grupa za odobrenje (APPROVAL grupa)**  
+  - Koristi se isključivo za tokove `approve/reject/activate SEP`.  
+  - U APPROVAL grupama **smiju postojati isključivo korisnici aplikacije** (`RecipientGroupUser`).  
+  - **Nije dozvoljeno** dodavati “slobodne” email adrese koje nisu vezane za postojeće User naloge.  
+  - Backend RBAC eksplicitno provjerava da je korisnik član odgovarajuće APPROVAL grupe (preko `RecipientGroupUser`) prije nego što mu dopusti odobravanje/odbijanje/aktivaciju u SEP.  
+  - Time se osigurava da **niko ko nije korisnik aplikacije** ne može raditi na odobrenju naloga, SEP aktivacijama i sličnim operacijama.
+
 ### Activity Log → Timeline za zapisnike
 Pošto postoji Dnevnik aktivnosti, isti se koristi kao osnova za Timeline na detalju zapisnika.
 
@@ -154,8 +172,8 @@ Pošto postoji Dnevnik aktivnosti, isti se koristi kao osnova za Timeline na det
 | P4-BE-11 | Backend | Mobile push: servis za slanje (Expo) + retry + invalid token cleanup | P4-BE-10 | Push dispatch |
 | P4-BE-12 | Backend | Mobile push: ručno slanje (broadcast/targeting) + audit log | P4-BE-11, P4-BE-09 | Admin broadcast push |
 | P4-FE-01 | Frontend | Dashboard stranica (stats, chart, recent activity) | P4-BE-05 | Dashboard UI |
-| P4-FE-02 | Frontend | Recipients management UI (grupe + primaoci) | P4-BE-02 | Recipient UI |
-| P4-FE-03 | Frontend | Send record modal (odabir grupe/ručni email) | P4-BE-03 | Slanje UI |
+| P4-FE-02 | Frontend | Recipients management UI (grupe + primaoci) – razdvojiti ponašanje za APPROVAL i INFO grupe: APPROVAL grupe mogu imati isključivo korisnike aplikacije (picker korisnika, bez ručnog unosa email adresa), dok INFO/obavijesne grupe mogu kombinovati korisnike i ručno unesene email adrese. | P4-BE-02 | Recipient UI |
+| P4-FE-03 | Frontend | Send record modal (odabir grupe/ručni email) – omogućiti izbor samo onih grupa koje su namijenjene za slanje emailova (INFO/obavijesne), uz dodatno polje za ručni unos email adrese; APPROVAL grupe ne koristiti za odabir email primaoca. | P4-BE-03 | Slanje UI |
 | P4-FE-04 | Frontend | Notification bell + dropdown + mark as read | P4-BE-04 | Notification UI |
 | P4-FE-05 | Frontend | Activity log stranica | P2-BE-08 | Audit pregled |
 | P4-FE-06 | Frontend | Settings stranica | P4-BE-06 | Admin settings UI |
