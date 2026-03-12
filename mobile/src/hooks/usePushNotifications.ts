@@ -10,10 +10,22 @@ import { pushTokensApi } from '@/api/push-tokens.api';
 async function registerForPushNotificationsAsync(): Promise<string | null> {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
+      name: 'Opće obavijesti',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#0f766e',
+    });
+    await Notifications.setNotificationChannelAsync('records', {
+      name: 'Zapisnici',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      vibrationPattern: [0, 200, 200, 200],
+      lightColor: '#0f766e',
+    });
+    await Notifications.setNotificationChannelAsync('system', {
+      name: 'Sistemske poruke',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 300, 300, 300],
+      lightColor: '#b91c1c',
     });
   }
 
