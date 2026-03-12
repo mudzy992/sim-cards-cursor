@@ -22,8 +22,6 @@ FROM node:20 AS runtime
 
 WORKDIR /usr/app
 
-ENV NODE_ENV=production
-
 # Kopiramo samo ono što je nužno za rad aplikacije
 COPY --from=build /usr/app/package*.json ./
 COPY --from=build /usr/app/node_modules ./node_modules
