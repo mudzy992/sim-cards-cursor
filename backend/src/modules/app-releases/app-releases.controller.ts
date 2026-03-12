@@ -22,13 +22,13 @@ import { AppReleasesService } from './app-releases.service';
 import { ParseUUIDPipe } from '@nestjs/common';
 
 @ApiTags('app-releases')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('app-releases')
 export class AppReleasesController {
   constructor(private readonly service: AppReleasesService) {}
 
   @Post('android')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
@@ -52,6 +52,8 @@ export class AppReleasesController {
   }
 
   @Get('android')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Lista svih Android release-ova' })
   listAndroid() {
@@ -59,15 +61,13 @@ export class AppReleasesController {
   }
 
   @Get('android/latest')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
-  @ApiOperation({ summary: 'Get latest Android release metadata (auth required)' })
+  @ApiOperation({ summary: 'Get latest Android release metadata (public)' })
   getLatestAndroid() {
     return this.service.getLatestAndroidRelease();
   }
 
   @Get('android/download/:id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
-  @ApiOperation({ summary: 'Download Android APK (auth required)' })
+  @ApiOperation({ summary: 'Download Android APK (public)' })
   async downloadAndroid(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
     const { release, stream } = await this.service.getAndroidApkStream(id);
 

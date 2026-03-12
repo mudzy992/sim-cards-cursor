@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import type { LoginInput } from '@/types/auth.types';
+import { useQuery } from '@tanstack/react-query';
+import { appReleasesApi } from '@/api/app-releases.api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -11,6 +13,12 @@ export default function LoginPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const latestReleaseQuery = useQuery({
+    queryKey: ['app-releases', 'latest-android'],
+    queryFn: () => appReleasesApi.latestAndroid(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const handleSubmit = async (values: LoginInput) => {
     setIsSubmitting(true);
@@ -71,6 +79,27 @@ export default function LoginPage() {
             Prijavi se
           </Button>
         </Form>
+
+        {latestReleaseQuery.isSuccess && (
+          <div className="mt-4 border-t pt-4">
+            <Typography.Text type="secondary" className="block mb-1">
+              Zadnja verzija mobilne aplikacije:
+            </Typography.Text>
+            <Typography.Text strong>
+              {latestReleaseQuery.data.versionName} (kod {latestReleaseQuery.data.versionCode})
+            </Typography.Text>
+            <div>
+              <a
+                href={latestReleaseQuery.data.downloadUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-emerald-700"
+              >
+                Preuzmi .apk
+              </a>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
