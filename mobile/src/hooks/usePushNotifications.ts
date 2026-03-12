@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -7,8 +8,13 @@ import { useAuthStore } from '@/store/auth.store';
 import { pushTokensApi } from '@/api/push-tokens.api';
 
 async function registerForPushNotificationsAsync(): Promise<string | null> {
-  if (!Device.isDevice) {
-    return null;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#0f766e',
+    });
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -21,7 +27,18 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
     return null;
   }
 
-  const token = await Notifications.getExpoPushTokenAsync();
+  // Token retrieval only works on physical devices.
+  if (!Device.isDevice) {
+    return null;
+  }
+
+  const projectId =
+    Constants.easConfig?.projectId ??
+    Constants.expoConfig?.extra?.eas?.projectId;
+
+  const token = await Notifications.getExpoPushTokenAsync({
+    projectId: projectId ?? undefined,
+  });
   return token.data ?? null;
 }
 
