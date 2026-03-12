@@ -4,7 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { UploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { appReleasesApi, type MobileAppRelease } from '@/api/app-releases.api';
-import { axiosInstance } from '@/api/axios.instance';
+import { API_BASE_URL } from '@/api/axios.instance';
 
 export default function AppReleasesPage() {
   const queryClient = useQueryClient();
@@ -83,36 +83,13 @@ export default function AppReleasesPage() {
       key: 'download',
       width: 140,
       render: (_, record) => (
-        <Button
-          type="link"
-          onClick={async () => {
-            try {
-              const response = await axiosInstance.get(
-                `/app-releases/android/download/${record.id}`,
-                { responseType: 'blob' },
-              );
-              const blob = new Blob([response.data], {
-                type: 'application/vnd.android.package-archive',
-              });
-              const url = window.URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `sim-tracker-${record.versionName}.apk`;
-              document.body.appendChild(link);
-              link.click();
-              link.remove();
-              window.URL.revokeObjectURL(url);
-            } catch (e: any) {
-              const msg =
-                e?.response?.data?.message ??
-                e?.message ??
-                'Greška pri preuzimanju .apk fajla.';
-              message.error(msg);
-            }
-          }}
+        <a
+          href={`${API_BASE_URL}/app-releases/android/download/${record.id}`}
+          target="_blank"
+          rel="noreferrer"
         >
           Preuzmi .apk
-        </Button>
+        </a>
       ),
     },
   ];

@@ -6,14 +6,23 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { PushTokensService } from './push-tokens.service';
 import { UserRole } from '@prisma/client';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { IsOptional, IsString } from 'class-validator';
 
 class RegisterPushTokenDto {
+  @IsString()
   token!: string;
+
+  @IsOptional()
+  @IsString()
   platform?: string;
+
+  @IsOptional()
+  @IsString()
   deviceId?: string;
 }
 
 class InvalidatePushTokenDto {
+  @IsString()
   token!: string;
 }
 
