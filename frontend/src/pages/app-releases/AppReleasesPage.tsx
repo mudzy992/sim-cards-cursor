@@ -158,6 +158,11 @@ export default function AppReleasesPage() {
             label="APK fajl"
             valuePropName="fileList"
             rules={[{ required: true, message: 'Potrebno je uploadovati .apk fajl.' }]}
+            getValueFromEvent={(e) => {
+              // AntD Upload šalje event koji sadrži fileList; ovdje ga normalizujemo u niz.
+              if (Array.isArray(e)) return e;
+              return e?.fileList ?? [];
+            }}
           >
             <Upload
               beforeUpload={(file) => {
