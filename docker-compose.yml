@@ -3,6 +3,7 @@ services:
     container_name: sim-tracker-backend
     build:
       context: ./backend
+      # Ovdje će se koristiti onaj optimizirani Dockerfile (node:20) koji smo ranije dogovorili
     restart: unless-stopped
     env_file:
       - ./backend/.env
@@ -13,10 +14,12 @@ services:
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.simtracker-backend.entrypoints=websecure'
-      - 'traefik.http.routers.simtracker-backend.rule=Host(`sim-tracker.hopto.org`) && PathPrefix(`/backend`)'
+      # Nova domena za backend
+      - 'traefik.http.routers.simtracker-backend.rule=Host(`simtracker.ba101.top`) && PathPrefix(`/backend`)'
       - 'traefik.http.routers.simtracker-backend.tls=true'
       - 'traefik.http.routers.simtracker-backend.tls.certresolver=le'
       - 'traefik.http.services.simtracker-backend.loadbalancer.server.port=3003'
+      # Middleware za skidanje /backend prefiksa prije nego zahtjev stigne do NestJS-a
       - 'traefik.http.middlewares.simtracker-backend-stripbackend.stripprefix.prefixes=/backend'
       - 'traefik.http.routers.simtracker-backend.middlewares=simtracker-backend-stripbackend'
 
@@ -24,13 +27,16 @@ services:
     container_name: sim-tracker-frontend
     build:
       context: ./frontend
+      args:
+        - VITE_API_URL=/backend
     restart: unless-stopped
     networks:
       - web
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.simtracker-frontend.entrypoints=websecure'
-      - 'traefik.http.routers.simtracker-frontend.rule=Host(`sim-tracker.hopto.org`)'
+      # Nova domena za frontend
+      - 'traefik.http.routers.simtracker-frontend.rule=Host(`simtracker.ba101.top`)'
       - 'traefik.http.routers.simtracker-frontend.tls=true'
       - 'traefik.http.routers.simtracker-frontend.tls.certresolver=le'
       - 'traefik.http.services.simtracker-frontend.loadbalancer.server.port=3004'
