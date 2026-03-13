@@ -47,8 +47,9 @@ Mount-an u backend kontejner kao `/usr/app/uploads`.
 
 1. Kloniranje repozitorija:
    ```bash
-   git clone <GIT_REMOTE_URL> sim-cards
-   cd sim-cards
+   git clone https://github.com/mudzy992/sim-cards-cursor.git
+    cd sim-cards-codex
+    git checkout vm-deploy
    ```
 
 ---
