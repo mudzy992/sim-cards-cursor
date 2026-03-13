@@ -41,7 +41,7 @@ async function bootstrap() {
   const isDev = appEnv === 'development';
 
   const devOrigins = ['http://localhost:3004'];
-  const prodOrigins = [config.get<string>('FRONTEND_URL', 'https://sim-tracker.hopto.org')];
+  const prodOrigins = [config.get<string>('FRONTEND_URL', 'https://simtracker.ba101.top')];
   const allowedOrigins = isDev ? devOrigins : prodOrigins;
 
   app.enableCors({
