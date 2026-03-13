@@ -7,6 +7,13 @@ frontend/dist/
 mobile/.expo/
 mobile/.expo-shared/
 
+# VM deploy branch specific – ne track-ati ove direktorije/fajlove
+.cursor/
+docs/
+execution-playbook/
+mobile/
+.cursorrules
+
 # Logs
 *.log
 npm-debug.log*
