@@ -24,6 +24,32 @@ export class SettingsController {
     return this.settingsService.findAll();
   }
 
+  @Get('mobile-push')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Dohvati globalni status mobilnih push notifikacija' })
+  async getMobilePush() {
+    const enabled = await this.settingsService.isMobilePushEnabled();
+    return { enabled };
+  }
+
+  @Patch('mobile-push')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Postavi globalni status mobilnih push notifikacija' })
+  async setMobilePush(
+    @Body() body: { enabled: boolean },
+    @CurrentUser() user: { id: string },
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    const setting = await this.settingsService.setMobilePushEnabled(body.enabled, {
+      userId: user.id,
+      ipAddress,
+    });
+    return { enabled: setting.value === 'true' };
+  }
+
   @Get(':key')
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Dohvati postavku po ključu' })

@@ -24,6 +24,57 @@ type SettingRow = {
   description?: string;
 };
 
+function SettingsMobilePushSection() {
+  const queryClient = useQueryClient();
+  const [messageApi, contextHolder] = message.useMessage();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['settings', 'mobile-push'],
+    queryFn: () => settingsApi.getMobilePush(),
+  });
+
+  const mutation = useMutation({
+    mutationFn: (enabled: boolean) => settingsApi.setMobilePush(enabled),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['settings', 'mobile-push'] });
+      messageApi.success('Postavka je sačuvana.');
+    },
+    onError: (e: unknown) => {
+      messageApi.error(
+        (e as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? 'Greška pri spremanju postavke.',
+      );
+    },
+  });
+
+  const enabled = data?.enabled ?? true;
+
+  return (
+    <div>
+      {contextHolder}
+      <Space align="start" className="w-full justify-between">
+        <div className="space-y-1 max-w-xl">
+          <Typography.Text strong>Dozvoli mobilne push notifikacije</Typography.Text>
+          <Typography.Paragraph type="secondary" className="!mb-0">
+            Kada je ova opcija isključena, mobilne aplikacije neće tražiti odobrenje za
+            notifikacije niti će slati push tokene prema serveru. Ovo je preporučeno za
+            zatvorena/offline okruženja bez pristupa internetu.
+          </Typography.Paragraph>
+        </div>
+        <Switch
+          checkedChildren="Uključeno"
+          unCheckedChildren="Isključeno"
+          loading={isLoading || mutation.isPending}
+          checked={enabled}
+          onChange={(next) => {
+            mutation.mutate(next);
+          }}
+        />
+      </Space>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
@@ -105,7 +156,7 @@ export default function SettingsPage() {
       <Typography.Title level={3} className="!mb-0">
         Postavke aplikacije
       </Typography.Title>
-      <Card>
+      <Card className="mb-4">
         <Table<SettingRow>
           dataSource={settings}
           rowKey="key"
@@ -157,7 +208,11 @@ export default function SettingsPage() {
         />
       </Card>
 
-      <Card title="Onboarding / App tour" className="mt-4">
+      <Card title="Mobilne push notifikacije" className="mb-4">
+        <SettingsMobilePushSection />
+      </Card>
+
+      <Card title="Onboarding / App tour">
         <Typography.Paragraph type="secondary">
           Tour je role-aware i data-aware. Ovdje možete ručno restartovati tour za trenutnog korisnika.
         </Typography.Paragraph>

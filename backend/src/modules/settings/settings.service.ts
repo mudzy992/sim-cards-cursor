@@ -53,6 +53,37 @@ export class SettingsService {
     return setting.value;
   }
 
+  async getBoolean(key: string, defaultValue: boolean): Promise<boolean> {
+    const setting = await this.prisma.appSetting.findUnique({
+      where: { key },
+    });
+    if (!setting || setting.value == null) {
+      return defaultValue;
+    }
+    const raw = String(setting.value).toLowerCase().trim();
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return defaultValue;
+  }
+
+  async isMobilePushEnabled(): Promise<boolean> {
+    return this.getBoolean('mobile.push.enabled', true);
+  }
+
+  async setMobilePushEnabled(
+    enabled: boolean,
+    ctx?: SettingChangeContext,
+  ): Promise<AppSetting> {
+    return this.upsert(
+      'mobile.push.enabled',
+      {
+        value: enabled ? 'true' : 'false',
+        description: 'Globalni toggle za mobilne push notifikacije (offline/online okruženje).',
+      },
+      ctx,
+    );
+  }
+
   private getUserTourKey(userId: string): string {
     return `user:tour-state:${userId}`;
   }

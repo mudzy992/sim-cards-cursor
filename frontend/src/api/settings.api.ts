@@ -32,6 +32,21 @@ export interface MySettings {
 }
 
 export const settingsApi = {
+  getMobilePush: async (): Promise<{ enabled: boolean }> => {
+    const response = await axiosInstance.get<ApiEnvelope<{ enabled: boolean }>>(
+      '/settings/mobile-push',
+    );
+    return response.data.data;
+  },
+
+  setMobilePush: async (enabled: boolean): Promise<{ enabled: boolean }> => {
+    const response = await axiosInstance.patch<ApiEnvelope<{ enabled: boolean }>>(
+      '/settings/mobile-push',
+      { enabled },
+    );
+    return response.data.data;
+  },
+
   list: async (): Promise<AppSetting[]> => {
     const response = await axiosInstance.get<ApiEnvelope<AppSetting[]>>(
       '/settings',
