@@ -15,7 +15,7 @@
     "smoke:phase2:import-validation": "ts-node scripts/phase2-import-validation-smoke.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "node -r ts-node/register/transpile-only prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
@@ -65,6 +65,6 @@
     "typescript": "^5.9.2"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "node -r ts-node/register/transpile-only prisma/seed.ts"
   }
 }
