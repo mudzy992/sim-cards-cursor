@@ -3,6 +3,8 @@ services:
     container_name: sim-tracker-traefik-vm
     image: traefik:v3.1
     restart: unless-stopped
+    environment:
+      - DOCKER_API_VERSION=1.54
     command:
       - --api.dashboard=false
       - --providers.docker=true
