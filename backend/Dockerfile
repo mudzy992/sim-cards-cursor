@@ -63,6 +63,8 @@ COPY --from=build /usr/app/package*.json ./
 COPY --from=build /usr/app/node_modules ./node_modules
 COPY --from=build /usr/app/dist ./dist
 COPY --from=build /usr/app/prisma ./prisma
+COPY --from=build /usr/app/tsconfig.json ./tsconfig.json
+COPY --from=build /usr/app/tsconfig.build.json ./tsconfig.build.json
 
 # Instaliramo Chrome za Puppeteer (managed browser)
 RUN npx puppeteer browsers install chrome
