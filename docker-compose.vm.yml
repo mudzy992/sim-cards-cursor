@@ -66,7 +66,7 @@ services:
       - traefik.enable=true
 
       # Backend HTTP: public /backend/* -> internal /* (Nest stays on /api)
-      - traefik.http.routers.sim_backend.rule=Host(`ep-web-sim`,`10.10.10.30`) && PathPrefix(`/backend`)
+      - traefik.http.routers.sim_backend.rule=(Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/backend`)
       - traefik.http.routers.sim_backend.entrypoints=web
       - traefik.http.routers.sim_backend.priority=10
       - traefik.http.routers.sim_backend.middlewares=sim_backend_stripprefix
