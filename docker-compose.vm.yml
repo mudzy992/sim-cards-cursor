@@ -101,6 +101,7 @@ services:
 networks:
   app:
     driver: bridge
+    name: sim-tracker-net
 
 volumes:
   mysql-data:
