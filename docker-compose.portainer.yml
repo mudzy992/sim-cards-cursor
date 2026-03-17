@@ -16,6 +16,8 @@ services:
       - traefik.http.routers.sim_portainer.entrypoints=web
       - traefik.http.routers.sim_portainer.priority=30
       - traefik.http.routers.sim_portainer.service=sim_portainer_svc
+      - traefik.http.routers.sim_portainer.middlewares=portainer_stripprefix
+      - traefik.http.middlewares.portainer_stripprefix.stripprefix.prefixes=/portainer
       - traefik.http.services.sim_portainer_svc.loadbalancer.server.port=9000
 
 networks:
