@@ -12,7 +12,7 @@ services:
       - app
     labels:
       - traefik.enable=true
-      - traefik.http.routers.sim_portainer.rule=(Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/portainer`)
+      - "traefik.http.routers.sim_portainer.rule=(Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/portainer`)"
       - traefik.http.routers.sim_portainer.entrypoints=web
       - traefik.http.routers.sim_portainer.priority=30
       - traefik.http.routers.sim_portainer.service=sim_portainer_svc
