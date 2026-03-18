@@ -185,7 +185,6 @@ function TemplatesCard() {
   const [selected, setSelected] = useState<string>('installation-record-approval-request');
   const [content, setContent] = useState<string>('');
   const [previewHtml, setPreviewHtml] = useState<string>('');
-  const [newTemplateName, setNewTemplateName] = useState<string>('');
 
   const templatesQuery = useQuery({
     queryKey: ['mail', 'templates'],
@@ -203,18 +202,47 @@ function TemplatesCard() {
     }
   }, [currentTemplate]);
 
-  const previewMutation = useMutation({
-    mutationFn: async () =>
-      mailApi.previewTemplate(selected, {
+  const sampleContext = useMemo(() => {
+    if (selected === 'installation-record-notification') {
+      return {
         recordNumber: 'TEST-001',
         recordId: 'test',
-        meterSerialNumber: 'M-123',
-        ipAddress: '10.0.0.1',
-        installationAddress: 'Test adresa 1',
-        municipality: 'Test općina',
-        installedByName: 'System Admin',
-        appUrl: window.location.origin,
-      }),
+      };
+    }
+    return {
+      recordNumber: 'TEST-001',
+      recordId: 'test',
+      meterSerialNumber: 'M-123',
+      ipAddress: '10.0.0.1',
+      installationAddress: 'Test adresa 1',
+      municipality: 'Test općina',
+      installedByName: 'System Admin',
+      appUrl: window.location.origin,
+    };
+  }, [selected]);
+
+  const availableFields = useMemo(() => {
+    if (selected === 'installation-record-notification') {
+      return [
+        { key: 'recordNumber', description: 'Broj zapisnika (npr. IR-0001)', example: 'TEST-001' },
+        { key: 'recordId', description: 'ID zapisnika (UUID)', example: 'test' },
+      ];
+    }
+    return [
+      { key: 'recordNumber', description: 'Broj zapisnika (npr. IR-0001)', example: 'TEST-001' },
+      { key: 'recordId', description: 'ID zapisnika (UUID)', example: 'test' },
+      { key: 'meterSerialNumber', description: 'Serijski broj brojila', example: 'M-123' },
+      { key: 'ipAddress', description: 'IP adresa (SIM/brojilo)', example: '10.0.0.1' },
+      { key: 'installationAddress', description: 'Adresa ugradnje', example: 'Test adresa 1' },
+      { key: 'municipality', description: 'Općina / lokacija', example: 'Test općina' },
+      { key: 'installedByName', description: 'Ime instalatera', example: 'System Admin' },
+      { key: 'appUrl', description: 'Base URL web aplikacije', example: window.location.origin },
+    ];
+  }, [selected]);
+
+  const previewMutation = useMutation({
+    mutationFn: async () =>
+      mailApi.previewTemplate(selected, sampleContext),
     onSuccess: (data) => setPreviewHtml(data.html),
     onError: (e: unknown) => {
       messageApi.error(
@@ -244,16 +272,7 @@ function TemplatesCard() {
         to,
         template: selected,
         subject: `Test email (${selected})`,
-        context: {
-          recordNumber: 'TEST-001',
-          recordId: 'test',
-          meterSerialNumber: 'M-123',
-          ipAddress: '10.0.0.1',
-          installationAddress: 'Test adresa 1',
-          municipality: 'Test općina',
-          installedByName: 'System Admin',
-          appUrl: window.location.origin,
-        },
+        context: sampleContext,
       }),
     onSuccess: () => messageApi.success('Test email poslan (ako je SMTP ispravno podešen).'),
     onError: (e: unknown) => {
@@ -298,29 +317,6 @@ function TemplatesCard() {
               Preview
             </Button>
           </Space>
-
-          <Space wrap>
-            <Input
-              placeholder="Novi template name (npr. password-reset)"
-              value={newTemplateName}
-              onChange={(e) => setNewTemplateName(e.target.value)}
-              style={{ width: 320 }}
-            />
-            <Button
-              onClick={async () => {
-                const name = newTemplateName.trim();
-                if (!name) return;
-                await mailApi.updateTemplate(name, '<!-- new template -->');
-                setNewTemplateName('');
-                setSelected(name);
-                void queryClient.invalidateQueries({ queryKey: ['mail', 'templates'] });
-                messageApi.success('Template kreiran (DB override).');
-              }}
-              disabled={!newTemplateName.trim()}
-            >
-              Kreiraj template
-            </Button>
-          </Space>
         </Space>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -328,6 +324,29 @@ function TemplatesCard() {
             <Typography.Text type="secondary" className="block mb-2">
               Editor (Handlebars .hbs)
             </Typography.Text>
+            <Alert
+              type="info"
+              message="Dostupna polja (placeholders)"
+              description={
+                <div>
+                  <div className="mb-2">
+                    Možeš koristiti <code>{'{{field}}'}</code> u template-u.
+                  </div>
+                  <ul className="list-disc ml-5">
+                    {availableFields.map((f) => (
+                      <li key={f.key}>
+                        <code>{`{{${f.key}}}`}</code> — {f.description}{' '}
+                        <Typography.Text type="secondary" className="font-mono">
+                          (npr. {String(f.example)})
+                        </Typography.Text>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              }
+              className="mb-3"
+              showIcon
+            />
             <Input.TextArea
               rows={18}
               value={content}

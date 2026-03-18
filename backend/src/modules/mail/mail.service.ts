@@ -31,6 +31,10 @@ export interface SendRecordEmailOptions {
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private readonly templateCache = new Map<string, Handlebars.TemplateDelegate>();
+  private readonly allowedTemplateNames = [
+    'installation-record-approval-request',
+    'installation-record-notification',
+  ] as const;
 
   constructor(
     private readonly config: ConfigService,
@@ -122,10 +126,19 @@ export class MailService {
     return `email.templates.${templateName}.hbs`;
   }
 
+  private assertAllowedTemplate(name: string): void {
+    if (!this.allowedTemplateNames.includes(name as (typeof this.allowedTemplateNames)[number])) {
+      throw new BadRequestException(
+        `Template "${name}" is not supported. Allowed: ${this.allowedTemplateNames.join(', ')}`,
+      );
+    }
+  }
+
   private async getTemplateSource(templateName: string): Promise<{
     source: string;
     sourceType: 'db' | 'file';
   }> {
+    this.assertAllowedTemplate(templateName);
     const key = this.getTemplateSettingKey(templateName);
     const row = await this.prisma.appSetting.findUnique({
       where: { key },
@@ -235,18 +248,7 @@ export class MailService {
   async listTemplates(): Promise<
     { name: string; key: string; sourceType: 'db' | 'file'; content: string }[]
   > {
-    const defaultNames = [
-      'installation-record-approval-request',
-      'installation-record-notification',
-    ];
-    const overrides = await this.prisma.appSetting.findMany({
-      where: { key: { startsWith: 'email.templates.' } },
-      select: { key: true },
-    });
-    const overrideNames = overrides
-      .map((r) => r.key.replace(/^email\.templates\./, '').replace(/\.hbs$/, ''))
-      .filter(Boolean);
-    const names = [...new Set([...defaultNames, ...overrideNames])];
+    const names = [...this.allowedTemplateNames];
     const result = [];
     for (const name of names) {
       // eslint-disable-next-line no-await-in-loop
@@ -259,6 +261,7 @@ export class MailService {
   async getTemplate(name: string): Promise<{ name: string; key: string; sourceType: 'db' | 'file'; content: string }> {
     const safe = String(name ?? '').trim();
     if (!safe) throw new BadRequestException('Missing template name');
+    this.assertAllowedTemplate(safe);
     const { source, sourceType } = await this.getTemplateSource(safe);
     return { name: safe, key: this.getTemplateSettingKey(safe), sourceType, content: source };
   }
@@ -266,6 +269,7 @@ export class MailService {
   async updateTemplate(name: string, content: string): Promise<{ name: string; key: string; sourceType: 'db'; content: string }> {
     const safe = String(name ?? '').trim();
     if (!safe) throw new BadRequestException('Missing template name');
+    this.assertAllowedTemplate(safe);
     if (safe.includes('..') || safe.includes('/') || safe.includes('\\')) {
       throw new BadRequestException('Invalid template name');
     }
@@ -286,6 +290,7 @@ export class MailService {
   ): Promise<{ name: string; html: string }> {
     const safe = String(name ?? '').trim();
     if (!safe) throw new BadRequestException('Missing template name');
+    this.assertAllowedTemplate(safe);
     if (safe.includes('..') || safe.includes('/') || safe.includes('\\')) {
       throw new BadRequestException('Invalid template name');
     }
@@ -303,6 +308,7 @@ export class MailService {
     if (!to) throw new BadRequestException('Missing "to"');
     const template = String(input.template ?? '').trim();
     if (!template) throw new BadRequestException('Missing "template"');
+    this.assertAllowedTemplate(template);
     const subject = String(input.subject ?? `Test email (${template})`);
 
     await this.sendMail({
