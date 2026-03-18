@@ -321,6 +321,8 @@ const DEFAULT_APP_SETTINGS: SeedSetting[] = [
 ];
 
 async function main() {
+  console.log(`[seed] DATABASE_URL=${process.env.DATABASE_URL ?? '(missing)'}`);
+
   let createdSettings = 0;
   let updatedDescriptions = 0;
   for (const s of DEFAULT_APP_SETTINGS) {
@@ -349,6 +351,8 @@ async function main() {
   console.log(
     `Seeded app settings: created=${createdSettings}, updated_descriptions=${updatedDescriptions}, total_defaults=${DEFAULT_APP_SETTINGS.length}`,
   );
+  const settingsCount = await prisma.appSetting.count();
+  console.log(`[seed] app_settings count after seed: ${settingsCount}`);
 
   const defaultDist = await prisma.distribution.upsert({
     where: { code: 'EDZ' },
