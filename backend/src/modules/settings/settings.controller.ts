@@ -31,14 +31,6 @@ export class SettingsController {
     return this.settingsService.findAll();
   }
 
-  @Get('mobile-push')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
-  @ApiOperation({ summary: 'Dohvati globalni status mobilnih push notifikacija' })
-  async getMobilePush() {
-    const enabled = await this.settingsService.isMobilePushEnabled();
-    return { enabled };
-  }
-
   @Patch('mobile-push')
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Postavi globalni status mobilnih push notifikacija' })
