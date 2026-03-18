@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Form, Input, Select, Space, Switch, Tabs, Typography, message } from 'antd';
+import { Alert, Button, Card, Form, Input, Select, Space, Switch, Tabs, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { settingsApi } from '@/api/settings.api';
 import { mailApi, type MailTemplate } from '@/api/mail.api';
@@ -184,6 +184,8 @@ function TemplatesCard() {
   const [messageApi, contextHolder] = message.useMessage();
   const [selected, setSelected] = useState<string>('installation-record-approval-request');
   const [content, setContent] = useState<string>('');
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [newTemplateName, setNewTemplateName] = useState<string>('');
 
   const templatesQuery = useQuery({
     queryKey: ['mail', 'templates'],
@@ -200,6 +202,27 @@ function TemplatesCard() {
       setContent(currentTemplate.content);
     }
   }, [currentTemplate]);
+
+  const previewMutation = useMutation({
+    mutationFn: async () =>
+      mailApi.previewTemplate(selected, {
+        recordNumber: 'TEST-001',
+        recordId: 'test',
+        meterSerialNumber: 'M-123',
+        ipAddress: '10.0.0.1',
+        installationAddress: 'Test adresa 1',
+        municipality: 'Test općina',
+        installedByName: 'System Admin',
+        appUrl: window.location.origin,
+      }),
+    onSuccess: (data) => setPreviewHtml(data.html),
+    onError: (e: unknown) => {
+      messageApi.error(
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Greška pri renderovanju preview-a.',
+      );
+    },
+  });
 
   const saveTemplate = useMutation({
     mutationFn: async () => mailApi.updateTemplate(selected, content),
@@ -257,42 +280,97 @@ function TemplatesCard() {
         </div>
 
         <Space wrap className="w-full justify-between">
-          <Select
-            value={selected}
-            onChange={(v) => setSelected(String(v))}
-            options={(templatesQuery.data ?? []).map((t: MailTemplate) => ({
-              value: t.name,
-              label: `${t.name} (${t.sourceType})`,
-            }))}
-            style={{ minWidth: 320 }}
-            loading={templatesQuery.isLoading}
-          />
+          <Space wrap>
+            <Select
+              value={selected}
+              onChange={(v) => {
+                setSelected(String(v));
+                setPreviewHtml('');
+              }}
+              options={(templatesQuery.data ?? []).map((t: MailTemplate) => ({
+                value: t.name,
+                label: `${t.name} (${t.sourceType})`,
+              }))}
+              style={{ minWidth: 360 }}
+              loading={templatesQuery.isLoading}
+            />
+            <Button onClick={() => previewMutation.mutate()} loading={previewMutation.isPending}>
+              Preview
+            </Button>
+          </Space>
+
           <Space wrap>
             <Input
-              placeholder="test@email.com"
-              value={testTo}
-              onChange={(e) => setTestTo(e.target.value)}
-              style={{ width: 260 }}
+              placeholder="Novi template name (npr. password-reset)"
+              value={newTemplateName}
+              onChange={(e) => setNewTemplateName(e.target.value)}
+              style={{ width: 320 }}
             />
             <Button
-              onClick={() => testEmail.mutate(testTo)}
-              loading={testEmail.isPending}
-              disabled={!testTo.trim()}
+              onClick={async () => {
+                const name = newTemplateName.trim();
+                if (!name) return;
+                await mailApi.updateTemplate(name, '<!-- new template -->');
+                setNewTemplateName('');
+                setSelected(name);
+                void queryClient.invalidateQueries({ queryKey: ['mail', 'templates'] });
+                messageApi.success('Template kreiran (DB override).');
+              }}
+              disabled={!newTemplateName.trim()}
             >
-              Pošalji test email
-            </Button>
-            <Button type="primary" onClick={() => saveTemplate.mutate()} loading={saveTemplate.isPending}>
-              Sačuvaj template
+              Kreiraj template
             </Button>
           </Space>
         </Space>
 
-        <Input.TextArea
-          rows={18}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="(Handlebars template)"
-        />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div>
+            <Typography.Text type="secondary" className="block mb-2">
+              Editor (Handlebars .hbs)
+            </Typography.Text>
+            <Input.TextArea
+              rows={18}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="(Handlebars template)"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="primary" onClick={() => saveTemplate.mutate()} loading={saveTemplate.isPending}>
+                Sačuvaj template
+              </Button>
+              <Input
+                placeholder="test@email.com"
+                value={testTo}
+                onChange={(e) => setTestTo(e.target.value)}
+                style={{ width: 260 }}
+              />
+              <Button
+                onClick={() => testEmail.mutate(testTo)}
+                loading={testEmail.isPending}
+                disabled={!testTo.trim()}
+              >
+                Pošalji test email
+              </Button>
+            </div>
+          </div>
+          <div>
+            <Typography.Text type="secondary" className="block mb-2">
+              HTML preview
+            </Typography.Text>
+            {previewHtml ? (
+              <iframe
+                title="template-preview"
+                className="w-full min-h-[420px] rounded border"
+                srcDoc={previewHtml}
+              />
+            ) : (
+              <Alert
+                type="info"
+                message="Klikni Preview da renderujemo template sa test podacima."
+              />
+            )}
+          </div>
+        </div>
       </Space>
     </Card>
   );
@@ -303,6 +381,19 @@ export default function EmailSettingsPage() {
     queryKey: ['settings'],
     queryFn: () => settingsApi.list(),
   });
+
+  const smtpProvider = getSetting(settings, 'smtp.provider') ?? 'custom';
+  const missing = useMemo(() => {
+    const required = ['smtp.provider', 'email.enabled'];
+    const missingKeys = required.filter((k) => !settings.some((s) => s.key === k));
+    const needsCreds = smtpProvider !== 'disabled' && (getSetting(settings, 'email.enabled') ?? 'true') === 'true';
+    const hasUser = !!(getSetting(settings, 'smtp.user') ?? '').trim();
+    const hasPass = !!(getSetting(settings, 'smtp.pass') ?? '').trim();
+    if (needsCreds && (!hasUser || !hasPass)) {
+      missingKeys.push('smtp.user/smtp.pass');
+    }
+    return missingKeys;
+  }, [settings, smtpProvider]);
 
   return (
     <div className="space-y-4">
@@ -324,6 +415,25 @@ export default function EmailSettingsPage() {
           },
         ]}
       />
+
+      {missing.length ? (
+        <Alert
+          type="warning"
+          message="Neke email postavke nisu podešene"
+          description={
+            <div>
+              <div>Provjeri sljedeće:</div>
+              <ul className="list-disc ml-5">
+                {missing.map((m) => (
+                  <li key={m}>
+                    <code>{m}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          }
+        />
+      ) : null}
 
       {isLoading ? (
         <Typography.Text type="secondary">Učitavanje postavki…</Typography.Text>

@@ -31,7 +31,21 @@ export interface MySettings {
   tour?: UserTourState;
 }
 
+export type AppFeatures = {
+  pushCampaignsEnabled: boolean;
+  mobilePushEnabled: boolean;
+  emailEnabled: boolean;
+  smtpProvider: string | null;
+  smtpConfigured: boolean;
+  missingKeys: string[];
+};
+
 export const settingsApi = {
+  getFeatures: async (): Promise<AppFeatures> => {
+    const response = await axiosInstance.get<ApiEnvelope<AppFeatures>>('/settings/features');
+    return response.data.data;
+  },
+
   getMobilePush: async (): Promise<{ enabled: boolean }> => {
     const response = await axiosInstance.get<ApiEnvelope<{ enabled: boolean }>>(
       '/settings/mobile-push',

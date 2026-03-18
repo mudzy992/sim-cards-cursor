@@ -235,10 +235,18 @@ export class MailService {
   async listTemplates(): Promise<
     { name: string; key: string; sourceType: 'db' | 'file'; content: string }[]
   > {
-    const names = [
+    const defaultNames = [
       'installation-record-approval-request',
       'installation-record-notification',
     ];
+    const overrides = await this.prisma.appSetting.findMany({
+      where: { key: { startsWith: 'email.templates.' } },
+      select: { key: true },
+    });
+    const overrideNames = overrides
+      .map((r) => r.key.replace(/^email\.templates\./, '').replace(/\.hbs$/, ''))
+      .filter(Boolean);
+    const names = [...new Set([...defaultNames, ...overrideNames])];
     const result = [];
     for (const name of names) {
       // eslint-disable-next-line no-await-in-loop
@@ -270,6 +278,19 @@ export class MailService {
     });
     this.templateCache.delete(safe);
     return { name: safe, key, sourceType: 'db', content: value };
+  }
+
+  async previewTemplate(
+    name: string,
+    context: Record<string, unknown>,
+  ): Promise<{ name: string; html: string }> {
+    const safe = String(name ?? '').trim();
+    if (!safe) throw new BadRequestException('Missing template name');
+    if (safe.includes('..') || safe.includes('/') || safe.includes('\\')) {
+      throw new BadRequestException('Invalid template name');
+    }
+    const html = await this.renderTemplate(safe, context);
+    return { name: safe, html };
   }
 
   async sendTestEmail(input: {

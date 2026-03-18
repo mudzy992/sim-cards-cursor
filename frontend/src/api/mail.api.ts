@@ -29,6 +29,14 @@ export const mailApi = {
     return response.data.data;
   },
 
+  previewTemplate: async (name: string, context: Record<string, unknown>): Promise<{ name: string; html: string }> => {
+    const response = await axiosInstance.post<ApiEnvelope<{ name: string; html: string }>>(
+      `/mail/templates/${encodeURIComponent(name)}/preview`,
+      { context },
+    );
+    return response.data.data;
+  },
+
   sendTest: async (input: {
     to: string;
     template: string;

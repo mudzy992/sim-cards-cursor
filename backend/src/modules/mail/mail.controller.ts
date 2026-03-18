@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -32,6 +32,16 @@ export class MailController {
   @ApiOperation({ summary: 'Update email template content (stored in DB)' })
   updateTemplate(@Param('name') name: string, @Body() body: { content: string }) {
     return this.mail.updateTemplate(name, body.content ?? '');
+  }
+
+  @Post('templates/:name/preview')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Render template HTML preview (no send)' })
+  previewTemplate(
+    @Param('name') name: string,
+    @Body() body: { context?: Record<string, unknown> },
+  ) {
+    return this.mail.previewTemplate(name, body.context ?? {});
   }
 
   @Put('test')

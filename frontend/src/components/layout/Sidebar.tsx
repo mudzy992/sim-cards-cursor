@@ -13,12 +13,16 @@ import {
 import { Layout, Menu } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
+import { useAppFeatures } from '@/hooks/useAppFeatures';
 
 const { Sider } = Layout;
 
 export function Sidebar() {
   const location = useLocation();
   const role = useAuthStore((state) => state.user?.role);
+
+  const featuresQuery = useAppFeatures();
+  const pushCampaignsEnabled = featuresQuery.data?.pushCampaignsEnabled ?? true;
 
   const items = [
     {
@@ -58,11 +62,15 @@ export function Sidebar() {
             icon: <MailOutlined />,
             label: <Link to="/recipients">Primaoci</Link>,
           },
-          {
-            key: '/push-campaigns',
-            icon: <NotificationOutlined />,
-            label: <Link to="/push-campaigns">Push kampanje</Link>,
-          },
+          ...(pushCampaignsEnabled
+            ? [
+                {
+                  key: '/push-campaigns',
+                  icon: <NotificationOutlined />,
+                  label: <Link to="/push-campaigns">Push kampanje</Link>,
+                },
+              ]
+            : []),
           {
             key: '/activity-log',
             icon: <UnorderedListOutlined />,
