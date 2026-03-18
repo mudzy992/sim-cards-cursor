@@ -7,7 +7,8 @@ import { SettingsService } from './settings.service';
 
 @Module({
   imports: [PrismaModule, ActivityLogModule],
-  controllers: [SettingsController, SettingsPublicController],
+  // Važno: public rute (npr. /settings/mobile-push) moraju biti registrovane prije /settings/:key
+  controllers: [SettingsPublicController, SettingsController],
   providers: [SettingsService],
   exports: [SettingsService],
 })
