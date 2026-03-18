@@ -68,6 +68,8 @@ Mount-an u backend kontejner kao `/usr/app/uploads`.
    MYSQL_DATABASE=CHANGE_ME_DB_NAME
    MYSQL_USER=sim_app
    MYSQL_PASSWORD=change_me_app_pass
+   # phpMyAdmin iza /dbadmin (obavezno da login redirect ne ode na /index.php u root)
+   PMA_ABSOLUTE_URI=http://10.10.10.30/dbadmin/
    ```
 
    Ove varijable se mapiraju na servis `mysql` u `docker-compose.vm.yml`.

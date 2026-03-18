@@ -48,6 +48,7 @@ services:
       - PMA_HOST=mysql
       - PMA_PORT=3306
       - PMA_ARBITRARY=0
+      - PMA_ABSOLUTE_URI=${PMA_ABSOLUTE_URI:-http://10.10.10.30/dbadmin/}
       # Upload limita (po potrebi za import)
       - UPLOAD_LIMIT=256M
     depends_on:
