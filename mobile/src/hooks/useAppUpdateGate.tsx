@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import * as Application from 'expo-application';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
@@ -113,16 +113,44 @@ export function useAppUpdateGate() {
   const actions = useMemo(() => {
     const downloadAndInstall = async (latest: AndroidLatestRelease) => {
       try {
+        setState({ kind: 'downloading', latest, progress: 0 });
+
+        const updatesDir = `${FileSystem.documentDirectory ?? ''}updates/`;
+        await FileSystem.makeDirectoryAsync(updatesDir, { intermediates: true });
+        const target = `${updatesDir}sim-tracker-${latest.versionName}-${latest.versionCode}.apk`;
+
         const base = axiosInstance.defaults.baseURL ?? '';
         const absoluteUrl = latest.downloadUrl.startsWith('http')
           ? latest.downloadUrl
           : `${base}${latest.downloadUrl}`;
 
-        // Preusmjeri korisnika na sistemski browser / download manager.
-        await Linking.openURL(absoluteUrl);
+        const download = FileSystem.createDownloadResumable(
+          absoluteUrl,
+          target,
+          {
+            headers: {
+              Authorization: `Bearer ${useAuthStore.getState().accessToken}`,
+            },
+          },
+          (p) => {
+            const progress = p.totalBytesExpectedToWrite
+              ? p.totalBytesWritten / p.totalBytesExpectedToWrite
+              : undefined;
+            setState({ kind: 'downloading', latest, progress });
+          },
+        );
 
-        // Nakon što smo otvorili URL u browseru, app može nastaviti normalno.
-        setState({ kind: 'no_update' });
+        const result = await download.downloadAsync();
+        if (!result?.uri) {
+          throw new Error('Download failed');
+        }
+
+        const contentUri = await FileSystem.getContentUriAsync(result.uri);
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1,
+          type: 'application/vnd.android.package-archive',
+        });
       } catch (e: any) {
         Alert.alert('Nadogradnja nije uspjela', e?.message ?? 'Greška pri nadogradnji');
         setState({ kind: 'error', message: e?.message ?? 'Download/install failed' });
