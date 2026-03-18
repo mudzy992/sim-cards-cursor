@@ -320,33 +320,35 @@ const DEFAULT_APP_SETTINGS: SeedSetting[] = [
   },
 ];
 
-async function ensureAppSetting(setting: SeedSetting): Promise<void> {
-  const existing = await prisma.appSetting.findUnique({ where: { key: setting.key } });
-  if (!existing) {
-    await prisma.appSetting.create({
-      data: {
-        key: setting.key,
-        value: setting.value,
-        description: setting.description,
-      },
-    });
-    return;
-  }
-
-  // Keep admin-edited values; only ensure a good description exists/updated.
-  if ((existing.description ?? '').trim() !== setting.description.trim()) {
-    await prisma.appSetting.update({
-      where: { key: setting.key },
-      data: { description: setting.description },
-    });
-  }
-}
-
 async function main() {
+  let createdSettings = 0;
+  let updatedDescriptions = 0;
   for (const s of DEFAULT_APP_SETTINGS) {
-    // eslint-disable-next-line no-await-in-loop
-    await ensureAppSetting(s);
+    const existing = await prisma.appSetting.findUnique({
+      where: { key: s.key },
+      select: { key: true, description: true },
+    });
+    if (!existing) {
+      // eslint-disable-next-line no-await-in-loop
+      await prisma.appSetting.create({
+        data: { key: s.key, value: s.value, description: s.description },
+      });
+      createdSettings += 1;
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+    if ((existing.description ?? '').trim() !== s.description.trim()) {
+      // eslint-disable-next-line no-await-in-loop
+      await prisma.appSetting.update({
+        where: { key: s.key },
+        data: { description: s.description },
+      });
+      updatedDescriptions += 1;
+    }
   }
+  console.log(
+    `Seeded app settings: created=${createdSettings}, updated_descriptions=${updatedDescriptions}, total_defaults=${DEFAULT_APP_SETTINGS.length}`,
+  );
 
   const defaultDist = await prisma.distribution.upsert({
     where: { code: 'EDZ' },
