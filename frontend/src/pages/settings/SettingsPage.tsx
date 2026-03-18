@@ -348,8 +348,15 @@ export default function SettingsPage() {
         <SettingsMobilePushSection />
       </Card>
 
-      <Card title="SMTP (Email transport)" className="mb-4">
-        <SettingsSmtpSection settings={settings} />
+      <Card title="Email / SMTP" className="mb-4">
+        <Space align="start" className="w-full justify-between" wrap>
+          <Typography.Paragraph type="secondary" className="!mb-0 max-w-2xl">
+            Email (SMTP) postavke i template-i su prebačeni na posebnu stranicu radi lakšeg podešavanja.
+          </Typography.Paragraph>
+          <Button type="primary" href="/settings/email">
+            Otvori Email postavke
+          </Button>
+        </Space>
       </Card>
 
       <Card title="Onboarding / App tour">

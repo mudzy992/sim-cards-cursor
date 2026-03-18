@@ -87,6 +87,11 @@ export function Sidebar() {
             label: <Link to="/settings">Postavke</Link>,
           },
           {
+            key: '/settings/email',
+            icon: <MailOutlined />,
+            label: <Link to="/settings/email">Email / SMTP</Link>,
+          },
+          {
             key: '/app-releases',
             icon: <SettingOutlined />,
             label: <Link to="/app-releases">App verzije</Link>,

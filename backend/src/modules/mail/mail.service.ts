@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as nodemailer from 'nodemailer';
@@ -118,13 +118,37 @@ export class MailService {
     return path.join(process.cwd(), 'templates', 'email');
   }
 
-  private renderTemplate(templateName: string, context: Record<string, unknown>): string {
+  private getTemplateSettingKey(templateName: string): string {
+    return `email.templates.${templateName}.hbs`;
+  }
+
+  private async getTemplateSource(templateName: string): Promise<{
+    source: string;
+    sourceType: 'db' | 'file';
+  }> {
+    const key = this.getTemplateSettingKey(templateName);
+    const row = await this.prisma.appSetting.findUnique({
+      where: { key },
+      select: { value: true },
+    });
+    const dbValue = row?.value ?? null;
+    if (dbValue && dbValue.trim()) {
+      return { source: dbValue, sourceType: 'db' };
+    }
+
+    const filePath = path.join(this.getTemplatesDir(), `${templateName}.hbs`);
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException(`Template "${templateName}" not found`);
+    }
+    return { source: fs.readFileSync(filePath, 'utf-8'), sourceType: 'file' };
+  }
+
+  private async renderTemplate(templateName: string, context: Record<string, unknown>): Promise<string> {
     const cacheKey = templateName;
     const cached = this.templateCache.get(cacheKey);
     if (cached) return cached(context);
 
-    const filePath = path.join(this.getTemplatesDir(), `${templateName}.hbs`);
-    const source = fs.readFileSync(filePath, 'utf-8');
+    const { source } = await this.getTemplateSource(templateName);
     const compiled = Handlebars.compile(source, { strict: true });
     this.templateCache.set(cacheKey, compiled);
     return compiled(context);
@@ -195,7 +219,7 @@ export class MailService {
       return;
     }
 
-    const html = this.renderTemplate(template, context);
+    const html = await this.renderTemplate(template, context);
     await transport.transporter.sendMail({
       to: recipients,
       from: transport.from,
@@ -206,5 +230,66 @@ export class MailService {
     });
 
     this.logger.log(`Email sent to ${recipients.join(', ')}`);
+  }
+
+  async listTemplates(): Promise<
+    { name: string; key: string; sourceType: 'db' | 'file'; content: string }[]
+  > {
+    const names = [
+      'installation-record-approval-request',
+      'installation-record-notification',
+    ];
+    const result = [];
+    for (const name of names) {
+      // eslint-disable-next-line no-await-in-loop
+      const { source, sourceType } = await this.getTemplateSource(name);
+      result.push({ name, key: this.getTemplateSettingKey(name), sourceType, content: source });
+    }
+    return result;
+  }
+
+  async getTemplate(name: string): Promise<{ name: string; key: string; sourceType: 'db' | 'file'; content: string }> {
+    const safe = String(name ?? '').trim();
+    if (!safe) throw new BadRequestException('Missing template name');
+    const { source, sourceType } = await this.getTemplateSource(safe);
+    return { name: safe, key: this.getTemplateSettingKey(safe), sourceType, content: source };
+  }
+
+  async updateTemplate(name: string, content: string): Promise<{ name: string; key: string; sourceType: 'db'; content: string }> {
+    const safe = String(name ?? '').trim();
+    if (!safe) throw new BadRequestException('Missing template name');
+    if (safe.includes('..') || safe.includes('/') || safe.includes('\\')) {
+      throw new BadRequestException('Invalid template name');
+    }
+    const key = this.getTemplateSettingKey(safe);
+    const value = String(content ?? '');
+    await this.prisma.appSetting.upsert({
+      where: { key },
+      create: { key, value, description: `Email template override: ${safe}` },
+      update: { value },
+    });
+    this.templateCache.delete(safe);
+    return { name: safe, key, sourceType: 'db', content: value };
+  }
+
+  async sendTestEmail(input: {
+    to: string;
+    template: string;
+    subject?: string;
+    context?: Record<string, unknown>;
+  }): Promise<{ ok: true }> {
+    const to = String(input.to ?? '').trim();
+    if (!to) throw new BadRequestException('Missing "to"');
+    const template = String(input.template ?? '').trim();
+    if (!template) throw new BadRequestException('Missing "template"');
+    const subject = String(input.subject ?? `Test email (${template})`);
+
+    await this.sendMail({
+      to,
+      subject,
+      template,
+      context: input.context ?? { recordNumber: 'TEST-001', recordId: 'test', appUrl: this.config.get<string>('FRONTEND_URL', '') },
+    });
+    return { ok: true };
   }
 }

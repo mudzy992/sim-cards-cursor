@@ -18,6 +18,7 @@ import InstallationRecordDetailPage from '@/pages/installation-records/Installat
 import RecipientsPage from '@/pages/recipients/RecipientsPage';
 import ActivityLogPage from '@/pages/activity-log/ActivityLogPage';
 import SettingsPage from '@/pages/settings/SettingsPage';
+import EmailSettingsPage from '@/pages/settings/EmailSettingsPage';
 import AnalyticsPage from '@/pages/analytics/AnalyticsPage';
 import AppReleasesPage from '@/pages/app-releases/AppReleasesPage';
 import PushCampaignsPage from '@/pages/push-campaigns/PushCampaignsPage';
@@ -150,6 +151,14 @@ export const router = createBrowserRouter([
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN']}>
                 <SettingsPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: '/settings/email',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN']}>
+                <EmailSettingsPage />
               </RoleGuard>
             ),
           },
