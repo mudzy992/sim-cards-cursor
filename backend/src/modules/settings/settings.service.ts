@@ -53,6 +53,97 @@ export class SettingsService {
     return setting.value;
   }
 
+  async getBoolean(key: string, defaultValue: boolean): Promise<boolean> {
+    const setting = await this.prisma.appSetting.findUnique({
+      where: { key },
+    });
+    if (!setting || setting.value == null) {
+      return defaultValue;
+    }
+    const raw = String(setting.value).toLowerCase().trim();
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return defaultValue;
+  }
+
+  async isMobilePushEnabled(): Promise<boolean> {
+    return this.getBoolean('mobile.push.enabled', true);
+  }
+
+  async isPushCampaignsEnabled(): Promise<boolean> {
+    const mobilePush = await this.isMobilePushEnabled();
+    const pushEnabled = await this.getBoolean('notifications.mobile.pushEnabled', true);
+    return mobilePush && pushEnabled;
+  }
+
+  async getFeatures(): Promise<{
+    pushCampaignsEnabled: boolean;
+    mobilePushEnabled: boolean;
+    emailEnabled: boolean;
+    smtpProvider: string | null;
+    smtpConfigured: boolean;
+    missingKeys: string[];
+  }> {
+    const mobilePushEnabled = await this.isMobilePushEnabled();
+    const pushCampaignsEnabled = await this.isPushCampaignsEnabled();
+    const emailEnabled = await this.getBoolean('email.enabled', true);
+    const smtpProvider = await this.prisma.appSetting
+      .findUnique({ where: { key: 'smtp.provider' }, select: { value: true } })
+      .then((r) => r?.value ?? null);
+    const smtpUser = await this.prisma.appSetting
+      .findUnique({ where: { key: 'smtp.user' }, select: { value: true } })
+      .then((r) => r?.value ?? null);
+    const smtpPass = await this.prisma.appSetting
+      .findUnique({ where: { key: 'smtp.pass' }, select: { value: true } })
+      .then((r) => r?.value ?? null);
+
+    const provider = (smtpProvider ?? 'custom').trim().toLowerCase();
+    const smtpConfigured =
+      !emailEnabled || provider === 'disabled'
+        ? true
+        : Boolean(smtpUser?.trim()) && Boolean(smtpPass?.trim());
+
+    const requiredKeys = [
+      'email.enabled',
+      'smtp.provider',
+      'mobile.push.enabled',
+      'notifications.mobile.pushEnabled',
+    ];
+    const existing = await this.prisma.appSetting.findMany({
+      where: { key: { in: requiredKeys } },
+      select: { key: true },
+    });
+    const existingSet = new Set(existing.map((e) => e.key));
+    const missingKeys = requiredKeys.filter((k) => !existingSet.has(k));
+
+    if (emailEnabled && provider !== 'disabled' && (!smtpUser?.trim() || !smtpPass?.trim())) {
+      missingKeys.push('smtp.user', 'smtp.pass');
+    }
+
+    return {
+      pushCampaignsEnabled,
+      mobilePushEnabled,
+      emailEnabled,
+      smtpProvider,
+      smtpConfigured,
+      missingKeys: [...new Set(missingKeys)],
+    };
+  }
+
+  async setMobilePushEnabled(
+    enabled: boolean,
+    ctx?: SettingChangeContext,
+  ): Promise<AppSetting> {
+    return this.upsert(
+      'mobile.push.enabled',
+      {
+        value: enabled ? 'true' : 'false',
+        description: 'Globalni toggle za mobilne push notifikacije (offline/online okruženje).',
+      },
+      ctx,
+    );
+  }
+
   private getUserTourKey(userId: string): string {
     return `user:tour-state:${userId}`;
   }

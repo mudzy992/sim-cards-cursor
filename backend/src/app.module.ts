@@ -25,6 +25,7 @@ import { PushTokensModule } from './modules/push-tokens/push-tokens.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { PushCampaignsModule } from './modules/push-campaigns/push-campaigns.module';
 import { AppReleasesModule } from './modules/app-releases/app-releases.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { AppReleasesModule } from './modules/app-releases/app-releases.module';
     PushCampaignsModule,
     AppReleasesModule,
   ],
+  controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,

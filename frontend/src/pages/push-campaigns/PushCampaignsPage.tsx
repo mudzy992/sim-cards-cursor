@@ -6,6 +6,8 @@ import dayjs from 'dayjs';
 import { pushCampaignsApi, type PushCampaign, type PushCampaignAudienceType, type PushCampaignStatus, type PushDeliveryListItem } from '@/api/push-campaigns.api';
 import { usersApi } from '@/api/users.api';
 import type { UserListItem } from '@/types/user.types';
+import { useAppFeatures } from '@/hooks/useAppFeatures';
+import { Alert } from 'antd';
 
 const statusColor: Record<PushCampaignStatus, string> = {
   DRAFT: 'default',
@@ -16,6 +18,19 @@ const statusColor: Record<PushCampaignStatus, string> = {
 };
 
 export default function PushCampaignsPage() {
+  const featuresQuery = useAppFeatures();
+  const pushEnabled = featuresQuery.data?.pushCampaignsEnabled ?? true;
+  if (!pushEnabled) {
+    return (
+      <Alert
+        type="warning"
+        message="Push kampanje su onemogućene"
+        description="Ova funkcionalnost je isključena u sistemskim postavkama (push/mobile notifikacije)."
+        showIcon
+      />
+    );
+  }
+
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);

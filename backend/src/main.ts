@@ -41,7 +41,15 @@ async function bootstrap() {
   const isDev = appEnv === 'development';
 
   const devOrigins = ['http://localhost:3004'];
-  const prodOrigins = [config.get<string>('FRONTEND_URL', 'https://simtracker.ba101.top')];
+  const prodOrigins = [
+    ...new Set(
+      (config
+        .get<string>('FRONTEND_URLS', config.get<string>('FRONTEND_URL', 'http://ep-web-sim'))
+        ?.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean) ?? []),
+    ),
+  ];
   const allowedOrigins = isDev ? devOrigins : prodOrigins;
 
   app.enableCors({

@@ -17,6 +17,13 @@ import { UpdateMySettingsDto } from './dto/update-my-settings.dto';
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
+  @Get('features')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @ApiOperation({ summary: 'Feature flags and configuration status (for UI)' })
+  getFeatures() {
+    return this.settingsService.getFeatures();
+  }
+
   @Get()
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Lista svih postavki' })
@@ -24,29 +31,22 @@ export class SettingsController {
     return this.settingsService.findAll();
   }
 
-  @Get(':key')
+  @Patch('mobile-push')
   @Roles(UserRole.SYSTEM_ADMIN)
-  @ApiOperation({ summary: 'Dohvati postavku po ključu' })
-  findByKey(@Param('key') key: string) {
-    return this.settingsService.findByKey(key);
-  }
-
-  @Patch(':key')
-  @Roles(UserRole.SYSTEM_ADMIN)
-  @ApiOperation({ summary: 'Ažuriraj postavku (upsert)' })
-  update(
-    @Param('key') key: string,
-    @Body() dto: UpdateSettingDto,
+  @ApiOperation({ summary: 'Postavi globalni status mobilnih push notifikacija' })
+  async setMobilePush(
+    @Body() body: { enabled: boolean },
     @CurrentUser() user: { id: string },
     @Req() req: Request,
   ) {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress;
-    return this.settingsService.upsert(key, dto, {
+    const setting = await this.settingsService.setMobilePushEnabled(body.enabled, {
       userId: user.id,
       ipAddress,
     });
+    return { enabled: setting.value === 'true' };
   }
 
   @Get('me')
@@ -87,5 +87,30 @@ export class SettingsController {
     }).then((tour) => ({
       tour,
     }));
+  }
+
+  @Get(':key')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Dohvati postavku po ključu' })
+  findByKey(@Param('key') key: string) {
+    return this.settingsService.findByKey(key);
+  }
+
+  @Patch(':key')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Ažuriraj postavku (upsert)' })
+  update(
+    @Param('key') key: string,
+    @Body() dto: UpdateSettingDto,
+    @CurrentUser() user: { id: string },
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    return this.settingsService.upsert(key, dto, {
+      userId: user.id,
+      ipAddress,
+    });
   }
 }

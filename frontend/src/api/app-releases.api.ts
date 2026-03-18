@@ -50,9 +50,9 @@ export const appReleasesApi = {
     return response.data.data;
   },
 
-  latestAndroid: async (): Promise<AndroidLatestWithMeta> => {
+  latestAndroid: async (): Promise<AndroidLatestWithMeta | null> => {
     const response = await axiosInstance.get<
-      ApiEnvelope<AndroidLatestWithMeta>
+      ApiEnvelope<AndroidLatestWithMeta | null>
     >('/app-releases/android/latest');
     return response.data.data;
   },

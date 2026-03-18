@@ -86,7 +86,7 @@ export class AppReleasesService {
       where: { platform: MobileAppPlatform.ANDROID },
       orderBy: [{ versionCode: 'desc' }, { publishedAt: 'desc' }],
     });
-    if (!latest) throw new NotFoundException('No Android release found');
+    if (!latest) return null;
 
     return {
       ...latest,

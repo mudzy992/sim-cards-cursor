@@ -15,7 +15,7 @@
     "smoke:phase2:import-validation": "ts-node scripts/phase2-import-validation-smoke.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "node -r ts-node/register/transpile-only prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
@@ -34,9 +34,9 @@
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "expo-server-sdk": "^3.14.0",
     "handlebars": "^4.7.8",
     "helmet": "^8.1.0",
-    "expo-server-sdk": "^3.14.0",
     "nodemailer": "^8.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -54,6 +54,7 @@
     "@types/express": "^5.0.3",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.19.16",
+    "@types/nodemailer": "^7.0.11",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/supertest": "^7.2.0",
@@ -65,6 +66,6 @@
     "typescript": "^5.9.2"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "node -r ts-node/register/transpile-only prisma/seed.ts"
   }
 }

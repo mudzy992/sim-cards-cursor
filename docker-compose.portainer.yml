@@ -1,0 +1,30 @@
+services:
+  portainer:
+    container_name: sim-tracker-portainer
+    image: portainer/portainer-ce:latest
+    restart: unless-stopped
+    command:
+      - --base-url=/portainer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    networks:
+      - app
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.sim_portainer.rule=(Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/portainer`)"
+      - traefik.http.routers.sim_portainer.entrypoints=web
+      - traefik.http.routers.sim_portainer.priority=30
+      - traefik.http.routers.sim_portainer.service=sim_portainer_svc
+      - traefik.http.routers.sim_portainer.middlewares=portainer_stripprefix
+      - traefik.http.middlewares.portainer_stripprefix.stripprefix.prefixes=/portainer
+      - traefik.http.services.sim_portainer_svc.loadbalancer.server.port=9000
+
+networks:
+  app:
+    external: true
+    name: sim-tracker-net
+
+volumes:
+  portainer-data:
+    driver: local

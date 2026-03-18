@@ -1,4 +1,4 @@
-import { Layout } from 'antd';
+import { Alert, Layout } from 'antd';
 import { Outlet } from 'react-router-dom';
 import { useNotificationSocket } from '@/hooks/useNotificationSocket';
 import { Breadcrumb } from './Breadcrumb';
@@ -11,6 +11,7 @@ import { Tour } from 'antd';
 import type { TourProps } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTourStore } from '@/store/tour.store';
+import { useAppFeatures } from '@/hooks/useAppFeatures';
 
 const { Content } = Layout;
 
@@ -18,6 +19,7 @@ export function AppLayout() {
   useNotificationSocket();
 
   const user = useAuthStore((s) => s.user);
+  const featuresQuery = useAppFeatures();
   const location = useLocation();
   const navigate = useNavigate();
   const { tour, currentVersion, settingsLoaded, loadForUser, markWebTourCompleted } =
@@ -230,6 +232,26 @@ export function AppLayout() {
           <Header />
           <Content className="px-6 py-5">
             <Breadcrumb />
+            {user?.role === 'SYSTEM_ADMIN' && featuresQuery.data?.missingKeys?.length ? (
+              <Alert
+                type="warning"
+                className="mb-4"
+                message="Sistem nije potpuno podešen"
+                description={
+                  <div>
+                    <div>Nedostaju ili nisu podešene ključne postavke:</div>
+                    <ul className="list-disc ml-5">
+                      {featuresQuery.data.missingKeys.map((k) => (
+                        <li key={k}>
+                          <code>{k}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                }
+                showIcon
+              />
+            ) : null}
             <div className="rounded-md bg-white p-4 shadow-sm">
               <Outlet />
             </div>
