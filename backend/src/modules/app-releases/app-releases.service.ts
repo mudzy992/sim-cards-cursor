@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MobileAppPlatform } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -86,7 +86,7 @@ export class AppReleasesService {
       where: { platform: MobileAppPlatform.ANDROID },
       orderBy: [{ versionCode: 'desc' }, { publishedAt: 'desc' }],
     });
-    if (!latest) throw new NotFoundException('No Android release found');
+    if (!latest) return null;
 
     return {
       ...latest,

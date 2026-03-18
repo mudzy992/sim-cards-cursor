@@ -50,31 +50,6 @@ export class SettingsController {
     return { enabled: setting.value === 'true' };
   }
 
-  @Get(':key')
-  @Roles(UserRole.SYSTEM_ADMIN)
-  @ApiOperation({ summary: 'Dohvati postavku po ključu' })
-  findByKey(@Param('key') key: string) {
-    return this.settingsService.findByKey(key);
-  }
-
-  @Patch(':key')
-  @Roles(UserRole.SYSTEM_ADMIN)
-  @ApiOperation({ summary: 'Ažuriraj postavku (upsert)' })
-  update(
-    @Param('key') key: string,
-    @Body() dto: UpdateSettingDto,
-    @CurrentUser() user: { id: string },
-    @Req() req: Request,
-  ) {
-    const ipAddress =
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-      req.socket?.remoteAddress;
-    return this.settingsService.upsert(key, dto, {
-      userId: user.id,
-      ipAddress,
-    });
-  }
-
   @Get('me')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
   @ApiOperation({
@@ -113,5 +88,30 @@ export class SettingsController {
     }).then((tour) => ({
       tour,
     }));
+  }
+
+  @Get(':key')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Dohvati postavku po ključu' })
+  findByKey(@Param('key') key: string) {
+    return this.settingsService.findByKey(key);
+  }
+
+  @Patch(':key')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Ažuriraj postavku (upsert)' })
+  update(
+    @Param('key') key: string,
+    @Body() dto: UpdateSettingDto,
+    @CurrentUser() user: { id: string },
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    return this.settingsService.upsert(key, dto, {
+      userId: user.id,
+      ipAddress,
+    });
   }
 }

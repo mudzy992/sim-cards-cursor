@@ -80,7 +80,7 @@ export default function LoginPage() {
           </Button>
         </Form>
 
-        {latestReleaseQuery.isSuccess && (
+        {latestReleaseQuery.isSuccess && latestReleaseQuery.data ? (
           <div className="mt-4 border-t pt-4">
             <Typography.Text type="secondary" className="block mb-1">
               Zadnja verzija mobilne aplikacije:
@@ -99,7 +99,7 @@ export default function LoginPage() {
               </a>
             </div>
           </div>
-        )}
+        ) : null}
       </Card>
     </div>
   );

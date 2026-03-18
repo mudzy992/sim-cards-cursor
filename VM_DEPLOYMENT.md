@@ -84,15 +84,14 @@ VITE_APP_NAME="Sim Cards"
 
 ---
 
-## 5. Novi docker-compose okruženje (bez Traefika)
-
-Bez dokera ovdje sve staje, i ide ručno podešavanje
+## 5. Novi docker-compose okruženje (VM)
 
 Struktura servisa:
 
 - `mysql` – MySQL 8.x sa lokalnim volume-om `mysql-data`
 - `backend` – NestJS backend, buildan iz `backend/Dockerfile`, mount za `/usr/app/uploads`
 - `frontend` – React (Vite) + Nginx, buildan iz `frontend/Dockerfile`
+- `dbadmin` – phpMyAdmin za administraciju MySQL (nema izložen port; pristup ide preko postojećeg HTTP entrypointa na putanji `/dbadmin`)
 
 Pokretanje:
 
@@ -114,8 +113,17 @@ Provjere:
    ```
 
 3. Pristup frontendu iz browsera:
-   - sa hosta: `http://localhost:3004/`
+   - sa hosta: `http://localhost/`
    - iz mreže firme: `http://<VM_IP>/`
+
+4. Pristup phpMyAdmin (DB admin UI) bez otvaranja novog porta:
+   - sa hosta: `http://localhost/dbadmin`
+   - iz mreže firme: `http://<VM_IP>/dbadmin`
+
+   Login:
+   - **Server/Host**: `mysql`
+   - **Username**: vrijednost `MYSQL_USER`
+   - **Password**: vrijednost `MYSQL_PASSWORD`
 
 ---
 

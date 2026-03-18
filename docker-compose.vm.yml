@@ -40,6 +40,31 @@ services:
     networks:
       - app
 
+  dbadmin:
+    container_name: sim-tracker-dbadmin
+    image: phpmyadmin:5-apache
+    restart: unless-stopped
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - PMA_ARBITRARY=0
+      # Upload limita (po potrebi za import)
+      - UPLOAD_LIMIT=256M
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.sim_dbadmin.rule=(Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/dbadmin`)"
+      - traefik.http.routers.sim_dbadmin.entrypoints=web
+      - traefik.http.routers.sim_dbadmin.priority=30
+      - traefik.http.routers.sim_dbadmin.middlewares=sim_dbadmin_stripprefix
+      - traefik.http.routers.sim_dbadmin.service=sim_dbadmin_svc
+      - traefik.http.middlewares.sim_dbadmin_stripprefix.stripprefix.prefixes=/dbadmin
+      - traefik.http.services.sim_dbadmin_svc.loadbalancer.server.port=80
+
   backend:
     container_name: sim-tracker-backend-vm
     build:
