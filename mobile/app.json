@@ -1,0 +1,87 @@
+{
+  "expo": {
+    "name": "SIM Tracker",
+    "slug": "sim-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "simtracker",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f766e"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ba.epbih.simtracker",
+      "infoPlist": {
+        "NSCameraUsageDescription": "SIM Tracker koristi kameru za skeniranje ICCID barkoda.",
+        "NSLocationWhenInUseUsageDescription": "SIM Tracker koristi lokaciju za automatski unos GPS koordinata pri kreiranju zapisnika ugradnje.",
+        "NSPhotoLibraryUsageDescription": "SIM Tracker koristi pristup fotografijama za prilog slika uz zapisnik ugradnje."
+      }
+    },
+    "android": {
+      "package": "ba.epbih.simtracker",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundImage": "./assets/ic_launcher_background.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#0f766e",
+      "androidMode": "default",
+      "androidCollapsedTitle": "SIM Tracker"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "SIM Tracker koristi kameru za skeniranje ICCID barkoda."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SIM Tracker koristi lokaciju za automatski unos GPS koordinata pri kreiranju zapisnika ugradnje."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SIM Tracker koristi pristup fotografijama za prilog slika uz zapisnik ugradnje.",
+          "cameraPermission": "SIM Tracker koristi kameru za snimanje fotografija uz zapisnik ugradnje."
+        }
+      ],
+      "expo-notifications",
+      "expo-asset",
+      "expo-font"
+    ],
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "11f0eb09-c999-4daa-a0d6-4fc72e83c57e"
+      }
+    }
+  }
+}
