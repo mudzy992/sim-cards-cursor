@@ -24,6 +24,22 @@ export interface MySettings {
 }
 
 export const settingsApi = {
+  getMobilePushEnabled: async (): Promise<boolean> => {
+    try {
+      const response = await axiosInstance.get('/settings/mobile-push');
+      const payload = response.data as any;
+      const enabled =
+        (payload?.data?.enabled as boolean | undefined) ??
+        (payload?.enabled as boolean | undefined);
+      return typeof enabled === 'boolean' ? enabled : true;
+    } catch {
+      console.warn(
+        '[Settings] Ne mogu pročitati mobile-push flag, fallback na enabled=true',
+      );
+      return true;
+    }
+  },
+
   getMy: async (): Promise<MySettings> => {
     const response = await axiosInstance.get<MySettings>('/settings/me');
     return response.data;

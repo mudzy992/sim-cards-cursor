@@ -40,12 +40,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "notification": {
-      "icon": "./assets/notification-icon.png",
-      "color": "#0f766e",
-      "androidMode": "default",
-      "androidCollapsedTitle": "SIM Tracker"
-    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
@@ -68,8 +62,18 @@
           "cameraPermission": "SIM Tracker koristi kameru za snimanje fotografija uz zapisnik ugradnje."
         }
       ],
-      "expo-notifications",
-      "expo-asset"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#0f766e",
+          "androidMode": "default",
+          "androidCollapsedTitle": "SIM Tracker"
+        }
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-audio"
     ],
     "updates": {
       "fallbackToCacheTimeout": 0
