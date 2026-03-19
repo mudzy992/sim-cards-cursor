@@ -3,9 +3,16 @@ import { useAuthStore } from '@/store/auth.store';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAppUpdateGate } from '@/hooks/useAppUpdateGate';
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Alert, Button, SafeAreaView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Button,
+  SafeAreaView,
+  Text,
+  View,
+} from 'react-native';
 
-export default function PrivateLayout() {
+const PrivateLayout = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   usePushNotifications();
@@ -90,4 +97,6 @@ export default function PrivateLayout() {
       <Stack.Screen name="notifications" options={{ title: 'Notifikacije' }} />
     </Stack>
   );
-}
+};
+
+export default PrivateLayout;
