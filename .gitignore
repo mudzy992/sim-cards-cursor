@@ -8,10 +8,10 @@ mobile/.expo/
 mobile/.expo-shared/
 
 # VM deploy branch specific – ne track-ati ove direktorije/fajlove
+# Ne stavljati ceo mobile/ ovdje: EAS Build pakuje prema .gitignore i onda nema package.json u arhivi
 .cursor/
 docs/
 execution-playbook/
-mobile/
 .cursorrules
 
 # Logs
