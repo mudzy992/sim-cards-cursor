@@ -53,9 +53,8 @@ async function bootstrap() {
   const defaultAllowedHostnames = new Set<string>([
     'localhost',
     '127.0.0.1',
-    '10.10.10.30',
-    '10.50.255.189',
     'ep-sim.epbih.ba',
+    'simtracker.ba101.top',
   ]);
 
   const allowedOriginsExact = new Set<string>([

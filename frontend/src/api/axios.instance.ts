@@ -10,11 +10,10 @@ type RetriableConfig = InternalAxiosRequestConfig & {
 
 const DEFAULT_API_BASE_URLS = {
   local: [
-    'http://10.10.10.30/backend/api',
-    'http://10.50.255.189/backend/api',
-    'https://ep-sim.epbih.ba/backend/api',
+    'http://localhost:3003/api',
+    'https://simtracker.ba101.top/backend/api',
   ],
-  prod: ['https://ep-sim.epbih.ba/backend/api', 'http://10.50.255.189/backend/api'],
+  prod: ['https://simtracker.ba101.top/backend/api'],
 } as const;
 
 export const getApiBaseUrls = (): string[] => {
@@ -33,8 +32,7 @@ export const getApiBaseUrls = (): string[] => {
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isLocal =
     hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.startsWith('10.10.10.')
+    hostname === '127.0.0.1'
 
   return isLocal ? [...DEFAULT_API_BASE_URLS.local] : [...DEFAULT_API_BASE_URLS.prod]
 };
