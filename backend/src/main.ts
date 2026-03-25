@@ -44,7 +44,7 @@ async function bootstrap() {
   const prodOrigins = [
     ...new Set(
       (config
-        .get<string>('FRONTEND_URLS', config.get<string>('FRONTEND_URL', 'http://ep-web-sim'))
+        .get<string>('FRONTEND_URLS', config.get<string>('FRONTEND_URL', 'http://ep-sim.epbih.ba'))
         ?.split(',')
         .map((s) => s.trim())
         .filter(Boolean) ?? []),

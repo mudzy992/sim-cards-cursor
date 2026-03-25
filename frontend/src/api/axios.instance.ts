@@ -6,7 +6,7 @@ import type { LoginResponse } from '@/types/auth.types';
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
+  import.meta.env.VITE_API_BASE_URL ?? 'http://10.50.255.189/backend/api';
 
 export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,

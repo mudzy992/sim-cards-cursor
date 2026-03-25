@@ -8,10 +8,18 @@ services:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
+      #- --entrypoints.traefik.address=:8080
       - --accesslog=true
       - --log.level=INFO
     ports:
       - "80:80"
+      #- "8080:8080"
+    #labels:
+      #- traefik.enable=true
+      #- "traefik.http.routers.traefik.rule=(PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+      #- traefik.http.routers.traefik.entrypoints=traefik
+      #- traefik.http.routers.traefik.service=api@internal
+      #- traefik.http.routers.traefik.priority=100
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -94,7 +102,7 @@ services:
       - traefik.enable=true
 
       # Backend HTTP: public /backend/* -> internal /* (Nest stays on /api)
-      - "traefik.http.routers.sim_backend.rule=(Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/backend`)"
+      - "traefik.http.routers.sim_backend.rule=(Host(`ep-sim.epbih.ba`) || Host(`10.50.255.189`) || Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/backend`)"
       - traefik.http.routers.sim_backend.entrypoints=web
       - traefik.http.routers.sim_backend.priority=10
       - traefik.http.routers.sim_backend.middlewares=sim_backend_stripprefix
@@ -103,10 +111,16 @@ services:
       - traefik.http.services.sim_backend_svc.loadbalancer.server.port=3003
 
       # Socket.io: keep path /api/socket.io (hardcoded in FE + BE)
-      - "traefik.http.routers.sim_socket.rule=(Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/api/socket.io`)"
+      - "traefik.http.routers.sim_socket.rule=(Host(`ep-sim.epbih.ba`) || Host(`10.50.255.189`) || Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/api/socket.io`)"
       - traefik.http.routers.sim_socket.entrypoints=web
       - traefik.http.routers.sim_socket.priority=20
       - traefik.http.routers.sim_socket.service=sim_backend_svc
+
+      # Swagger docs assets: /api/docs/* must go to backend (otherwise frontend catches it)
+      - "traefik.http.routers.sim_docs.rule=(Host(`ep-sim.epbih.ba`) || Host(`10.50.255.189`) || Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/api/docs`)"
+      - traefik.http.routers.sim_docs.entrypoints=web
+      - traefik.http.routers.sim_docs.priority=25
+      - traefik.http.routers.sim_docs.service=sim_backend_svc
 
   frontend:
     container_name: sim-tracker-frontend-vm
@@ -119,7 +133,7 @@ services:
       - app
     labels:
       - traefik.enable=true
-      - "traefik.http.routers.sim_frontend.rule=(Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/`)"
+      - "traefik.http.routers.sim_frontend.rule=(Host(`ep-sim.epbih.ba`) || Host(`10.50.255.189`) || Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/`)"
       - traefik.http.routers.sim_frontend.entrypoints=web
       - traefik.http.routers.sim_frontend.priority=1
       - traefik.http.routers.sim_frontend.service=sim_frontend_svc
