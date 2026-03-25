@@ -43,7 +43,22 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }],
+      [
+        "expo-build-properties",
+        {
+            "android": {
+            "usesCleartextTraffic": true,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0",
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+            },
+            "ios": {
+            "deploymentTarget": "15.1"
+            }
+        }
+      ],
       [
         "expo-camera",
         {
