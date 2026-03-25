@@ -44,6 +44,19 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-build-properties",
+        {
+            "android": {
+            "usesCleartextTraffic": true,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0",
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+            }
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "SIM Tracker koristi kameru za skeniranje ICCID barkoda."

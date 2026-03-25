@@ -3,10 +3,43 @@ import { useAuthStore } from '@/store/auth.store';
 import type { ApiEnvelope } from '@/types/common.types';
 import type { LoginResponse } from '@/types/auth.types';
 
-type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+type RetriableConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+  _baseUrlIndex?: number;
+};
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
+const DEFAULT_API_BASE_URLS = {
+  local: [
+    'http://10.10.10.30/backend/api',
+    'http://10.50.255.189/backend/api',
+    'https://ep-sim.epbih.ba/backend/api',
+  ],
+  prod: ['https://ep-sim.epbih.ba/backend/api', 'http://10.50.255.189/backend/api'],
+} as const;
+
+export const getApiBaseUrls = (): string[] => {
+  const envBaseUrls = import.meta.env.VITE_API_BASE_URLS as string | undefined;
+  if (envBaseUrls) {
+    const parsed = envBaseUrls
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (parsed.length > 0) return parsed
+  }
+
+  const envBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  if (envBaseUrl) return [envBaseUrl, ...DEFAULT_API_BASE_URLS.prod.filter((u) => u !== envBaseUrl)]
+
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isLocal =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.startsWith('10.10.10.')
+
+  return isLocal ? [...DEFAULT_API_BASE_URLS.local] : [...DEFAULT_API_BASE_URLS.prod]
+};
+
+export const API_BASE_URL = getApiBaseUrls()[0] ?? DEFAULT_API_BASE_URLS.prod[0];
 
 export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -14,19 +47,41 @@ export const axiosInstance = axios.create({
 });
 
 axiosInstance.interceptors.request.use((config) => {
+  const requestConfig = config as RetriableConfig;
   const accessToken = useAuthStore.getState().tokens?.accessToken;
 
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
+  if (!requestConfig.baseURL) {
+    requestConfig.baseURL = API_BASE_URL;
   }
 
-  return config;
+  if (requestConfig._baseUrlIndex === undefined) {
+    requestConfig._baseUrlIndex = 0;
+  }
+
+  if (accessToken) {
+    requestConfig.headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return requestConfig;
 });
 
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as RetriableConfig | undefined;
+
+    const isNetworkError = !error.response;
+    if (originalRequest && isNetworkError) {
+      const baseUrls = getApiBaseUrls();
+      const currentIndex = originalRequest._baseUrlIndex ?? 0;
+      const nextIndex = currentIndex + 1;
+
+      if (nextIndex < baseUrls.length) {
+        originalRequest._baseUrlIndex = nextIndex;
+        originalRequest.baseURL = baseUrls[nextIndex];
+        return axiosInstance.request(originalRequest);
+      }
+    }
 
     if (!originalRequest || originalRequest._retry || error.response?.status !== 401) {
       return Promise.reject(error);
@@ -43,9 +98,11 @@ axiosInstance.interceptors.response.use(
     originalRequest._retry = true;
 
     try {
-      const refreshResponse = await axios.post<ApiEnvelope<LoginResponse>>(
-        `${API_BASE_URL}/auth/refresh`,
+      const refreshBaseUrl = originalRequest.baseURL ?? API_BASE_URL;
+      const refreshResponse = await axiosInstance.post<ApiEnvelope<LoginResponse>>(
+        '/auth/refresh',
         { refreshToken },
+        { baseURL: refreshBaseUrl },
       );
 
       const payload = refreshResponse.data.data;

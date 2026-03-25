@@ -40,17 +40,28 @@ async function bootstrap() {
   const appEnv = config.get<string>('APP_ENV', process.env.NODE_ENV || 'development');
   const isDev = appEnv === 'development';
 
-  const devOrigins = ['http://localhost:3004'];
-  const prodOrigins = [
+  const envOrigins = [
     ...new Set(
       (config
-        .get<string>('FRONTEND_URLS', config.get<string>('FRONTEND_URL', 'http://ep-web-sim'))
+        .get<string>('FRONTEND_URLS', config.get<string>('FRONTEND_URL', 'http://ep-sim.epbih.ba'))
         ?.split(',')
         .map((s) => s.trim())
         .filter(Boolean) ?? []),
     ),
   ];
-  const allowedOrigins = isDev ? devOrigins : prodOrigins;
+
+  const defaultAllowedHostnames = new Set<string>([
+    'localhost',
+    '127.0.0.1',
+    '10.10.10.30',
+    '10.50.255.189',
+    'ep-sim.epbih.ba',
+  ]);
+
+  const allowedOriginsExact = new Set<string>([
+    ...(isDev ? ['http://localhost:3004', 'http://localhost:5173'] : []),
+    ...envOrigins,
+  ]);
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -59,8 +70,17 @@ async function bootstrap() {
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOriginsExact.has(origin)) {
         return callback(null, true);
+      }
+
+      try {
+        const url = new URL(origin);
+        if (defaultAllowedHostnames.has(url.hostname)) {
+          return callback(null, true);
+        }
+      } catch {
+        // ignore
       }
 
       logger.warn(`CORS blocked for origin: ${origin} (env=${appEnv})`);
