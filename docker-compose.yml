@@ -6,7 +6,7 @@ services:
       # Ovdje će se koristiti onaj optimizirani Dockerfile (node:20) koji smo ranije dogovorili
     restart: unless-stopped
     env_file:
-      - ./backend/.env
+      - ./backend/.env.host
     networks:
       - web
     volumes:
@@ -28,7 +28,8 @@ services:
     build:
       context: ./frontend
       args:
-        - VITE_API_URL=/backend
+        - VITE_API_BASE_URL=/backend/api
+        - VITE_API_BASE_URLS=/backend/api
     restart: unless-stopped
     networks:
       - web

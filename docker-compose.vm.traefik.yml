@@ -1,0 +1,31 @@
+services:
+  traefik:
+    container_name: sim-tracker-traefik-vm
+    image: traefik:latest
+    restart: unless-stopped
+    command:
+      - --api.dashboard=false
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      #- --entrypoints.traefik.address=:8080
+      - --accesslog=true
+      - --log.level=INFO
+    ports:
+      - "80:80"
+      #- "8080:8080"
+    #labels:
+      #- traefik.enable=true
+      #- "traefik.http.routers.traefik.rule=(PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+      #- traefik.http.routers.traefik.entrypoints=traefik
+      #- traefik.http.routers.traefik.service=api@internal
+      #- traefik.http.routers.traefik.priority=100
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app
+
+networks:
+  app:
+    external: true
+    name: sim-tracker-net

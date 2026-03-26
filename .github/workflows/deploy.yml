@@ -66,14 +66,15 @@ jobs:
           ssh -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_IP" bash << EOF
           set -euo pipefail
           cd "$APP_PATH"
+          COMPOSE_FILE="docker-compose.yml"
 
           echo "Pulling latest code..."
           git fetch origin main
           git reset --hard origin/main
 
           echo "Checking existing containers (including stopped)..."
-          BACKEND_CONTAINER_ID=\$(docker compose ps -a -q backend || true)
-          FRONTEND_CONTAINER_ID=\$(docker compose ps -a -q frontend || true)
+          BACKEND_CONTAINER_ID=\$(docker compose -f "\$COMPOSE_FILE" ps -a -q backend || true)
+          FRONTEND_CONTAINER_ID=\$(docker compose -f "\$COMPOSE_FILE" ps -a -q frontend || true)
 
           NEED_BACKEND_BOOTSTRAP=false
           NEED_FRONTEND_BOOTSTRAP=false
@@ -92,28 +93,28 @@ jobs:
 
           if [ "$BACKEND_CHANGED" = "true" ] || [ "\$NEED_BACKEND_BOOTSTRAP" = "true" ]; then
             echo "Recreating backend: stop, remove, clear cache, rebuild, start..."
-            docker compose stop backend || true
-            docker compose rm -f backend || true
+            docker compose -f "\$COMPOSE_FILE" stop backend || true
+            docker compose -f "\$COMPOSE_FILE" rm -f backend || true
             if [ "$BACKEND_CHANGED" = "true" ]; then
               echo "Pruning unused Docker build cache and images before backend rebuild..."
               docker builder prune -f || true
               docker image prune -f || true
             fi
-            docker compose build --no-cache backend
-            docker compose up -d backend
+            docker compose -f "\$COMPOSE_FILE" build --no-cache backend
+            docker compose -f "\$COMPOSE_FILE" up -d backend
           fi
 
           if [ "$FRONTEND_CHANGED" = "true" ] || [ "\$NEED_FRONTEND_BOOTSTRAP" = "true" ]; then
             echo "Recreating frontend: stop, remove, clear cache, rebuild, start..."
-            docker compose stop frontend || true
-            docker compose rm -f frontend || true
+            docker compose -f "\$COMPOSE_FILE" stop frontend || true
+            docker compose -f "\$COMPOSE_FILE" rm -f frontend || true
             if [ "$FRONTEND_CHANGED" = "true" ]; then
               echo "Pruning unused Docker build cache and images before frontend rebuild..."
               docker builder prune -f || true
               docker image prune -f || true
             fi
-            docker compose build --no-cache frontend
-            docker compose up -d frontend
+            docker compose -f "\$COMPOSE_FILE" build --no-cache frontend
+            docker compose -f "\$COMPOSE_FILE" up -d frontend
           fi
 
           if [ "$BACKEND_CHANGED" != "true" ] && [ "$FRONTEND_CHANGED" != "true" ] && \
