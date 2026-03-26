@@ -50,13 +50,14 @@ async function bootstrap() {
     ),
   ];
 
-  const defaultAllowedHostnames = new Set<string>([
-    'localhost',
-    '127.0.0.1',
-    '10.10.10.30',
-    '10.50.255.189',
-    'ep-sim.epbih.ba',
-  ]);
+  const allowedHostnames = new Set<string>(['localhost', '127.0.0.1']);
+  for (const envOrigin of envOrigins) {
+    try {
+      allowedHostnames.add(new URL(envOrigin).hostname);
+    } catch {
+      // ignore
+    }
+  }
 
   const allowedOriginsExact = new Set<string>([
     ...(isDev ? ['http://localhost:3004', 'http://localhost:5173'] : []),
@@ -76,7 +77,7 @@ async function bootstrap() {
 
       try {
         const url = new URL(origin);
-        if (defaultAllowedHostnames.has(url.hostname)) {
+        if (allowedHostnames.has(url.hostname)) {
           return callback(null, true);
         }
       } catch {

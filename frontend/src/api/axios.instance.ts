@@ -8,15 +8,6 @@ type RetriableConfig = InternalAxiosRequestConfig & {
   _baseUrlIndex?: number;
 };
 
-const DEFAULT_API_BASE_URLS = {
-  local: [
-    'http://10.10.10.30/backend/api',
-    'http://10.50.255.189/backend/api',
-    'https://ep-sim.epbih.ba/backend/api',
-  ],
-  prod: ['https://ep-sim.epbih.ba/backend/api', 'http://10.50.255.189/backend/api'],
-} as const;
-
 export const getApiBaseUrls = (): string[] => {
   const envBaseUrls = import.meta.env.VITE_API_BASE_URLS as string | undefined;
   if (envBaseUrls) {
@@ -28,18 +19,12 @@ export const getApiBaseUrls = (): string[] => {
   }
 
   const envBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  if (envBaseUrl) return [envBaseUrl, ...DEFAULT_API_BASE_URLS.prod.filter((u) => u !== envBaseUrl)]
+  if (envBaseUrl) return [envBaseUrl]
 
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  const isLocal =
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.startsWith('10.10.10.')
-
-  return isLocal ? [...DEFAULT_API_BASE_URLS.local] : [...DEFAULT_API_BASE_URLS.prod]
+  return ['/backend/api']
 };
 
-export const API_BASE_URL = getApiBaseUrls()[0] ?? DEFAULT_API_BASE_URLS.prod[0];
+export const API_BASE_URL = getApiBaseUrls()[0] ?? '/backend/api';
 
 export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,

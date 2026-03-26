@@ -100,8 +100,9 @@ Pokretanje:
 ```bash
 # unutar root foldera repozitorija na VM-u
 docker compose -f docker-compose.vm.traefik.yml up -d
-docker compose -f docker-compose.vm.db.yml up -d
-docker compose -f docker-compose.vm.app.yml up -d --build
+
+# DB + APP moraju biti u istom compose projektu (zbog depends_on mysql)
+docker compose -f docker-compose.vm.db.yml -f docker-compose.vm.app.yml up -d --build
 ```
 
 Provjere:
@@ -147,9 +148,9 @@ Provjere:
    - ponovo buildati kontejnere:
      ```bash
      docker compose -f docker-compose.vm.traefik.yml pull
-     docker compose -f docker-compose.vm.db.yml pull
      docker compose -f docker-compose.vm.app.yml pull
-     docker compose -f docker-compose.vm.app.yml up -d --build
+     docker compose -f docker-compose.vm.db.yml pull
+     docker compose -f docker-compose.vm.db.yml -f docker-compose.vm.app.yml up -d --build
      ```
    - po potrebi ponovo pokrenuti `prisma migrate deploy`.
 
