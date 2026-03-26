@@ -72,11 +72,11 @@ Mount-an u backend kontejner kao `/usr/app/uploads`.
    PMA_ABSOLUTE_URI=http://10.10.10.30/dbadmin/
    ```
 
-   Ove varijable se mapiraju na servis `mysql` u `docker-compose.vm.yml`.
+   Ove varijable se mapiraju na servis `mysql` u `docker-compose.vm.db.yml`.
 
 ### 4.2. Frontend `.env`
 
-Frontend se build-a unutar Docker kontejnera i `VITE_API_URL` se eksplicitno prosljeđuje kroz build arg (vidi `docker-compose.vm.yml`). Ipak, ako aplikacija koristi i druge `VITE_` varijable, treba ih definisati u `frontend/.env` na VM-u.
+Frontend se build-a unutar Docker kontejnera i `VITE_API_BASE_URL` / `VITE_API_BASE_URLS` se prosljeđuju kroz build arg (vidi `docker-compose.vm.app.yml`). Preporuka je koristiti relativni URL `/backend/api` da isti build radi i na VM-u i na produkciji.
 
 Primjer:
 ```env
@@ -99,7 +99,9 @@ Pokretanje:
 
 ```bash
 # unutar root foldera repozitorija na VM-u
-docker compose -f docker-compose.vm.yml up -d --build
+docker compose -f docker-compose.vm.traefik.yml up -d
+docker compose -f docker-compose.vm.db.yml up -d
+docker compose -f docker-compose.vm.app.yml up -d --build
 ```
 
 Provjere:
@@ -144,8 +146,10 @@ Provjere:
    - `git pull` na VM-u (dok ste na `vm-deploy` grani),
    - ponovo buildati kontejnere:
      ```bash
-     docker compose -f docker-compose.vm.yml pull   # ako koristite remote image-e
-     docker compose -f docker-compose.vm.yml up -d --build
+     docker compose -f docker-compose.vm.traefik.yml pull
+     docker compose -f docker-compose.vm.db.yml pull
+     docker compose -f docker-compose.vm.app.yml pull
+     docker compose -f docker-compose.vm.app.yml up -d --build
      ```
    - po potrebi ponovo pokrenuti `prisma migrate deploy`.
 
@@ -157,7 +161,9 @@ U ovoj grani preporučeno je imati:
 
 - `backend/` + `backend/Dockerfile`
 - `frontend/` + `frontend/Dockerfile`
-- `docker-compose.vm.yml`
+- `docker-compose.vm.traefik.yml`
+- `docker-compose.vm.db.yml`
+- `docker-compose.vm.app.yml`
 - `VM_DEPLOYMENT.md`
 - dokumentaciju koja je nužna za deployment (bez osjetljivih `.env` fajlova)
 
