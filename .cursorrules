@@ -127,3 +127,13 @@ Task gotov tek kad: implementacija u scopeu task ID-a; testovi prošli; dokument
 ---
 
 Korištenje skill-ova: za backend/API → SKILL_02; za schema/migracije → SKILL_03; za import → SKILL_04; za mobile scan/record → SKILL_05; za PDF/email → SKILL_06; za testove → SKILL_07; za release → SKILL_08. Kompleksni feature: SK-01 (breakdown) → SK-03 ako treba → SK-02/SK-05 → SK-06 ako treba → SK-07 → SK-08 za release.
+
+---
+
+## 14. Branching (main + vm-deploy)
+
+- Kod promjene koje trebaju i **host** i **VM** se rade na **`main`** i onda se prenesu na **`vm-deploy`** merge-om `main -> vm-deploy`.
+- VM-only packaging promjene (VM compose / VM env / VM runbook) idu na `vm-deploy` i ne vraćaju se na `main`.
+- Host-only deploy promjene (npr. `.github/`, `docker-compose.yml`) idu na `main` i ne prenose se na `vm-deploy`.
+
+Obaveza asistenta: prije commita, pitati korisnika da li promjena treba ići na **`main`**, **`vm-deploy`**, ili oba, i predložiti tačne korake (`merge` ili `cherry-pick`) prema `BRANCHING_WORKFLOW.md`.
