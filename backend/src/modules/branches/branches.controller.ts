@@ -29,17 +29,17 @@ export class BranchesController {
   }
 
   @Get()
-  @Roles('SYSTEM_ADMIN', 'MODERATOR')
+  @Roles('SYSTEM_ADMIN', 'DIST_ADMIN')
   findAll(
     @Query('distributionId') distributionId?: string,
     @CurrentUser() user?: { role: string; distributionId?: string | null },
   ) {
-    const effectiveDistributionId = distributionId ?? (user?.role === 'MODERATOR' ? user.distributionId ?? undefined : undefined);
+    const effectiveDistributionId = distributionId ?? (user?.role === 'DIST_ADMIN' ? user.distributionId ?? undefined : undefined);
     return this.service.findAll(effectiveDistributionId);
   }
 
   @Get(':id')
-  @Roles('SYSTEM_ADMIN', 'MODERATOR')
+  @Roles('SYSTEM_ADMIN', 'DIST_ADMIN')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }

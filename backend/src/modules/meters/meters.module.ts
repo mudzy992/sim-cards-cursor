@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { MetersController } from './meters.controller';
 import { MetersService } from './meters.service';
 import { InstallationRecordsModule } from '../installation-records/installation-records.module';
+import { MeterTypeDefinitionsModule } from '../meter-type-definitions/meter-type-definitions.module';
 
 @Module({
-  imports: [InstallationRecordsModule],
+  imports: [InstallationRecordsModule, MeterTypeDefinitionsModule],
   controllers: [MetersController],
   providers: [MetersService],
 })

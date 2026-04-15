@@ -9,7 +9,7 @@ datasource db {
 
 enum UserRole {
   SYSTEM_ADMIN
-  MODERATOR
+  DIST_ADMIN
   USER
 }
 
@@ -36,12 +36,10 @@ enum MeterType {
 
 enum RecordStatus {
   DRAFT
-  PENDING           // poslano grupi, čeka odobrenje
-  SUBMIT_FAILED     // greška pri slanju grupi
-  REJECTED
-  WAITING_SEP_ACTIVATION  // odobreno, čeka aktivaciju u SEP
-  ACTIVATED_IN_SEP  // aktivirano u SEP, može se ručno poslati PDF
-  SENT              // PDF poslan
+  SENT
+  SEND_FAILED
+  SEP_ACTIVATED
+  LEGACY_COMPLETED
 }
 
 enum ShipmentStatus {
@@ -86,7 +84,6 @@ model Distribution {
   branches       Branch[]
   users          User[]          @relation("UserDistribution")
   shipments      Shipment[]
-  recipientGroups RecipientGroup[]
   pushCampaignsScoped PushCampaign[]
 
   @@map("distributions")
@@ -103,8 +100,9 @@ model Branch {
 
   users              User[]                @relation("UserBranch")
   meters             Meter[]
-  approvalGroupMapping BranchApprovalGroup?
   pushCampaignsScoped PushCampaign[]
+  emailRecipients    BranchEmailRecipient[]
+  branchModerators   BranchModerator[]
 
   @@unique([distributionId, code])
   @@index([distributionId])
@@ -139,11 +137,11 @@ model User {
   activityLogs      ActivityLog[]
   demountTasksAssigned DemountTask[]     @relation("DemountTasksAssigned")
   demountTasksCreated  DemountTask[]     @relation("DemountTasksCreated")
-  recipientGroups   RecipientGroupUser[]
   pushTokens        PushToken[]
   pushCampaignsCreated PushCampaign[]    @relation("PushCampaignCreatedBy")
   mobileReleasesCreated MobileAppRelease[] @relation("MobileAppReleaseCreatedBy")
   pushDeliveries    PushDelivery[]
+  branchModeratorRoles BranchModerator[]
 
   @@map("users")
 }
@@ -210,6 +208,7 @@ model Meter {
   measuringPoint            String?               @map("measuring_point")
   latitude                  Decimal?              @db.Decimal(10, 8)
   longitude                 Decimal?              @db.Decimal(11, 8)
+  dynamicFieldValues        Json?                 @map("dynamic_field_values")
   createdAt                 DateTime              @default(now()) @map("created_at")
   updatedAt                 DateTime              @updatedAt @map("updated_at")
   installationRecords       InstallationRecord[]
@@ -232,6 +231,7 @@ model MeterTypeDefinition {
   createdAt             DateTime             @default(now()) @map("created_at")
   updatedAt             DateTime             @updatedAt @map("updated_at")
   meters                Meter[]
+  fields                MeterTypeField[]
 
   @@map("meter_type_definitions")
 }
@@ -260,76 +260,6 @@ model InstallationRecord {
   @@index([status])
   @@index([meterId])
   @@map("installation_records")
-}
-
-enum RecipientGroupType {
-  APPROVAL   // prima tekstualni zapisnik na odobrenje (bez PDF)
-  PDF        // prima PDF pri ručnom slanju
-}
-
-model RecipientGroup {
-  id             String            @id @default(uuid())
-  name           String
-  description    String?           @db.Text
-  type           RecipientGroupType @default(PDF)
-  distributionId String?           @map("distribution_id")
-  distribution   Distribution?     @relation(fields: [distributionId], references: [id], onDelete: SetNull)
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
-  recipients     Recipient[]
-  branchMappings BranchApprovalGroup[]
-  groupUsers     RecipientGroupUser[]
-
-  @@index([distributionId])
-  @@map("recipient_groups")
-}
-
-// Korisnici aplikacije koji su članovi grupe – dobijaju email + in-app notifikacije
-model RecipientGroupUser {
-  id               String         @id @default(uuid())
-  recipientGroupId String         @map("recipient_group_id")
-  recipientGroup   RecipientGroup @relation(fields: [recipientGroupId], references: [id], onDelete: Cascade)
-  userId           String         @map("user_id")
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  canApproveFromPending Boolean   @default(true) @map("can_approve_from_pending")
-  canRejectFromPending  Boolean   @default(true) @map("can_reject_from_pending")
-  canActivateSep        Boolean   @default(true) @map("can_activate_sep")
-  canSendPdf            Boolean   @default(false) @map("can_send_pdf")
-  createdAt        DateTime       @default(now()) @map("created_at")
-
-  @@unique([recipientGroupId, userId])
-  @@index([recipientGroupId])
-  @@index([userId])
-  @@map("recipient_group_users")
-}
-
-// Koje podružnice šalju zapisnike kojoj grupi na odobrenje
-model BranchApprovalGroup {
-  id               String         @id @default(uuid())
-  branchId         String         @map("branch_id")
-  branch           Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  recipientGroupId String         @map("recipient_group_id")
-  recipientGroup   RecipientGroup @relation(fields: [recipientGroupId], references: [id], onDelete: Cascade)
-  createdAt        DateTime       @default(now()) @map("created_at")
-
-  @@unique([branchId])
-  @@index([recipientGroupId])
-  @@map("branch_approval_groups")
-}
-
-model Recipient {
-  id        String         @id @default(uuid())
-  email     String
-  firstName String         @map("first_name")
-  lastName  String         @map("last_name")
-  position  String?
-  isActive  Boolean        @default(true) @map("is_active")
-  groupId   String         @map("group_id")
-  group     RecipientGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
-
-  @@map("recipients")
 }
 
 model Notification {
@@ -505,6 +435,59 @@ model DemountTask {
   @@index([assignedToId])
   @@index([status])
   @@map("demount_tasks")
+}
+
+model BranchModerator {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branchId  String   @map("branch_id")
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, branchId])
+  @@index([userId])
+  @@index([branchId])
+  @@map("branch_moderators")
+}
+
+model BranchEmailRecipient {
+  id        String   @id @default(uuid())
+  branchId  String   @map("branch_id")
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  email     String
+  label     String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([branchId])
+  @@map("branch_email_recipients")
+}
+
+enum MeterFieldType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATE
+}
+
+model MeterTypeField {
+  id                    String              @id @default(uuid())
+  meterTypeDefinitionId String              @map("meter_type_definition_id")
+  meterTypeDefinition   MeterTypeDefinition @relation(fields: [meterTypeDefinitionId], references: [id], onDelete: Cascade)
+  name                  String
+  label                 String
+  fieldType             MeterFieldType      @default(STRING) @map("field_type")
+  isRequired            Boolean             @default(false) @map("is_required")
+  isOperatorFillable    Boolean             @default(false) @map("is_operator_fillable")
+  defaultValue          String?             @map("default_value")
+  sortOrder             Int                 @default(0) @map("sort_order")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  @@index([meterTypeDefinitionId])
+  @@map("meter_type_fields")
 }
 
 model AppSetting {

@@ -15,10 +15,11 @@ import { InstallationRecordsModule } from './modules/installation-records/instal
 import { DemountTasksModule } from './modules/demount-tasks/demount-tasks.module';
 import { DistributionsModule } from './modules/distributions/distributions.module';
 import { BranchesModule } from './modules/branches/branches.module';
+import { BranchModeratorsModule } from './modules/branch-moderators/branch-moderators.module';
+import { BranchEmailRecipientsModule } from './modules/branch-email-recipients/branch-email-recipients.module';
 import { FilesModule } from './modules/files/files.module';
 import { MailModule } from './modules/mail/mail.module';
 import { SettingsModule } from './modules/settings/settings.module';
-import { RecipientsModule } from './modules/recipients/recipients.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PushTokensModule } from './modules/push-tokens/push-tokens.module';
@@ -48,10 +49,11 @@ import { HealthController } from './health.controller';
     DemountTasksModule,
     DistributionsModule,
     BranchesModule,
+    BranchModeratorsModule,
+    BranchEmailRecipientsModule,
     FilesModule,
     MailModule,
     SettingsModule,
-    RecipientsModule,
     NotificationsModule,
     DashboardModule,
     PushTokensModule,

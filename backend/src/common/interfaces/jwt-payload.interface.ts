@@ -6,4 +6,5 @@ export interface JwtPayload {
   role: UserRole;
   distributionId?: string | null;
   branchId?: string | null;
+  branchModeratorBranchIds?: string[];
 }

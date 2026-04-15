@@ -9,11 +9,10 @@ import { StatusTransitionGuard } from './guards/status-transition.guard';
 import { PdfGeneratorService } from 'src/common/utils/pdf-generator.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { MailModule } from '../mail/mail.module';
-import { RecipientsModule } from '../recipients/recipients.module';
-import { NotificationsModule } from '../notifications/notifications.module';
+import { MeterTypeDefinitionsModule } from '../meter-type-definitions/meter-type-definitions.module';
 
 @Module({
-  imports: [PrismaModule, ActivityLogModule, MailModule, RecipientsModule, NotificationsModule],
+  imports: [PrismaModule, ActivityLogModule, MailModule, MeterTypeDefinitionsModule],
   controllers: [InstallationRecordsController],
   providers: [
     InstallationRecordsService,

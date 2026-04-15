@@ -1,4 +1,3 @@
-
 import {
   Injectable,
   CanActivate,
@@ -33,13 +32,11 @@ export class StatusTransitionGuard implements CanActivate {
 
     const currentStatus = record.status;
     const allowedTransitions: Record<RecordStatus, RecordStatus[]> = {
-      [RecordStatus.DRAFT]: [RecordStatus.PENDING, RecordStatus.SUBMIT_FAILED],
-      [RecordStatus.PENDING]: [RecordStatus.WAITING_SEP_ACTIVATION, RecordStatus.REJECTED],
-      [RecordStatus.SUBMIT_FAILED]: [RecordStatus.PENDING],
-      [RecordStatus.REJECTED]: [],
-      [RecordStatus.WAITING_SEP_ACTIVATION]: [RecordStatus.ACTIVATED_IN_SEP],
-      [RecordStatus.ACTIVATED_IN_SEP]: [RecordStatus.SENT],
-      [RecordStatus.SENT]: [],
+      [RecordStatus.DRAFT]: [RecordStatus.SENT, RecordStatus.SEND_FAILED],
+      [RecordStatus.SEND_FAILED]: [RecordStatus.SENT, RecordStatus.SEND_FAILED],
+      [RecordStatus.SENT]: [RecordStatus.SEP_ACTIVATED],
+      [RecordStatus.SEP_ACTIVATED]: [],
+      [RecordStatus.LEGACY_COMPLETED]: [],
     };
 
     if (

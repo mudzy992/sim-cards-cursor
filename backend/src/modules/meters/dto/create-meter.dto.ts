@@ -61,6 +61,13 @@ export class CreateMeterDto {
   longitude?: number;
 
   @ApiPropertyOptional({
+    description: 'Dinamička polja definisana za tip brojila (key-value)',
+    type: 'object',
+  })
+  @IsOptional()
+  dynamicFieldValues?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
     description:
       'SIM kartica za pridruživanje – pretraga po ICCID, unesite ID pronađene kartice',
   })

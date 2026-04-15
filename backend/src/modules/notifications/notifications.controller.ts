@@ -23,7 +23,7 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Lista notifikacija trenutnog korisnika' })
   findByUser(
     @CurrentUser() user: { id: string },
@@ -37,21 +37,21 @@ export class NotificationsController {
   }
 
   @Get('unread-count')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Broj nepročitanih notifikacija' })
   getUnreadCount(@CurrentUser() user: { id: string }) {
     return this.notificationsService.getUnreadCount(user.id);
   }
 
   @Post('read-all')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Označi sve notifikacije kao pročitane' })
   markAllAsRead(@CurrentUser() user: { id: string }) {
     return this.notificationsService.markAllAsRead(user.id);
   }
 
   @Post(':id/read')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Označi notifikaciju kao pročitanu' })
   markAsRead(
     @Param('id', ParseUUIDPipe) id: string,

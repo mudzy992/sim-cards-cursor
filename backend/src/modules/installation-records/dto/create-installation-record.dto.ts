@@ -89,6 +89,13 @@ export class CreateInstallationRecordDto {
   @IsOptional()
   longitude?: number;
 
+  @ApiPropertyOptional({
+    description: 'Dinamička polja definisana za tip brojila (key-value)',
+    type: 'object',
+  })
+  @IsOptional()
+  dynamicFieldValues?: Record<string, unknown>;
+
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()

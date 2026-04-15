@@ -43,7 +43,7 @@ export class DemountTasksService {
     if (!assignedTo) {
       throw new BadRequestException('Operator nije pronađen.');
     }
-    if (scope?.role === 'MODERATOR' && scope.distributionId) {
+    if (scope?.role === 'DIST_ADMIN' && scope.distributionId) {
       const opDistributionId = assignedTo.distributionId ?? assignedTo.branch?.distributionId;
       if (opDistributionId !== scope.distributionId) {
         throw new BadRequestException('Možete dodijeliti zadatak samo operatorima iz svoje distribucije.');

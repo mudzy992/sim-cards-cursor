@@ -168,13 +168,13 @@ export class AnalyticsService {
     to: Date,
     scope?: ScopeContext | null,
   ): Promise<number[]> {
-    // približan KPI: vrijeme od kreiranja zapisnika do ACTIVATED_IN_SEP,
+    // približan KPI: vrijeme od kreiranja zapisnika do SEP_ACTIVATED,
     // računato iz installation_records polja (bez oslanjanja na SimEvent).
     const irScope = scopeWhere(scope, { viaMeter: true });
     const where: Prisma.InstallationRecordWhereInput = {
       ...(irScope ? { AND: [irScope] } : {}),
       createdAt: { gte: from, lte: to },
-      status: RecordStatus.ACTIVATED_IN_SEP,
+      status: RecordStatus.SEP_ACTIVATED,
     };
 
     const records = await this.prisma.installationRecord.findMany({

@@ -18,7 +18,7 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get('features')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Feature flags and configuration status (for UI)' })
   getFeatures() {
     return this.settingsService.getFeatures();
@@ -50,7 +50,7 @@ export class SettingsController {
   }
 
   @Get('me')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({
     summary: 'Dohvati user-specifične postavke (tour state)',
   })
@@ -61,7 +61,7 @@ export class SettingsController {
   }
 
   @Patch('me')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({
     summary: 'Ažuriraj user-specifične postavke (tour state)',
   })

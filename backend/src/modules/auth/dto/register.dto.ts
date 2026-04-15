@@ -10,7 +10,7 @@ import {
 } from 'class-validator';
 
 export class RegisterDto {
-  @ApiProperty({ example: 'moderator@simtracker.local' })
+  @ApiProperty({ example: 'user@simtracker.local' })
   @IsEmail()
   email!: string;
 

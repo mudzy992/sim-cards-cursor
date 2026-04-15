@@ -38,7 +38,7 @@ export class MetersController {
   ) {}
 
   @Post()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Create a new meter' })
   @ApiResponse({ status: 201, description: 'The meter has been successfully created.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
@@ -66,7 +66,7 @@ export class MetersController {
   }
 
   @Get()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiPaginated()
   @ApiOperation({ summary: 'Get all meters' })
   findAll(@Query() filter: MeterFilterDto, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
@@ -75,7 +75,7 @@ export class MetersController {
   }
 
   @Get('available')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Get all available meters' })
   @ApiResponse({ status: 200, description: 'Return all available meters.'})
   findAvailable(@CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }): Promise<Meter[]> {
@@ -84,7 +84,7 @@ export class MetersController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Get a meter by ID' })
   @ApiResponse({ status: 200, description: 'Return the meter.' })
   @ApiResponse({ status: 404, description: 'Meter not found.' })
@@ -94,7 +94,7 @@ export class MetersController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Update a meter' })
   @ApiResponse({ status: 200, description: 'The meter has been successfully updated.' })
   @ApiResponse({ status: 404, description: 'Meter not found.' })
@@ -108,7 +108,7 @@ export class MetersController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Delete a meter' })
   @ApiResponse({ status: 200, description: 'The meter has been successfully deleted.' })
   @ApiResponse({ status: 404, description: 'Meter not found.' })

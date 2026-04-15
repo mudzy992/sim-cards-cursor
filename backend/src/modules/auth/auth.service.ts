@@ -27,6 +27,7 @@ type SafeUser = {
   distributionId: string | null;
   branchId: string | null;
   branch: { id: string; name: string; code: string } | null;
+  branchModeratorBranchIds: string[];
 };
 
 @Injectable()
@@ -49,7 +50,8 @@ export class AuthService {
       return null;
     }
 
-    return this.sanitizeUser(user);
+    const modBranchIds = await this.loadBranchModeratorIds(user.id, user.role);
+    return this.sanitizeUser(user, modBranchIds);
   }
 
   async login(loginDto: LoginDto, ipAddress?: string) {
@@ -63,6 +65,8 @@ export class AuthService {
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    const modBranchIds = await this.loadBranchModeratorIds(user.id, user.role);
 
     const tokenPair = await this.createTokenPair({
       sub: user.id,
@@ -91,7 +95,7 @@ export class AuthService {
     });
 
     return {
-      user: this.sanitizeUser(user),
+      user: this.sanitizeUser(user, modBranchIds),
       ...tokenPair,
     };
   }
@@ -185,8 +189,9 @@ export class AuthService {
       },
     });
 
+    const modBranchIds = await this.loadBranchModeratorIds(user.id, user.role);
     return {
-      user: this.sanitizeUser(user),
+      user: this.sanitizeUser(user, modBranchIds),
       ...tokenPair,
     };
   }
@@ -257,7 +262,8 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    return this.sanitizeUser(user);
+    const modBranchIds = await this.loadBranchModeratorIds(user.id, user.role);
+    return this.sanitizeUser(user, modBranchIds);
   }
 
   private async createTokenPair(payload: JwtPayload) {
@@ -301,20 +307,32 @@ export class AuthService {
     });
   }
 
-  private sanitizeUser(user: {
-    id: string;
-    email: string;
-    username?: string | null;
-    firstName: string;
-    lastName: string;
-    role: UserRole;
-    status: UserStatus;
-    phone: string | null;
-    distributionId?: string | null;
-    distribution?: { id: string } | null;
-    branchId?: string | null;
-    branch?: { id: string; name: string; code: string } | null;
-  }): SafeUser {
+  private async loadBranchModeratorIds(userId: string, role: UserRole): Promise<string[]> {
+    if (role !== UserRole.USER) return [];
+    const entries = await this.prisma.branchModerator.findMany({
+      where: { userId },
+      select: { branchId: true },
+    });
+    return entries.map((e) => e.branchId);
+  }
+
+  private sanitizeUser(
+    user: {
+      id: string;
+      email: string;
+      username?: string | null;
+      firstName: string;
+      lastName: string;
+      role: UserRole;
+      status: UserStatus;
+      phone: string | null;
+      distributionId?: string | null;
+      distribution?: { id: string } | null;
+      branchId?: string | null;
+      branch?: { id: string; name: string; code: string } | null;
+    },
+    branchModeratorBranchIds: string[] = [],
+  ): SafeUser {
     const distributionId = user.distributionId ?? user.distribution?.id ?? null;
     const branchId = user.branchId ?? user.branch?.id ?? null;
     return {
@@ -329,6 +347,7 @@ export class AuthService {
       distributionId,
       branchId,
       branch: user.branch ? { id: user.branch.id, name: user.branch.name, code: user.branch.code } : null,
+      branchModeratorBranchIds,
     };
   }
 }

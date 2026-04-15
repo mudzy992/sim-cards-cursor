@@ -4,34 +4,32 @@ export type ScopeContext = {
   role: UserRole;
   distributionId: string | null;
   branchId: string | null;
+  branchModeratorBranchIds?: string[];
+};
+
+export type ScopeWhereOptions = {
+  branchIdField?: string;
+  distributionIdField?: string;
+  viaMeter?: boolean;
+  userScope?: boolean;
+  viaShipment?: boolean;
 };
 
 /**
  * Returns Prisma where clause for scope filtering.
  * SYSTEM_ADMIN: no filter (sees all)
- * MODERATOR: filter by distributionId (distribution + its branches)
- * USER (operator): filter by branchId
+ * DIST_ADMIN: filter by distributionId (distribution + its branches)
+ * USER (operator): filter by branchId; branch moderators see their assigned branches too
  */
 export function scopeWhere<T extends Record<string, unknown>>(
   ctx: ScopeContext | null | undefined,
-  options: {
-    /** For entities with direct branchId (Meter) */
-    branchIdField?: string;
-    /** For entities with direct distributionId (Shipment, User) */
-    distributionIdField?: string;
-    /** For entities linked via meter (InstallationRecord, DemountTask) - use meter.branchId */
-    viaMeter?: boolean;
-    /** For User entity - moderator sees users in their distribution; operator sees users in their branch */
-    userScope?: boolean;
-    /** For SimCard - scope via shipment.distributionId */
-    viaShipment?: boolean;
-  },
+  options: ScopeWhereOptions,
 ): T | undefined {
   if (!ctx || ctx.role === 'SYSTEM_ADMIN') {
     return undefined;
   }
 
-  if (ctx.role === 'MODERATOR' && ctx.distributionId) {
+  if (ctx.role === 'DIST_ADMIN' && ctx.distributionId) {
     if (options.distributionIdField) {
       return { [options.distributionIdField]: ctx.distributionId } as unknown as T;
     }
@@ -55,6 +53,14 @@ export function scopeWhere<T extends Record<string, unknown>>(
   }
 
   if (ctx.role === 'USER' && (ctx.branchId || ctx.distributionId)) {
+    const modBranches = ctx.branchModeratorBranchIds ?? [];
+    const allBranchIds = ctx.branchId
+      ? [ctx.branchId, ...modBranches.filter((id) => id !== ctx.branchId)]
+      : modBranches;
+
+    if (allBranchIds.length > 1) {
+      return buildMultiBranchWhere<T>(allBranchIds, options);
+    }
     if (options.branchIdField) {
       return { [options.branchIdField]: ctx.branchId } as unknown as T;
     }
@@ -75,15 +81,30 @@ export function scopeWhere<T extends Record<string, unknown>>(
   return undefined;
 }
 
+function buildMultiBranchWhere<T>(branchIds: string[], options: ScopeWhereOptions): T {
+  if (options.branchIdField) {
+    return { [options.branchIdField]: { in: branchIds } } as unknown as T;
+  }
+  if (options.viaMeter) {
+    return { meter: { branchId: { in: branchIds } } } as unknown as T;
+  }
+  if (options.userScope) {
+    return { branchId: { in: branchIds } } as unknown as T;
+  }
+  return { branchId: { in: branchIds } } as unknown as T;
+}
+
 export function toScopeContext(user: {
   role: UserRole;
   distributionId?: string | null;
   branchId?: string | null;
+  branchModeratorBranchIds?: string[];
 } | null): ScopeContext | null {
   if (!user) return null;
   return {
     role: user.role,
     distributionId: user.distributionId ?? null,
     branchId: user.branchId ?? null,
+    branchModeratorBranchIds: user.branchModeratorBranchIds ?? [],
   };
 }

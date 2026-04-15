@@ -26,8 +26,11 @@ export class ShipmentsService {
   ) {}
 
   async create(dto: CreateShipmentDto, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
+    if (scope?.role === 'DIST_ADMIN' && !scope.distributionId) {
+      throw new BadRequestException('Distribution admin scope is missing.');
+    }
     const distributionId =
-      scope?.role === 'MODERATOR' && scope.distributionId
+      scope?.role === 'DIST_ADMIN' && scope.distributionId
         ? scope.distributionId
         : dto.distributionId;
     if (scope?.role === 'SYSTEM_ADMIN' && !distributionId) {

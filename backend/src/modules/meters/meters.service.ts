@@ -6,10 +6,14 @@ import { UpdateMeterDto } from './dto/update-meter.dto';
 import { Prisma, Meter } from '@prisma/client';
 import { MeterFilterDto } from './dto/meter-filter.dto';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
+import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
 
 @Injectable()
 export class MetersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly meterTypeFieldsService: MeterTypeFieldsService,
+  ) {}
 
   async create(createMeterDto: CreateMeterDto): Promise<Meter> {
     const data: Record<string, unknown> = {
@@ -29,6 +33,14 @@ export class MetersService {
       data.measuringPoint = createMeterDto.measuringPoint;
     if (createMeterDto.latitude != null) data.latitude = createMeterDto.latitude;
     if (createMeterDto.longitude != null) data.longitude = createMeterDto.longitude;
+
+    const validated = await this.meterTypeFieldsService.validateDynamicValues(
+      createMeterDto.meterTypeDefinitionId,
+      createMeterDto.dynamicFieldValues ?? null,
+    );
+    if (Object.keys(validated).length > 0) {
+      data.dynamicFieldValues = validated;
+    }
 
     return this.prisma.meter.create({
       data: data as Parameters<typeof this.prisma.meter.create>[0]['data'],
@@ -109,6 +121,21 @@ export class MetersService {
       data.installationDate = new Date(data.installationDate as string);
     }
     if (data.branchId !== undefined) (data as Record<string, unknown>).branchId = data.branchId;
+
+    if (updateMeterDto.dynamicFieldValues !== undefined) {
+      const meter = await this.prisma.meter.findUnique({
+        where: { id },
+        select: { meterTypeDefinitionId: true },
+      });
+      if (meter) {
+        const validated = await this.meterTypeFieldsService.validateDynamicValues(
+          meter.meterTypeDefinitionId,
+          updateMeterDto.dynamicFieldValues ?? null,
+        );
+        data.dynamicFieldValues = Object.keys(validated).length > 0 ? validated : Prisma.DbNull;
+      }
+    }
+
     try {
       return await this.prisma.meter.update({
         where: { id },
