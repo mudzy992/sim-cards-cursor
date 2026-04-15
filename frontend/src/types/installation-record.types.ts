@@ -1,11 +1,9 @@
 export type RecordStatus =
   | 'DRAFT'
-  | 'PENDING'
-  | 'SUBMIT_FAILED'
-  | 'REJECTED'
-  | 'WAITING_SEP_ACTIVATION'
-  | 'ACTIVATED_IN_SEP'
-  | 'SENT';
+  | 'SENT'
+  | 'SEND_FAILED'
+  | 'SEP_ACTIVATED'
+  | 'LEGACY_COMPLETED';
 
 export type InstallationRecordItem = {
   id: string;

@@ -5,6 +5,11 @@ import type {
   CreateMeterTypeDefinitionInput,
   UpdateMeterTypeDefinitionInput,
 } from '@/types/meter-type-definition.types';
+import type {
+  CreateMeterTypeFieldInput,
+  MeterTypeFieldItem,
+  UpdateMeterTypeFieldInput,
+} from '@/types/meter-type-field.types'
 
 const baseUrl = '/meter-type-definitions';
 
@@ -61,5 +66,47 @@ export const meterTypeDefinitionsApi = {
 
   remove: async (id: string): Promise<void> => {
     await axiosInstance.delete(`${baseUrl}/${id}`);
+  },
+
+  listFields: async (definitionId: string): Promise<MeterTypeFieldItem[]> => {
+    const response = await axiosInstance.get<ApiEnvelope<MeterTypeFieldItem[]>>(
+      `${baseUrl}/${definitionId}/fields`,
+    )
+    return response.data.data
+  },
+
+  createField: async (
+    definitionId: string,
+    data: CreateMeterTypeFieldInput,
+  ): Promise<MeterTypeFieldItem> => {
+    const response = await axiosInstance.post<ApiEnvelope<MeterTypeFieldItem>>(
+      `${baseUrl}/${definitionId}/fields`,
+      data,
+    )
+    return response.data.data
+  },
+
+  updateField: async (
+    definitionId: string,
+    fieldId: string,
+    data: UpdateMeterTypeFieldInput,
+  ): Promise<MeterTypeFieldItem> => {
+    const response = await axiosInstance.patch<ApiEnvelope<MeterTypeFieldItem>>(
+      `${baseUrl}/${definitionId}/fields/${fieldId}`,
+      data,
+    )
+    return response.data.data
+  },
+
+  removeField: async (definitionId: string, fieldId: string): Promise<void> => {
+    await axiosInstance.delete(`${baseUrl}/${definitionId}/fields/${fieldId}`)
+  },
+
+  reorderFields: async (definitionId: string, fieldIds: string[]): Promise<MeterTypeFieldItem[]> => {
+    const response = await axiosInstance.put<ApiEnvelope<MeterTypeFieldItem[]>>(
+      `${baseUrl}/${definitionId}/fields/reorder`,
+      { fieldIds },
+    )
+    return response.data.data
   },
 };

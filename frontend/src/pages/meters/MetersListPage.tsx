@@ -6,20 +6,18 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Popconfirm,
   Select,
   Space,
+  Switch,
   Table,
   Tabs,
   Typography,
   message,
-  Tour,
 } from 'antd';
-import type { TourProps } from 'antd';
 import { useState, useEffect } from 'react';
 import { PlusOutlined, ThunderboltOutlined, AppstoreOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { metersApi } from '@/api/meters.api';
 import { usersApi } from '@/api/users.api';
@@ -28,9 +26,9 @@ import { installationRecordsApi } from '@/api/installation-records.api';
 import { demountTasksApi } from '@/api/demount-tasks.api';
 import InstallationRecordCreateForm from '@/components/installation-records/InstallationRecordCreateForm';
 import type { CreateMeterInput, MeterItem, MeterType, UpdateMeterInput } from '@/types/meter.types';
+import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 import type {
   MeterTypeDefinitionItem,
-  CreateMeterTypeDefinitionInput,
 } from '@/types/meter-type-definition.types';
 
 const meterTypeOptions: { label: string; value: MeterType }[] = [
@@ -50,20 +48,13 @@ type MeterFormValues = {
   measuringPoint?: string;
   simCardIccid?: string;
   simCardId?: string;
-};
-
-type TypeFormValues = {
-  name: string;
-  manufacturer?: string;
-  model?: string;
-  type?: MeterType;
-  maxCurrent?: string;
-  notes?: string;
+  dynamicFieldValues?: Record<string, {}>;
 };
 
 const defaultPagination = { page: 1, limit: 20 };
 
 export default function MetersListPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState<string>('meters');
@@ -71,30 +62,26 @@ export default function MetersListPage() {
   const [filterTypeId, setFilterTypeId] = useState<string | undefined>(undefined);
   const [serialSearchInput, setSerialSearchInput] = useState('');
   const [serialNumberFilter, setSerialNumberFilter] = useState<string | undefined>(undefined);
-  const [meterModalOpen, setMeterModalOpen] = useState(false);
+  const [meterDrawerOpen, setMeterDrawerOpen] = useState(false);
   const [editingMeter, setEditingMeter] = useState<MeterItem | null>(null);
   const [detailMeter, setDetailMeter] = useState<MeterItem | null>(null);
-  const [typeModalOpen, setTypeModalOpen] = useState(false);
-  const [editingType, setEditingType] = useState<MeterTypeDefinitionItem | null>(null);
-  const [demountModalOpen, setDemountModalOpen] = useState(false);
+  const [demountDrawerOpen, setDemountDrawerOpen] = useState(false);
   const [demountMeter, setDemountMeter] = useState<MeterItem | null>(null);
   const [demountOperatorId, setDemountOperatorId] = useState<string>('');
   const [demountNotes, setDemountNotes] = useState('');
 
   const [meterForm] = Form.useForm<MeterFormValues>();
-  const [typeForm] = Form.useForm<TypeFormValues>();
   const userRole = useAuthStore((s) => s.user?.role);
-  const [tourOpen, setTourOpen] = useState(false);
-  const [tourStep, setTourStep] = useState(0);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const seen = window.localStorage.getItem('sim-tracker-page-tour-meters-v1');
-    const globalActive = window.localStorage.getItem('sim-tracker-global-tour-active') === '1';
-    if (!seen && (userRole === 'SYSTEM_ADMIN' || userRole === 'MODERATOR') && !globalActive) {
-      setTourOpen(true);
-    }
-  }, [userRole]);
+  const selectedEditMeterTypeDefinitionId = Form.useWatch('meterTypeDefinitionId', meterForm) as
+    | string
+    | undefined
+
+  const meterTypeFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', 'fields', selectedEditMeterTypeDefinitionId],
+    queryFn: () => meterTypeDefinitionsApi.listFields(selectedEditMeterTypeDefinitionId!),
+    enabled: Boolean(selectedEditMeterTypeDefinitionId) && Boolean(editingMeter),
+  })
 
   const listQuery = useQuery({
     queryKey: ['meters', 'list', pagination, filterTypeId, serialNumberFilter],
@@ -120,7 +107,7 @@ export default function MetersListPage() {
   const operatorsQuery = useQuery({
     queryKey: ['users', 'operators'],
     queryFn: () => usersApi.list({ role: 'USER', limit: 100 }),
-    enabled: demountModalOpen,
+    enabled: demountDrawerOpen,
   });
 
   const createDemountMutation = useMutation({
@@ -128,7 +115,7 @@ export default function MetersListPage() {
       demountTasksApi.create(payload),
     onSuccess: () => {
       messageApi.success('Zadatak demontaže je kreiran.');
-      setDemountModalOpen(false);
+      setDemountDrawerOpen(false);
       setDemountMeter(null);
       setDemountOperatorId('');
       setDemountNotes('');
@@ -156,7 +143,7 @@ export default function MetersListPage() {
     mutationFn: (payload: CreateMeterInput) => metersApi.create(payload),
     onSuccess: () => {
       messageApi.success('Brojilo je kreirano.');
-      setMeterModalOpen(false);
+      setMeterDrawerOpen(false);
       setEditingMeter(null);
       meterForm.resetFields();
       void queryClient.invalidateQueries({ queryKey: ['meters', 'list'] });
@@ -176,7 +163,7 @@ export default function MetersListPage() {
       metersApi.update(id, payload),
     onSuccess: () => {
       messageApi.success('Brojilo je ažurirano.');
-      setMeterModalOpen(false);
+      setMeterDrawerOpen(false);
       setEditingMeter(null);
       meterForm.resetFields();
       void queryClient.invalidateQueries({ queryKey: ['meters', 'list'] });
@@ -209,45 +196,6 @@ export default function MetersListPage() {
     },
   });
 
-  const createTypeMutation = useMutation({
-    mutationFn: (payload: CreateMeterTypeDefinitionInput) =>
-      meterTypeDefinitionsApi.create(payload),
-    onSuccess: () => {
-      messageApi.success('Tip brojila je kreiran.');
-      setTypeModalOpen(false);
-      typeForm.resetFields();
-      setEditingType(null);
-      void queryClient.invalidateQueries({ queryKey: ['meter-type-definitions'] });
-    },
-    onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Kreiranje tipa nije uspjelo.',
-      );
-    },
-  });
-
-  const updateTypeMutation = useMutation({
-    mutationFn: ({
-      id,
-      payload,
-    }: { id: string; payload: Partial<CreateMeterTypeDefinitionInput> }) =>
-      meterTypeDefinitionsApi.update(id, payload),
-    onSuccess: () => {
-      messageApi.success('Tip brojila je ažuriran.');
-      setTypeModalOpen(false);
-      setEditingType(null);
-      typeForm.resetFields();
-      void queryClient.invalidateQueries({ queryKey: ['meter-type-definitions'] });
-    },
-    onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Ažuriranje tipa nije uspjelo.',
-      );
-    },
-  });
-
   const deleteTypeMutation = useMutation({
     mutationFn: (id: string) => meterTypeDefinitionsApi.remove(id),
     onSuccess: () => {
@@ -265,7 +213,7 @@ export default function MetersListPage() {
   function openMeterCreate() {
     setEditingMeter(null);
     meterForm.resetFields();
-    setMeterModalOpen(true);
+    setMeterDrawerOpen(true);
   }
 
   function openMeterEdit(record: MeterItem) {
@@ -280,8 +228,9 @@ export default function MetersListPage() {
       city: (record as MeterItem & { city?: string }).city ?? undefined,
       municipality: (record as MeterItem & { municipality?: string }).municipality ?? undefined,
       measuringPoint: (record as MeterItem & { measuringPoint?: string }).measuringPoint ?? undefined,
+      dynamicFieldValues: (record.dynamicFieldValues as Record<string, {}> | null) ?? undefined,
     });
-    setMeterModalOpen(true);
+    setMeterDrawerOpen(true);
   }
 
   function openMeterDetail(record: MeterItem) {
@@ -289,22 +238,11 @@ export default function MetersListPage() {
   }
 
   function openTypeCreate() {
-    setEditingType(null);
-    typeForm.resetFields();
-    setTypeModalOpen(true);
+    navigate('/meter-types/new')
   }
 
   function openTypeEdit(record: MeterTypeDefinitionItem) {
-    setEditingType(record);
-    typeForm.setFieldsValue({
-      name: record.name,
-      manufacturer: record.manufacturer ?? undefined,
-      model: record.model ?? undefined,
-      type: record.type,
-      maxCurrent: record.maxCurrent ?? undefined,
-      notes: record.notes ?? undefined,
-    });
-    setTypeModalOpen(true);
+    navigate(`/meter-types/${record.id}`)
   }
 
   function handleMeterSubmit(values: MeterFormValues) {
@@ -318,6 +256,7 @@ export default function MetersListPage() {
       city: values.city,
       municipality: values.municipality,
       measuringPoint: values.measuringPoint,
+      dynamicFieldValues: values.dynamicFieldValues as Record<string, unknown> | undefined,
     };
     if (values.simCardId) payload.simCardId = values.simCardId;
     if (editingMeter) {
@@ -327,12 +266,19 @@ export default function MetersListPage() {
     }
   }
 
-  function handleTypeSubmit(values: TypeFormValues) {
-    if (editingType) {
-      updateTypeMutation.mutate({ id: editingType.id, payload: values });
-    } else {
-      createTypeMutation.mutate(values);
+  const isDynamicFieldEditable = (field: MeterTypeFieldItem) => field.isOperatorFillable
+
+  const renderDynamicFieldInput = (field: MeterTypeFieldItem) => {
+    if (field.fieldType === 'NUMBER') {
+      return <InputNumber disabled={!isDynamicFieldEditable(field)} style={{ width: '100%' }} />
     }
+    if (field.fieldType === 'BOOLEAN') {
+      return <Switch disabled={!isDynamicFieldEditable(field)} />
+    }
+    if (field.fieldType === 'DATE') {
+      return <Input type="date" disabled={!isDynamicFieldEditable(field)} />
+    }
+    return <Input disabled={!isDynamicFieldEditable(field)} />
   }
 
   const meterRows = listQuery.data?.items ?? [];
@@ -345,7 +291,7 @@ export default function MetersListPage() {
     <div
       className="space-y-4"
       data-tour-id="admin-meters"
-      data-tour-role="SYSTEM_ADMIN MODERATOR"
+      data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
     >
       {messageContextHolder}
       <Typography.Title level={3} className="!mb-0">
@@ -572,9 +518,11 @@ export default function MetersListPage() {
                       width: 140,
                       render: (_, record) => (
                         <Space>
-                          <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
-                            Uredi
-                          </Button>
+                          {userRole === 'SYSTEM_ADMIN' && (
+                            <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
+                              Uredi
+                            </Button>
+                          )}
                           <Popconfirm
                             title="Obrisati tip brojila?"
                             onConfirm={() => deleteTypeMutation.mutate(record.id)}
@@ -582,7 +530,12 @@ export default function MetersListPage() {
                             cancelText="Ne"
                             okButtonProps={{ danger: true }}
                           >
-                            <Button type="link" size="small" danger>
+                            <Button
+                              type="link"
+                              size="small"
+                              danger
+                              disabled={userRole !== 'SYSTEM_ADMIN'}
+                            >
                               Obriši
                             </Button>
                           </Popconfirm>
@@ -608,12 +561,12 @@ export default function MetersListPage() {
           detailMeter ? (
             <Space>
               {(detailMeter as MeterItem & { simCard?: { id: string } }).simCard &&
-                (userRole === 'SYSTEM_ADMIN' || userRole === 'MODERATOR') && (
+                (userRole === 'SYSTEM_ADMIN' || userRole === 'DIST_ADMIN') && (
                   <Button
                     size="small"
                     onClick={() => {
                       setDemountMeter(detailMeter);
-                      setDemountModalOpen(true);
+                      setDemountDrawerOpen(true);
                     }}
                   >
                     Demontiraj SIM
@@ -731,39 +684,37 @@ export default function MetersListPage() {
         )}
       </Drawer>
 
-      <Modal
+      <Drawer
         title={editingMeter ? 'Uredi brojilo' : 'Novi zapisnik'}
-        open={meterModalOpen}
-        onCancel={() => {
-          setMeterModalOpen(false);
-          setEditingMeter(null);
-          meterForm.resetFields();
+        open={meterDrawerOpen}
+        width={560}
+        onClose={() => {
+          setMeterDrawerOpen(false)
+          setEditingMeter(null)
+          meterForm.resetFields()
         }}
         destroyOnClose
-        width={560}
         footer={
-          editingMeter
-            ? [
-                <Button
-                  key="cancel"
-                  onClick={() => {
-                    setMeterModalOpen(false);
-                    setEditingMeter(null);
-                    meterForm.resetFields();
-                  }}
-                >
-                  Odustani
-                </Button>,
-                <Button
-                  key="submit"
-                  type="primary"
-                  loading={updateMeterMutation.isPending}
-                  onClick={() => meterForm.submit()}
-                >
-                  Snimi
-                </Button>,
-              ]
-            : null
+          editingMeter ? (
+            <div className="flex justify-end gap-2">
+              <Button
+                onClick={() => {
+                  setMeterDrawerOpen(false)
+                  setEditingMeter(null)
+                  meterForm.resetFields()
+                }}
+              >
+                Odustani
+              </Button>
+              <Button
+                type="primary"
+                loading={updateMeterMutation.isPending}
+                onClick={() => meterForm.submit()}
+              >
+                Snimi
+              </Button>
+            </div>
+          ) : null
         }
       >
         {editingMeter ? (
@@ -817,106 +768,91 @@ export default function MetersListPage() {
             <Form.Item name="notes" label="Napomena">
               <Input.TextArea rows={2} placeholder="Opcionalno" />
             </Form.Item>
+
+            {selectedEditMeterTypeDefinitionId && (
+              <div className="rounded-md border border-slate-200 p-3">
+                <div className="font-medium mb-2">Dodatna polja</div>
+                {(meterTypeFieldsQuery.data ?? [])
+                  .slice()
+                  .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                  .map((field) => (
+                    <Form.Item
+                      key={field.id}
+                      name={['dynamicFieldValues', field.name]}
+                      label={field.label}
+                      initialValue={field.defaultValue ?? undefined}
+                      valuePropName={field.fieldType === 'BOOLEAN' ? 'checked' : 'value'}
+                      rules={
+                        field.isRequired && isDynamicFieldEditable(field)
+                          ? [{ required: true, message: `Unesite: ${field.label}` }]
+                          : []
+                      }
+                    >
+                      {renderDynamicFieldInput(field)}
+                    </Form.Item>
+                  ))}
+                {meterTypeFieldsQuery.isLoading && (
+                  <div className="text-sm text-slate-500">Učitavanje polja…</div>
+                )}
+              </div>
+            )}
           </Form>
         ) : (
           <InstallationRecordCreateForm
             embedded
             onSuccess={() => {
-              setMeterModalOpen(false);
+              setMeterDrawerOpen(false);
               setEditingMeter(null);
               void queryClient.invalidateQueries({ queryKey: ['meters'] });
               void queryClient.invalidateQueries({ queryKey: ['installation-records'] });
             }}
             onCancel={() => {
-              setMeterModalOpen(false);
+              setMeterDrawerOpen(false);
               setEditingMeter(null);
             }}
           />
         )}
-      </Modal>
+      </Drawer>
 
-      <Modal
-        title={editingType ? 'Uredi tip brojila' : 'Novi tip brojila'}
-        open={typeModalOpen}
-        onCancel={() => {
-          setTypeModalOpen(false);
-          setEditingType(null);
-          typeForm.resetFields();
+      <Drawer
+        title="Zadatak demontaže SIM kartice"
+        open={demountDrawerOpen}
+        width={520}
+        onClose={() => {
+          setDemountDrawerOpen(false)
+          setDemountMeter(null)
+          setDemountOperatorId('')
+          setDemountNotes('')
         }}
         destroyOnClose
-        width={520}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => {
-              setTypeModalOpen(false);
-              setEditingType(null);
-              typeForm.resetFields();
-            }}
-          >
-            Odustani
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            loading={createTypeMutation.isPending || updateTypeMutation.isPending}
-            onClick={() => typeForm.submit()}
-          >
-            Snimi
-          </Button>,
-        ]}
-      >
-        <Form
-          form={typeForm}
-          layout="vertical"
-          onFinish={handleTypeSubmit}
-          className="mt-4"
-        >
-          <Form.Item
-            name="name"
-            label="Naziv"
-            rules={[{ required: true, message: 'Unesite naziv.' }]}
-          >
-            <Input placeholder="npr. AMM 3.0" />
-          </Form.Item>
-          <Form.Item name="manufacturer" label="Proizvođač">
-            <Input placeholder="Opcionalno" />
-          </Form.Item>
-          <Form.Item name="model" label="Model">
-            <Input placeholder="Opcionalno" />
-          </Form.Item>
-          <Form.Item name="type" label="Tip">
-            <Select allowClear placeholder="Odaberi" options={meterTypeOptions} />
-          </Form.Item>
-          <Form.Item name="maxCurrent" label="Maks. struja (A)">
-            <Input placeholder="Opcionalno" />
-          </Form.Item>
-          <Form.Item name="notes" label="Napomena">
-            <Input.TextArea rows={2} placeholder="Opcionalno" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Zadatak demontaže SIM kartice"
-        open={demountModalOpen}
-        onCancel={() => {
-          setDemountModalOpen(false);
-          setDemountMeter(null);
-          setDemountOperatorId('');
-          setDemountNotes('');
-        }}
-        onOk={() => {
-          if (!demountMeter || !demountOperatorId) return;
-          createDemountMutation.mutate({
-            meterId: demountMeter.id,
-            assignedToId: demountOperatorId,
-            notes: demountNotes || undefined,
-          });
-        }}
-        okText="Kreiraj zadatak"
-        cancelText="Odustani"
-        confirmLoading={createDemountMutation.isPending}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setDemountDrawerOpen(false)
+                setDemountMeter(null)
+                setDemountOperatorId('')
+                setDemountNotes('')
+              }}
+            >
+              Odustani
+            </Button>
+            <Button
+              type="primary"
+              loading={createDemountMutation.isPending}
+              onClick={() => {
+                if (!demountMeter || !demountOperatorId) return
+                createDemountMutation.mutate({
+                  meterId: demountMeter.id,
+                  assignedToId: demountOperatorId,
+                  notes: demountNotes || undefined,
+                })
+              }}
+            >
+              Kreiraj zadatak
+            </Button>
+          </div>
+        }
       >
         {demountMeter && (
           <Space direction="vertical" className="w-full" size="middle">
@@ -954,70 +890,7 @@ export default function MetersListPage() {
             </Form.Item>
           </Space>
         )}
-      </Modal>
-      <Tour
-        open={tourOpen}
-        current={tourStep}
-        onClose={() => {
-          setTourOpen(false);
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('sim-tracker-page-tour-meters-v1', '1');
-          }
-        }}
-        onChange={(next) => setTourStep(next)}
-        steps={
-          [
-            {
-              title: 'Pregled brojila',
-              description:
-                'Ovdje vidiš sva brojila po serijskom broju i osnovnim karakteristikama.',
-              target: () =>
-                document.querySelector('[data-tour-id="admin-meters"]') as HTMLElement,
-            },
-            {
-              title: 'Filteri brojila',
-              description:
-                'Filtriraj brojila po tipu i pretražuj po serijskom broju da brzo pronađeš uređaj.',
-              target: () =>
-                document.querySelector('[data-tour-id="meters-filters"]') as HTMLElement,
-            },
-            {
-              title: 'Kreiranje zapisnika sa brojila',
-              description:
-                'Dugme „Novi zapisnik“ otvara wizard za novu ugradnju SIM kartice na brojilo.',
-              target: () =>
-                document.querySelector('[data-tour-id="meters-new-record"]') as HTMLElement,
-            },
-            {
-              title: 'Tabela brojila',
-              description:
-                'Klikom na red otvaraš detalje brojila, SIM karticu, lokaciju i povezane zapisnike.',
-              target: () =>
-                document.querySelector('[data-tour-id="meters-table"]') as HTMLElement,
-            },
-            {
-              title: 'Katalog tipova brojila',
-              description:
-                'Drugi tab sadrži katalog tipova brojila (proizvođač, model, faznost, maksimalna struja).',
-              target: () =>
-                document.querySelector('[data-tour-id="meters-types-table"]') as HTMLElement,
-            },
-            {
-              title: 'Dodavanje novog tipa brojila',
-              description:
-                'Koristi „Novi tip brojila“ da proširiš katalog; tip se kasnije bira pri definisanju brojila.',
-              target: () =>
-                document.querySelector('[data-tour-id="meters-new-type"]') as HTMLElement,
-            },
-          ].filter((step) => {
-            try {
-              return Boolean(step.target && step.target());
-            } catch {
-              return false;
-            }
-          }) as TourProps['steps']
-        }
-      />
+      </Drawer>
     </div>
   );
 }

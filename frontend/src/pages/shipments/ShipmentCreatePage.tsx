@@ -15,11 +15,12 @@ import {
   message,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeftOutlined, UploadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { shipmentsApi } from '@/api/shipments.api';
 import { distributionsApi } from '@/api/distributions.api';
+import { useAuthStore } from '@/store/auth.store';
 import type {
   CreateShipmentInput,
   ImportColumnMapping,
@@ -39,6 +40,9 @@ export default function ShipmentCreatePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
+  const currentUser = useAuthStore((s) => s.user);
+  const isDistAdmin = currentUser?.role === 'DIST_ADMIN';
+  const distAdminDistributionId = currentUser?.distributionId ?? null;
   const [createForm] = Form.useForm<{
     name: string;
     provider: string;
@@ -47,9 +51,16 @@ export default function ShipmentCreatePage() {
     distributionId: string;
   }>();
 
+  useEffect(() => {
+    if (!isDistAdmin) return;
+    if (!distAdminDistributionId) return;
+    createForm.setFieldsValue({ distributionId: distAdminDistributionId });
+  }, [createForm, distAdminDistributionId, isDistAdmin]);
+
   const distributionsQuery = useQuery({
     queryKey: ['distributions', 'list'],
     queryFn: () => distributionsApi.list(),
+    enabled: !isDistAdmin,
   });
 
   const shipmentsQuery = useQuery({
@@ -61,6 +72,7 @@ export default function ShipmentCreatePage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ShipmentImportPreview | null>(null);
   const [mapping, setMapping] = useState<ImportColumnMapping>({});
+  const [previewPagination, setPreviewPagination] = useState({ page: 1, pageSize: 50 })
 
   const rows = shipmentsQuery.data?.items ?? [];
   const distributions = (distributionsQuery.data ?? []) as Array<{ id: string; name: string; code: string }>;
@@ -92,6 +104,7 @@ export default function ShipmentCreatePage() {
     onSuccess: (result) => {
       if (result.mode !== 'preview') return;
       setPreview(result);
+      setPreviewPagination({ page: 1, pageSize: 50 })
       setMapping({
         iccid: result.resolvedMapping.iccid ?? undefined,
         ipAddress: result.resolvedMapping.ipAddress ?? undefined,
@@ -127,6 +140,7 @@ export default function ShipmentCreatePage() {
       if (result.mode !== 'import') return;
       messageApi.success(`Import završen. Ubačeno redova: ${result.insertedRows}.`);
       setPreview(null);
+      setPreviewPagination({ page: 1, pageSize: 50 })
       await queryClient.invalidateQueries({ queryKey: ['shipments', 'list'] });
       await queryClient.invalidateQueries({ queryKey: ['sim-cards', 'list'] });
     },
@@ -182,6 +196,7 @@ export default function ShipmentCreatePage() {
                 placeholder="Odaberi distribuciju"
                 options={distributions.map((d) => ({ label: `${d.name} (${d.code})`, value: d.id }))}
                 loading={distributionsQuery.isLoading}
+                disabled={isDistAdmin}
               />
             </Form.Item>
             <Form.Item name="name" label="Naziv" rules={[{ required: true, message: 'Obavezno' }]}>
@@ -298,7 +313,17 @@ export default function ShipmentCreatePage() {
               <Table
                 rowKey="rowNumber"
                 dataSource={preview.previewRows}
-                pagination={false}
+                pagination={{
+                  current: previewPagination.page,
+                  pageSize: previewPagination.pageSize,
+                  total: preview.previewRows.length,
+                  showSizeChanger: true,
+                  pageSizeOptions: ['50', '100', '200', '500'],
+                  showTotal: (total) => `Ukupno: ${total}`,
+                  onChange: (page, pageSize) => {
+                    setPreviewPagination({ page, pageSize })
+                  },
+                }}
                 size="small"
                 columns={[
                   { title: 'Red', dataIndex: 'rowNumber', width: 90 },

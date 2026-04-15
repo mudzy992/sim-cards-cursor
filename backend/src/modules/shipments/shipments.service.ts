@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -26,8 +27,11 @@ export class ShipmentsService {
   ) {}
 
   async create(dto: CreateShipmentDto, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
+    if (scope?.role === 'DIST_ADMIN' && !scope.distributionId) {
+      throw new BadRequestException('Distribution admin scope is missing.');
+    }
     const distributionId =
-      scope?.role === 'MODERATOR' && scope.distributionId
+      scope?.role === 'DIST_ADMIN' && scope.distributionId
         ? scope.distributionId
         : dto.distributionId;
     if (scope?.role === 'SYSTEM_ADMIN' && !distributionId) {
@@ -323,13 +327,23 @@ export class ShipmentsService {
       shipmentId,
     );
 
-    const inserted = await this.prisma.simCard.createMany({
-      data: createManyData.map((item) => ({
-        ...item,
-        status: SimCardStatus.AVAILABLE,
-      })),
-      skipDuplicates: true,
-    });
+    let inserted: { count: number };
+    try {
+      inserted = await this.prisma.simCard.createMany({
+        data: createManyData.map((item) => ({
+          ...item,
+          status: SimCardStatus.AVAILABLE,
+        })),
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Import sadrži ICCID koji već postoji u bazi (globalno).');
+      }
+      throw error;
+    }
 
     const shipmentSimTotal = await this.prisma.simCard.count({
       where: { shipmentId },

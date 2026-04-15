@@ -29,8 +29,6 @@ import { InstallationRecordFilterDto } from './dto/installation-record-filter.dt
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { ApiPaginated } from 'src/common/decorators/api-paginated.decorator';
 import { StatusTransitionGuard } from './guards/status-transition.guard';
-import { RejectionReasonDto } from './dto/rejection-reason.dto';
-import { SendRecordDto } from './dto/send-record.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -55,7 +53,7 @@ export class InstallationRecordsController {
     description: 'The installation record has been successfully created.',
   })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   create(
     @Body() createInstallationRecordDto: CreateInstallationRecordDto,
     @CurrentUser() user?: { id: string; branchId?: string | null },
@@ -78,7 +76,7 @@ export class InstallationRecordsController {
     }),
   )
   @ApiOperation({ summary: 'Upload photo for installation record (returns path for photos array)' })
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   async uploadPhoto(@UploadedFile() file: Express.Multer.File): Promise<{ path: string }> {
     const path = await this.photoUploadService.save(file);
     return { path };
@@ -87,7 +85,7 @@ export class InstallationRecordsController {
   @Get()
   @ApiPaginated()
   @ApiOperation({ summary: 'Get all installation records' })
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   findAll(
     @Query() filter: InstallationRecordFilterDto,
     @CurrentUser() user?: { id: string; role: string; distributionId?: string | null; branchId?: string | null },
@@ -102,7 +100,7 @@ export class InstallationRecordsController {
   @Get('my')
   @ApiPaginated()
   @ApiOperation({ summary: 'Get current user installation records' })
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   findMy(
     @CurrentUser() user: { id: string; role: string; distributionId?: string | null; branchId?: string | null },
     @Query() filter: InstallationRecordFilterDto,
@@ -122,7 +120,7 @@ export class InstallationRecordsController {
 
   @Get(':id/timeline')
   @ApiOperation({ summary: 'Timeline događaja za dati zapisnik (ActivityLog feed)' })
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   getTimeline(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { role: string; distributionId?: string | null; branchId?: string | null },
@@ -141,7 +139,7 @@ export class InstallationRecordsController {
 
   @Get(':id/permissions')
   @ApiOperation({ summary: 'Permissions for current user on installation record actions' })
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   getPermissions(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { id: string; role: string; distributionId?: string | null; branchId?: string | null },
@@ -215,23 +213,11 @@ export class InstallationRecordsController {
     });
   }
 
-  @Post(':id/approve')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Post(':id/mark-sep-activated')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Approve an installation record' })
-  approve(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null },
-  ): Promise<InstallationRecord> {
-    const scope = { role: user.role, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null };
-    return this.installationRecordsService.approve(id, user.id, scope);
-  }
-
-  @Post(':id/submit-for-approval')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Pošalji zapisnik grupi na odobrenje (tekstualni email)' })
-  submitForApproval(
+  @ApiOperation({ summary: 'Označi zapisnik kao SEP aktiviran (moderator podružnice ili admin)' })
+  markSepActivated(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null },
     @Req() req: Request,
@@ -240,18 +226,18 @@ export class InstallationRecordsController {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress;
-    return this.installationRecordsService.submitForApproval(
+    return this.installationRecordsService.markSepActivated(
       id,
       { userId: user.id, ipAddress },
       scope,
     );
   }
 
-  @Post(':id/activate-sep')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Post(':id/retry-send')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Označi zapisnik kao aktiviran u SEP' })
-  activateInSep(
+  @ApiOperation({ summary: 'Ponovo pošalji email za zapisnik koji nije uspio' })
+  retrySend(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null },
     @Req() req: Request,
@@ -260,53 +246,10 @@ export class InstallationRecordsController {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress;
-    return this.installationRecordsService.activateInSep(
+    return this.installationRecordsService.retrySendEmail(
       id,
       { userId: user.id, ipAddress },
       scope,
     );
-  }
-
-  @Post(':id/send')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send approved record via email with PDF attachment' })
-  send(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: SendRecordDto,
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null },
-    @Req() req: Request,
-  ): Promise<InstallationRecord> {
-    const scope = { role: user.role, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null };
-    const ipAddress =
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-      req.socket?.remoteAddress;
-    return this.installationRecordsService.sendRecord(
-      id,
-      dto.recipientGroupIds,
-      dto.manualEmails,
-      { userId: user.id, ipAddress },
-      scope,
-    );
-  }
-
-  @Post(':id/reject')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reject an installation record' })
-  reject(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() rejectionReasonDto: RejectionReasonDto,
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null },
-    @Req() req: Request,
-  ): Promise<InstallationRecord> {
-    const ipAddress =
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-      req.socket?.remoteAddress;
-    const scope = { role: user.role, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null };
-    return this.installationRecordsService.reject(id, rejectionReasonDto, {
-      userId: user.id,
-      ipAddress,
-    }, scope);
   }
 }

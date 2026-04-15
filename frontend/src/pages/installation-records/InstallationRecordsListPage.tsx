@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Select, Space, Table, Tag, Typography, Tour } from 'antd';
-import type { TourProps } from 'antd';
-import { useState, useEffect } from 'react';
+import { Button, Select, Space, Table, Tag, Typography } from 'antd';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { getApiErrorMessage } from '@/utils/error.utils';
@@ -14,32 +13,26 @@ import type {
 const statusFilterOptions = [
   { label: 'Svi statusi', value: '' },
   { label: 'Nacrt', value: 'DRAFT' },
-  { label: 'Čeka odobrenje', value: 'PENDING' },
-  { label: 'Greška slanja', value: 'SUBMIT_FAILED' },
-  { label: 'Odbijeno', value: 'REJECTED' },
-  { label: 'Čeka SEP', value: 'WAITING_SEP_ACTIVATION' },
-  { label: 'Aktivirano u SEP', value: 'ACTIVATED_IN_SEP' },
   { label: 'Poslano', value: 'SENT' },
+  { label: 'Greška slanja', value: 'SEND_FAILED' },
+  { label: 'SEP aktiviran', value: 'SEP_ACTIVATED' },
+  { label: 'Legacy završeno', value: 'LEGACY_COMPLETED' },
 ];
 
 const statusColor: Record<string, string> = {
   DRAFT: 'default',
-  PENDING: 'processing',
-  SUBMIT_FAILED: 'error',
-  REJECTED: 'error',
-  WAITING_SEP_ACTIVATION: 'warning',
-  ACTIVATED_IN_SEP: 'success',
   SENT: 'blue',
+  SEND_FAILED: 'error',
+  SEP_ACTIVATED: 'success',
+  LEGACY_COMPLETED: 'default',
 };
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Nacrt',
-  PENDING: 'Čeka odobrenje',
-  SUBMIT_FAILED: 'Greška slanja',
-  REJECTED: 'Odbijeno',
-  WAITING_SEP_ACTIVATION: 'Čeka SEP',
-  ACTIVATED_IN_SEP: 'Aktivirano u SEP',
   SENT: 'Poslano',
+  SEND_FAILED: 'Greška slanja',
+  SEP_ACTIVATED: 'SEP aktiviran',
+  LEGACY_COMPLETED: 'Legacy završeno',
 };
 
 const defaultFilters: InstallationRecordsListParams = {
@@ -51,17 +44,6 @@ export default function InstallationRecordsListPage() {
   const navigate = useNavigate();
   const [filters, setFilters] =
     useState<InstallationRecordsListParams>(defaultFilters);
-  const [tourOpen, setTourOpen] = useState(false);
-  const [tourStep, setTourStep] = useState(0);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const seen = window.localStorage.getItem('sim-tracker-page-tour-records-v1');
-    const globalActive = window.localStorage.getItem('sim-tracker-global-tour-active') === '1';
-    if (!seen && !globalActive) {
-      setTourOpen(true);
-    }
-  }, []);
 
   const listQuery = useQuery({
     queryKey: ['installation-records', 'list', filters],
@@ -79,7 +61,7 @@ export default function InstallationRecordsListPage() {
     <div
       className="space-y-4"
       data-tour-id="admin-records"
-      data-tour-role="SYSTEM_ADMIN MODERATOR"
+      data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
     >
       <div
         className="flex flex-wrap items-center justify-between gap-4"
@@ -201,48 +183,6 @@ export default function InstallationRecordsListPage() {
             ),
           },
         ]}
-      />
-      <Tour
-        open={tourOpen}
-        current={tourStep}
-        onClose={() => {
-          setTourOpen(false);
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('sim-tracker-page-tour-records-v1', '1');
-          }
-        }}
-        onChange={(next) => setTourStep(next)}
-        steps={
-          [
-            {
-              title: 'Pregled zapisnika',
-              description:
-                'Ovdje vidiš sve zapisnike ugradnje sa ključnim informacijama i statusom.',
-              target: () =>
-                document.querySelector('[data-tour-id="records-header"]') as HTMLElement,
-            },
-            {
-              title: 'Filter po statusu',
-              description:
-                'Filter statusa omogućava fokus na zapisnike koji su u određenom koraku lifecycle-a (npr. Čeka odobrenje).',
-              target: () =>
-                document.querySelector('[data-tour-id="records-filters"]') as HTMLElement,
-            },
-            {
-              title: 'Tabela zapisnika',
-              description:
-                'Klikom na broj zapisnika otvaraš detalje, PDF i radnje odobravanja u skladu sa svojom ulogom.',
-              target: () =>
-                document.querySelector('[data-tour-id="admin-records"] table') as HTMLElement,
-            },
-          ].filter((step) => {
-            try {
-              return Boolean(step.target && step.target());
-            } catch {
-              return false;
-            }
-          }) as TourProps['steps']
-        }
       />
     </div>
   );

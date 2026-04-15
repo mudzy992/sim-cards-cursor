@@ -11,22 +11,18 @@ import {
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Nacrt',
-  PENDING: 'Čeka odobrenje',
-  SUBMIT_FAILED: 'Greška slanja',
-  REJECTED: 'Odbijeno',
-  WAITING_SEP_ACTIVATION: 'Čeka SEP',
-  ACTIVATED_IN_SEP: 'Aktivirano u SEP',
   SENT: 'Poslano',
+  SEND_FAILED: 'Greška slanja',
+  SEP_ACTIVATED: 'SEP aktiviran',
+  LEGACY_COMPLETED: 'Legacy završeno',
 };
 
 const statusColor: Record<string, string> = {
   DRAFT: 'default',
-  PENDING: 'processing',
-  SUBMIT_FAILED: 'error',
-  REJECTED: 'error',
-  WAITING_SEP_ACTIVATION: 'warning',
-  ACTIVATED_IN_SEP: 'success',
   SENT: 'blue',
+  SEND_FAILED: 'error',
+  SEP_ACTIVATED: 'success',
+  LEGACY_COMPLETED: 'default',
 };
 
 export default function DashboardPage() {
@@ -53,7 +49,7 @@ export default function DashboardPage() {
     <div
       className="space-y-6"
       data-tour-id="admin-dashboard"
-      data-tour-role="SYSTEM_ADMIN MODERATOR"
+      data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
     >
       <Typography.Title level={3} className="!mb-0">
         Dashboard

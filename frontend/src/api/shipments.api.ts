@@ -33,6 +33,9 @@ export const shipmentsApi = {
     const response = await axiosInstance.post<ApiEnvelope<ShipmentItem>>('/shipments', payload);
     return response.data.data;
   },
+  remove: async (id: string): Promise<void> => {
+    await axiosInstance.delete(`/shipments/${id}`)
+  },
   importExcel: async (params: {
     shipmentId: string;
     file: File;

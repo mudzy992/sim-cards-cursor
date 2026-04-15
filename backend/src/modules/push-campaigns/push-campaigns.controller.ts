@@ -19,7 +19,7 @@ export class PushCampaignsController {
   constructor(private readonly service: PushCampaignsService) {}
 
   @Post()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Kreiraj draft push kampanju' })
   createDraft(
     @CurrentUser()
@@ -39,7 +39,7 @@ export class PushCampaignsController {
   }
 
   @Post(':id/send')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Pošalji push kampanju' })
   send(
     @Param('id', ParseUUIDPipe) id: string,
@@ -51,7 +51,7 @@ export class PushCampaignsController {
   }
 
   @Get()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Lista push kampanja' })
   list(
     @Query() query: ListPushCampaignsDto,
@@ -63,7 +63,7 @@ export class PushCampaignsController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Detalji kampanje' })
   getOne(
     @Param('id', ParseUUIDPipe) id: string,
@@ -75,7 +75,7 @@ export class PushCampaignsController {
   }
 
   @Get(':id/stats')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Statistika dostave kampanje' })
   stats(
     @Param('id', ParseUUIDPipe) id: string,
@@ -87,7 +87,7 @@ export class PushCampaignsController {
   }
 
   @Get(':id/recipients')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Lista recipienta i statusa dostave' })
   recipients(
     @Param('id', ParseUUIDPipe) id: string,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Button, Card, Form, Input, InputNumber, Radio, Select, message } from 'antd';
+import { Button, Card, Form, Input, InputNumber, Radio, Select, Switch, message } from 'antd';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { metersApi } from '@/api/meters.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
@@ -8,6 +8,7 @@ import { simCardsApi } from '@/api/sim-cards.api';
 import { branchesApi } from '@/api/branches.api';
 import { useAuthStore } from '@/store/auth.store';
 import type { InstallationRecordItem } from '@/types/installation-record.types';
+import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 
 type CreateMode = 'existing' | 'new';
 
@@ -54,13 +55,23 @@ export default function InstallationRecordCreateForm({
     enabled: Boolean(userId) && createMode === 'new',
   });
 
+  const selectedMeterTypeDefinitionId = Form.useWatch('meterTypeDefinitionId', form) as
+    | string
+    | undefined
+
+  const meterTypeFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', 'fields', selectedMeterTypeDefinitionId],
+    queryFn: () => meterTypeDefinitionsApi.listFields(selectedMeterTypeDefinitionId!),
+    enabled: Boolean(userId) && createMode === 'new' && Boolean(selectedMeterTypeDefinitionId),
+  })
+
   const branchesQuery = useQuery({
     queryKey: ['branches', 'list', userDistributionId],
     queryFn: () => branchesApi.list(userDistributionId ?? undefined),
     enabled:
       Boolean(userId) &&
       createMode === 'new' &&
-      (userRole === 'SYSTEM_ADMIN' || userRole === 'MODERATOR'),
+      (userRole === 'SYSTEM_ADMIN' || userRole === 'DIST_ADMIN'),
   });
 
   const createMutation = useMutation({
@@ -138,10 +149,30 @@ export default function InstallationRecordCreateForm({
         measuringPoint: values.measuringPoint as string | undefined,
         latitude: values.latitude != null ? Number(values.latitude) : undefined,
         longitude: values.longitude != null ? Number(values.longitude) : undefined,
+        dynamicFieldValues: (values.dynamicFieldValues as Record<string, unknown> | undefined) ?? undefined,
         notes: values.notes as string | undefined,
       });
     }
   };
+
+  const isFieldEditable = (field: MeterTypeFieldItem) => {
+    if (!isOperator) return true
+    return field.isOperatorFillable
+  }
+
+  const renderFieldInput = (field: MeterTypeFieldItem) => {
+    const disabled = !isFieldEditable(field)
+    if (field.fieldType === 'NUMBER') {
+      return <InputNumber disabled={disabled} style={{ width: '100%' }} />
+    }
+    if (field.fieldType === 'BOOLEAN') {
+      return <Switch disabled={disabled} />
+    }
+    if (field.fieldType === 'DATE') {
+      return <Input type="date" disabled={disabled} />
+    }
+    return <Input disabled={disabled} />
+  }
 
   const formContent = (
     <>
@@ -249,6 +280,34 @@ export default function InstallationRecordCreateForm({
                 )}
               </Form.Item>
             </div>
+
+            {selectedMeterTypeDefinitionId && (
+              <div className="rounded-md border border-slate-200 p-3">
+                <div className="font-medium mb-2">Dodatna polja</div>
+                {(meterTypeFieldsQuery.data ?? [])
+                  .slice()
+                  .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                  .map((field) => (
+                    <Form.Item
+                      key={field.id}
+                      name={['dynamicFieldValues', field.name]}
+                      label={field.label}
+                      rules={
+                        field.isRequired && isFieldEditable(field)
+                          ? [{ required: true, message: `Unesite: ${field.label}` }]
+                          : []
+                      }
+                      initialValue={field.defaultValue ?? undefined}
+                      valuePropName={field.fieldType === 'BOOLEAN' ? 'checked' : 'value'}
+                    >
+                      {renderFieldInput(field)}
+                    </Form.Item>
+                  ))}
+                {meterTypeFieldsQuery.isLoading && (
+                  <div className="text-sm text-slate-500">Učitavanje polja…</div>
+                )}
+              </div>
+            )}
             <Form.Item name="measuringPoint" label="Mjerno mjesto">
               <Input placeholder="Opcionalno" />
             </Form.Item>

@@ -31,15 +31,14 @@ export type CreateInstallationRecordInput =
       measuringPoint?: string;
       latitude?: number;
       longitude?: number;
+      dynamicFieldValues?: Record<string, unknown>;
       notes?: string;
       photos?: unknown;
     };
 
 export type InstallationRecordPermissions = {
-  canSubmitForApproval: boolean;
-  canApproveReject: boolean;
-  canActivateSep: boolean;
-  isApprovalOperator: boolean;
+  canRetrySend: boolean;
+  canMarkSepActivated: boolean;
 };
 
 export const installationRecordsApi = {
@@ -94,44 +93,17 @@ export const installationRecordsApi = {
     return response.data.data;
   },
 
-  submitForApproval: async (id: string): Promise<InstallationRecordItem> => {
+  markSepActivated: async (id: string): Promise<InstallationRecordItem> => {
     const response = await axiosInstance.post<
       ApiEnvelope<InstallationRecordItem>
-    >(`${baseUrl}/${id}/submit-for-approval`);
+    >(`${baseUrl}/${id}/mark-sep-activated`);
     return response.data.data;
   },
 
-  activateInSep: async (id: string): Promise<InstallationRecordItem> => {
+  retrySend: async (id: string): Promise<InstallationRecordItem> => {
     const response = await axiosInstance.post<
       ApiEnvelope<InstallationRecordItem>
-    >(`${baseUrl}/${id}/activate-sep`);
-    return response.data.data;
-  },
-
-  approve: async (id: string): Promise<InstallationRecordItem> => {
-    const response = await axiosInstance.post<
-      ApiEnvelope<InstallationRecordItem>
-    >(`${baseUrl}/${id}/approve`);
-    return response.data.data;
-  },
-
-  reject: async (
-    id: string,
-    rejectionReason: string,
-  ): Promise<InstallationRecordItem> => {
-    const response = await axiosInstance.post<
-      ApiEnvelope<InstallationRecordItem>
-    >(`${baseUrl}/${id}/reject`, { rejectionReason });
-    return response.data.data;
-  },
-
-  send: async (
-    id: string,
-    payload: { recipientGroupIds?: string[]; manualEmails?: string[] },
-  ): Promise<InstallationRecordItem> => {
-    const response = await axiosInstance.post<
-      ApiEnvelope<InstallationRecordItem>
-    >(`${baseUrl}/${id}/send`, payload);
+    >(`${baseUrl}/${id}/retry-send`);
     return response.data.data;
   },
 

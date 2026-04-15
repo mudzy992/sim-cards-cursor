@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, Card, Descriptions, Space, Tag, Typography } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import { simCardsApi } from '@/api/sim-cards.api';
+import { getSimCardStatusLabel } from '@/utils/labels.utils'
 
 const statusColor: Record<string, string> = {
   AVAILABLE: 'green',
@@ -38,7 +39,9 @@ export default function SimCardDetailsPage() {
           <Descriptions column={2} bordered>
             <Descriptions.Item label="ICCID">{simCard.iccid}</Descriptions.Item>
             <Descriptions.Item label="Status">
-              <Tag color={statusColor[simCard.status] ?? 'default'}>{simCard.status}</Tag>
+              <Tag color={statusColor[simCard.status] ?? 'default'}>
+                {getSimCardStatusLabel(simCard.status)}
+              </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="IP adresa">{simCard.ipAddress}</Descriptions.Item>
             <Descriptions.Item label="Javna IP">

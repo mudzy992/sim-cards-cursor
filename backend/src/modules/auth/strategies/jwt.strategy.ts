@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
-import { UserStatus } from '@prisma/client';
+import { UserRole, UserStatus } from '@prisma/client';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { JwtPayload } from '../../../common/interfaces/jwt-payload.interface';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -39,11 +39,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User is not active');
     }
 
+    let branchModeratorBranchIds: string[] = [];
+    if (user.role === UserRole.USER) {
+      const moderatorEntries = await this.prisma.branchModerator.findMany({
+        where: { userId: user.id },
+        select: { branchId: true },
+      });
+      branchModeratorBranchIds = moderatorEntries.map((e) => e.branchId);
+    }
+
     const { branch, ...rest } = user;
     return {
       ...rest,
       distributionId: rest.distributionId ?? branch?.distributionId ?? null,
       branchId: rest.branchId ?? null,
+      branchModeratorBranchIds,
     };
   }
 }

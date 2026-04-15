@@ -18,6 +18,7 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { User, UserRole, DemountTaskStatus } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { toScopeContext } from 'src/common/utils/scope-filter.util';
 
 @ApiTags('Demount Tasks (Zadaci demontaže)')
 @Controller('demount-tasks')
@@ -27,33 +28,33 @@ export class DemountTasksController {
   constructor(private readonly demountTasksService: DemountTasksService) {}
 
   @Post()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Kreiraj zadatak demontaže – bira operatora' })
   create(
     @Body() dto: CreateDemountTaskDto,
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null },
+    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null; branchModeratorBranchIds?: string[] },
     @Req() req: Request,
   ) {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress;
-    const scope = { role: user.role, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null };
+    const scope = toScopeContext({ ...user, role: user.role });
     return this.demountTasksService.create(dto, user.id, ipAddress, scope);
   }
 
   @Get('my')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Moji zadaci demontaže (za operatora)' })
   findMy(
-    @CurrentUser() user: { id: string; role: string; distributionId?: string | null; branchId?: string | null },
+    @CurrentUser() user: { id: string; role: string; distributionId?: string | null; branchId?: string | null; branchModeratorBranchIds?: string[] },
     @Query('status') status?: DemountTaskStatus,
   ) {
-    const scope = { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null };
+    const scope = toScopeContext({ ...user, role: user.role as UserRole });
     return this.demountTasksService.findMy(user.id, status, scope);
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Ažuriraj status (IN_PROGRESS, COMPLETED)' })
   updateStatus(
     @Param('id') id: string,

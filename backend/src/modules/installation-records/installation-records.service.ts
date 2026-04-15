@@ -12,12 +12,10 @@ import { Prisma, InstallationRecord, RecordStatus, SimCardStatus } from '@prisma
 import { InstallationRecordFilterDto } from './dto/installation-record-filter.dto';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { RecordNumberGenerator } from 'src/common/utils/record-number.generator';
-import { RejectionReasonDto } from './dto/rejection-reason.dto';
 import { PdfGeneratorService } from 'src/common/utils/pdf-generator.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { MailService } from '../mail/mail.service';
-import { RecipientsService } from '../recipients/recipients.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -42,8 +40,7 @@ export class InstallationRecordsService {
     private readonly pdfGenerator: PdfGeneratorService,
     private readonly activityLogService: ActivityLogService,
     private readonly mailService: MailService,
-    private readonly recipientsService: RecipientsService,
-    private readonly notificationsService: NotificationsService,
+    private readonly meterTypeFieldsService: MeterTypeFieldsService,
   ) {}
 
   async create(
@@ -81,6 +78,11 @@ export class InstallationRecordsService {
       const branchId =
         createInstallationRecordDto.branchId ?? ctx?.branchId ?? undefined;
 
+      const validatedDynamic = await this.meterTypeFieldsService.validateDynamicValues(
+        createInstallationRecordDto.meterTypeDefinitionId,
+        createInstallationRecordDto.dynamicFieldValues ?? null,
+      );
+
       const meter = await this.prisma.meter.create({
         data: {
           serialNumber: createInstallationRecordDto.serialNumber.trim(),
@@ -96,6 +98,7 @@ export class InstallationRecordsService {
           measuringPoint: createInstallationRecordDto.measuringPoint ?? undefined,
           latitude: createInstallationRecordDto.latitude ?? undefined,
           longitude: createInstallationRecordDto.longitude ?? undefined,
+          ...(Object.keys(validatedDynamic).length > 0 && { dynamicFieldValues: validatedDynamic as Prisma.InputJsonValue }),
         },
       });
       meterId = meter.id;
@@ -170,6 +173,7 @@ export class InstallationRecordsService {
         },
       });
     }
+    this.autoSendRecordEmail(record.id, ctx).catch(() => {});
     return record;
   }
 
@@ -185,19 +189,19 @@ export class InstallationRecordsService {
     filter: InstallationRecordFilterDto,
     scope?: ScopeContext | null,
   ): Promise<PaginatedResult<InstallationRecord>> {
-    const isApprover = await this.isUserApprovalOperator(userId, scope);
-    if (isApprover) {
-      // Approval operator should work on distribution scope (same visibility as moderator for records).
-      if (scope?.distributionId) {
-        return this.findManyWithFilter(filter, undefined, {
-          role: 'MODERATOR',
-          distributionId: scope.distributionId,
-          branchId: null,
-        });
-      }
-      return this.findManyWithFilter(filter, undefined, scope);
+    const moderatedBranches = await this.prisma.branchModerator.findMany({
+      where: { userId },
+      select: { branchId: true },
+    });
+    if (moderatedBranches.length > 0) {
+      const branchIds = moderatedBranches.map((b) => b.branchId);
+      return this.findManyWithFilter(
+        filter,
+        undefined,
+        scope,
+        { meter: { branchId: { in: branchIds } } },
+      );
     }
-    // Classic field operator (not in approval groups): only own records.
     return this.findManyWithFilter(filter, { installedById: userId }, scope);
   }
 
@@ -213,20 +217,24 @@ export class InstallationRecordsService {
     filter: InstallationRecordFilterDto,
     extraWhere: { installedById?: string } | undefined,
     scope?: ScopeContext | null,
+    additionalWhere?: Record<string, unknown>,
   ): Promise<PaginatedResult<InstallationRecord>> {
-    if (scope?.role === 'USER' && !scope.branchId) {
+    if (scope?.role === 'USER' && !scope.branchId && !additionalWhere) {
       throw new ForbiddenException(
         'Korisnik mora biti vezan za podružnicu da bi pristupio listi zapisnika.',
       );
     }
     const { page, limit, status, meterId } = filter;
     const skip = (page - 1) * limit;
-    const scopeClause = scopeWhere(scope, { viaMeter: true });
+    const scopeClause = additionalWhere ? undefined : scopeWhere(scope, { viaMeter: true });
+    const andClauses: Record<string, unknown>[] = [];
+    if (scopeClause) andClauses.push(scopeClause);
+    if (additionalWhere) andClauses.push(additionalWhere);
     const where = {
       ...(status ? { status } : {}),
       ...(meterId ? { meterId } : {}),
       ...(extraWhere ?? {}),
-      ...(scopeClause ? { AND: [scopeClause] } : {}),
+      ...(andClauses.length ? { AND: andClauses } : {}),
     };
 
     const [items, total] = await this.prisma.$transaction([
@@ -311,68 +319,39 @@ export class InstallationRecordsService {
     userId: string,
     scope?: ScopeContext | null,
   ): Promise<{
-    canSubmitForApproval: boolean;
-    canApproveReject: boolean;
-    canActivateSep: boolean;
-    isApprovalOperator: boolean;
+    canRetrySend: boolean;
+    canMarkSepActivated: boolean;
   }> {
     const record = await this.findOne(id, scope);
-    const isUserRole = scope?.role === 'USER';
-    let isApprovalOperator = false;
-    let approvalPerms:
-      | {
-          canApproveFromPending: boolean;
-          canRejectFromPending: boolean;
-          canActivateSep: boolean;
-          canSendPdf: boolean;
-        }
-      | null = null;
-    if (isUserRole) {
+    const isAdmin = scope?.role === 'SYSTEM_ADMIN' || scope?.role === 'DIST_ADMIN';
+    let isBranchModerator = false;
+    if (scope?.role === 'USER') {
       const meter = await this.prisma.meter.findUnique({
         where: { id: record.meterId },
         select: { branchId: true },
       });
-      const branchId = meter?.branchId ?? null;
-      approvalPerms = await this.recipientsService.getUserApprovalPermissionsForBranch(
-        userId,
-        branchId ?? null,
-      );
-      isApprovalOperator = !!approvalPerms;
+      if (meter?.branchId) {
+        const modEntry = await this.prisma.branchModerator.findUnique({
+          where: { userId_branchId: { userId, branchId: meter.branchId } },
+        });
+        isBranchModerator = !!modEntry;
+      }
     }
-
     return {
-      canSubmitForApproval:
-        record.status === RecordStatus.DRAFT &&
-        (record.installedById === userId || scope?.role === 'SYSTEM_ADMIN' || scope?.role === 'MODERATOR'),
-      canApproveReject:
-        record.status === RecordStatus.PENDING &&
-          (!isUserRole ||
-            (isApprovalOperator && !!approvalPerms?.canApproveFromPending)),
-      canActivateSep:
-        record.status === RecordStatus.WAITING_SEP_ACTIVATION &&
-          (!isUserRole ||
-            (isApprovalOperator && !!approvalPerms?.canActivateSep)),
-      isApprovalOperator,
+      canRetrySend:
+        record.status === RecordStatus.SEND_FAILED &&
+        (record.installedById === userId || isAdmin),
+      canMarkSepActivated:
+        record.status === RecordStatus.SENT &&
+        (isAdmin || isBranchModerator),
     };
   }
 
-  private async isUserApprovalOperator(
-    userId: string,
-    scope?: ScopeContext | null,
-  ): Promise<boolean> {
-    const where: Prisma.BranchApprovalGroupWhereInput = {
-      recipientGroup: {
-        type: 'APPROVAL',
-        groupUsers: { some: { userId } },
-      },
-    };
-    if (scope?.distributionId) {
-      where.branch = { distributionId: scope.distributionId };
-    } else if (scope?.branchId) {
-      where.branchId = scope.branchId;
-    }
-    const count = await this.prisma.branchApprovalGroup.count({ where });
-    return count > 0;
+  async isBranchModerator(userId: string, branchId: string): Promise<boolean> {
+    const entry = await this.prisma.branchModerator.findUnique({
+      where: { userId_branchId: { userId, branchId } },
+    });
+    return !!entry;
   }
 
   async update(
@@ -437,74 +416,15 @@ export class InstallationRecordsService {
     }
   }
 
-  async approve(id: string, approvedById: string, scope?: ScopeContext | null): Promise<InstallationRecord> {
-    const record = await this.findOne(id, scope);
-    if (record.status !== RecordStatus.PENDING) {
-      throw new BadRequestException(
-        `Installation record can only be approved from PENDING status. Current status: ${record.status}`,
-      );
-    }
-    if (scope?.role === 'USER') {
-      const meter = await this.prisma.meter.findUnique({
-        where: { id: record.meterId },
-        select: { branchId: true },
-      });
-      const branchId = meter?.branchId ?? null;
-      if (!branchId) {
-        throw new ForbiddenException(
-          'Zapisnik nema povezanu podružnicu. Samo moderator ili admin mogu odobriti.',
-        );
-      }
-      const perms = await this.recipientsService.getUserApprovalPermissionsForBranch(
-        approvedById,
-        branchId,
-      );
-      if (!perms || !perms.canApproveFromPending) {
-        throw new ForbiddenException(
-          'Niste u grupi odobravatelja za ovu podružnicu ili nemate pravo odobravanja zapisnika.',
-        );
-      }
-    }
-    const updated = await this.prisma.installationRecord.update({
-      where: { id },
-      data: {
-        status: RecordStatus.WAITING_SEP_ACTIVATION,
-        approvedById,
-        approvedAt: new Date(),
-      },
-    });
-    await this.notificationsService.create({
-      userId: record.installedById,
-      title: 'Zapisnik odobren',
-      message: `Zapisnik ${record.recordNumber} je odobren. Čeka aktivaciju u SEP.`,
-      type: 'installation_record',
-      link: `/installation-records/${id}`,
-    });
-    await this.activityLogService.log({
-      userId: approvedById,
-      action: 'APPROVE',
-      entity: 'installation_record',
-      entityId: id,
-      details: { recordNumber: record.recordNumber },
-    });
-    await this.createSimEventFromInstallationRecord(
-      id,
-      'APPROVED',
-      approvedById,
-    );
-    return updated;
-  }
-
-  async reject(
+  async markSepActivated(
     id: string,
-    rejectionReasonDto: RejectionReasonDto,
     ctx?: InstallationRecordContext,
     scope?: ScopeContext | null,
   ): Promise<InstallationRecord> {
     const record = await this.findOne(id, scope);
-    if (record.status !== RecordStatus.PENDING) {
+    if (record.status !== RecordStatus.SENT) {
       throw new BadRequestException(
-        `Installation record can only be rejected from PENDING status. Current status: ${record.status}`,
+        `Zapisnik se može označiti kao SEP aktiviran samo iz statusa SENT. Trenutni: ${record.status}`,
       );
     }
     if (scope?.role === 'USER' && ctx?.userId) {
@@ -512,56 +432,53 @@ export class InstallationRecordsService {
         where: { id: record.meterId },
         select: { branchId: true },
       });
-      const branchId = meter?.branchId ?? null;
-      if (!branchId) {
+      if (!meter?.branchId) {
         throw new ForbiddenException(
-          'Zapisnik nema povezanu podružnicu. Samo moderator ili admin mogu odbiti.',
+          'Zapisnik nema povezanu podružnicu.',
         );
       }
-      const perms = await this.recipientsService.getUserApprovalPermissionsForBranch(
-        ctx.userId,
-        branchId,
-      );
-      if (!perms || !perms.canRejectFromPending) {
+      const isMod = await this.isBranchModerator(ctx.userId, meter.branchId);
+      if (!isMod) {
         throw new ForbiddenException(
-          'Niste u grupi odobravatelja za ovu podružnicu ili nemate pravo odbijanja zapisnika.',
+          'Nemate pravo moderatora za ovu podružnicu.',
         );
       }
     }
     const updated = await this.prisma.installationRecord.update({
       where: { id },
-      data: {
-        status: RecordStatus.REJECTED,
-        rejectionReason: rejectionReasonDto.rejectionReason,
-      },
-    });
-    await this.notificationsService.create({
-      userId: record.installedById,
-      title: 'Zapisnik odbijen',
-      message: `Zapisnik ${record.recordNumber} je odbijen. Razlog: ${rejectionReasonDto.rejectionReason || 'Nije naveden.'}`,
-      type: 'installation_record',
-      link: `/installation-records/${id}`,
+      data: { status: RecordStatus.SEP_ACTIVATED },
     });
     await this.activityLogService.log({
       userId: ctx?.userId,
-      action: 'REJECT',
+      action: 'MARK_SEP_ACTIVATED',
       entity: 'installation_record',
       entityId: id,
-      details: {
-        recordNumber: record.recordNumber,
-        reason: rejectionReasonDto.rejectionReason,
-      },
+      details: { recordNumber: record.recordNumber },
       ipAddress: ctx?.ipAddress,
     });
     await this.createSimEventFromInstallationRecord(
       id,
-      'REJECTED',
+      'SEP_ACTIVATED',
       ctx?.userId,
     );
     return updated;
   }
 
-  private serializeRecordForPdf(record: InstallationRecord & {
+  async retrySendEmail(
+    id: string,
+    ctx?: InstallationRecordContext,
+    scope?: ScopeContext | null,
+  ): Promise<InstallationRecord> {
+    const record = await this.findOne(id, scope);
+    if (record.status !== RecordStatus.SEND_FAILED) {
+      throw new BadRequestException(
+        `Ponovo slanje je moguće samo iz statusa SEND_FAILED. Trenutni: ${record.status}`,
+      );
+    }
+    return this.autoSendRecordEmail(id, ctx, scope);
+  }
+
+  private async serializeRecordForPdf(record: InstallationRecord & {
     photos?: string[] | null;
     meter?: {
       serialNumber: string;
@@ -574,12 +491,14 @@ export class InstallationRecordsService {
       measuringPoint?: string | null;
       latitude?: number | string | null;
       longitude?: number | string | null;
+      dynamicFieldValues?: Record<string, unknown> | null;
+      meterTypeDefinitionId: string;
       meterTypeDefinition?: { name: string; manufacturer?: string | null; model?: string | null; type: string; maxCurrent?: string | null } | null;
       simCard?: { iccid: string; ipAddress: string; publicIpAddress?: string | null; phoneNumber?: string | null; apn?: string | null; assignedTo?: { firstName: string; lastName: string } | null } | null;
     } | null;
     installedBy?: { firstName: string; lastName: string } | null;
     approvedBy?: { firstName: string; lastName: string } | null;
-  }): Record<string, unknown> {
+  }): Promise<Record<string, unknown>> {
     const formatDate = (d: Date | string | null | undefined) =>
       d ? new Date(d).toLocaleDateString('bs-BA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
     const typeLabel = (t: string) => (t === 'SINGLE_PHASE' ? 'Jednofazno' : t === 'THREE_PHASE' ? 'Trofazno' : t);
@@ -634,6 +553,25 @@ export class InstallationRecordsService {
         // skip invalid photos
       }
     }
+    const dynamicFields: { label: string; value: string }[] = [];
+    if (record.meter?.dynamicFieldValues && record.meter.meterTypeDefinitionId) {
+      const fieldDefs = await this.meterTypeFieldsService.findAllByDefinition(
+        record.meter.meterTypeDefinitionId,
+      );
+      const vals = record.meter.dynamicFieldValues as Record<string, unknown>;
+      for (const fd of fieldDefs) {
+        const raw = vals[fd.name];
+        if (raw === undefined || raw === null || raw === '') continue;
+        let display = String(raw);
+        if (fd.fieldType === 'BOOLEAN') {
+          display = raw === true || raw === 'true' ? 'Da' : 'Ne';
+        } else if (fd.fieldType === 'DATE') {
+          display = formatDate(raw as string);
+        }
+        dynamicFields.push({ label: fd.label, value: display });
+      }
+    }
+
     return {
       recordNumber: record.recordNumber,
       installationAddress: (record.meter?.installationAddress ?? '') as string,
@@ -652,12 +590,14 @@ export class InstallationRecordsService {
         : null,
       hasPhotos: photoDataUrls.length > 0,
       photoDataUrls,
+      hasDynamicFields: dynamicFields.length > 0,
+      dynamicFields,
     };
   }
 
   async generatePdf(id: string, scope?: ScopeContext | null): Promise<Buffer> {
     const installationRecord = await this.findOne(id, scope) as Parameters<InstallationRecordsService['serializeRecordForPdf']>[0];
-    const pdfData = this.serializeRecordForPdf(installationRecord);
+    const pdfData = await this.serializeRecordForPdf(installationRecord);
     const buffer = await this.pdfGenerator.generatePdf(
       'installation-record',
       pdfData,
@@ -674,36 +614,26 @@ export class InstallationRecordsService {
     return buffer;
   }
 
-  async sendRecord(
+  async autoSendRecordEmail(
     id: string,
-    recipientGroupIds: string[] | undefined,
-    manualEmails: string[] | undefined,
     ctx?: InstallationRecordContext,
     scope?: ScopeContext | null,
   ): Promise<InstallationRecord> {
     const record = await this.findOne(id, scope) as Parameters<InstallationRecordsService['serializeRecordForPdf']>[0];
-    if (record.status !== RecordStatus.ACTIVATED_IN_SEP) {
-      throw new BadRequestException(
-        `Zapisnik se može slati samo u statusu ACTIVATED_IN_SEP. Trenutni status: ${record.status}`,
-      );
-    }
-
-    const emails: string[] = [];
-    if (recipientGroupIds?.length) {
-      const fromGroups = await this.recipientsService.getActiveEmailsByGroupIds(
-        recipientGroupIds,
-      );
-      emails.push(...fromGroups);
-    }
-    if (manualEmails?.length) {
-      emails.push(...manualEmails);
+    const meter = await this.prisma.meter.findUnique({
+      where: { id: record.meterId },
+      select: { branchId: true },
+    });
+    const branchId = meter?.branchId ?? ctx?.branchId;
+    let emails: string[] = [];
+    if (branchId) {
+      const recipients = await this.prisma.branchEmailRecipient.findMany({
+        where: { branchId, isActive: true },
+        select: { email: true },
+      });
+      emails = recipients.map((r) => r.email);
     }
     const uniqueEmails = [...new Set(emails)].filter((e) => e?.trim());
-    if (uniqueEmails.length === 0) {
-      throw new BadRequestException(
-        'Navedite barem jednu grupu primalaca ili ručne email adrese.',
-      );
-    }
 
     let pdfBuffer: Buffer;
     if (record.pdfPath) {
@@ -715,6 +645,22 @@ export class InstallationRecordsService {
       }
     } else {
       pdfBuffer = await this.generatePdf(id, scope);
+    }
+
+    if (uniqueEmails.length === 0) {
+      const updated = await this.prisma.installationRecord.update({
+        where: { id },
+        data: { status: RecordStatus.SENT, sentAt: new Date() },
+      });
+      await this.activityLogService.log({
+        userId: ctx?.userId,
+        action: 'SEND',
+        entity: 'installation_record',
+        entityId: id,
+        details: { recordNumber: record.recordNumber, warning: 'No email recipients configured for branch' },
+        ipAddress: ctx?.ipAddress,
+      });
+      return updated;
     }
 
     const pdfFileName = `${record.recordNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
@@ -731,7 +677,19 @@ export class InstallationRecordsService {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Slanje email-a nije uspjelo';
-      throw new BadRequestException(`Slanje nije uspjelo: ${msg}`);
+      await this.prisma.installationRecord.update({
+        where: { id },
+        data: { status: RecordStatus.SEND_FAILED },
+      });
+      await this.activityLogService.log({
+        userId: ctx?.userId,
+        action: 'SEND_FAILED',
+        entity: 'installation_record',
+        entityId: id,
+        details: { recordNumber: record.recordNumber, error: msg },
+        ipAddress: ctx?.ipAddress,
+      });
+      return this.findOne(id, scope);
     }
 
     const updated = await this.prisma.installationRecord.update({
@@ -748,165 +706,16 @@ export class InstallationRecordsService {
       action: 'SEND',
       entity: 'installation_record',
       entityId: id,
-      details: {
-        recordNumber: record.recordNumber,
-        sentTo: uniqueEmails,
-      },
+      details: { recordNumber: record.recordNumber, sentTo: uniqueEmails },
       ipAddress: ctx?.ipAddress,
     });
 
-    await this.createSimEventFromInstallationRecord(
-      id,
-      'SENT',
-      ctx?.userId,
-    );
+    await this.createSimEventFromInstallationRecord(id, 'SENT', ctx?.userId);
 
     return updated;
   }
 
-  async submitForApproval(
-    id: string,
-    ctx?: InstallationRecordContext,
-    scope?: ScopeContext | null,
-  ): Promise<InstallationRecord> {
-    const record = await this.findOne(id, scope) as Parameters<InstallationRecordsService['serializeRecordForPdf']>[0];
-    if (record.status !== RecordStatus.DRAFT) {
-      throw new BadRequestException(
-        `Zapisnik se može slati na odobrenje samo iz statusa DRAFT. Trenutni: ${record.status}`,
-      );
-    }
-    const meter = record.meter as { branchId?: string } | null;
-    const installer = record.installedBy as { branchId?: string } | null;
-    const branchId = meter?.branchId ?? installer?.branchId;
-    if (!branchId) {
-      throw new BadRequestException(
-        'Zapisnik nema povezanu podružnicu. Nemoguće odrediti grupu za odobrenje.',
-      );
-    }
-    const approvalGroup = await this.recipientsService.getApprovalGroupForBranch(branchId);
-    if (!approvalGroup) {
-      throw new BadRequestException(
-        'Nije definisana grupa za odobrenje za ovu podružnicu. Moderator treba postaviti mapiranje podružnica.',
-      );
-    }
-    const { emails, userIds } = await this.recipientsService.getEmailsAndUserIdsForGroup(
-      approvalGroup.id,
-    );
-    if (emails.length === 0) {
-      throw new BadRequestException(
-        'Grupa za odobrenje nema primalaca. Dodajte Recipients ili korisnike aplikacije u grupu.',
-      );
-    }
-    const installedByName = record.installedBy
-      ? `${(record.installedBy as { firstName: string }).firstName} ${(record.installedBy as { lastName: string }).lastName}`
-      : 'Nepoznato';
-    try {
-      await this.mailService.sendApprovalRequest({
-        to: emails,
-        recordNumber: record.recordNumber,
-        recordId: id,
-        meterSerialNumber: record.meter?.serialNumber ?? '–',
-        ipAddress: record.meter?.simCard?.ipAddress ?? '–',
-        installationAddress: record.meter?.installationAddress ?? '',
-        municipality: record.meter?.municipality ?? '',
-        installedByName,
-      });
-    } catch (err) {
-      await this.prisma.installationRecord.update({
-        where: { id },
-        data: { status: RecordStatus.SUBMIT_FAILED },
-      });
-      const msg = err instanceof Error ? err.message : 'Slanje email-a nije uspjelo';
-      throw new BadRequestException(`Slanje na odobrenje nije uspjelo: ${msg}`);
-    }
-    const updated = await this.prisma.installationRecord.update({
-      where: { id },
-      data: { status: RecordStatus.PENDING },
-    });
-    // In-app notifikacija za sve User-e u grupi (RecipientGroupUser)
-    for (const uid of userIds) {
-      await this.notificationsService.create({
-        userId: uid,
-        title: 'Novi zapisnik na odobrenje',
-        message: `Zapisnik ${record.recordNumber} od ${installedByName} čeka vaše odobrenje.`,
-        type: 'installation_record',
-        link: `/installation-records/${id}`,
-      });
-    }
-    await this.activityLogService.log({
-      userId: ctx?.userId,
-      action: 'SUBMIT_FOR_APPROVAL',
-      entity: 'installation_record',
-      entityId: id,
-      details: { recordNumber: record.recordNumber, sentTo: emails },
-      ipAddress: ctx?.ipAddress,
-    });
-    await this.createSimEventFromInstallationRecord(
-      id,
-      'SUBMITTED_FOR_APPROVAL',
-      ctx?.userId,
-    );
-    return updated;
-  }
-
-  async activateInSep(
-    id: string,
-    ctx?: InstallationRecordContext,
-    scope?: ScopeContext | null,
-  ): Promise<InstallationRecord> {
-    const record = await this.findOne(id, scope);
-    if (record.status !== RecordStatus.WAITING_SEP_ACTIVATION) {
-      throw new BadRequestException(
-        `Zapisnik se može aktivirati samo iz statusa WAITING_SEP_ACTIVATION. Trenutni: ${record.status}`,
-      );
-    }
-    if (scope?.role === 'USER' && ctx?.userId) {
-      const meter = await this.prisma.meter.findUnique({
-        where: { id: record.meterId },
-        select: { branchId: true },
-      });
-      const branchId = meter?.branchId ?? null;
-      if (!branchId) {
-        throw new ForbiddenException(
-          'Zapisnik nema povezanu podružnicu. Samo moderator ili admin mogu aktivirati u SEP.',
-        );
-      }
-      const perms = await this.recipientsService.getUserApprovalPermissionsForBranch(
-        ctx.userId,
-        branchId,
-      );
-      if (!perms || !perms.canActivateSep) {
-        throw new ForbiddenException(
-          'Niste u grupi odobravatelja za ovu podružnicu ili nemate pravo aktivirati zapisnik u SEP.',
-        );
-      }
-    }
-    const updated = await this.prisma.installationRecord.update({
-      where: { id },
-      data: { status: RecordStatus.ACTIVATED_IN_SEP },
-    });
-    await this.notificationsService.create({
-      userId: record.installedById,
-      title: 'Zapisnik aktiviran u SEP',
-      message: `Zapisnik ${record.recordNumber} je označen kao aktiviran u SEP. Možete ga ručno poslati sa PDF-om.`,
-      type: 'installation_record',
-      link: `/installation-records/${id}`,
-    });
-    await this.activityLogService.log({
-      userId: ctx?.userId,
-      action: 'ACTIVATE_SEP',
-      entity: 'installation_record',
-      entityId: id,
-      details: { recordNumber: record.recordNumber },
-      ipAddress: ctx?.ipAddress,
-    });
-    await this.createSimEventFromInstallationRecord(
-      id,
-      'ACTIVATED_IN_SEP',
-      ctx?.userId,
-    );
-    return updated;
-  }
+  
   private async createSimEventFromInstallationRecord(
     recordId: string,
     type: string,

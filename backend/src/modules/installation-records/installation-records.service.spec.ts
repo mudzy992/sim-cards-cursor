@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { RecordStatus, UserRole } from '@prisma/client';
 import { RecordNumberGenerator } from 'src/common/utils/record-number.generator';
@@ -6,158 +6,171 @@ import { PdfGeneratorService } from 'src/common/utils/pdf-generator.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { MailService } from '../mail/mail.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { RecipientsService } from '../recipients/recipients.service';
+import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
 import { InstallationRecordsService } from './installation-records.service';
 
-describe('InstallationRecordsService RBAC', () => {
+const mockRecord = {
+  id: 'rec-1',
+  recordNumber: 'REC-001',
+  meterId: 'meter-1',
+  installedById: 'user-1',
+  status: RecordStatus.DRAFT,
+  approvedById: null,
+  approvedAt: null,
+  rejectionReason: null,
+  sentToEmail: null,
+  sentAt: null,
+  pdfPath: null,
+  notes: null,
+  photos: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  meter: {
+    id: 'meter-1',
+    branchId: 'branch-1',
+    serialNumber: 'SN-001',
+    simCard: null,
+    meterTypeDefinition: { name: 'Type A', manufacturer: null, model: null, type: 'SINGLE_PHASE', maxCurrent: null },
+  },
+  installedBy: { firstName: 'Test', lastName: 'User' },
+  approvedBy: null,
+};
+
+describe('InstallationRecordsService', () => {
   let service: InstallationRecordsService;
-  let prisma: {
-    meter: { findUnique: jest.Mock };
-    installationRecord: { update: jest.Mock; findUnique: jest.Mock };
-  };
-  let recipientsService: {
-    isUserInApprovalGroupForBranch: jest.Mock;
-    getUserApprovalPermissionsForBranch: jest.Mock;
-  };
+  let prismaMock: Record<string, any>;
 
   beforeEach(async () => {
-    prisma = {
-      meter: { findUnique: jest.fn() },
-      installationRecord: { update: jest.fn(), findUnique: jest.fn() },
-    };
-
-    recipientsService = {
-      isUserInApprovalGroupForBranch: jest.fn(),
-      getUserApprovalPermissionsForBranch: jest.fn(),
+    prismaMock = {
+      $transaction: jest.fn((args) => {
+        if (Array.isArray(args)) return Promise.resolve(args);
+        return args(prismaMock);
+      }),
+      installationRecord: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        create: jest.fn(),
+        delete: jest.fn(),
+      },
+      meter: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+      meterTypeDefinition: { findUnique: jest.fn() },
+      simCard: { findUnique: jest.fn(), update: jest.fn() },
+      simEvent: { create: jest.fn() },
+      branchModerator: { findUnique: jest.fn(), findMany: jest.fn() },
+      branchEmailRecipient: { findMany: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InstallationRecordsService,
-        { provide: PrismaService, useValue: prisma },
-        { provide: RecordNumberGenerator, useValue: {} },
-        { provide: PdfGeneratorService, useValue: {} },
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: RecordNumberGenerator, useValue: { generate: jest.fn().mockResolvedValue('REC-001') } },
+        { provide: PdfGeneratorService, useValue: { generatePdf: jest.fn().mockResolvedValue(Buffer.from('pdf')) } },
         { provide: ActivityLogService, useValue: { log: jest.fn() } },
-        { provide: MailService, useValue: {} },
-        { provide: RecipientsService, useValue: recipientsService },
-        { provide: NotificationsService, useValue: { create: jest.fn() } },
+        { provide: MailService, useValue: { sendRecordWithPdf: jest.fn().mockResolvedValue(undefined) } },
+        { provide: MeterTypeFieldsService, useValue: { validateDynamicValues: jest.fn().mockResolvedValue({}), findAllByDefinition: jest.fn().mockResolvedValue([]) } },
       ],
     }).compile();
 
     service = module.get<InstallationRecordsService>(InstallationRecordsService);
   });
 
-  it('allows USER to approve when user belongs to branch approval group', async () => {
-    const record = {
-      id: 'r1',
-      meterId: 'm1',
-      installedById: 'installer-1',
-      recordNumber: 'ZR-001',
-      status: RecordStatus.PENDING,
-    };
-    jest.spyOn(service, 'findOne').mockResolvedValue(record as never);
-    prisma.meter.findUnique.mockResolvedValue({ branchId: 'b1' });
-    recipientsService.getUserApprovalPermissionsForBranch.mockResolvedValue({
-      canApproveFromPending: true,
-      canRejectFromPending: true,
-      canActivateSep: true,
-      canSendPdf: false,
+  describe('RBAC scope filtering', () => {
+    it('blocks USER list access when user has no branch scope', async () => {
+      await expect(
+        service.findAll(
+          { page: 1, limit: 20 } as never,
+          { role: UserRole.USER, distributionId: null, branchId: null },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
-    prisma.installationRecord.update.mockResolvedValue({
-      ...record,
-      status: RecordStatus.WAITING_SEP_ACTIVATION,
-    });
-
-    const result = await service.approve('r1', 'user-1', {
-      role: UserRole.USER,
-      distributionId: 'd1',
-      branchId: 'b1',
-    });
-
-    expect(result.status).toBe(RecordStatus.WAITING_SEP_ACTIVATION);
-    expect(recipientsService.getUserApprovalPermissionsForBranch).toHaveBeenCalledWith(
-      'user-1',
-      'b1',
-    );
   });
 
-  it('blocks USER approve when user is not in branch approval group', async () => {
-    const record = {
-      id: 'r1',
-      meterId: 'm1',
-      installedById: 'installer-1',
-      recordNumber: 'ZR-001',
-      status: RecordStatus.PENDING,
-    };
-    jest.spyOn(service, 'findOne').mockResolvedValue(record as never);
-    prisma.meter.findUnique.mockResolvedValue({ branchId: 'b1' });
-    recipientsService.getUserApprovalPermissionsForBranch.mockResolvedValue(null);
+  describe('markSepActivated', () => {
+    it('rejects when status is not SENT', async () => {
+      const draftRecord = { ...mockRecord, status: RecordStatus.DRAFT };
+      prismaMock.installationRecord.findFirst.mockResolvedValue(draftRecord);
 
-    await expect(
-      service.approve('r1', 'user-1', {
-        role: UserRole.USER,
-        distributionId: 'd1',
-        branchId: 'b1',
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(prisma.installationRecord.update).not.toHaveBeenCalled();
+      await expect(
+        service.markSepActivated('rec-1', { userId: 'user-1' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('allows DIST_ADMIN to mark SENT record as SEP_ACTIVATED', async () => {
+      const sentRecord = { ...mockRecord, status: RecordStatus.SENT };
+      prismaMock.installationRecord.findFirst.mockResolvedValue(sentRecord);
+      prismaMock.installationRecord.update.mockResolvedValue({
+        ...sentRecord,
+        status: RecordStatus.SEP_ACTIVATED,
+      });
+      prismaMock.installationRecord.findUnique.mockResolvedValue(sentRecord);
+
+      const result = await service.markSepActivated(
+        'rec-1',
+        { userId: 'admin-1' },
+        { role: UserRole.DIST_ADMIN, distributionId: 'dist-1', branchId: null },
+      );
+
+      expect(result.status).toBe(RecordStatus.SEP_ACTIVATED);
+    });
+
+    it('blocks USER who is not branch moderator', async () => {
+      const sentRecord = { ...mockRecord, status: RecordStatus.SENT };
+      prismaMock.installationRecord.findFirst.mockResolvedValue(sentRecord);
+      prismaMock.meter.findUnique.mockResolvedValue({ branchId: 'branch-1' });
+      prismaMock.branchModerator.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.markSepActivated(
+          'rec-1',
+          { userId: 'user-1' },
+          { role: UserRole.USER, distributionId: null, branchId: 'branch-1' },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 
-  it('allows USER to approve own record when in approval group', async () => {
-    const record = {
-      id: 'r1',
-      meterId: 'm1',
-      installedById: 'user-1',
-      recordNumber: 'ZR-001',
-      status: RecordStatus.PENDING,
-    };
-    jest.spyOn(service, 'findOne').mockResolvedValue(record as never);
-    prisma.meter.findUnique.mockResolvedValue({ branchId: 'b1' });
-    recipientsService.getUserApprovalPermissionsForBranch.mockResolvedValue({
-      canApproveFromPending: true,
-      canRejectFromPending: true,
-      canActivateSep: true,
-      canSendPdf: false,
-    });
+  describe('retrySendEmail', () => {
+    it('rejects when status is not SEND_FAILED', async () => {
+      const sentRecord = { ...mockRecord, status: RecordStatus.SENT };
+      prismaMock.installationRecord.findFirst.mockResolvedValue(sentRecord);
 
-    await service.approve('r1', 'user-1', {
-      role: UserRole.USER,
-      distributionId: 'd1',
-      branchId: 'b1',
+      await expect(
+        service.retrySendEmail('rec-1', { userId: 'user-1' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
-    expect(prisma.installationRecord.update).toHaveBeenCalled();
   });
 
-  it('allows MODERATOR approve without approval-group membership check', async () => {
-    const record = {
-      id: 'r1',
-      meterId: 'm1',
-      installedById: 'installer-1',
-      recordNumber: 'ZR-001',
-      status: RecordStatus.PENDING,
-    };
-    jest.spyOn(service, 'findOne').mockResolvedValue(record as never);
-    prisma.installationRecord.update.mockResolvedValue({
-      ...record,
-      status: RecordStatus.WAITING_SEP_ACTIVATION,
+  describe('getPermissions', () => {
+    it('returns canRetrySend=true for SEND_FAILED record when user is creator', async () => {
+      const failedRecord = { ...mockRecord, status: RecordStatus.SEND_FAILED };
+      prismaMock.installationRecord.findFirst.mockResolvedValue(failedRecord);
+
+      const perms = await service.getPermissions(
+        'rec-1',
+        'user-1',
+        { role: UserRole.USER, distributionId: null, branchId: 'branch-1' },
+      );
+
+      expect(perms.canRetrySend).toBe(true);
+      expect(perms.canMarkSepActivated).toBe(false);
     });
 
-    await service.approve('r1', 'mod-1', {
-      role: UserRole.MODERATOR,
-      distributionId: 'd1',
-      branchId: null,
+    it('returns canMarkSepActivated=true for SENT record when user is DIST_ADMIN', async () => {
+      const sentRecord = { ...mockRecord, status: RecordStatus.SENT };
+      prismaMock.installationRecord.findFirst.mockResolvedValue(sentRecord);
+
+      const perms = await service.getPermissions(
+        'rec-1',
+        'admin-1',
+        { role: UserRole.DIST_ADMIN, distributionId: 'dist-1', branchId: null },
+      );
+
+      expect(perms.canRetrySend).toBe(false);
+      expect(perms.canMarkSepActivated).toBe(true);
     });
-
-    expect(recipientsService.getUserApprovalPermissionsForBranch).not.toHaveBeenCalled();
-  });
-
-  it('blocks USER list access when user has no branch scope', async () => {
-    await expect(
-      service.findAll(
-        { page: 1, limit: 20 } as never,
-        { role: UserRole.USER, distributionId: null, branchId: null },
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

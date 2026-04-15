@@ -58,6 +58,17 @@
       </table>
     </div>
 
+    {{#if hasDynamicFields}}
+    <div class="section">
+      <h2>Dodatna polja brojila</h2>
+      <table class="details">
+        {{#each dynamicFields}}
+        <tr><th>{{this.label}}</th><td>{{this.value}}</td></tr>
+        {{/each}}
+      </table>
+    </div>
+    {{/if}}
+
     {{#if hasPhotos}}
     <div class="section">
       <h2>Fotografije</h2>

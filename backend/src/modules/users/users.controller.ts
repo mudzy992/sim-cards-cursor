@@ -30,7 +30,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiPaginated('Lista korisnika')
   findAll(@Query() filter: UserFilterDto, @CurrentUser() user: { role: string; distributionId?: string | null; branchId?: string | null }) {
     const scope = { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null };
@@ -38,7 +38,7 @@ export class UsersController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Detalji korisnika' })
   findOne(@Param('id') id: string, @CurrentUser() user: { role: string; distributionId?: string | null; branchId?: string | null }) {
     const scope = { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null };
@@ -53,7 +53,7 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Ažuriranje korisnika' })
   update(
     @Param('id') id: string,
@@ -72,7 +72,7 @@ export class UsersController {
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Promjena statusa korisnika' })
   updateStatus(
     @Param('id') id: string,

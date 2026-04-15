@@ -35,7 +35,7 @@ export function Sidebar() {
       icon: <AreaChartOutlined />,
       label: <Link to="/analytics">Analitika</Link>,
     },
-    ...(role === 'SYSTEM_ADMIN' || role === 'MODERATOR'
+    ...(role === 'SYSTEM_ADMIN' || role === 'DIST_ADMIN'
       ? [
           {
             key: '/shipments',
@@ -58,9 +58,9 @@ export function Sidebar() {
             label: <Link to="/users">Korisnici</Link>,
           },
           {
-            key: '/recipients',
+            key: '/branch-email-recipients',
             icon: <MailOutlined />,
-            label: <Link to="/recipients">Primaoci</Link>,
+            label: <Link to="/branch-email-recipients">Email primaoci</Link>,
           },
           ...(pushCampaignsEnabled
             ? [

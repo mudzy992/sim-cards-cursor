@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
 import { MetersService } from './meters.service';
 
 describe('MetersService', () => {
@@ -27,6 +28,10 @@ describe('MetersService', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: MeterTypeFieldsService,
+          useValue: { validateDynamicValues: jest.fn().mockResolvedValue({}) },
         },
       ],
     }).compile();

@@ -16,7 +16,7 @@ export class ActivityLogController {
   constructor(private readonly activityLogService: ActivityLogService) {}
 
   @Get()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiPaginated('Lista aktivnosti')
   @ApiOperation({ summary: 'Lista aktivnosti sistema' })
   findAll(@Query() filter: ActivityLogFilterDto) {

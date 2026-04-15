@@ -32,7 +32,7 @@ export class SimCardsController {
   constructor(private readonly simCardsService: SimCardsService) {}
 
   @Get()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiPaginated('Lista SIM kartica')
   findAll(@Query() filter: SimCardFilterDto, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
     const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
@@ -40,7 +40,7 @@ export class SimCardsController {
   }
 
   @Get('my-assigned')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiPaginated('Moje dodijeljene SIM kartice')
   myAssigned(@CurrentUser() user: { id: string; role: string; distributionId?: string | null; branchId?: string | null }, @Query() filter: SimCardFilterDto) {
     const scope = { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null };
@@ -48,7 +48,7 @@ export class SimCardsController {
   }
 
   @Get('available')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiPaginated('Dostupne SIM kartice')
   available(@Query() filter: SimCardFilterDto, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
     const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
@@ -56,7 +56,7 @@ export class SimCardsController {
   }
 
   @Get('stats')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Statistike po statusu SIM kartica' })
   stats(@CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
     const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
@@ -64,7 +64,7 @@ export class SimCardsController {
   }
 
   @Get('scan/:iccid')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Skeniranje SIM kartice po ICCID' })
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   scan(
@@ -76,7 +76,7 @@ export class SimCardsController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Detalji SIM kartice' })
   findOne(@Param('id') id: string, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
     const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
@@ -84,7 +84,7 @@ export class SimCardsController {
   }
 
   @Post()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Kreiranje SIM kartice' })
   create(
     @Body() dto: CreateSimCardDto,
@@ -96,7 +96,7 @@ export class SimCardsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Ažuriranje SIM kartice' })
   update(
     @Param('id') id: string,
@@ -109,7 +109,7 @@ export class SimCardsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Brisanje SIM kartice' })
   remove(
     @Param('id') id: string,
@@ -121,7 +121,7 @@ export class SimCardsController {
   }
 
   @Post(':id/assign')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Dodjela SIM kartice korisniku' })
   assign(
     @Param('id') id: string,
@@ -134,7 +134,7 @@ export class SimCardsController {
   }
 
   @Post(':id/claim')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Zaduživanje SIM kartice od strane prijavljenog korisnika' })
   claim(@Param('id') id: string, @CurrentUser() user: { id: string; role: string; distributionId?: string | null; branchId?: string | null }, @Ip() ipAddress: string) {
     const scope = { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null };
@@ -142,7 +142,7 @@ export class SimCardsController {
   }
 
   @Post(':id/unassign')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Oduzimanje dodijeljene SIM kartice' })
   unassign(
     @Param('id') id: string,

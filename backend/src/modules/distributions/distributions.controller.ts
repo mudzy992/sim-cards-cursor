@@ -29,13 +29,13 @@ export class DistributionsController {
   }
 
   @Get()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   findAll(@CurrentUser() user?: { role: string; distributionId?: string | null }) {
-    return this.service.findAll(user?.role === 'MODERATOR' ? user.distributionId ?? undefined : undefined);
+    return this.service.findAll(user?.role === 'DIST_ADMIN' ? user.distributionId ?? undefined : undefined);
   }
 
   @Get(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }

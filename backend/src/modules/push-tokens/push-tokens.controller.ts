@@ -34,7 +34,7 @@ export class PushTokensController {
   constructor(private readonly pushTokensService: PushTokensService) {}
 
   @Post('register')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Registruj ili osvježi mobile push token za trenutnog korisnika' })
   register(
     @CurrentUser() user: { id: string },
@@ -49,7 +49,7 @@ export class PushTokensController {
   }
 
   @Post('invalidate')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.MODERATOR, UserRole.USER)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Invalidiraj push token za trenutnog korisnika (odjava ili uninstall)' })
   async invalidate(
     @CurrentUser() user: { id: string },

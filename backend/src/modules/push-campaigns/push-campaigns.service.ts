@@ -36,11 +36,11 @@ export class PushCampaignsService {
     this.validateCreate(input);
 
     const scopeDistributionId =
-      input.actor.role === UserRole.MODERATOR ? input.actor.distributionId : null;
+      input.actor.role === UserRole.DIST_ADMIN ? input.actor.distributionId : null;
     const scopeBranchId = null;
 
-    if (input.actor.role === UserRole.MODERATOR && !scopeDistributionId) {
-      throw new ForbiddenException('Moderator distribution scope is missing');
+    if (input.actor.role === UserRole.DIST_ADMIN && !scopeDistributionId) {
+      throw new ForbiddenException('Distribution admin scope is missing');
     }
 
     const campaign = await this.prisma.pushCampaign.create({
@@ -223,7 +223,7 @@ export class PushCampaignsService {
 
     const where: Prisma.PushCampaignWhereInput = {
       ...(dto.status ? { status: dto.status } : {}),
-      ...(actor.role === UserRole.MODERATOR && actor.distributionId
+      ...(actor.role === UserRole.DIST_ADMIN && actor.distributionId
         ? { scopeDistributionId: actor.distributionId }
         : {}),
     };
@@ -416,8 +416,8 @@ export class PushCampaignsService {
     actor: ScopeContext,
   ) {
     if (actor.role === UserRole.SYSTEM_ADMIN) return;
-    if (actor.role === UserRole.MODERATOR) {
-      if (!actor.distributionId) throw new ForbiddenException('Missing moderator distribution');
+    if (actor.role === UserRole.DIST_ADMIN) {
+      if (!actor.distributionId) throw new ForbiddenException('Missing distribution admin scope');
       if (campaign.scopeDistributionId && campaign.scopeDistributionId !== actor.distributionId) {
         throw new ForbiddenException('Out of scope');
       }

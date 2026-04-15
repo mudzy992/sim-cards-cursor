@@ -8,15 +8,17 @@ import { UpdateMeterTypeDefinitionDto } from './dto/update-meter-type-definition
 export class MeterTypeDefinitionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(): Promise<MeterTypeDefinition[]> {
+  async findAll() {
     return this.prisma.meterTypeDefinition.findMany({
       orderBy: { name: 'asc' },
+      include: { fields: { orderBy: { sortOrder: 'asc' } } },
     });
   }
 
-  async findOne(id: string): Promise<MeterTypeDefinition> {
+  async findOne(id: string) {
     const item = await this.prisma.meterTypeDefinition.findUnique({
       where: { id },
+      include: { fields: { orderBy: { sortOrder: 'asc' } } },
     });
     if (!item) {
       throw new NotFoundException(`Tip brojila s ID ${id} nije pronađen.`);
