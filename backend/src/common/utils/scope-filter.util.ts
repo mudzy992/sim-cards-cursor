@@ -73,8 +73,11 @@ export function scopeWhere<T extends Record<string, unknown>>(
     if (options.userScope) {
       return { branchId: ctx.branchId } as unknown as T;
     }
-    if (options.viaShipment && ctx.distributionId) {
-      return { shipment: { distributionId: ctx.distributionId } } as unknown as T;
+    if (options.viaShipment) {
+      if (ctx.distributionId) {
+        return { shipment: { distributionId: ctx.distributionId } } as unknown as T;
+      }
+      return { meter: { branchId: ctx.branchId } } as unknown as T;
     }
   }
 
@@ -86,6 +89,9 @@ function buildMultiBranchWhere<T>(branchIds: string[], options: ScopeWhereOption
     return { [options.branchIdField]: { in: branchIds } } as unknown as T;
   }
   if (options.viaMeter) {
+    return { meter: { branchId: { in: branchIds } } } as unknown as T;
+  }
+  if (options.viaShipment) {
     return { meter: { branchId: { in: branchIds } } } as unknown as T;
   }
   if (options.userScope) {

@@ -1,4 +1,4 @@
-export type UserRole = 'SYSTEM_ADMIN' | 'MODERATOR' | 'USER';
+export type UserRole = 'SYSTEM_ADMIN' | 'DIST_ADMIN' | 'USER';
 
 export type AuthUser = {
   id: string;

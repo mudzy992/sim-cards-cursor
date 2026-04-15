@@ -40,12 +40,15 @@ export class BranchModeratorsController {
   }
 
   @Get()
-  @Roles('SYSTEM_ADMIN', 'DIST_ADMIN')
+  @Roles('SYSTEM_ADMIN', 'DIST_ADMIN', 'USER')
   findAll(
     @Query('branchId') branchId: string | undefined,
     @Query('userId') userId: string | undefined,
-    @CurrentUser() user: { role: UserRole; distributionId: string | null },
+    @CurrentUser() user: { id: string; role: UserRole; distributionId: string | null },
   ) {
+    if (user.role === UserRole.USER) {
+      return this.service.findByUser(user.id)
+    }
     if (branchId) {
       return this.service.findByBranch(branchId, user)
     }

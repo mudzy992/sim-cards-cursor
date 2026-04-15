@@ -6,12 +6,10 @@ import { installationRecordsApi } from '@/api/installation-records.api';
 
 const statusLabels: Record<string, string> = {
   DRAFT: 'Nacrt',
-  PENDING: 'Čeka odobrenje',
-  SUBMIT_FAILED: 'Greška pri slanju',
-  REJECTED: 'Odbijen',
-  WAITING_SEP_ACTIVATION: 'Čeka aktivaciju SEP',
-  ACTIVATED_IN_SEP: 'Aktivirano u SEP',
   SENT: 'Poslano',
+  SEND_FAILED: 'Greška pri slanju',
+  SEP_ACTIVATED: 'SEP aktiviran',
+  LEGACY_COMPLETED: 'Završeno (legacy)',
 };
 
 export default function RecordDetailsScreen() {
@@ -24,17 +22,40 @@ export default function RecordDetailsScreen() {
     enabled: Boolean(recordId),
   });
 
-  const submitMutation = useMutation({
-    mutationFn: () => installationRecordsApi.submitForApproval(recordId),
+  const permissionsQuery = useQuery({
+    queryKey: ['mobile-record-permissions', recordId],
+    queryFn: () => installationRecordsApi.getPermissions(recordId),
+    enabled: Boolean(recordId),
+  });
+
+  const retrySendMutation = useMutation({
+    mutationFn: () => installationRecordsApi.retrySend(recordId),
     onSuccess: async () => {
       await recordQuery.refetch();
-      Alert.alert('Uspjeh', 'Zapisnik je poslan na odobrenje.');
+      await permissionsQuery.refetch();
+      Alert.alert('Uspjeh', 'Zapisnik je ponovo poslan.');
     },
     onError: (err) => {
       const msg =
         axios.isAxiosError(err) && err.response?.data?.message
           ? String(err.response.data.message)
-          : 'Slanje na odobrenje nije uspjelo.';
+          : 'Ponovo slanje nije uspjelo.';
+      Alert.alert('Greška', msg);
+    },
+  });
+
+  const markSepMutation = useMutation({
+    mutationFn: () => installationRecordsApi.markSepActivated(recordId),
+    onSuccess: async () => {
+      await recordQuery.refetch();
+      await permissionsQuery.refetch();
+      Alert.alert('Uspjeh', 'Zapisnik je označen kao SEP aktiviran.');
+    },
+    onError: (err) => {
+      const msg =
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'Ažuriranje statusa nije uspjelo.';
       Alert.alert('Greška', msg);
     },
   });
@@ -78,8 +99,10 @@ export default function RecordDetailsScreen() {
   }
 
   const record = recordQuery.data;
-  const needsManualSubmit =
-    record.status === 'DRAFT' || record.status === 'SUBMIT_FAILED';
+  const canRetrySend = Boolean(permissionsQuery.data?.canRetrySend);
+  const canMarkSepActivated = Boolean(permissionsQuery.data?.canMarkSepActivated);
+  const showRetrySend = record.status === 'SEND_FAILED' && canRetrySend;
+  const showMarkSep = record.status === 'SENT' && canMarkSepActivated;
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
@@ -228,14 +251,6 @@ export default function RecordDetailsScreen() {
             ? `${record.installedBy.firstName} ${record.installedBy.lastName}`
             : '–'}
         </Text>
-        {record.approvedBy && (
-          <Text style={{ color: '#475569' }}>
-            Odobrio: {record.approvedBy.firstName} {record.approvedBy.lastName}
-          </Text>
-        )}
-        {record.rejectionReason ? (
-          <Text style={{ color: '#b91c1c' }}>Razlog odbijanja: {record.rejectionReason}</Text>
-        ) : null}
         {record.notes ? (
           <Text style={{ color: '#475569' }}>Napomena: {record.notes}</Text>
         ) : null}
@@ -247,7 +262,7 @@ export default function RecordDetailsScreen() {
         ) : null}
       </View>
 
-      {needsManualSubmit && (
+      {(showRetrySend || showMarkSep) && (
         <View
           style={{
             marginTop: 4,
@@ -259,24 +274,60 @@ export default function RecordDetailsScreen() {
             gap: 8,
           }}
         >
-          <Text style={{ color: '#92400e', fontWeight: '600' }}>
-            Ukoliko zapisnik nije poslan automatski, pošaljite ga ručno.
-          </Text>
-          <Pressable
-            onPress={() => submitMutation.mutate()}
-            disabled={submitMutation.isPending}
-            style={{
-              backgroundColor: '#0f766e',
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              borderRadius: 8,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '600' }}>
-              {submitMutation.isPending ? 'Slanje...' : 'Pošalji na odobrenje'}
-            </Text>
-          </Pressable>
+          {showRetrySend && (
+            <>
+              <Text style={{ color: '#92400e', fontWeight: '600' }}>
+                Slanje emaila nije uspjelo. Pokušajte ponovo.
+              </Text>
+              <Pressable
+                onPress={() => retrySendMutation.mutate()}
+                disabled={retrySendMutation.isPending}
+                style={{
+                  backgroundColor: '#0f766e',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>
+                  {retrySendMutation.isPending ? 'Slanje...' : 'Ponovo pošalji'}
+                </Text>
+              </Pressable>
+            </>
+          )}
+
+          {showMarkSep && (
+            <>
+              <Text style={{ color: '#92400e', fontWeight: '600' }}>
+                Nakon potvrde u SEP, označite zapisnik kao SEP aktiviran.
+              </Text>
+              <Pressable
+                onPress={() => {
+                  Alert.alert(
+                    'Potvrda',
+                    'Da li ste sigurni da želite označiti SEP kao aktiviran?',
+                    [
+                      { text: 'Odustani', style: 'cancel' },
+                      { text: 'Označi', onPress: () => markSepMutation.mutate() },
+                    ],
+                  );
+                }}
+                disabled={markSepMutation.isPending}
+                style={{
+                  backgroundColor: '#0f766e',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>
+                  {markSepMutation.isPending ? 'Ažuriranje...' : 'Označi SEP aktiviranim'}
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
       )}
     </ScrollView>

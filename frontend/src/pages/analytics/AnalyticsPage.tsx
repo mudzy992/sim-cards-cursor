@@ -16,25 +16,23 @@ import {
   type AnalyticsRange,
   type TimeRangeParams,
 } from '@/api/analytics.api';
+import { getSimCardStatusLabel } from '@/utils/labels.utils'
+import type { SimCardStatus } from '@/types/sim-card.types'
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Nacrt',
-  PENDING: 'Čeka odobrenje',
-  SUBMIT_FAILED: 'Greška slanja',
-  REJECTED: 'Odbijeno',
-  WAITING_SEP_ACTIVATION: 'Čeka SEP',
-  ACTIVATED_IN_SEP: 'Aktivirano u SEP',
   SENT: 'Poslano',
+  SEND_FAILED: 'Greška slanja',
+  SEP_ACTIVATED: 'SEP aktiviran',
+  LEGACY_COMPLETED: 'Legacy završeno',
 };
 
 const statusColor: Record<string, string> = {
   DRAFT: 'default',
-  PENDING: 'processing',
-  SUBMIT_FAILED: 'error',
-  REJECTED: 'error',
-  WAITING_SEP_ACTIVATION: 'warning',
-  ACTIVATED_IN_SEP: 'success',
   SENT: 'blue',
+  SEND_FAILED: 'error',
+  SEP_ACTIVATED: 'success',
+  LEGACY_COMPLETED: 'default',
 };
 
 const rangeOptions: { label: string; value: AnalyticsRange }[] = [
@@ -162,7 +160,7 @@ export default function AnalyticsPage() {
               {sim?.byStatus &&
                 Object.entries(sim.byStatus).map(([status, count]) => (
                   <div key={status} className="flex items-center gap-2 text-xs">
-                    <span className="w-28">{status}</span>
+                    <span className="w-28">{getSimCardStatusLabel(status as SimCardStatus)}</span>
                     <div className="flex-1 h-3 bg-slate-100 rounded">
                       <div
                         className="h-full bg-emerald-500 rounded"

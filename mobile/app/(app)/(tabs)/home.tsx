@@ -9,12 +9,10 @@ import { useMiniTour } from '@/hooks/useMiniTour';
 
 const statusLabels: Record<string, string> = {
   DRAFT: 'Nacrt',
-  PENDING: 'Čeka odobrenje',
-  SUBMIT_FAILED: 'Greška pri slanju',
-  REJECTED: 'Odbijen',
-  WAITING_SEP_ACTIVATION: 'Čeka aktivaciju SEP',
-  ACTIVATED_IN_SEP: 'Aktivirano u SEP',
   SENT: 'Poslano',
+  SEND_FAILED: 'Greška pri slanju',
+  SEP_ACTIVATED: 'SEP aktiviran',
+  LEGACY_COMPLETED: 'Završeno (legacy)',
 };
 
 function StatCard({

@@ -24,7 +24,7 @@ export default function ActivityLogPage() {
     <div
       className="space-y-4"
       data-tour-id="admin-activity-log"
-      data-tour-role="SYSTEM_ADMIN MODERATOR"
+      data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
     >
       <Typography.Title level={3} className="!mb-0">
         Dnevnik aktivnosti

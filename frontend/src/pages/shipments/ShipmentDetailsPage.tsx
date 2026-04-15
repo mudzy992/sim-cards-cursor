@@ -3,6 +3,7 @@ import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { shipmentsApi } from '@/api/shipments.api';
+import { getSimCardStatusLabel } from '@/utils/labels.utils'
 import type { ShipmentSimCardsResponse } from '@/types/shipment.types';
 type ShipmentSimCard = ShipmentSimCardsResponse['items'][number];
 
@@ -104,7 +105,9 @@ export default function ShipmentDetailsPage() {
             {
               title: 'Status',
               render: (_, row) => (
-                <Tag color={simStatusColor[row.status] ?? 'default'}>{row.status}</Tag>
+                <Tag color={simStatusColor[row.status] ?? 'default'}>
+                  {getSimCardStatusLabel(row.status as any)}
+                </Tag>
               ),
             },
             {

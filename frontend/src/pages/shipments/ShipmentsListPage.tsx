@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
+  Drawer,
   Input,
-  Modal,
+  Popconfirm,
   Select,
   Space,
   Table,
@@ -10,16 +11,15 @@ import {
   Tag,
   Typography,
   message,
-  Tour,
 } from 'antd';
-import type { TourProps } from 'antd';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { InboxOutlined, CreditCardOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { shipmentsApi } from '@/api/shipments.api';
 import { simCardsApi } from '@/api/sim-cards.api';
 import { usersApi } from '@/api/users.api';
 import { useAuthStore } from '@/store/auth.store';
+import { getSimCardStatusLabel } from '@/utils/labels.utils'
 import type {
   ShipmentItem,
   ShipmentListParams,
@@ -64,7 +64,7 @@ export default function ShipmentsListPage() {
   const [messageApi, messageContextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState<string>('shipments');
   const currentUserRole = useAuthStore((s) => s.user?.role);
-  const isSystemAdmin = currentUserRole === 'SYSTEM_ADMIN';
+  const canManageShipments = currentUserRole === 'SYSTEM_ADMIN' || currentUserRole === 'DIST_ADMIN';
 
   const [shipmentFilters, setShipmentFilters] = useState<ShipmentListParams>(defaultShipmentFilters);
   const [searchInput, setSearchInput] = useState('');
@@ -74,17 +74,6 @@ export default function ShipmentsListPage() {
   const [simSearchInput, setSimSearchInput] = useState('');
   const [assignTarget, setAssignTarget] = useState<SimCardItem | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [tourOpen, setTourOpen] = useState(false);
-  const [tourStep, setTourStep] = useState(0);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const seen = window.localStorage.getItem('sim-tracker-page-tour-shipments-v1');
-    const globalActive = window.localStorage.getItem('sim-tracker-global-tour-active') === '1';
-    if (!seen && isSystemAdmin && !globalActive) {
-      setTourOpen(true);
-    }
-  }, [isSystemAdmin]);
 
   const shipmentsQuery = useQuery({
     queryKey: ['shipments', 'list', shipmentFilters],
@@ -133,6 +122,20 @@ export default function ShipmentsListPage() {
       messageApi.error('Oduzimanje nije uspjelo.');
     },
   });
+
+  const removeShipmentMutation = useMutation({
+    mutationFn: (id: string) => shipmentsApi.remove(id),
+    onSuccess: async () => {
+      messageApi.success('Isporuka je obrisana.')
+      await queryClient.invalidateQueries({ queryKey: ['shipments', 'list'] })
+      await queryClient.invalidateQueries({ queryKey: ['shipments', 'list', 'for-filter'] })
+    },
+    onError: (e: unknown) => {
+      const maybeMessage = (e as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message
+      messageApi.error(typeof maybeMessage === 'string' ? maybeMessage : 'Brisanje nije uspjelo.')
+    },
+  })
 
   const shipmentRows = shipmentsQuery.data?.items ?? [];
   const simRows = simCardsQuery.data?.items ?? [];
@@ -187,7 +190,7 @@ export default function ShipmentsListPage() {
             <Typography.Text type="secondary">
               Pregled isporuka SIM kartica. Pretraga i filteri.
             </Typography.Text>
-            {isSystemAdmin && (
+            {canManageShipments && (
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -278,6 +281,29 @@ export default function ShipmentsListPage() {
                   <Tag color={shipmentStatusColor[status] ?? 'default'}>{status}</Tag>
                 ),
               },
+              {
+                title: 'Akcije',
+                width: 140,
+                render: (_: unknown, row) => {
+                  const simCount = row._count?.simCards ?? 0
+                  const canDelete = canManageShipments && simCount === 0
+                  if (!canDelete) return null
+                  return (
+                    <Popconfirm
+                      title="Obrisati isporuku?"
+                      description="Isporuka nema SIM kartica i može se obrisati."
+                      okText="Obriši"
+                      cancelText="Odustani"
+                      okButtonProps={{ danger: true, loading: removeShipmentMutation.isPending }}
+                      onConfirm={() => removeShipmentMutation.mutate(row.id)}
+                    >
+                      <Button danger size="small">
+                        Obriši
+                      </Button>
+                    </Popconfirm>
+                  )
+                },
+              },
             ]}
             data-tour-id="shipments-table"
           />
@@ -294,7 +320,7 @@ export default function ShipmentsListPage() {
       children: (
         <div className="space-y-4">
           <Typography.Text type="secondary">
-            Moderator vidi samo SIM kartice iz isporuka dodijeljenih njegovoj distribuciji.
+            Distribucijski admin vidi samo SIM kartice iz isporuka dodijeljenih njegovoj distribuciji.
           </Typography.Text>
 
           <Space
@@ -375,7 +401,9 @@ export default function ShipmentsListPage() {
                 title: 'Status',
                 dataIndex: 'status',
                 render: (status: string) => (
-                  <Tag color={simStatusColor[status] ?? 'default'}>{status}</Tag>
+                  <Tag color={simStatusColor[status] ?? 'default'}>
+                    {getSimCardStatusLabel(status as SimCardStatus)}
+                  </Tag>
                 ),
               },
               {
@@ -427,7 +455,7 @@ export default function ShipmentsListPage() {
     <div
       className="space-y-4"
       data-tour-id="admin-shipments-sim"
-      data-tour-role="SYSTEM_ADMIN MODERATOR"
+      data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
     >
       {messageContextHolder}
       <Typography.Title level={3} className="!mb-0">
@@ -435,31 +463,50 @@ export default function ShipmentsListPage() {
       </Typography.Title>
 
       <Typography.Paragraph type="secondary" className="!mb-4">
-        Isporuke SIM kartica i pregled kartica. Samo sistemski administrator može dodavati isporuke
-        i importovati liste – pri tome dodjeljuje distribuciji. Moderator vidi SIM kartice svojih
-        isporuka.
+        Isporuke SIM kartica i pregled kartica. Sistemski administrator može dodavati isporuke i birati
+        distribuciju. Distribucijski admin može dodavati isporuke i importovati liste samo za svoju
+        distribuciju.
       </Typography.Paragraph>
 
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
 
-      <Modal
+      <Drawer
         title="Dodjela SIM kartice"
         open={Boolean(assignTarget)}
-        onCancel={() => {
+        width={520}
+        onClose={() => {
           setAssignTarget(null);
           setSelectedUserId(null);
         }}
-        onOk={() => {
-          if (!assignTarget || !selectedUserId) {
-            messageApi.warning('Odaberi korisnika za dodjelu.');
-            return;
-          }
-          void assignMutation.mutate({
-            simCardId: assignTarget.id,
-            userId: selectedUserId,
-          });
-        }}
-        okButtonProps={{ loading: assignMutation.isPending }}
+        destroyOnClose
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setAssignTarget(null)
+                setSelectedUserId(null)
+              }}
+            >
+              Odustani
+            </Button>
+            <Button
+              type="primary"
+              loading={assignMutation.isPending}
+              onClick={() => {
+                if (!assignTarget || !selectedUserId) {
+                  messageApi.warning('Odaberi korisnika za dodjelu.')
+                  return
+                }
+                void assignMutation.mutate({
+                  simCardId: assignTarget.id,
+                  userId: selectedUserId,
+                })
+              }}
+            >
+              Dodijeli
+            </Button>
+          </div>
+        }
       >
         <Space direction="vertical" style={{ width: '100%' }}>
           <Typography.Text>SIM: {assignTarget?.iccid}</Typography.Text>
@@ -472,70 +519,7 @@ export default function ShipmentsListPage() {
             options={userOptions}
           />
         </Space>
-      </Modal>
-      <Tour
-        open={tourOpen}
-        current={tourStep}
-        onClose={() => {
-          setTourOpen(false);
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('sim-tracker-page-tour-shipments-v1', '1');
-          }
-        }}
-        onChange={(next) => setTourStep(next)}
-        steps={
-          [
-            {
-              title: 'Pregled isporuka',
-              description:
-                'Ovdje vidiš sve isporuke SIM kartica, broj kartica u svakoj i njihov status.',
-              target: () =>
-                document.querySelector('[data-tour-id="shipments-header"]') as HTMLElement,
-            },
-            {
-              title: 'Filteri i pretraga isporuka',
-              description:
-                'Pretraga po nazivu, provajderu i statusu ti omogućava brzo sužavanje liste isporuka.',
-              target: () =>
-                document.querySelector('[data-tour-id="shipments-filters"]') as HTMLElement,
-            },
-            {
-              title: 'Tabela isporuka',
-              description:
-                'Klikom na naziv isporuke otvaraš detalje i Excel import; kolone prikazuju osnovne podatke.',
-              target: () =>
-                document.querySelector('[data-tour-id="shipments-table"]') as HTMLElement,
-            },
-            {
-              title: 'Kreiranje nove isporuke',
-              description:
-                'Samo sistemski administrator može otvoriti novu isporuku i importovati listu SIM kartica.',
-              target: () =>
-                document.querySelector('[data-tour-id="shipments-new-button"]') as HTMLElement,
-            },
-            {
-              title: 'SIM kartice po isporukama',
-              description:
-                'Drugi tab prikazuje pojedinačne SIM kartice sa filtrima po ICCID/IP, statusu i isporuci.',
-              target: () =>
-                document.querySelector('[data-tour-id="shipments-sim-filters"]') as HTMLElement,
-            },
-            {
-              title: 'Tabela SIM kartica i dodjela',
-              description:
-                'U tabeli vidiš sve SIM kartice; preko akcija možeš dodijeliti ili oduzeti karticu korisniku.',
-              target: () =>
-                document.querySelector('[data-tour-id="shipments-sim-table"]') as HTMLElement,
-            },
-          ].filter((step) => {
-            try {
-              return Boolean(step.target && step.target());
-            } catch {
-              return false;
-            }
-          }) as TourProps['steps']
-        }
-      />
+      </Drawer>
     </div>
   );
 }

@@ -24,6 +24,7 @@ export type MeterItem = {
   measuringPoint?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  dynamicFieldValues?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -53,6 +54,7 @@ export type CreateMeterInput = {
   city?: string;
   municipality?: string;
   measuringPoint?: string;
+  dynamicFieldValues?: Record<string, unknown>;
   simCardId?: string;
 };
 

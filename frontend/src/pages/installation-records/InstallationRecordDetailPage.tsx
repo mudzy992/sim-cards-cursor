@@ -2,11 +2,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Button,
   Card,
-  Checkbox,
   Descriptions,
   Image,
-  Input,
-  Modal,
   Space,
   Tag,
   Typography,
@@ -16,47 +13,31 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { activityLogApi } from '@/api/activity-log.api';
-import { recipientsApi } from '@/api/recipients.api';
 import { useAuthStore } from '@/store/auth.store';
 import type { InstallationRecordItem } from '@/types/installation-record.types';
 import { RecordPhotoImage } from '@/components/installation-records/RecordPhotoImage';
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Nacrt',
-  PENDING: 'Čeka odobrenje',
-  SUBMIT_FAILED: 'Greška pri slanju',
-  REJECTED: 'Odbijeno',
-  WAITING_SEP_ACTIVATION: 'Čeka aktivaciju SEP',
-  ACTIVATED_IN_SEP: 'Aktivirano u SEP',
   SENT: 'Poslano',
+  SEND_FAILED: 'Greška slanja',
+  SEP_ACTIVATED: 'SEP aktiviran',
+  LEGACY_COMPLETED: 'Legacy završeno',
 };
 
 const statusColor: Record<string, string> = {
   DRAFT: 'default',
-  PENDING: 'processing',
-  SUBMIT_FAILED: 'error',
-  REJECTED: 'error',
-  WAITING_SEP_ACTIVATION: 'warning',
-  ACTIVATED_IN_SEP: 'success',
   SENT: 'blue',
+  SEND_FAILED: 'error',
+  SEP_ACTIVATED: 'success',
+  LEGACY_COMPLETED: 'default',
 };
 
 export default function InstallationRecordDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [messageApi, messageContextHolder] = message.useMessage();
-  const [approveRejectModalOpen, setApproveRejectModalOpen] = useState(false);
-  const [sendModalOpen, setSendModalOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
   const [pdfObjectUrl, setPdfObjectUrl] = useState<string | null>(null);
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
-  const [manualEmails, setManualEmails] = useState('');
-
-  const groupsQuery = useQuery({
-    queryKey: ['recipient-groups'],
-    queryFn: () => recipientsApi.listGroups(),
-    enabled: sendModalOpen,
-  });
 
   const recordQuery = useQuery({
     queryKey: ['installation-record', id],
@@ -93,85 +74,32 @@ export default function InstallationRecordDetailPage() {
     return () => URL.revokeObjectURL(url);
   }, [pdfQuery.data]);
 
-  const approveMutation = useMutation({
-    mutationFn: () => installationRecordsApi.approve(id!),
+  const markSepActivatedMutation = useMutation({
+    mutationFn: () => installationRecordsApi.markSepActivated(id!),
     onSuccess: () => {
-      messageApi.success('Zapisnik je odobren.');
-      setApproveRejectModalOpen(false);
+      messageApi.success('Zapisnik je označen kao SEP aktiviran.');
       void recordQuery.refetch();
+      void permissionsQuery.refetch();
     },
     onError: (err: unknown) => {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Odobravanje nije uspjelo.';
+        'Akcija nije uspjela.';
       messageApi.error(msg);
     },
   });
 
-  const submitForApprovalMutation = useMutation({
-    mutationFn: () => installationRecordsApi.submitForApproval(id!),
+  const retrySendMutation = useMutation({
+    mutationFn: () => installationRecordsApi.retrySend(id!),
     onSuccess: () => {
-      messageApi.success('Zapisnik je poslan na odobrenje.');
+      messageApi.success('Email je ponovo poslan.');
       void recordQuery.refetch();
-    },
-    onError: (err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Slanje na odobrenje nije uspjelo.';
-      messageApi.error(msg);
-    },
-  });
-
-  const activateInSepMutation = useMutation({
-    mutationFn: () => installationRecordsApi.activateInSep(id!),
-    onSuccess: () => {
-      messageApi.success('Zapisnik je označen kao aktiviran u SEP.');
-      void recordQuery.refetch();
-    },
-    onError: (err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Greška.';
-      messageApi.error(msg);
-    },
-  });
-
-  const sendMutation = useMutation({
-    mutationFn: () =>
-      installationRecordsApi.send(id!, {
-        recipientGroupIds:
-          selectedGroupIds.length > 0 ? selectedGroupIds : undefined,
-        manualEmails: manualEmails
-          ? manualEmails.split(/[\s,;]+/).filter((e) => e.trim())
-          : undefined,
-      }),
-    onSuccess: () => {
-      messageApi.success('Zapisnik je poslan email-om.');
-      setSendModalOpen(false);
-      setSelectedGroupIds([]);
-      setManualEmails('');
-      void recordQuery.refetch();
-    },
-    onError: (err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Slanje nije uspjelo.';
-      messageApi.error(msg);
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: () => installationRecordsApi.reject(id!, rejectReason),
-    onSuccess: () => {
-      messageApi.success('Zapisnik je odbijen.');
-      setApproveRejectModalOpen(false);
-      setRejectReason('');
-      void recordQuery.refetch();
+      void permissionsQuery.refetch();
     },
     onError: (err: unknown) => {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Odbijanje nije uspjelo.';
+        'Akcija nije uspjela.';
       messageApi.error(msg);
     },
   });
@@ -198,26 +126,8 @@ export default function InstallationRecordDetailPage() {
   }
 
   const record = recordQuery.data;
-  const role = useAuthStore((s) => s.user?.role);
-  const currentUserId = useAuthStore((s) => s.user?.id);
-  const canSubmitForApproval =
-    record?.status === 'DRAFT' &&
-    (record.installedById === currentUserId ||
-      role === 'SYSTEM_ADMIN' ||
-      role === 'MODERATOR');
-  const canApproveReject =
-    role === 'USER'
-      ? !!permissionsQuery.data?.canApproveReject
-      : (role === 'SYSTEM_ADMIN' || role === 'MODERATOR') &&
-        record?.status === 'PENDING';
-  const canActivateSep =
-    role === 'USER'
-      ? !!permissionsQuery.data?.canActivateSep
-      : (role === 'SYSTEM_ADMIN' || role === 'MODERATOR') &&
-        record?.status === 'WAITING_SEP_ACTIVATION';
-  const canSend =
-    (role === 'SYSTEM_ADMIN' || role === 'MODERATOR') &&
-    record?.status === 'ACTIVATED_IN_SEP';
+  const canMarkSepActivated = !!permissionsQuery.data?.canMarkSepActivated;
+  const canRetrySend = !!permissionsQuery.data?.canRetrySend;
   const canDownloadPdf = true;
 
   if (!id) {
@@ -251,31 +161,22 @@ export default function InstallationRecordDetailPage() {
         </Typography.Title>
         <Space>
           <Button onClick={() => navigate('/installation-records')}>Natrag na listu</Button>
-          {canSubmitForApproval && (
+          {canMarkSepActivated && (
             <Button
               type="primary"
-              onClick={() => submitForApprovalMutation.mutate()}
-              loading={submitForApprovalMutation.isPending}
+              onClick={() => markSepActivatedMutation.mutate()}
+              loading={markSepActivatedMutation.isPending}
             >
-              Pošalji na odobrenje
+              Označi SEP aktiviran
             </Button>
           )}
-          {canApproveReject && (
-            <Button type="primary" onClick={() => setApproveRejectModalOpen(true)}>
-              Odobri / Odbij
-            </Button>
-          )}
-          {canActivateSep && (
+          {canRetrySend && (
             <Button
-              type="primary"
-              onClick={() => activateInSepMutation.mutate()}
-              loading={activateInSepMutation.isPending}
+              onClick={() => retrySendMutation.mutate()}
+              loading={retrySendMutation.isPending}
             >
-              Aktiviraj u SEP
+              Ponovo pošalji email
             </Button>
-          )}
-          {canSend && (
-            <Button onClick={() => setSendModalOpen(true)}>Pošalji PDF email</Button>
           )}
           {canDownloadPdf && (
             <Button onClick={handleDownloadPdf} loading={pdfQuery.isLoading}>
@@ -426,104 +327,6 @@ export default function InstallationRecordDetailPage() {
         )}
       </Card>
 
-      <Modal
-        title="Odobri ili odbij zapisnik"
-        open={approveRejectModalOpen}
-        onCancel={() => {
-          setApproveRejectModalOpen(false);
-          setRejectReason('');
-        }}
-        footer={null}
-        destroyOnClose
-      >
-        <Space direction="vertical" className="w-full" size="middle">
-          <Button
-            type="primary"
-            block
-            loading={approveMutation.isPending}
-            onClick={() => approveMutation.mutate()}
-          >
-            Odobri zapisnik
-          </Button>
-          <div>
-            <Typography.Text type="secondary">Razlog odbijanja (obavezno za odbijanje):</Typography.Text>
-            <Input.TextArea
-              rows={3}
-              value={rejectReason}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRejectReason(e.target.value)}
-              placeholder="Unesite razlog odbijanja"
-              className="mt-1"
-            />
-          </div>
-          <Button
-            danger
-            block
-            loading={rejectMutation.isPending}
-            disabled={!rejectReason.trim()}
-            onClick={() => rejectMutation.mutate()}
-          >
-            Odbij zapisnik
-          </Button>
-        </Space>
-      </Modal>
-
-      <Modal
-        title="Pošalji zapisnik email-om"
-        open={sendModalOpen}
-        onCancel={() => {
-          setSendModalOpen(false);
-          setSelectedGroupIds([]);
-          setManualEmails('');
-        }}
-        onOk={() => sendMutation.mutate()}
-        okText="Pošalji"
-        confirmLoading={sendMutation.isPending}
-        okButtonProps={{
-          disabled:
-            selectedGroupIds.length === 0 && !manualEmails.trim(),
-        }}
-        destroyOnClose
-      >
-        <Space direction="vertical" className="w-full" size="middle">
-          <div>
-            <Typography.Text strong>Odaberi grupe primalaca:</Typography.Text>
-            <div className="mt-2 space-y-2">
-              {groupsQuery.data?.map((g) => (
-                <Checkbox
-                  key={g.id}
-                  checked={selectedGroupIds.includes(g.id)}
-                  onChange={(e) =>
-                    setSelectedGroupIds((prev) =>
-                      e.target.checked
-                        ? [...prev, g.id]
-                        : prev.filter((id) => id !== g.id),
-                    )
-                  }
-                >
-                  {g.name} ({g.recipients?.length ?? 0} primalaca)
-                </Checkbox>
-              ))}
-              {(!groupsQuery.data || groupsQuery.data.length === 0) && (
-                <Typography.Text type="secondary">
-                  Nema grupa. Kreirajte grupe na stranici Primaoci.
-                </Typography.Text>
-              )}
-            </div>
-          </div>
-          <div>
-            <Typography.Text strong>
-              Dodatne email adrese (odvojene zarezom):
-            </Typography.Text>
-            <Input.TextArea
-              rows={2}
-              value={manualEmails}
-              onChange={(e) => setManualEmails(e.target.value)}
-              placeholder="email1@example.com, email2@example.com"
-              className="mt-1"
-            />
-          </div>
-        </Space>
-      </Modal>
     </div>
   );
 }

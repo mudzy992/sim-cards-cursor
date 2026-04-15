@@ -4,12 +4,10 @@ import { axiosInstance } from './axios.instance';
 
 export type RecordStatus =
   | 'DRAFT'
-  | 'PENDING'
-  | 'SUBMIT_FAILED'
-  | 'REJECTED'
-  | 'WAITING_SEP_ACTIVATION'
-  | 'ACTIVATED_IN_SEP'
-  | 'SENT';
+  | 'SENT'
+  | 'SEND_FAILED'
+  | 'SEP_ACTIVATED'
+  | 'LEGACY_COMPLETED';
 
 export type InstallationRecordItem = {
   id: string;
@@ -24,9 +22,6 @@ export type InstallationRecordItem = {
   installationDate?: string | null;
   installedById: string;
   status: RecordStatus;
-  approvedById?: string | null;
-  approvedAt?: string | null;
-  rejectionReason?: string | null;
   sentToEmail?: string | null;
   sentAt?: string | null;
   pdfPath?: string | null;
@@ -38,6 +33,7 @@ export type InstallationRecordItem = {
   meter?: {
     id?: string;
     serialNumber?: string;
+    dynamicFieldValues?: Record<string, unknown> | null;
     installationAddress?: string | null;
     installationDate?: string | null;
     city?: string | null;
@@ -45,6 +41,7 @@ export type InstallationRecordItem = {
     latitude?: number | null;
     longitude?: number | null;
     meterTypeDefinition?: { name: string } | null;
+    meterTypeDefinitionId?: string;
     simCard?: {
       id?: string;
       iccid: string;
@@ -58,11 +55,6 @@ export type InstallationRecordItem = {
     lastName: string;
     email: string;
   };
-  approvedBy?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  } | null;
 };
 
 export type InstallationRecordsListResponse = {
@@ -94,6 +86,7 @@ export type CreateInstallationRecordPayload =
       measuringPoint?: string;
       latitude?: number;
       longitude?: number;
+      dynamicFieldValues?: Record<string, unknown>;
       notes?: string;
       photos?: string[];
     };
@@ -104,7 +97,7 @@ type QueuedInstallationRecord = {
   createdAt: string;
 };
 
-const OFFLINE_RECORDS_KEY = 'sim_tracker_offline_records_v1';
+const OFFLINE_RECORDS_KEY = 'sim_tracker_offline_records_v2';
 
 async function loadQueuedInstallationRecords(): Promise<QueuedInstallationRecord[]> {
   const raw = await SecureStore.getItemAsync(OFFLINE_RECORDS_KEY);
@@ -143,7 +136,7 @@ export async function syncOfflineInstallationRecords(): Promise<void> {
 
   const remaining: QueuedInstallationRecord[] = [];
 
-  // pokušaj slanja svake pending akcije; ako je mreža nedostupna, prekini rani
+  // pokušaj slanja svake queued stavke; ako je mreža nedostupna, prekini rani
   for (const item of queue) {
     try {
       await axiosInstance.post('/installation-records', item.payload);
@@ -185,10 +178,22 @@ export const installationRecordsApi = {
     return response.data.data;
   },
 
-  submitForApproval: async (id: string): Promise<InstallationRecordItem> => {
+  getPermissions: async (
+    id: string,
+  ): Promise<{ canRetrySend: boolean; canMarkSepActivated: boolean }> => {
+    const response = await axiosInstance.get(`/installation-records/${id}/permissions`);
+    return response.data.data;
+  },
+
+  markSepActivated: async (id: string): Promise<InstallationRecordItem> => {
     const response = await axiosInstance.post(
-      `/installation-records/${id}/submit-for-approval`,
+      `/installation-records/${id}/mark-sep-activated`,
     );
+    return response.data.data;
+  },
+
+  retrySend: async (id: string): Promise<InstallationRecordItem> => {
+    const response = await axiosInstance.post(`/installation-records/${id}/retry-send`);
     return response.data.data;
   },
 

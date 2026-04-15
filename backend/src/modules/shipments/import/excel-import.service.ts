@@ -199,7 +199,7 @@ export class ExcelImportService {
       headers: parsed.headers,
       resolvedMapping: mapping,
       summary: validation.summary,
-      previewRows: validation.rows.slice(0, 50),
+      previewRows: validation.rows,
       canImport: validation.canImport,
     };
   }

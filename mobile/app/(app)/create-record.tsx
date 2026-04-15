@@ -7,6 +7,7 @@ import {
   Alert,
   Pressable,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   View,
@@ -15,7 +16,7 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { installationRecordsApi, queueInstallationRecord, type CreateInstallationRecordPayload } from '@/api/installation-records.api';
-import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
+import { meterTypeDefinitionsApi, type MeterTypeFieldItem } from '@/api/meter-type-definitions.api';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function CreateRecordScreen() {
@@ -48,6 +49,18 @@ export default function CreateRecordScreen() {
   const [photoPaths, setPhotoPaths] = useState<string[]>([]);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [dynamicFieldValues, setDynamicFieldValues] = useState<Record<string, unknown>>({});
+
+  const meterTypeFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', meterTypeId, 'fields'],
+    queryFn: () => meterTypeDefinitionsApi.listFields(meterTypeId),
+    enabled: Boolean(meterTypeId),
+  });
+
+  useEffect(() => {
+    if (!meterTypeId) return;
+    setDynamicFieldValues({});
+  }, [meterTypeId]);
 
   const buildPayload = (): CreateInstallationRecordPayload => {
     if (!userId || !simCardId || !meterTypeId || !serialNumber.trim()) {
@@ -57,6 +70,24 @@ export default function CreateRecordScreen() {
     const lat = latitude ? parseFloat(latitude) : undefined;
     const lon = longitude ? parseFloat(longitude) : undefined;
     const yearNum = year ? parseInt(year, 10) : undefined;
+
+    const meterFields = Array.isArray(meterTypeFieldsQuery.data)
+      ? meterTypeFieldsQuery.data
+      : [];
+
+    const missingRequired: string[] = [];
+    for (const f of meterFields) {
+      if (!f.isOperatorFillable || !f.isRequired) continue;
+      const v = dynamicFieldValues[f.name];
+      const isEmpty =
+        v === undefined ||
+        v === null ||
+        (typeof v === 'string' && v.trim().length === 0);
+      if (isEmpty) missingRequired.push(f.label);
+    }
+    if (missingRequired.length > 0) {
+      throw new Error(`Obavezna polja: ${missingRequired.join(', ')}`);
+    }
 
     return {
       simCardId,
@@ -72,6 +103,7 @@ export default function CreateRecordScreen() {
       measuringPoint: measuringPoint.trim() || undefined,
       latitude: Number.isFinite(lat) ? lat : undefined,
       longitude: Number.isFinite(lon) ? lon : undefined,
+      dynamicFieldValues: Object.keys(dynamicFieldValues).length > 0 ? dynamicFieldValues : undefined,
       notes: notes.trim() || undefined,
       photos: photoPaths.length > 0 ? photoPaths : undefined,
     };
@@ -85,8 +117,26 @@ export default function CreateRecordScreen() {
 
   const createMutation = useMutation({
     mutationFn: () => installationRecordsApi.create(buildPayload()),
-    onSuccess: () => {
-      Alert.alert('Uspjeh', 'Zapisnik je kreiran.', [
+    onSuccess: (created) => {
+      if (created?.status === 'SEND_FAILED') {
+        Alert.alert(
+          'Upozorenje',
+          'Zapisnik je kreiran, ali slanje emaila nije uspjelo. Otvorite detalje i pokušajte ponovo.',
+          [
+            {
+              text: 'Detalji',
+              onPress: () =>
+                router.replace({
+                  pathname: '/(app)/record-details',
+                  params: { id: created.id },
+                }),
+            },
+            { text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') },
+          ],
+        );
+        return;
+      }
+      Alert.alert('Uspjeh', 'Zapisnik kreiran i poslan na email.', [
         { text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') },
       ]);
     },
@@ -222,6 +272,122 @@ export default function CreateRecordScreen() {
           }}
         />
       </View>
+
+      {meterTypeId ? (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: '#e2e8f0',
+            borderRadius: 10,
+            padding: 12,
+            gap: 10,
+            backgroundColor: '#fff',
+          }}
+        >
+          <Text style={{ fontWeight: '700', color: '#0f172a' }}>Dodatna polja</Text>
+
+          {meterTypeFieldsQuery.isLoading ? (
+            <View style={{ paddingVertical: 8 }}>
+              <ActivityIndicator size="small" />
+            </View>
+          ) : meterTypeFieldsQuery.isError ? (
+            <Text style={{ color: '#dc2626' }}>
+              Nije moguće učitati dodatna polja za odabrani tip brojila.
+            </Text>
+          ) : (
+            (() => {
+              const fields = Array.isArray(meterTypeFieldsQuery.data)
+                ? meterTypeFieldsQuery.data
+                : [];
+
+              if (fields.length === 0) {
+                return <Text style={{ color: '#64748b' }}>Nema dodatnih polja.</Text>;
+              }
+
+              const renderField = (f: MeterTypeFieldItem) => {
+                const requiredMark = f.isRequired ? ' *' : '';
+                const current = dynamicFieldValues[f.name];
+
+                if (!f.isOperatorFillable) {
+                  return (
+                    <View key={f.id} style={{ gap: 4 }}>
+                      <Text style={{ fontWeight: '600' }}>{f.label}</Text>
+                      <Text style={{ color: '#64748b' }}>
+                        {f.defaultValue ?? '—'}
+                      </Text>
+                    </View>
+                  );
+                }
+
+                if (f.fieldType === 'BOOLEAN') {
+                  const boolValue = current === true || current === 'true';
+                  return (
+                    <View key={f.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontWeight: '600' }}>
+                        {f.label}
+                        {requiredMark}
+                      </Text>
+                      <Switch
+                        value={boolValue}
+                        onValueChange={(v) =>
+                          setDynamicFieldValues((prev) => ({ ...prev, [f.name]: v }))
+                        }
+                      />
+                    </View>
+                  );
+                }
+
+                const textValue =
+                  typeof current === 'string' || typeof current === 'number'
+                    ? String(current)
+                    : '';
+
+                return (
+                  <View key={f.id} style={{ gap: 4 }}>
+                    <Text style={{ fontWeight: '600' }}>
+                      {f.label}
+                      {requiredMark}
+                    </Text>
+                    <TextInput
+                      value={textValue}
+                      onChangeText={(v) => {
+                        if (f.fieldType === 'NUMBER') {
+                          const normalized = v.replace(',', '.');
+                          const num = normalized.length > 0 ? Number(normalized) : undefined;
+                          setDynamicFieldValues((prev) => ({
+                            ...prev,
+                            [f.name]: Number.isFinite(num) ? num : v,
+                          }));
+                          return;
+                        }
+                        setDynamicFieldValues((prev) => ({ ...prev, [f.name]: v }));
+                      }}
+                      placeholder={f.fieldType === 'DATE' ? 'YYYY-MM-DD' : ''}
+                      keyboardType={f.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'}
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#e2e8f0',
+                        borderRadius: 8,
+                        padding: 12,
+                        fontSize: 16,
+                      }}
+                    />
+                  </View>
+                );
+              };
+
+              return (
+                <View style={{ gap: 12 }}>
+                  {fields
+                    .slice()
+                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                    .map(renderField)}
+                </View>
+              );
+            })()
+          )}
+        </View>
+      ) : null}
 
       <View>
         <Text style={{ marginBottom: 4, fontWeight: '600' }}>Godina proizvodnje</Text>

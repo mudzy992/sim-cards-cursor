@@ -15,13 +15,16 @@ import MetersListPage from '@/pages/meters/MetersListPage';
 import InstallationRecordsListPage from '@/pages/installation-records/InstallationRecordsListPage';
 import InstallationRecordCreatePage from '@/pages/installation-records/InstallationRecordCreatePage';
 import InstallationRecordDetailPage from '@/pages/installation-records/InstallationRecordDetailPage';
-import RecipientsPage from '@/pages/recipients/RecipientsPage';
 import ActivityLogPage from '@/pages/activity-log/ActivityLogPage';
 import SettingsPage from '@/pages/settings/SettingsPage';
 import EmailSettingsPage from '@/pages/settings/EmailSettingsPage';
 import AnalyticsPage from '@/pages/analytics/AnalyticsPage';
 import AppReleasesPage from '@/pages/app-releases/AppReleasesPage';
 import PushCampaignsPage from '@/pages/push-campaigns/PushCampaignsPage';
+import BranchModeratorsPage from '@/pages/branch-moderators/BranchModeratorsPage'
+import BranchEmailRecipientsPage from '@/pages/branch-email-recipients/BranchEmailRecipientsPage'
+import MeterTypeFieldsPage from '@/pages/meter-type-fields/MeterTypeFieldsPage'
+import MeterTypeUpsertPage from '@/pages/meter-types/MeterTypeUpsertPage'
 
 export const router = createBrowserRouter([
   {
@@ -49,7 +52,7 @@ export const router = createBrowserRouter([
           {
             path: '/users',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <UsersListPage />
               </RoleGuard>
             ),
@@ -57,7 +60,7 @@ export const router = createBrowserRouter([
           {
             path: '/shipments',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <ShipmentsListPage />
               </RoleGuard>
             ),
@@ -65,7 +68,7 @@ export const router = createBrowserRouter([
           {
             path: '/shipments/new',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <ShipmentCreatePage />
               </RoleGuard>
             ),
@@ -73,7 +76,7 @@ export const router = createBrowserRouter([
           {
             path: '/shipments/:id',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <ShipmentDetailsPage />
               </RoleGuard>
             ),
@@ -81,8 +84,24 @@ export const router = createBrowserRouter([
           {
             path: '/meters',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <MetersListPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: '/meter-types/new',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN']}>
+                <MeterTypeUpsertPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: '/meter-types/:id',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN']}>
+                <MeterTypeUpsertPage />
               </RoleGuard>
             ),
           },
@@ -93,7 +112,7 @@ export const router = createBrowserRouter([
           {
             path: '/sim-cards/:id',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <SimCardDetailsPage />
               </RoleGuard>
             ),
@@ -101,7 +120,7 @@ export const router = createBrowserRouter([
           {
             path: '/installation-records',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR', 'USER']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN', 'USER']}>
                 <InstallationRecordsListPage />
               </RoleGuard>
             ),
@@ -109,7 +128,7 @@ export const router = createBrowserRouter([
           {
             path: '/installation-records/new',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR', 'USER']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN', 'USER']}>
                 <InstallationRecordCreatePage />
               </RoleGuard>
             ),
@@ -117,23 +136,15 @@ export const router = createBrowserRouter([
           {
             path: '/installation-records/:id',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR', 'USER']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN', 'USER']}>
                 <InstallationRecordDetailPage />
-              </RoleGuard>
-            ),
-          },
-          {
-            path: '/recipients',
-            element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
-                <RecipientsPage />
               </RoleGuard>
             ),
           },
           {
             path: '/push-campaigns',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <PushCampaignsPage />
               </RoleGuard>
             ),
@@ -141,7 +152,7 @@ export const router = createBrowserRouter([
           {
             path: '/activity-log',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <ActivityLogPage />
               </RoleGuard>
             ),
@@ -173,8 +184,32 @@ export const router = createBrowserRouter([
           {
             path: '/analytics',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'MODERATOR', 'USER']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN', 'USER']}>
                 <AnalyticsPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: '/branch-moderators',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+                <BranchModeratorsPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: '/branch-email-recipients',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+                <BranchEmailRecipientsPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: '/meter-type-fields',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN']}>
+                <MeterTypeFieldsPage />
               </RoleGuard>
             ),
           },

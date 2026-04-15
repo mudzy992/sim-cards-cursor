@@ -223,7 +223,7 @@ export default function PushCampaignsPage() {
             Push kampanje
           </Typography.Title>
           <Typography.Text type="secondary">
-            Ručno slanje push notifikacija (SYSTEM_ADMIN i MODERATOR u scope-u).
+            Ručno slanje push notifikacija (SYSTEM_ADMIN i DIST_ADMIN u scope-u).
           </Typography.Text>
         </div>
         <Button type="primary" onClick={openCreate}>

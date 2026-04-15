@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
+  Divider,
+  Drawer,
   Form,
   Input,
-  Modal,
   Popconfirm,
   Select,
   Table,
@@ -11,21 +12,21 @@ import {
   Tag,
   Typography,
   message,
-  Tour,
 } from 'antd';
-import type { TourProps } from 'antd';
 import { PlusOutlined, EditOutlined, UserOutlined, ApartmentOutlined, BankOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { usersApi, type CreateUserInput, type UpdateUserInput } from '@/api/users.api';
 import { distributionsApi, type Distribution } from '@/api/distributions.api';
 import { branchesApi, type Branch } from '@/api/branches.api';
+import { branchModeratorsApi } from '@/api/branch-moderators.api'
 import { useAuthStore } from '@/store/auth.store';
 import type { UserListItem } from '@/types/user.types';
 import type { UserRole } from '@/types/auth.types';
+import { getUserRoleLabel, getUserStatusLabel } from '@/utils/labels.utils'
 
 const ROLE_OPTIONS: { label: string; value: UserRole }[] = [
   { label: 'Sistemski administrator', value: 'SYSTEM_ADMIN' },
-  { label: 'Moderator', value: 'MODERATOR' },
+  { label: 'Distribucijski admin', value: 'DIST_ADMIN' },
   { label: 'Operator', value: 'USER' },
 ];
 
@@ -39,17 +40,22 @@ export default function UsersListPage() {
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState<string>('users');
-  const [modalOpen, setModalOpen] = useState(false);
+  const [userDrawerOpen, setUserDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<UserListItem | null>(null);
   const [form] = Form.useForm<CreateUserInput & { confirmPassword?: string }>();
-  const [distModalOpen, setDistModalOpen] = useState(false);
+  const [distDrawerOpen, setDistDrawerOpen] = useState(false);
   const [editingDist, setEditingDist] = useState<Distribution | null>(null);
   const [distForm] = Form.useForm<{ name: string; code: string }>();
-  const [branchModalOpen, setBranchModalOpen] = useState(false);
+  const [branchDrawerOpen, setBranchDrawerOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [branchForm] = Form.useForm<{ distributionId: string; name: string; code: string }>();
   const currentUser = useAuthStore((s) => s.user);
   const currentUserRole = currentUser?.role;
+  const [moderatorBranchIds, setModeratorBranchIds] = useState<string[]>([])
+  const [pendingModeratorSync, setPendingModeratorSync] = useState<{
+    userId: string
+    desiredBranchIds: string[]
+  } | null>(null)
 
   const usersQuery = useQuery({
     queryKey: ['users', 'list'],
@@ -59,21 +65,27 @@ export default function UsersListPage() {
   const distributionsQuery = useQuery({
     queryKey: ['distributions', 'list'],
     queryFn: () => distributionsApi.list(),
-    enabled: currentUserRole === 'SYSTEM_ADMIN' || currentUserRole === 'MODERATOR',
+    enabled: currentUserRole === 'SYSTEM_ADMIN' || currentUserRole === 'DIST_ADMIN',
   });
 
   const branchesQuery = useQuery({
     queryKey: ['branches', 'list'],
     queryFn: () => branchesApi.list(),
-    enabled: currentUserRole === 'SYSTEM_ADMIN' || currentUserRole === 'MODERATOR',
+    enabled: currentUserRole === 'SYSTEM_ADMIN' || currentUserRole === 'DIST_ADMIN',
   });
+
+  const branchModeratorAssignmentsQuery = useQuery({
+    queryKey: ['branch-moderators', 'list', 'user', editing?.id],
+    queryFn: () => branchModeratorsApi.list({ userId: editing!.id }),
+    enabled: currentUserRole === 'SYSTEM_ADMIN' && userDrawerOpen && Boolean(editing?.id),
+  })
 
   const createDistMutation = useMutation({
     mutationFn: (data: { name: string; code: string }) => distributionsApi.create(data),
     onSuccess: () => {
       messageApi.success('Distribucija kreirana');
       queryClient.invalidateQueries({ queryKey: ['distributions'] });
-      setDistModalOpen(false);
+      setDistDrawerOpen(false);
       distForm.resetFields();
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
@@ -87,7 +99,7 @@ export default function UsersListPage() {
     onSuccess: () => {
       messageApi.success('Distribucija ažurirana');
       queryClient.invalidateQueries({ queryKey: ['distributions'] });
-      setDistModalOpen(false);
+      setDistDrawerOpen(false);
       setEditingDist(null);
       distForm.resetFields();
     },
@@ -113,7 +125,7 @@ export default function UsersListPage() {
     onSuccess: () => {
       messageApi.success('Podružnica kreirana');
       queryClient.invalidateQueries({ queryKey: ['branches'] });
-      setBranchModalOpen(false);
+      setBranchDrawerOpen(false);
       branchForm.resetFields();
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
@@ -127,7 +139,7 @@ export default function UsersListPage() {
     onSuccess: () => {
       messageApi.success('Podružnica ažurirana');
       queryClient.invalidateQueries({ queryKey: ['branches'] });
-      setBranchModalOpen(false);
+      setBranchDrawerOpen(false);
       setEditingBranch(null);
       branchForm.resetFields();
     },
@@ -152,7 +164,7 @@ export default function UsersListPage() {
     onSuccess: () => {
       messageApi.success('Korisnik kreiran');
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setModalOpen(false);
+      setUserDrawerOpen(false);
       setEditing(null);
       form.resetFields();
     },
@@ -164,10 +176,31 @@ export default function UsersListPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateUserInput }) =>
       usersApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       messageApi.success('Korisnik ažuriran');
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setModalOpen(false);
+      if (pendingModeratorSync?.userId) {
+        const currentAssignments = branchModeratorAssignmentsQuery.data ?? []
+        const desiredBranchIds = pendingModeratorSync.desiredBranchIds
+        const currentBranchIds = currentAssignments.map((a) => a.branchId)
+        const toAdd = desiredBranchIds.filter((b) => !currentBranchIds.includes(b))
+        const toRemove = currentAssignments.filter((a) => !desiredBranchIds.includes(a.branchId))
+        try {
+          await Promise.all([
+            ...toAdd.map((branchId) => branchModeratorsApi.assign({ userId: pendingModeratorSync.userId, branchId })),
+            ...toRemove.map((a) => branchModeratorsApi.remove(a.id)),
+          ])
+          await queryClient.invalidateQueries({ queryKey: ['branch-moderators'] })
+        } catch (e) {
+          messageApi.error(
+            (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+              'Greška pri spremanju moderatora podružnica.',
+          )
+        } finally {
+          setPendingModeratorSync(null)
+        }
+      }
+      setUserDrawerOpen(false);
       setEditing(null);
       form.resetFields();
     },
@@ -193,19 +226,19 @@ export default function UsersListPage() {
   const handleOpenCreate = () => {
     setEditing(null);
     form.resetFields();
-    setModalOpen(true);
+    setUserDrawerOpen(true);
   };
 
   const handleOpenDistCreate = () => {
     setEditingDist(null);
     distForm.resetFields();
-    setDistModalOpen(true);
+    setDistDrawerOpen(true);
   };
 
   const handleOpenDistEdit = (row: Distribution) => {
     setEditingDist(row);
     distForm.setFieldsValue({ name: row.name, code: row.code });
-    setDistModalOpen(true);
+    setDistDrawerOpen(true);
   };
 
   const handleDistSubmit = () => {
@@ -221,7 +254,7 @@ export default function UsersListPage() {
   const handleOpenBranchCreate = () => {
     setEditingBranch(null);
     branchForm.resetFields();
-    setBranchModalOpen(true);
+    setBranchDrawerOpen(true);
   };
 
   const handleOpenBranchEdit = (row: Branch) => {
@@ -231,7 +264,7 @@ export default function UsersListPage() {
       name: row.name,
       code: row.code,
     });
-    setBranchModalOpen(true);
+    setBranchDrawerOpen(true);
   };
 
   const handleBranchSubmit = () => {
@@ -246,6 +279,7 @@ export default function UsersListPage() {
 
   const handleOpenEdit = async (row: UserListItem) => {
     setEditing(row);
+    setModeratorBranchIds([])
     form.setFieldsValue({
       email: row.email,
       firstName: row.firstName,
@@ -256,7 +290,7 @@ export default function UsersListPage() {
       distributionId: row.distributionId ?? undefined,
       branchId: row.branchId ?? undefined,
     });
-    setModalOpen(true);
+    setUserDrawerOpen(true);
   };
 
   const handleSubmit = () => {
@@ -268,10 +302,13 @@ export default function UsersListPage() {
       }
       const payload: CreateUserInput & UpdateUserInput = {
         ...rest,
-        distributionId: rest.role === 'MODERATOR' ? rest.distributionId : undefined,
+        distributionId: rest.role === 'DIST_ADMIN' ? rest.distributionId : undefined,
         branchId: rest.role === 'USER' ? rest.branchId : undefined,
       };
       if (editing) {
+        if (currentUserRole === 'SYSTEM_ADMIN') {
+          setPendingModeratorSync({ userId: editing.id, desiredBranchIds: moderatorBranchIds })
+        }
         const updateData: UpdateUserInput = { ...payload };
         if (!updateData.password) delete updateData.password;
         updateMutation.mutate({ id: editing.id, data: updateData });
@@ -281,30 +318,15 @@ export default function UsersListPage() {
     });
   };
 
-  const role = Form.useWatch('role', form);
-  const showDistribution = role === 'MODERATOR';
-  const showBranch = role === 'USER';
-
   useEffect(() => {
-    if (!showDistribution) form.setFieldValue('distributionId', undefined);
-    if (!showBranch) form.setFieldValue('branchId', undefined);
-  }, [showDistribution, showBranch, form]);
-
-  const [tourOpen, setTourOpen] = useState(false);
-  const [tourStep, setTourStep] = useState(0);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const seen = window.localStorage.getItem('sim-tracker-page-tour-users-v1');
-    const globalActive = window.localStorage.getItem('sim-tracker-global-tour-active') === '1';
-    if (!seen && currentUserRole === 'SYSTEM_ADMIN' && !globalActive) {
-      setTourOpen(true);
-    }
-  }, [currentUserRole]);
+    if (!userDrawerOpen || currentUserRole !== 'SYSTEM_ADMIN' || !editing?.id) return
+    const currentAssignments = branchModeratorAssignmentsQuery.data ?? []
+    setModeratorBranchIds(currentAssignments.map((a) => a.branchId))
+  }, [userDrawerOpen, currentUserRole, editing?.id, branchModeratorAssignmentsQuery.data])
 
   const rows = usersQuery.data?.items ?? [];
   const canManage = currentUserRole === 'SYSTEM_ADMIN';
-  const canEdit = currentUserRole === 'SYSTEM_ADMIN' || currentUserRole === 'MODERATOR';
+  const canEdit = currentUserRole === 'SYSTEM_ADMIN' || currentUserRole === 'DIST_ADMIN';
   const showOrgTabs = currentUserRole === 'SYSTEM_ADMIN';
 
   const tabItems = [
@@ -335,6 +357,7 @@ export default function UsersListPage() {
         loading={usersQuery.isLoading}
         dataSource={rows}
         pagination={false}
+        scroll={{ x: 900 }}
         columns={[
           {
             title: 'Ime i prezime',
@@ -349,7 +372,7 @@ export default function UsersListPage() {
           {
             title: 'Role',
             dataIndex: 'role',
-            render: (r) => <Tag>{r}</Tag>,
+            render: (r: UserRole) => <Tag>{getUserRoleLabel(r)}</Tag>,
           },
           {
             title: 'Distribucija / Podružnica',
@@ -366,7 +389,9 @@ export default function UsersListPage() {
             title: 'Status',
             dataIndex: 'status',
             render: (s) => (
-              <Tag color={s === 'ACTIVE' ? 'green' : 'orange'}>{s}</Tag>
+              <Tag color={s === 'ACTIVE' ? 'green' : s === 'SUSPENDED' ? 'red' : 'orange'}>
+                {getUserStatusLabel(s)}
+              </Tag>
             ),
           },
           ...(canEdit
@@ -521,7 +546,7 @@ export default function UsersListPage() {
     <div
       className="space-y-4"
       data-tour-id="admin-users"
-      data-tour-role="SYSTEM_ADMIN MODERATOR"
+      data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
     >
       {messageContextHolder}
       <div className="flex justify-between items-center">
@@ -530,19 +555,48 @@ export default function UsersListPage() {
         </Typography.Title>
       </div>
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
-      <Modal
+      <Drawer
         title={editing ? 'Uredi korisnika' : 'Novi korisnik'}
-        open={modalOpen}
-        onOk={handleSubmit}
-        onCancel={() => {
-          setModalOpen(false);
-          setEditing(null);
-          form.resetFields();
+        open={userDrawerOpen}
+        width={520}
+        onClose={() => {
+          setUserDrawerOpen(false)
+          setEditing(null)
+          form.resetFields()
         }}
-        confirmLoading={createMutation.isPending || updateMutation.isPending}
-        width={480}
+        styles={{ body: { overflowY: 'auto', paddingBottom: 96 } }}
+        destroyOnClose
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setUserDrawerOpen(false)
+                setEditing(null)
+                form.resetFields()
+              }}
+            >
+              Odustani
+            </Button>
+            <Button
+              type="primary"
+              loading={createMutation.isPending || updateMutation.isPending}
+              onClick={handleSubmit}
+            >
+              {editing ? 'Snimi' : 'Kreiraj'}
+            </Button>
+          </div>
+        }
       >
-        <Form form={form} layout="vertical">
+        <Form
+          form={form}
+          layout="vertical"
+          onValuesChange={(changedValues) => {
+            if (!('role' in changedValues)) return
+            const nextRole = changedValues.role as UserRole | undefined
+            if (nextRole !== 'DIST_ADMIN') form.setFieldValue('distributionId', undefined)
+            if (nextRole !== 'USER') form.setFieldValue('branchId', undefined)
+          }}
+        >
           <Form.Item
             name="email"
             label="Email"
@@ -602,41 +656,100 @@ export default function UsersListPage() {
           <Form.Item name="status" label="Status">
             <Select placeholder="Odaberi status" options={STATUS_OPTIONS} />
           </Form.Item>
-          {showDistribution && (
-            <Form.Item name="distributionId" label="Distribucija">
-              <Select
-                placeholder="Odaberi distribuciju (za moderatora)"
-                allowClear
-                options={distributions.map((d) => ({
-                  label: `${d.name} (${d.code})`,
-                  value: d.id,
-                }))}
-              />
-            </Form.Item>
-          )}
-          {showBranch && (
-            <Form.Item name="branchId" label="Podružnica">
-              <Select
-                placeholder="Odaberi podružnicu (za operatora)"
-                allowClear
-                options={branches.map((b) => ({
-                  label: `${b.name} (${b.code})${b.distribution ? ` – ${b.distribution.name}` : ''}`,
-                  value: b.id,
-                }))}
-              />
-            </Form.Item>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, next) => prev.role !== next.role}
+          >
+            {({ getFieldValue }) => {
+              const roleValue = getFieldValue('role') as UserRole | undefined
+              const showDistribution = roleValue === 'DIST_ADMIN'
+              const showBranch = roleValue === 'USER'
+              return (
+                <>
+                  {showDistribution && (
+                    <Form.Item name="distributionId" label="Distribucija">
+                      <Select
+                        placeholder="Odaberi distribuciju (za distribucijskog admina)"
+                        allowClear
+                        options={distributions.map((d) => ({
+                          label: `${d.name} (${d.code})`,
+                          value: d.id,
+                        }))}
+                      />
+                    </Form.Item>
+                  )}
+                  {showBranch && (
+                    <Form.Item name="branchId" label="Podružnica">
+                      <Select
+                        placeholder="Odaberi podružnicu (za operatora)"
+                        allowClear
+                        options={branches.map((b) => ({
+                          label: `${b.name} (${b.code})${b.distribution ? ` – ${b.distribution.name}` : ''}`,
+                          value: b.id,
+                        }))}
+                      />
+                    </Form.Item>
+                  )}
+                </>
+              )
+            }}
+          </Form.Item>
+          {currentUserRole === 'SYSTEM_ADMIN' && editing?.id && (
+            <>
+              <Divider className="!my-3" />
+              <Form.Item label="Moderator podružnica (opciono)">
+                <Select
+                  mode="multiple"
+                  allowClear
+                  placeholder="Odaberi jednu ili više podružnica"
+                  value={moderatorBranchIds}
+                  onChange={(next) => setModeratorBranchIds(next)}
+                  options={branches.map((b) => ({
+                    label: `${b.name} (${b.code})${b.distribution ? ` – ${b.distribution.name}` : ''}`,
+                    value: b.id,
+                  }))}
+                  loading={branchModeratorAssignmentsQuery.isLoading || branchesQuery.isLoading}
+                  showSearch
+                  optionFilterProp="label"
+                />
+              </Form.Item>
+              <Typography.Text type="secondary" className="block -mt-2">
+                Korisnik ostaje USER/OPERATOR po roli, ali ima dodatnu moderatorsku ovlast za odabrane podružnice.
+              </Typography.Text>
+            </>
           )}
         </Form>
-      </Modal>
-      <Modal
+      </Drawer>
+      <Drawer
         title={editingDist ? 'Uredi distribuciju' : 'Nova distribucija'}
-        open={distModalOpen}
-        onOk={handleDistSubmit}
-        onCancel={() => {
-          setDistModalOpen(false);
-          setEditingDist(null);
+        open={distDrawerOpen}
+        width={520}
+        onClose={() => {
+          setDistDrawerOpen(false)
+          setEditingDist(null)
+          distForm.resetFields()
         }}
-        confirmLoading={createDistMutation.isPending || updateDistMutation.isPending}
+        destroyOnClose
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setDistDrawerOpen(false)
+                setEditingDist(null)
+                distForm.resetFields()
+              }}
+            >
+              Odustani
+            </Button>
+            <Button
+              type="primary"
+              loading={createDistMutation.isPending || updateDistMutation.isPending}
+              onClick={handleDistSubmit}
+            >
+              {editingDist ? 'Snimi' : 'Kreiraj'}
+            </Button>
+          </div>
+        }
       >
         <Form form={distForm} layout="vertical">
           <Form.Item name="name" label="Naziv" rules={[{ required: true }]}>
@@ -646,16 +759,37 @@ export default function UsersListPage() {
             <Input placeholder="npr. EDZ" disabled={!!editingDist} />
           </Form.Item>
         </Form>
-      </Modal>
-      <Modal
+      </Drawer>
+      <Drawer
         title={editingBranch ? 'Uredi podružnicu' : 'Nova podružnica'}
-        open={branchModalOpen}
-        onOk={handleBranchSubmit}
-        onCancel={() => {
-          setBranchModalOpen(false);
-          setEditingBranch(null);
+        open={branchDrawerOpen}
+        width={520}
+        onClose={() => {
+          setBranchDrawerOpen(false)
+          setEditingBranch(null)
+          branchForm.resetFields()
         }}
-        confirmLoading={createBranchMutation.isPending || updateBranchMutation.isPending}
+        destroyOnClose
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setBranchDrawerOpen(false)
+                setEditingBranch(null)
+                branchForm.resetFields()
+              }}
+            >
+              Odustani
+            </Button>
+            <Button
+              type="primary"
+              loading={createBranchMutation.isPending || updateBranchMutation.isPending}
+              onClick={handleBranchSubmit}
+            >
+              {editingBranch ? 'Snimi' : 'Kreiraj'}
+            </Button>
+          </div>
+        }
       >
         <Form form={branchForm} layout="vertical">
           <Form.Item
@@ -676,70 +810,7 @@ export default function UsersListPage() {
             <Input placeholder="npr. ZEN" disabled={!!editingBranch} />
           </Form.Item>
         </Form>
-      </Modal>
-      <Tour
-        open={tourOpen}
-        current={tourStep}
-        onClose={() => {
-          setTourOpen(false);
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('sim-tracker-page-tour-users-v1', '1');
-          }
-        }}
-        onChange={(next) => setTourStep(next)}
-        steps={
-          [
-            {
-              title: 'Lista korisnika',
-              description:
-                'Ovdje upravljaš svim korisnicima sistema, njihovim ulogama i statusima.',
-              target: () =>
-                document.querySelector('[data-tour-id="users-header"]') as HTMLElement,
-            },
-            {
-              title: 'Tabela korisnika',
-              description:
-                'Tabela prikazuje osnovne podatke; kroz akcije možeš uređivati, deaktivirati ili brisati korisnike.',
-              target: () =>
-                document.querySelector('[data-tour-id="users-table"]') as HTMLElement,
-            },
-            {
-              title: 'Distribucije',
-              description:
-                'Tab „Distribucije“ služi za održavanje distribucijskih jedinica (npr. ED Zenica).',
-              target: () =>
-                document.querySelector('[data-tour-id="users-distributions-header"]') as HTMLElement,
-            },
-            {
-              title: 'Tabela distribucija',
-              description:
-                'Za svaku distribuciju vidiš naziv i kod; akcije služe za uređivanje i brisanje.',
-              target: () =>
-                document.querySelector('[data-tour-id="users-distributions-table"]') as HTMLElement,
-            },
-            {
-              title: 'Podružnice',
-              description:
-                'Tab „Podružnice“ definira organizacione jedinice unutar distribucija (npr. Zenica, Travnik).',
-              target: () =>
-                document.querySelector('[data-tour-id="users-branches-header"]') as HTMLElement,
-            },
-            {
-              title: 'Tabela podružnica',
-              description:
-                'Ovdje održavaš šifre i nazive podružnica; kasnije se koriste pri dodjeli korisnika i mapiranju approval grupa.',
-              target: () =>
-                document.querySelector('[data-tour-id="users-branches-table"]') as HTMLElement,
-            },
-          ].filter((step) => {
-            try {
-              return Boolean(step.target && step.target());
-            } catch {
-              return false;
-            }
-          }) as TourProps['steps']
-        }
-      />
+      </Drawer>
     </div>
   );
 }

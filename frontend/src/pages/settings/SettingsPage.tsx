@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
   Card,
+  Drawer,
   Form,
   Input,
-  Modal,
   Select,
   Space,
   Switch,
@@ -16,7 +16,6 @@ import {
 import { settingsApi } from '@/api/settings.api';
 import { useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
-import { useTourStore } from '@/store/tour.store';
 
 type SettingRow = {
   key: string;
@@ -216,9 +215,8 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [messageApi, contextHolder] = message.useMessage();
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const user = useAuthStore((s) => s.user);
-  const { tour, resetWebTourForRole, currentVersion } = useTourStore();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useAuthStore((s) => s.user);
 
   const { data: settings = [], isLoading } = useQuery<SettingRow[]>({
     queryKey: ['settings'],
@@ -236,7 +234,7 @@ export default function SettingsPage() {
     onSuccess: () => {
       messageApi.success('Postavka je ažurirana.');
       setEditingKey(null);
-      setModalOpen(false);
+      setDrawerOpen(false);
       form.resetFields();
       void queryClient.invalidateQueries({ queryKey: ['settings'] });
     },
@@ -259,7 +257,7 @@ export default function SettingsPage() {
           : record.value,
       description: record.description,
     });
-    setModalOpen(true);
+    setDrawerOpen(true);
   };
 
   const handleSubmit = (values: { value: string | boolean; description?: string }) => {
@@ -359,53 +357,15 @@ export default function SettingsPage() {
         </Space>
       </Card>
 
-      <Card title="Onboarding / App tour">
-        <Typography.Paragraph type="secondary">
-          Tour je role-aware i data-aware. Ovdje možete ručno restartovati tour za trenutnog korisnika.
-        </Typography.Paragraph>
-        <Divider className="!my-3" />
-        <Space direction="vertical">
-          <Typography.Text>
-            Zadnja verzija tour-a: <strong>{currentVersion}</strong>
-          </Typography.Text>
-          <Typography.Text>
-            Status za SYSTEM_ADMIN:{' '}
-            <strong>
-              {tour?.web?.systemAdmin?.completedAt ? 'Završen' : 'Nije završen'}
-            </strong>
-          </Typography.Text>
-          <Typography.Text>
-            Status za MODERATOR:{' '}
-            <strong>
-              {tour?.web?.moderator?.completedAt ? 'Završen' : 'Nije završen'}
-            </strong>
-          </Typography.Text>
-          <Space>
-            <Button
-              onClick={() => {
-                if (!user) return;
-                if (user.role === 'SYSTEM_ADMIN' || user.role === 'MODERATOR') {
-                  void resetWebTourForRole(user.role);
-                  messageApi.success('Tour je resetovan. Biće prikazan pri sljedećoj posjeti dashboardu.');
-                }
-              }}
-              disabled={!user || (user.role !== 'SYSTEM_ADMIN' && user.role !== 'MODERATOR')}
-            >
-              Restart tour za moju ulogu
-            </Button>
-          </Space>
-        </Space>
-      </Card>
-
-      <Modal
-      title={`Uredi postavku: ${editingKey}`}
-        open={modalOpen}
-        onCancel={() => {
-          setModalOpen(false);
-          setEditingKey(null);
-          form.resetFields();
+      <Drawer
+        title={`Uredi postavku: ${editingKey}`}
+        open={drawerOpen}
+        width={520}
+        onClose={() => {
+          setDrawerOpen(false)
+          setEditingKey(null)
+          form.resetFields()
         }}
-        footer={null}
         destroyOnClose
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
@@ -493,7 +453,7 @@ export default function SettingsPage() {
               </Button>
               <Button
                 onClick={() => {
-                  setModalOpen(false);
+                  setDrawerOpen(false);
                   setEditingKey(null);
                 }}
               >
@@ -502,7 +462,7 @@ export default function SettingsPage() {
             </Space>
           </Form.Item>
         </Form>
-      </Modal>
+      </Drawer>
     </div>
   );
 }
