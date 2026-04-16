@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   bump-frontend-version:
-    if: ${{ github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, 'chore(frontend): bump app version') }}
+    if: "${{ github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, 'chore(frontend): bump app version') }}"
     runs-on: ubuntu-latest
 
     steps:
@@ -36,7 +36,7 @@ jobs:
           fi
 
       - name: Commit bumped version
-        if: ${{ steps.version_changes.outputs.has_changes == 'true' }}
+        if: "${{ steps.version_changes.outputs.has_changes == 'true' }}"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -44,5 +44,5 @@ jobs:
           git commit -m "chore(frontend): bump app version"
 
       - name: Push bumped version
-        if: ${{ steps.version_changes.outputs.has_changes == 'true' }}
+        if: "${{ steps.version_changes.outputs.has_changes == 'true' }}"
         run: git push
