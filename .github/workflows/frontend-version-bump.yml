@@ -1,0 +1,48 @@
+name: Frontend Version Bump
+
+on:
+  push:
+
+permissions:
+  contents: write
+
+jobs:
+  bump-frontend-version:
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, 'chore(frontend): bump app version')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Bump frontend patch version
+        run: npm --prefix frontend version patch --no-git-tag-version
+
+      - name: Detect version changes
+        id: version_changes
+        shell: bash
+        run: |
+          if git diff --quiet -- frontend/package.json frontend/package-lock.json; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit bumped version
+        if: steps.version_changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/package.json frontend/package-lock.json
+          git commit -m "chore(frontend): bump app version"
+
+      - name: Push bumped version
+        if: steps.version_changes.outputs.has_changes == 'true'
+        run: git push
