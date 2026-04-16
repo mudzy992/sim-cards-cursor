@@ -9,7 +9,6 @@ export type MobileSimCard = {
   publicIpAddress?: string | null;
   status: string;
   phoneNumber?: string | null;
-  apn?: string | null;
   assignedTo?: {
     id: string;
     firstName: string;

@@ -1,10 +1,11 @@
 import axios from 'axios';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { simCardsApi, type MobileSimCard } from '@/api/sim-cards.api';
 import { useAuthStore } from '@/store/auth.store';
+import { colors } from '@/theme/colors';
 
 export default function ScanResultScreen() {
   const router = useRouter();
@@ -13,6 +14,13 @@ export default function ScanResultScreen() {
   const iccid = params.iccid?.trim() ?? '';
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [justClaimed, setJustClaimed] = useState(false);
+
+  useEffect(() => {
+    setActionMessage(null);
+    setActionError(null);
+    setJustClaimed(false);
+  }, [iccid]);
 
   const query = useQuery({
     queryKey: ['scan-result', iccid],
@@ -25,6 +33,7 @@ export default function ScanResultScreen() {
     onSuccess: async () => {
       setActionError(null);
       setActionMessage('Kartica je uspješno zadužena.');
+      setJustClaimed(true);
       await query.refetch();
     },
     onError: (error) => {
@@ -50,6 +59,46 @@ export default function ScanResultScreen() {
     Boolean(result.assignedTo?.id) &&
     result.assignedTo?.id !== currentUserId;
   const canClaim = result?.status === 'AVAILABLE';
+
+  const showClaimButton = Boolean(result && canClaim && !justClaimed);
+  const showAssignedToMeInfo = Boolean(result && isAssignedToMe && !justClaimed);
+  const showCreateRecordCta = Boolean(result && (isAssignedToMe || justClaimed));
+
+  const statusLabel = useMemo(() => {
+    if (!result) return null;
+    if (result.status === 'AVAILABLE') return { text: 'Dostupna', tone: 'success' as const };
+    if (result.status === 'ASSIGNED') return { text: 'Zadužena', tone: 'warn' as const };
+    return { text: result.status, tone: 'neutral' as const };
+  }, [result]);
+
+  const StatusBadge = useMemo(() => {
+    if (!statusLabel) return null;
+    const bg =
+      statusLabel.tone === 'success'
+        ? '#dcfce7'
+        : statusLabel.tone === 'warn'
+          ? '#fef3c7'
+          : '#f1f5f9';
+    const fg =
+      statusLabel.tone === 'success'
+        ? '#166534'
+        : statusLabel.tone === 'warn'
+          ? '#92400e'
+          : '#475569';
+    return (
+      <View
+        style={{
+          alignSelf: 'flex-start',
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 999,
+          backgroundColor: bg,
+        }}
+      >
+        <Text style={{ fontSize: 12, fontWeight: '600', color: fg }}>{statusLabel.text}</Text>
+      </View>
+    );
+  }, [statusLabel]);
 
   const renderBody = () => {
     if (!iccid) {
@@ -102,15 +151,18 @@ export default function ScanResultScreen() {
       <View
         style={{
           borderWidth: 1,
-          borderColor: '#e2e8f0',
+          borderColor: colors.border,
           borderRadius: 12,
           padding: 12,
           gap: 6,
+          backgroundColor: colors.surface,
         }}
       >
-        <Text style={{ fontWeight: '700', fontSize: 16 }}>SIM info</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ fontWeight: '700', fontSize: 16, color: colors.text }}>SIM info</Text>
+          {StatusBadge}
+        </View>
         <Text>ICCID: {result.iccid}</Text>
-        <Text>Status: {result.status}</Text>
         <View
           style={{
             backgroundColor: '#fef3c7',
@@ -135,7 +187,6 @@ export default function ScanResultScreen() {
             : '-'}
         </Text>
         <Text>Telefon: {result.phoneNumber ?? '-'}</Text>
-        <Text>APN: {result.apn ?? '-'}</Text>
         <Text>Isporuka: {result.shipment?.name ?? '-'}</Text>
       </View>
     );
@@ -144,7 +195,7 @@ export default function ScanResultScreen() {
   return (
     <View style={{ flex: 1, padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 20, fontWeight: '700' }}>Rezultat skena</Text>
-      <Text style={{ color: '#64748b' }}>ICCID: {iccid || '-'}</Text>
+      <Text style={{ color: colors.textMuted }}>ICCID: {iccid || '-'}</Text>
 
       {isFromOfflineCache && (
         <View
@@ -181,49 +232,50 @@ export default function ScanResultScreen() {
 
       {renderBody()}
 
-      <Pressable
-        disabled={!result || !canClaim || claimMutation.isPending}
-        onPress={() => {
-          if (!result) {
-            return;
-          }
-          void claimMutation.mutate(result.id);
-        }}
-        style={{
-          backgroundColor: !result || !canClaim ? '#94a3b8' : '#0f766e',
-          padding: 12,
-          borderRadius: 10,
-          alignItems: 'center',
-        }}
-      >
-        <Text style={{ color: '#fff' }}>
-          {claimMutation.isPending ? 'Zaduživanje...' : 'Zaduži karticu'}
-        </Text>
-      </Pressable>
+      {showClaimButton ? (
+        <Pressable
+          disabled={claimMutation.isPending}
+          onPress={() => result && void claimMutation.mutate(result.id)}
+          style={({ pressed }) => ({
+            backgroundColor: pressed ? colors.primaryPressed : colors.primary,
+            padding: 12,
+            borderRadius: 10,
+            alignItems: 'center',
+            opacity: claimMutation.isPending ? 0.7 : 1,
+          })}
+        >
+          <Text style={{ color: '#fff', fontWeight: '600' }}>
+            {claimMutation.isPending ? 'Zaduživanje...' : 'Zaduži karticu'}
+          </Text>
+        </Pressable>
+      ) : null}
 
-      {isAssignedToMe ? (
-        <>
-          <Text style={{ color: '#15803d' }}>Kartica je već zadužena kod tebe.</Text>
-          <Pressable
-            onPress={() =>
-              result && router.push({ pathname: '/create-record', params: { simCardId: result.id } })
-            }
-            style={{
-              backgroundColor: '#0f766e',
-              padding: 12,
-              borderRadius: 10,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ color: '#fff' }}>Kreiraj zapisnik ugradnje</Text>
-          </Pressable>
-        </>
+      {showAssignedToMeInfo ? (
+        <Text style={{ color: '#15803d', fontWeight: '600' }}>
+          Kartica je već zadužena kod tebe.
+        </Text>
+      ) : null}
+
+      {showCreateRecordCta ? (
+        <Pressable
+          onPress={() =>
+            result && router.push({ pathname: '/create-record', params: { simCardId: result.id } })
+          }
+          style={({ pressed }) => ({
+            backgroundColor: pressed ? colors.primaryPressed : colors.primary,
+            padding: 12,
+            borderRadius: 10,
+            alignItems: 'center',
+          })}
+        >
+          <Text style={{ color: '#fff', fontWeight: '600' }}>Kreiraj zapisnik ugradnje</Text>
+        </Pressable>
       ) : null}
       {isAssignedToAnother ? (
         <Text style={{ color: '#b45309' }}>Kartica je već zadužena kod drugog operatora.</Text>
       ) : null}
       {result && !canClaim && !isAssignedToMe && !isAssignedToAnother ? (
-        <Text style={{ color: '#64748b' }}>
+        <Text style={{ color: colors.textMuted }}>
           Kartica nije u statusu `AVAILABLE` i ne može se zadužiti.
         </Text>
       ) : null}
@@ -232,14 +284,14 @@ export default function ScanResultScreen() {
 
       <Pressable
         onPress={() => void query.refetch()}
-        style={{
-          backgroundColor: '#0f766e',
+        style={({ pressed }) => ({
+          backgroundColor: pressed ? colors.primaryPressed : colors.primary,
           padding: 12,
           borderRadius: 10,
           alignItems: 'center',
-        }}
+        })}
       >
-        <Text style={{ color: '#fff' }}>Osvježi</Text>
+        <Text style={{ color: '#fff', fontWeight: '600' }}>Osvježi</Text>
       </Pressable>
 
       <Pressable
@@ -251,7 +303,7 @@ export default function ScanResultScreen() {
           alignItems: 'center',
         }}
       >
-        <Text style={{ color: '#fff' }}>Novi scan</Text>
+        <Text style={{ color: '#fff', fontWeight: '600' }}>Novi scan</Text>
       </Pressable>
     </View>
   );

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { dashboardApi } from '@/api/dashboard.api';
 import { notificationsApi } from '@/api/notifications.api';
 import { useMiniTour } from '@/hooks/useMiniTour';
+import { colors } from '@/theme/colors';
 
 const statusLabels: Record<string, string> = {
   DRAFT: 'Nacrt',
@@ -35,8 +36,8 @@ function StatCard({
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Ionicons name={icon} size={20} color="#0f766e" />
-        <Text style={{ fontSize: 12, color: '#64748b' }}>{title}</Text>
+        <Ionicons name={icon} size={20} color={colors.primary} />
+        <Text style={{ fontSize: 12, color: colors.textMuted }}>{title}</Text>
       </View>
       <Text style={{ fontSize: 24, fontWeight: '700', color: '#0f172a' }}>{value}</Text>
     </View>
@@ -65,7 +66,7 @@ export default function HomeScreen() {
           <Text style={{ fontSize: 22, fontWeight: '700', color: '#0f172a' }}>
             Dobrodošao, {user?.firstName ?? 'Korisnik'}
           </Text>
-          <Text style={{ fontSize: 14, color: '#64748b', marginTop: 4 }}>
+          <Text style={{ fontSize: 14, color: colors.textMuted, marginTop: 4 }}>
             Pregled statistika i aktivnosti
           </Text>
         </View>
@@ -78,7 +79,7 @@ export default function HomeScreen() {
             position: 'relative',
           }}
         >
-          <Ionicons name="notifications-outline" size={24} color="#0f766e" />
+          <Ionicons name="notifications-outline" size={24} color={colors.primary} />
           {unreadCount > 0 && (
             <View
               style={{
@@ -104,7 +105,7 @@ export default function HomeScreen() {
 
       {isLoading ? (
         <View style={{ padding: 32, alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#0f766e" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : stats ? (
         <View style={{ gap: 12 }}>
@@ -205,7 +206,7 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 12, color: '#6b7280' }}>Kasnije</Text>
             </Pressable>
             <Pressable onPress={miniTour.complete}>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#4f46e5' }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.link }}>
                 Razumijem
               </Text>
             </Pressable>

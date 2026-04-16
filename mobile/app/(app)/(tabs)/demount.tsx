@@ -12,6 +12,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { demountTasksApi, type DemountTaskItem, type DemountTaskStatus } from '@/api/demount-tasks.api';
+import { colors } from '@/theme/colors';
 
 const statusLabels: Record<DemountTaskStatus, string> = {
   PENDING: 'Čeka',
@@ -78,7 +79,7 @@ export default function DemountScreen() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#0f766e" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -86,7 +87,7 @@ export default function DemountScreen() {
   return (
     <View style={{ flex: 1, padding: 16, gap: 8 }}>
       <Text style={{ fontSize: 20, fontWeight: '700' }}>Zadaci demontaže</Text>
-      <Text style={{ color: '#64748b' }}>
+      <Text style={{ color: colors.textMuted }}>
         Lista zadataka za demontažu SIM kartica s brojila.
       </Text>
 
@@ -97,7 +98,7 @@ export default function DemountScreen() {
             onPress={() => void load(true)}
             style={{
               alignSelf: 'flex-start',
-              backgroundColor: '#0f766e',
+              backgroundColor: colors.primary,
               paddingHorizontal: 12,
               paddingVertical: 8,
               borderRadius: 8,
@@ -123,7 +124,7 @@ export default function DemountScreen() {
           <View
             style={{
               borderWidth: 1,
-              borderColor: '#e2e8f0',
+              borderColor: colors.border,
               borderRadius: 10,
               padding: 12,
               marginBottom: 8,
@@ -179,12 +180,13 @@ export default function DemountScreen() {
                     key={status}
                     disabled={updatingId === item.id}
                     onPress={() => handleStatusChange(item, status)}
-                    style={{
-                      backgroundColor: '#0f766e',
+                    style={({ pressed }) => ({
+                      backgroundColor: pressed ? colors.primaryPressed : colors.primary,
                       paddingHorizontal: 12,
                       paddingVertical: 8,
                       borderRadius: 8,
-                    }}
+                      opacity: updatingId === item.id ? 0.7 : 1,
+                    })}
                   >
                     {updatingId === item.id ? (
                       <ActivityIndicator size="small" color="#fff" />

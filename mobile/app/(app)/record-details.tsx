@@ -3,6 +3,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { installationRecordsApi } from '@/api/installation-records.api';
+import { meterTypeDefinitionsApi, type MeterTypeFieldItem } from '@/api/meter-type-definitions.api';
+import { colors } from '@/theme/colors';
 
 const statusLabels: Record<string, string> = {
   DRAFT: 'Nacrt',
@@ -27,6 +29,44 @@ export default function RecordDetailsScreen() {
     queryFn: () => installationRecordsApi.getPermissions(recordId),
     enabled: Boolean(recordId),
   });
+
+  const meterTypeDefinitionId = recordQuery.data?.meter?.meterTypeDefinitionId?.trim() ?? '';
+  const meterTypeFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', meterTypeDefinitionId, 'fields'],
+    queryFn: () => meterTypeDefinitionsApi.listFields(meterTypeDefinitionId),
+    enabled: Boolean(meterTypeDefinitionId),
+  });
+
+  const formatDynamicValue = (field: MeterTypeFieldItem, value: unknown): string => {
+    const fallback = '–';
+    if (value === undefined || value === null) {
+      if (!field.isOperatorFillable && field.defaultValue != null && field.defaultValue.length > 0) {
+        return field.defaultValue;
+      }
+      return fallback;
+    }
+
+    if (field.fieldType === 'BOOLEAN') {
+      if (value === true || value === 'true') return 'Da';
+      if (value === false || value === 'false') return 'Ne';
+      return fallback;
+    }
+
+    if (field.fieldType === 'DATE') {
+      const raw = String(value);
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleDateString();
+    }
+
+    if (field.fieldType === 'NUMBER') {
+      if (typeof value === 'number') return String(value);
+      const s = String(value).trim();
+      return s.length > 0 ? s : fallback;
+    }
+
+    const s = String(value).trim();
+    return s.length > 0 ? s : fallback;
+  };
 
   const retrySendMutation = useMutation({
     mutationFn: () => installationRecordsApi.retrySend(recordId),
@@ -71,7 +111,7 @@ export default function RecordDetailsScreen() {
   if (recordQuery.isLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#0f766e" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -86,7 +126,7 @@ export default function RecordDetailsScreen() {
           onPress={() => void recordQuery.refetch()}
           style={{
             alignSelf: 'flex-start',
-            backgroundColor: '#0f766e',
+            backgroundColor: colors.primary,
             paddingHorizontal: 12,
             paddingVertical: 8,
             borderRadius: 8,
@@ -129,7 +169,7 @@ export default function RecordDetailsScreen() {
       <View
         style={{
           borderWidth: 1,
-          borderColor: '#e2e8f0',
+          borderColor: colors.border,
           borderRadius: 10,
           padding: 12,
           gap: 6,
@@ -150,7 +190,7 @@ export default function RecordDetailsScreen() {
       <View
         style={{
           borderWidth: 1,
-          borderColor: '#e2e8f0',
+          borderColor: colors.border,
           borderRadius: 10,
           padding: 12,
           gap: 6,
@@ -178,10 +218,59 @@ export default function RecordDetailsScreen() {
         </Text>
       </View>
 
+      {meterTypeDefinitionId ? (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 10,
+            padding: 12,
+            gap: 10,
+          }}
+        >
+          <Text style={{ fontWeight: '600', color: colors.text }}>Dodatna polja</Text>
+
+          {meterTypeFieldsQuery.isLoading ? (
+            <View style={{ paddingVertical: 8 }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : meterTypeFieldsQuery.isError ? (
+            <Text style={{ color: '#dc2626' }}>Nije moguće učitati dodatna polja.</Text>
+          ) : (
+            (() => {
+              const fields = Array.isArray(meterTypeFieldsQuery.data) ? meterTypeFieldsQuery.data : [];
+              if (fields.length === 0) {
+                return <Text style={{ color: colors.textMuted }}>Nema dodatnih polja.</Text>;
+              }
+
+              const values = record.meter?.dynamicFieldValues ?? {};
+
+              return (
+                <View style={{ gap: 10 }}>
+                  {fields
+                    .slice()
+                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                    .map((f) => (
+                      <View key={f.id} style={{ gap: 2 }}>
+                        <Text style={{ fontWeight: '600', color: colors.text }}>
+                          {f.label}
+                        </Text>
+                        <Text style={{ color: colors.textMuted }}>
+                          {formatDynamicValue(f, (values as Record<string, unknown>)[f.name])}
+                        </Text>
+                      </View>
+                    ))}
+                </View>
+              );
+            })()
+          )}
+        </View>
+      ) : null}
+
       <View
         style={{
           borderWidth: 1,
-          borderColor: '#e2e8f0',
+          borderColor: colors.border,
           borderRadius: 10,
           padding: 12,
           gap: 6,
@@ -222,7 +311,7 @@ export default function RecordDetailsScreen() {
             style={{
               marginTop: 6,
               alignSelf: 'flex-start',
-              backgroundColor: '#0f766e',
+              backgroundColor: colors.primary,
               paddingHorizontal: 12,
               paddingVertical: 8,
               borderRadius: 8,
@@ -238,7 +327,7 @@ export default function RecordDetailsScreen() {
       <View
         style={{
           borderWidth: 1,
-          borderColor: '#e2e8f0',
+          borderColor: colors.border,
           borderRadius: 10,
           padding: 12,
           gap: 6,
@@ -283,7 +372,7 @@ export default function RecordDetailsScreen() {
                 onPress={() => retrySendMutation.mutate()}
                 disabled={retrySendMutation.isPending}
                 style={{
-                  backgroundColor: '#0f766e',
+                  backgroundColor: colors.primary,
                   paddingHorizontal: 12,
                   paddingVertical: 10,
                   borderRadius: 8,
@@ -315,7 +404,7 @@ export default function RecordDetailsScreen() {
                 }}
                 disabled={markSepMutation.isPending}
                 style={{
-                  backgroundColor: '#0f766e',
+                  backgroundColor: colors.primary,
                   paddingHorizontal: 12,
                   paddingVertical: 10,
                   borderRadius: 8,

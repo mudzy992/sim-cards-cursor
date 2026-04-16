@@ -4,6 +4,7 @@ import { useAudioPlayer } from 'expo-audio';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Pressable, Text, TextInput, View, Vibration } from 'react-native';
+import { colors } from '@/theme/colors';
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -60,15 +61,15 @@ export default function ScanScreen() {
   return (
     <View style={{ flex: 1, padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 20, fontWeight: '700' }}>Scan SIM</Text>
-      <Text style={{ color: '#64748b' }}>
+      <Text style={{ color: colors.textMuted }}>
         Skeniraj barkod kamerom ili unesi ICCID ručno kao fallback.
       </Text>
-      <Text style={{ color: '#64748b', marginTop: 2 }}>
+      <Text style={{ color: colors.textMuted, marginTop: 2 }}>
         Poravnaj barkod unutar označenog okvira za najpreciznije skeniranje.
       </Text>
 
       {!permission ? (
-        <Text style={{ color: '#64748b' }}>Provjeravam dozvole kamere...</Text>
+        <Text style={{ color: colors.textMuted }}>Provjeravam dozvole kamere...</Text>
       ) : null}
 
       {permission && !hasPermission ? (
@@ -84,12 +85,12 @@ export default function ScanScreen() {
           <Text>Pristup kameri nije odobren.</Text>
           <Pressable
             onPress={() => void requestPermission()}
-            style={{
-              backgroundColor: '#0f766e',
+            style={({ pressed }) => ({
+              backgroundColor: pressed ? colors.primaryPressed : colors.primary,
               padding: 12,
               borderRadius: 10,
               alignItems: 'center',
-            }}
+            })}
           >
             <Text style={{ color: '#fff' }}>Dozvoli kameru</Text>
           </Pressable>
@@ -129,9 +130,9 @@ export default function ScanScreen() {
                 width: '80%',
                 height: 180,
                 borderWidth: 2,
-                borderColor: '#0f766e',
+                borderColor: colors.primary,
                 borderRadius: 16,
-                backgroundColor: 'rgba(15,118,110,0.08)',
+                backgroundColor: 'rgba(22,72,155,0.08)',
               }}
             />
           </View>
@@ -168,12 +169,12 @@ export default function ScanScreen() {
 
       <Pressable
         onPress={() => openResult(manualIccid)}
-        style={{
-          backgroundColor: '#0f766e',
+        style={({ pressed }) => ({
+          backgroundColor: pressed ? colors.primaryPressed : colors.primary,
           padding: 12,
           borderRadius: 10,
           alignItems: 'center',
-        }}
+        })}
       >
         <Text style={{ color: '#fff' }}>Provjeri ICCID</Text>
       </Pressable>

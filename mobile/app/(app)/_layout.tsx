@@ -2,6 +2,7 @@ import { Redirect, Stack } from 'expo-router';
 import { useAuthStore } from '@/store/auth.store';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAppUpdateGate } from '@/hooks/useAppUpdateGate';
+import { colors } from '@/theme/colors';
 import { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -89,7 +90,18 @@ const PrivateLayout = () => {
   }
 
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.surface,
+        },
+        headerTintColor: colors.text,
+        headerTitleStyle: {
+          color: colors.text,
+        },
+        statusBarStyle: 'dark',
+      }}
+    >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="record-details" options={{ title: 'Detalji zapisnika' }} />
       <Stack.Screen name="scan-result" options={{ title: 'Rezultat skena' }} />

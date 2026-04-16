@@ -10,6 +10,7 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { notificationsApi } from '@/api/notifications.api';
 import type { Notification } from '@/api/notifications.api';
+import { colors } from '@/theme/colors';
 
 function NotificationItem({
   item,
@@ -101,7 +102,7 @@ export default function NotificationsScreen() {
                 onPress={() => markAllAsReadMutation.mutate()}
                 style={{ padding: 8 }}
               >
-                <Text style={{ color: '#0f766e', fontSize: 14, fontWeight: '500' }}>
+                <Text style={{ color: colors.link, fontSize: 14, fontWeight: '500' }}>
                   Označi sve pročitano
                 </Text>
               </Pressable>
@@ -110,7 +111,7 @@ export default function NotificationsScreen() {
       />
       {isLoading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#0f766e" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -130,7 +131,7 @@ export default function NotificationsScreen() {
             <RefreshControl
               refreshing={isLoading}
               onRefresh={() => void refetch()}
-              colors={['#0f766e']}
+              colors={[colors.primary]}
             />
           }
         />

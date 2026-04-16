@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/auth.store';
 import { pushTokensApi } from '@/api/push-tokens.api';
 import { settingsApi } from '@/api/settings.api';
+import { colors } from '@/theme/colors';
 
 function resolveProjectId(): string | undefined {
   const fromEnv = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
@@ -42,13 +43,13 @@ async function configureChannels(
     name: 'Opće obavijesti',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#0f766e',
+    lightColor: colors.primary,
   });
   await Notifications.setNotificationChannelAsync('records', {
     name: 'Zapisnici',
     importance: Notifications.AndroidImportance.DEFAULT,
     vibrationPattern: [0, 200, 200, 200],
-    lightColor: '#0f766e',
+    lightColor: colors.primary,
   });
   await Notifications.setNotificationChannelAsync('system', {
     name: 'Sistemske poruke',
