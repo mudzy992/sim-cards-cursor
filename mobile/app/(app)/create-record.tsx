@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { installationRecordsApi, queueInstallationRecord, type CreateInstallationRecordPayload } from '@/api/installation-records.api';
 import { meterTypeDefinitionsApi, type MeterTypeFieldItem } from '@/api/meter-type-definitions.api';
 import { useAuthStore } from '@/store/auth.store';
+import { colors } from '@/theme/colors';
 
 export default function CreateRecordScreen() {
   const router = useRouter();
@@ -184,7 +185,7 @@ export default function CreateRecordScreen() {
           onPress={() => router.back()}
           style={{
             marginTop: 16,
-            backgroundColor: '#0f766e',
+            backgroundColor: colors.primary,
             padding: 12,
             borderRadius: 8,
             alignItems: 'center',
@@ -238,7 +239,7 @@ export default function CreateRecordScreen() {
                     paddingVertical: 12,
                     marginHorizontal: 4,
                     borderRadius: 8,
-                    backgroundColor: meterTypeId === t.id ? '#0f766e' : '#f1f5f9',
+                    backgroundColor: meterTypeId === t.id ? colors.primary : colors.surfaceMuted,
                   }}
                 >
                   <Text
@@ -263,6 +264,8 @@ export default function CreateRecordScreen() {
           value={serialNumber}
           onChangeText={setSerialNumber}
           placeholder="Unesite serijski broj s brojila"
+          keyboardType="number-pad"
+          inputMode="numeric"
           style={{
             borderWidth: 1,
             borderColor: '#e2e8f0',
@@ -463,6 +466,8 @@ export default function CreateRecordScreen() {
           value={measuringPoint}
           onChangeText={setMeasuringPoint}
           placeholder="Opcionalno"
+          keyboardType="number-pad"
+          inputMode="numeric"
           style={{
             borderWidth: 1,
             borderColor: '#e2e8f0',
@@ -556,7 +561,7 @@ export default function CreateRecordScreen() {
             }}
             disabled={isFetchingLocation}
             style={{
-              backgroundColor: '#0f766e',
+              backgroundColor: colors.primary,
               paddingHorizontal: 14,
               paddingVertical: 12,
               borderRadius: 8,
@@ -626,11 +631,11 @@ export default function CreateRecordScreen() {
             }}
           >
             {isUploadingPhoto ? (
-              <ActivityIndicator size="small" color="#0f766e" />
+              <ActivityIndicator size="small" color={colors.primary} />
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="camera" size={24} color="#0f766e" />
-                <Text style={{ color: '#0f766e', fontWeight: '600' }}>Dodaj fotografiju</Text>
+                <Ionicons name="camera" size={24} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontWeight: '600' }}>Dodaj fotografiju</Text>
               </View>
             )}
           </Pressable>
@@ -664,7 +669,7 @@ export default function CreateRecordScreen() {
         disabled={!canSubmit || createMutation.isPending}
         onPress={() => createMutation.mutate()}
         style={{
-          backgroundColor: !canSubmit ? '#94a3b8' : '#0f766e',
+          backgroundColor: !canSubmit ? colors.disabled : colors.primary,
           padding: 14,
           borderRadius: 10,
           alignItems: 'center',

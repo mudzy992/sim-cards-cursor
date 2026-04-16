@@ -12,6 +12,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { installationRecordsApi, syncOfflineInstallationRecords } from '@/api/installation-records.api';
 import type { InstallationRecordItem } from '@/api/installation-records.api';
+import { colors } from '@/theme/colors';
 
 const statusLabels: Record<string, string> = {
   DRAFT: 'Nacrt',
@@ -59,7 +60,7 @@ export default function RecordsScreen() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#0f766e" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -67,7 +68,7 @@ export default function RecordsScreen() {
   return (
     <View style={{ flex: 1, padding: 16, gap: 8 }}>
       <Text style={{ fontSize: 20, fontWeight: '700' }}>Moji zapisnici</Text>
-      <Text style={{ color: '#64748b' }}>
+      <Text style={{ color: colors.textMuted }}>
         Pregled zapisnika ugradnje koje ste kreirali.
       </Text>
 
@@ -78,7 +79,7 @@ export default function RecordsScreen() {
             onPress={() => void load(true)}
             style={{
               alignSelf: 'flex-start',
-              backgroundColor: '#0f766e',
+              backgroundColor: colors.primary,
               paddingHorizontal: 12,
               paddingVertical: 8,
               borderRadius: 8,
@@ -110,7 +111,7 @@ export default function RecordsScreen() {
             }
             style={{
               borderWidth: 1,
-              borderColor: '#e2e8f0',
+              borderColor: colors.border,
               borderRadius: 10,
               padding: 12,
               marginBottom: 8,
@@ -124,18 +125,18 @@ export default function RecordsScreen() {
             }}
           >
             <Text style={{ fontWeight: '700' }}>{item.recordNumber}</Text>
-              <Text style={{ color: '#0f766e', fontWeight: '600' }}>Detalji</Text>
+              <Text style={{ color: colors.link, fontWeight: '600' }}>Detalji</Text>
             </View>
-            <Text style={{ color: '#64748b', fontSize: 14 }}>
+            <Text style={{ color: colors.textMuted, fontSize: 14 }}>
               Brojilo: {item.meter?.serialNumber ?? '–'} • {item.meter?.meterTypeDefinition?.name ?? '–'}
             </Text>
-            <Text style={{ color: '#64748b', fontSize: 14 }}>
+            <Text style={{ color: colors.textMuted, fontSize: 14 }}>
               SIM: {item.meter?.simCard?.iccid ?? '–'}
             </Text>
             <View style={{ marginTop: 6 }}>
               <View
                 style={{
-                  backgroundColor: '#f1f5f9',
+                  backgroundColor: colors.surfaceMuted,
                   paddingHorizontal: 8,
                   paddingVertical: 4,
                   borderRadius: 6,

@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0f766e"
+      "backgroundColor": "#16489B"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -85,7 +85,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#0f766e",
+          "color": "#16489B",
           "androidMode": "default",
           "androidCollapsedTitle": "SIM Tracker"
         }
