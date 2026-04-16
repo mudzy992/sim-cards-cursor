@@ -17,6 +17,7 @@ execution-playbook/
 # Logs
 *.log
 npm-debug.log*
+expo-env.d.ts
 
 # Prisma
 backend/prisma/dev.db
