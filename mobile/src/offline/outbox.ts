@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AuthUser } from '@/types/auth.types'
 import { axiosInstance } from '@/api/axios.instance'
-import { installationRecordsApi } from '@/api/installation-records.api'
+import { installationRecordsUploadApi } from '@/api/installation-records-upload.api'
 import { deletePersistedJson, readPersistedJson, writePersistedJson } from './persisted-json'
 
 export type OutboxStatus = 'PENDING' | 'SENDING' | 'FAILED' | 'SENT'
@@ -153,7 +153,7 @@ async function sendOne(item: OutboxItem): Promise<void> {
     const body = item.request.body as any
     const uploaded: string[] = []
     for (const uri of item.meta.localPhotoUris) {
-      const path = await installationRecordsApi.uploadPhoto(uri)
+      const path = await installationRecordsUploadApi.uploadPhoto(uri)
       uploaded.push(path)
     }
     item.request.body = {

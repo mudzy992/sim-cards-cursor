@@ -2,6 +2,7 @@ import axios from 'axios';
 import { axiosInstance } from './axios.instance';
 import { useAuthStore } from '@/store/auth.store'
 import { enqueueOutboxItem, syncOutbox } from '@/offline/outbox'
+import { installationRecordsUploadApi } from './installation-records-upload.api'
 
 export type RecordStatus =
   | 'DRAFT'
@@ -168,20 +169,5 @@ export const installationRecordsApi = {
     return response.data.data;
   },
 
-  uploadPhoto: async (uri: string): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', {
-      uri,
-      type: 'image/jpeg',
-      name: 'photo.jpg',
-    } as unknown as Blob);
-    const response = await axiosInstance.post<{ data: { path: string } }>(
-      '/installation-records/upload-photo',
-      formData,
-      {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      },
-    );
-    return response.data.data.path;
-  },
+  uploadPhoto: installationRecordsUploadApi.uploadPhoto,
 };
