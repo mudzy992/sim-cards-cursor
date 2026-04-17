@@ -70,6 +70,17 @@ export class MailService {
     from: string;
     replyTo?: string;
   } | null> {
+    const emailNotificationsEnabled = await this.getBooleanSetting(
+      'notifications.email.enabled',
+      true,
+    );
+    if (!emailNotificationsEnabled) {
+      this.logger.warn(
+        'Email notifications disabled by app setting: notifications.email.enabled=false',
+      );
+      return null;
+    }
+
     const emailEnabled = await this.getBooleanSetting('email.enabled', true);
     if (!emailEnabled) {
       this.logger.warn('Email sending disabled by app setting: email.enabled=false');

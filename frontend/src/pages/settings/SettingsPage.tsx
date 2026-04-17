@@ -159,20 +159,25 @@ function SettingsSmtpSection(props: { settings: SettingRow[] }) {
   );
 }
 
-function SettingsMobilePushSection() {
+function SettingsNotificationsSection() {
   const queryClient = useQueryClient();
   const [messageApi, contextHolder] = message.useMessage();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['settings', 'mobile-push'],
-    queryFn: () => settingsApi.getMobilePush(),
+    queryKey: ['settings', 'notifications'],
+    queryFn: () => settingsApi.getNotificationChannelSettings(),
   });
 
   const mutation = useMutation({
-    mutationFn: (enabled: boolean) => settingsApi.setMobilePush(enabled),
+    mutationFn: (patch: {
+      pushEnabled?: boolean;
+      emailEnabled?: boolean;
+      inAppEnabled?: boolean;
+    }) => settingsApi.setNotificationChannelSettings(patch),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['settings', 'mobile-push'] });
-      messageApi.success('Postavka je sačuvana.');
+      void queryClient.invalidateQueries({ queryKey: ['settings', 'notifications'] });
+      void queryClient.invalidateQueries({ queryKey: ['settings', 'features'] });
+      messageApi.success('Postavke su sačuvane.');
     },
     onError: (e: unknown) => {
       messageApi.error(
@@ -182,29 +187,76 @@ function SettingsMobilePushSection() {
     },
   });
 
-  const enabled = data?.enabled ?? true;
+  const pushEnabled = data?.pushEnabled ?? true;
+  const emailEnabled = data?.emailEnabled ?? true;
+  const inAppEnabled = data?.inAppEnabled ?? true;
 
   return (
     <div>
       {contextHolder}
-      <Space align="start" className="w-full justify-between">
-        <div className="space-y-1 max-w-xl">
-          <Typography.Text strong>Dozvoli mobilne push notifikacije</Typography.Text>
-          <Typography.Paragraph type="secondary" className="!mb-0">
-            Kada je ova opcija isključena, mobilne aplikacije neće tražiti odobrenje za
-            notifikacije niti će slati push tokene prema serveru. Ovo je preporučeno za
-            zatvorena/offline okruženja bez pristupa internetu.
-          </Typography.Paragraph>
-        </div>
-        <Switch
-          checkedChildren="Uključeno"
-          unCheckedChildren="Isključeno"
-          loading={isLoading || mutation.isPending}
-          checked={enabled}
-          onChange={(next) => {
-            mutation.mutate(next);
-          }}
-        />
+      <Space direction="vertical" size="large" className="w-full">
+        <Typography.Paragraph type="secondary" className="!mb-0 max-w-3xl">
+          Ove postavke su globalne (za sve korisnike). U offline/lokalnom režimu, push i email
+          ne mogu raditi bez izlaza na internet — zato ih ovdje možeš sigurno isključiti.
+        </Typography.Paragraph>
+
+        <Space align="start" className="w-full justify-between">
+          <div className="space-y-1 max-w-xl">
+            <Typography.Text strong>Push notifikacije (mobile)</Typography.Text>
+            <Typography.Paragraph type="secondary" className="!mb-0">
+              Kada je isključeno, mobilne aplikacije neće tražiti odobrenje niti slati push tokene.
+            </Typography.Paragraph>
+          </div>
+          <Switch
+            checkedChildren="Uključeno"
+            unCheckedChildren="Isključeno"
+            loading={isLoading || mutation.isPending}
+            checked={pushEnabled}
+            onChange={(next) => {
+              mutation.mutate({ pushEnabled: next });
+            }}
+          />
+        </Space>
+
+        <Divider className="!my-0" />
+
+        <Space align="start" className="w-full justify-between">
+          <div className="space-y-1 max-w-xl">
+            <Typography.Text strong>Email notifikacije</Typography.Text>
+            <Typography.Paragraph type="secondary" className="!mb-0">
+              Kontroliše slanje email notifikacija iz sistema (ne mijenja SMTP konfiguraciju).
+            </Typography.Paragraph>
+          </div>
+          <Switch
+            checkedChildren="Uključeno"
+            unCheckedChildren="Isključeno"
+            loading={isLoading || mutation.isPending}
+            checked={emailEnabled}
+            onChange={(next) => {
+              mutation.mutate({ emailEnabled: next });
+            }}
+          />
+        </Space>
+
+        <Divider className="!my-0" />
+
+        <Space align="start" className="w-full justify-between">
+          <div className="space-y-1 max-w-xl">
+            <Typography.Text strong>In-app notifikacije</Typography.Text>
+            <Typography.Paragraph type="secondary" className="!mb-0">
+              Kontroliše kreiranje i emitovanje in-app notifikacija (web zvono i mobile inbox).
+            </Typography.Paragraph>
+          </div>
+          <Switch
+            checkedChildren="Uključeno"
+            unCheckedChildren="Isključeno"
+            loading={isLoading || mutation.isPending}
+            checked={inAppEnabled}
+            onChange={(next) => {
+              mutation.mutate({ inAppEnabled: next });
+            }}
+          />
+        </Space>
       </Space>
     </div>
   );
@@ -342,8 +394,8 @@ export default function SettingsPage() {
         />
       </Card>
 
-      <Card title="Mobilne push notifikacije" className="mb-4">
-        <SettingsMobilePushSection />
+      <Card title="Notifikacije" className="mb-4">
+        <SettingsNotificationsSection />
       </Card>
 
       <Card title="Email / SMTP" className="mb-4">
