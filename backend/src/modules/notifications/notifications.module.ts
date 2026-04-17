@@ -5,10 +5,12 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { NotificationsGateway } from './notifications.gateway';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
     PrismaModule,
+    SettingsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

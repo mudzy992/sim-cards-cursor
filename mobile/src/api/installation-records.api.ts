@@ -1,6 +1,8 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
 import { axiosInstance } from './axios.instance';
+import { useAuthStore } from '@/store/auth.store'
+import { enqueueOutboxItem, syncOutbox } from '@/offline/outbox'
+import { installationRecordsUploadApi } from './installation-records-upload.api'
 
 export type RecordStatus =
   | 'DRAFT'
@@ -71,6 +73,7 @@ export type CreateInstallationRecordPayload =
       meterId: string;
       installedById: string;
       notes?: string;
+      clientRequestId?: string
     }
   | {
       simCardId: string;
@@ -89,71 +92,40 @@ export type CreateInstallationRecordPayload =
       dynamicFieldValues?: Record<string, unknown>;
       notes?: string;
       photos?: string[];
+      clientRequestId?: string
     };
 
-type QueuedInstallationRecord = {
-  id: string;
-  payload: CreateInstallationRecordPayload;
-  createdAt: string;
-};
-
-const OFFLINE_RECORDS_KEY = 'sim_tracker_offline_records_v2';
-
-async function loadQueuedInstallationRecords(): Promise<QueuedInstallationRecord[]> {
-  const raw = await SecureStore.getItemAsync(OFFLINE_RECORDS_KEY);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed as QueuedInstallationRecord[];
-  } catch {
-    return [];
-  }
-}
-
-async function saveQueuedInstallationRecords(queue: QueuedInstallationRecord[]): Promise<void> {
-  if (!queue.length) {
-    await SecureStore.deleteItemAsync(OFFLINE_RECORDS_KEY);
-    return;
-  }
-  await SecureStore.setItemAsync(OFFLINE_RECORDS_KEY, JSON.stringify(queue));
+function requireUser() {
+  const user = useAuthStore.getState().user
+  if (!user) throw new Error('Not authenticated')
+  return user
 }
 
 export async function queueInstallationRecord(payload: CreateInstallationRecordPayload): Promise<void> {
-  const existing = await loadQueuedInstallationRecords();
-  const queued: QueuedInstallationRecord = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    payload,
-    createdAt: new Date().toISOString(),
-  };
-  await saveQueuedInstallationRecords([...existing, queued]);
+  const user = requireUser()
+  const localPhotoUris = (payload as any)?.localPhotoUris as unknown
+  const sanitizedPayload =
+    localPhotoUris && typeof localPhotoUris === 'object'
+      ? (() => {
+          const { localPhotoUris: _ignored, ...rest } = payload as any
+          return rest as CreateInstallationRecordPayload
+        })()
+      : payload
+  await enqueueOutboxItem(user, {
+    kind: 'INSTALLATION_RECORD_CREATE',
+    request: { method: 'POST', url: '/installation-records', body: sanitizedPayload },
+    meta: {
+      simCardId: payload.simCardId,
+      meterId: 'meterId' in payload ? payload.meterId : undefined,
+      localPhotoUris: Array.isArray(localPhotoUris) ? (localPhotoUris as string[]) : undefined,
+    },
+  })
 }
 
 export async function syncOfflineInstallationRecords(): Promise<void> {
-  const queue = await loadQueuedInstallationRecords();
-  if (!queue.length) return;
-
-  const remaining: QueuedInstallationRecord[] = [];
-
-  // pokušaj slanja svake queued stavke; ako je mreža nedostupna, prekini rani
-  for (const item of queue) {
-    try {
-      await axiosInstance.post('/installation-records', item.payload);
-      // uspješno – ne vraćamo u queue
-    } catch (error) {
-      if (axios.isAxiosError(error) && !error.response) {
-        // backend nedostupan / offline – prekidamo obradu, preostale ostaju u queue
-        remaining.push(item, ...queue.slice(queue.indexOf(item) + 1));
-        break;
-      }
-
-      // server-side greška – preskačemo ovu stavku, da se ne blokira cijeli queue
-      // (može se naknadno vidjeti u activity logu / backend logovima)
-    }
-  }
-
-  await saveQueuedInstallationRecords(remaining);
+  const user = useAuthStore.getState().user
+  if (!user) return
+  await syncOutbox(user, { maxItems: 50 })
 }
 
 export const installationRecordsApi = {
@@ -197,20 +169,5 @@ export const installationRecordsApi = {
     return response.data.data;
   },
 
-  uploadPhoto: async (uri: string): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', {
-      uri,
-      type: 'image/jpeg',
-      name: 'photo.jpg',
-    } as unknown as Blob);
-    const response = await axiosInstance.post<{ data: { path: string } }>(
-      '/installation-records/upload-photo',
-      formData,
-      {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      },
-    );
-    return response.data.data.path;
-  },
+  uploadPhoto: installationRecordsUploadApi.uploadPhoto,
 };

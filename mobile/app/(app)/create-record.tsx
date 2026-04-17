@@ -18,7 +18,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { installationRecordsApi, queueInstallationRecord, type CreateInstallationRecordPayload } from '@/api/installation-records.api';
 import { meterTypeDefinitionsApi, type MeterTypeFieldItem } from '@/api/meter-type-definitions.api';
 import { useAuthStore } from '@/store/auth.store';
+import { useConnectivity } from '@/hooks/useConnectivity'
 import { colors } from '@/theme/colors';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
+import { ScreenHeader } from '@/components/common/ScreenHeader'
+import { Card } from '@/components/common/Card'
 
 export default function CreateRecordScreen() {
   const router = useRouter();
@@ -27,6 +31,7 @@ export default function CreateRecordScreen() {
   const userId = useAuthStore((state) => state.user?.id);
   const userBranch = useAuthStore((state) => state.user?.branch);
   const userRole = useAuthStore((state) => state.user?.role);
+  const { isOnline } = useConnectivity()
 
   const [meterTypeId, setMeterTypeId] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -48,9 +53,13 @@ export default function CreateRecordScreen() {
   const [longitude, setLongitude] = useState('');
   const [notes, setNotes] = useState('');
   const [photoPaths, setPhotoPaths] = useState<string[]>([]);
+  const [localPhotoUris, setLocalPhotoUris] = useState<string[]>([])
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [dynamicFieldValues, setDynamicFieldValues] = useState<Record<string, unknown>>({});
+  const [clientRequestId] = useState(
+    () => `crid_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+  )
 
   const meterTypeFieldsQuery = useQuery({
     queryKey: ['meter-type-definitions', meterTypeId, 'fields'],
@@ -93,6 +102,7 @@ export default function CreateRecordScreen() {
     return {
       simCardId,
       installedById: userId,
+      clientRequestId,
       meterTypeDefinitionId: meterTypeId,
       serialNumber: serialNumber.trim(),
       year: Number.isFinite(yearNum) ? yearNum : undefined,
@@ -107,6 +117,7 @@ export default function CreateRecordScreen() {
       dynamicFieldValues: Object.keys(dynamicFieldValues).length > 0 ? dynamicFieldValues : undefined,
       notes: notes.trim() || undefined,
       photos: photoPaths.length > 0 ? photoPaths : undefined,
+      ...(localPhotoUris.length > 0 ? { localPhotoUris } : {}),
     };
   };
 
@@ -198,12 +209,16 @@ export default function CreateRecordScreen() {
   }
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
-      <Text style={{ fontSize: 18, fontWeight: '700' }}>Novi zapisnik ugradnje</Text>
-      <Text style={{ fontSize: 14, color: '#64748b', marginBottom: 4 }}>
-        Unesite podatke o brojilu koje montirate. Serijski broj i lokacija se
-        unose na terenu pri montaži.
-      </Text>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader
+        title="Novi zapisnik"
+        subtitle="Unesite podatke o brojilu i lokaciji. Obavezno: tip brojila i serijski broj."
+      />
+      <KeyboardAwareScrollView
+        bottomOffset={62}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 24, gap: 12 }}
+        keyboardShouldPersistTaps="handled"
+      >
 
       <View>
         <Text style={{ marginBottom: 4, fontWeight: '600' }}>Tip brojila *</Text>
@@ -268,26 +283,18 @@ export default function CreateRecordScreen() {
           inputMode="numeric"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
 
       {meterTypeId ? (
-        <View
-          style={{
-            borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 10,
-            padding: 12,
-            gap: 10,
-            backgroundColor: '#fff',
-          }}
-        >
-          <Text style={{ fontWeight: '700', color: '#0f172a' }}>Dodatna polja</Text>
+        <Card style={{ padding: 12, gap: 10 }}>
+          <Text style={{ fontWeight: '800', color: colors.text }}>Dodatna polja</Text>
 
           {meterTypeFieldsQuery.isLoading ? (
             <View style={{ paddingVertical: 8 }}>
@@ -304,7 +311,7 @@ export default function CreateRecordScreen() {
                 : [];
 
               if (fields.length === 0) {
-                return <Text style={{ color: '#64748b' }}>Nema dodatnih polja.</Text>;
+                return <Text style={{ color: colors.textMuted }}>Nema dodatnih polja.</Text>;
               }
 
               const renderField = (f: MeterTypeFieldItem) => {
@@ -369,10 +376,11 @@ export default function CreateRecordScreen() {
                       keyboardType={f.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'}
                       style={{
                         borderWidth: 1,
-                        borderColor: '#e2e8f0',
-                        borderRadius: 8,
+                        borderColor: colors.border,
+                        borderRadius: 12,
                         padding: 12,
                         fontSize: 16,
+                        backgroundColor: colors.surface,
                       }}
                     />
                   </View>
@@ -389,7 +397,7 @@ export default function CreateRecordScreen() {
               );
             })()
           )}
-        </View>
+        </Card>
       ) : null}
 
       <View>
@@ -401,10 +409,11 @@ export default function CreateRecordScreen() {
           keyboardType="number-pad"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -417,10 +426,11 @@ export default function CreateRecordScreen() {
           placeholder="Ulica, broj, mjesto"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -434,10 +444,11 @@ export default function CreateRecordScreen() {
             placeholder="Grad"
             style={{
               borderWidth: 1,
-              borderColor: '#e2e8f0',
-              borderRadius: 8,
+              borderColor: colors.border,
+              borderRadius: 12,
               padding: 12,
               fontSize: 16,
+              backgroundColor: colors.surface,
             }}
           />
         </View>
@@ -450,11 +461,11 @@ export default function CreateRecordScreen() {
             editable={userRole !== 'USER'}
             style={{
               borderWidth: 1,
-              borderColor: '#e2e8f0',
-              borderRadius: 8,
+              borderColor: colors.border,
+              borderRadius: 12,
               padding: 12,
               fontSize: 16,
-              backgroundColor: userRole === 'USER' ? '#f8fafc' : undefined,
+              backgroundColor: userRole === 'USER' ? colors.surfaceMuted : colors.surface,
             }}
           />
         </View>
@@ -470,10 +481,11 @@ export default function CreateRecordScreen() {
           inputMode="numeric"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -486,10 +498,11 @@ export default function CreateRecordScreen() {
           placeholder="YYYY-MM-DD"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -508,10 +521,11 @@ export default function CreateRecordScreen() {
               keyboardType="decimal-pad"
               style={{
                 borderWidth: 1,
-                borderColor: '#e2e8f0',
-                borderRadius: 8,
+                borderColor: colors.border,
+                borderRadius: 12,
                 padding: 12,
                 fontSize: 16,
+                backgroundColor: colors.surface,
               }}
             />
           </View>
@@ -524,10 +538,11 @@ export default function CreateRecordScreen() {
               keyboardType="decimal-pad"
               style={{
                 borderWidth: 1,
-                borderColor: '#e2e8f0',
-                borderRadius: 8,
+                borderColor: colors.border,
+                borderRadius: 12,
                 padding: 12,
                 fontSize: 16,
+                backgroundColor: colors.surface,
               }}
             />
           </View>
@@ -605,9 +620,17 @@ export default function CreateRecordScreen() {
               if (result.canceled || !result.assets[0]?.uri) return;
               setIsUploadingPhoto(true);
               try {
+                if (!isOnline) {
+                  setLocalPhotoUris((p) => [...p, result.assets[0].uri])
+                  return
+                }
                 const path = await installationRecordsApi.uploadPhoto(result.assets[0].uri);
                 setPhotoPaths((p) => [...p, path]);
               } catch (err) {
+                if (axios.isAxiosError(err) && !err.response) {
+                  setLocalPhotoUris((p) => [...p, result.assets[0].uri])
+                  return
+                }
                 Alert.alert(
                   'Greška',
                   axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
@@ -644,6 +667,11 @@ export default function CreateRecordScreen() {
               Dodano: {photoPaths.length}
             </Text>
           )}
+          {localPhotoUris.length > 0 && (
+            <Text style={{ color: '#b45309', fontSize: 14 }}>
+              Na čekanju (offline): {localPhotoUris.length}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -656,11 +684,12 @@ export default function CreateRecordScreen() {
           multiline
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+          borderColor: colors.border,
+          borderRadius: 12,
             padding: 12,
             fontSize: 16,
             minHeight: 60,
+          backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -693,6 +722,7 @@ export default function CreateRecordScreen() {
       >
         <Text style={{ color: '#64748b' }}>Odustani</Text>
       </Pressable>
-    </ScrollView>
+      </KeyboardAwareScrollView>
+    </View>
   );
 }

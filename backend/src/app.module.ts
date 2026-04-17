@@ -13,6 +13,7 @@ import { MetersModule } from './modules/meters/meters.module';
 import { MeterTypeDefinitionsModule } from './modules/meter-type-definitions/meter-type-definitions.module';
 import { InstallationRecordsModule } from './modules/installation-records/installation-records.module';
 import { DemountTasksModule } from './modules/demount-tasks/demount-tasks.module';
+import { InstallTasksModule } from './modules/install-tasks/install-tasks.module';
 import { DistributionsModule } from './modules/distributions/distributions.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { BranchModeratorsModule } from './modules/branch-moderators/branch-moderators.module';
@@ -47,6 +48,7 @@ import { HealthController } from './health.controller';
     MeterTypeDefinitionsModule,
     InstallationRecordsModule,
     DemountTasksModule,
+    InstallTasksModule,
     DistributionsModule,
     BranchesModule,
     BranchModeratorsModule,

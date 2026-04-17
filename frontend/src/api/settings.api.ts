@@ -40,9 +40,32 @@ export type AppFeatures = {
   missingKeys: string[];
 };
 
+export type NotificationChannelSettings = {
+  pushEnabled: boolean;
+  emailEnabled: boolean;
+  inAppEnabled: boolean;
+};
+
 export const settingsApi = {
   getFeatures: async (): Promise<AppFeatures> => {
     const response = await axiosInstance.get<ApiEnvelope<AppFeatures>>('/settings/features');
+    return response.data.data;
+  },
+
+  getNotificationChannelSettings: async (): Promise<NotificationChannelSettings> => {
+    const response = await axiosInstance.get<ApiEnvelope<NotificationChannelSettings>>(
+      '/settings/notifications',
+    );
+    return response.data.data;
+  },
+
+  setNotificationChannelSettings: async (
+    patch: Partial<NotificationChannelSettings>,
+  ): Promise<NotificationChannelSettings> => {
+    const response = await axiosInstance.patch<ApiEnvelope<NotificationChannelSettings>>(
+      '/settings/notifications',
+      patch,
+    );
     return response.data.data;
   },
 

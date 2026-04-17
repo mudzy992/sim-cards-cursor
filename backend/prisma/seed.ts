@@ -78,6 +78,24 @@ const DEFAULT_APP_SETTINGS: SeedSetting[] = [
     description:
       'Da li su push notifikacije dozvoljene za mobilnu aplikaciju (Expo/FCM/APNs). Ako je isključeno, klijent ne treba slati push tokene.',
   },
+  {
+    key: 'notifications.push.enabled',
+    value: 'true',
+    description:
+      'Globalni toggle za push notifikacije. Ako je isključeno, mobilni klijenti ne bi trebali registrovati push tokene niti server slati push poruke.',
+  },
+  {
+    key: 'notifications.email.enabled',
+    value: 'true',
+    description:
+      'Globalni toggle za email notifikacije. Ako je isključeno, sistem neće slati email notifikacije (nezavisno od SMTP transporta).',
+  },
+  {
+    key: 'notifications.inApp.enabled',
+    value: 'true',
+    description:
+      'Globalni toggle za in-app notifikacije (web zvono + mobile inbox). Ako je isključeno, server neće kreirati niti emitovati in-app notifikacije.',
+  },
 
   // Email
   {

@@ -12,6 +12,7 @@ export type AuthUser = {
   distributionId?: string | null;
   branchId?: string | null;
   branch?: { id: string; name: string; code: string } | null;
+  branchModeratorBranchIds?: string[];
 };
 
 export type AuthTokens = {

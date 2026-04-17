@@ -1,8 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDownOutlined, ArrowUpOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Divider, Drawer, Form, Input, InputNumber, Select, Space, Switch, Table, Typography, message } from 'antd'
+import {
+  Button,
+  Descriptions,
+  Divider,
+  Drawer,
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Typography,
+  message,
+} from 'antd'
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useAuthStore } from '@/store/auth.store'
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import type { CreateMeterTypeDefinitionInput, MeterType, MeterTypeDefinitionItem } from '@/types/meter-type-definition.types'
 import type { MeterFieldType, MeterTypeFieldItem } from '@/types/meter-type-field.types'
@@ -38,12 +53,20 @@ type FieldFormValues = {
   sortOrder?: number
 }
 
+const renderMeterPhaseLabel = (t: MeterType | undefined) => {
+  if (t === 'SINGLE_PHASE') return 'Jednofazno'
+  if (t === 'THREE_PHASE') return 'Trofazno'
+  return '–'
+}
+
 export default function MeterTypeUpsertPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [messageApi, messageContextHolder] = message.useMessage()
   const params = useParams()
   const definitionId = params.id
+  const userRole = useAuthStore((s) => s.user?.role)
+  const canEditMeterTypes = userRole === 'SYSTEM_ADMIN'
 
   const [typeForm] = Form.useForm<TypeFormValues>()
   const [fieldForm] = Form.useForm<FieldFormValues>()
@@ -51,6 +74,7 @@ export default function MeterTypeUpsertPage() {
   const [editingField, setEditingField] = useState<MeterTypeFieldItem | null>(null)
 
   const isCreate = !definitionId
+  const readOnlyMode = Boolean(definitionId) && !canEditMeterTypes
 
   const typeQuery = useQuery({
     queryKey: ['meter-type-definitions', 'get', definitionId],
@@ -190,149 +214,201 @@ export default function MeterTypeUpsertPage() {
     reorderFieldsMutation.mutate(next.map((f) => f.id))
   }
 
+  const fieldsColumnsReadOnly = [
+    { title: 'Name', dataIndex: 'name', width: 180 },
+    { title: 'Label', dataIndex: 'label' },
+    { title: 'Type', dataIndex: 'fieldType', width: 110 },
+    { title: 'Obavezno', dataIndex: 'isRequired', width: 100, render: (v: boolean) => (v ? 'Da' : 'Ne') },
+    {
+      title: 'Operator popunjava',
+      dataIndex: 'isOperatorFillable',
+      width: 140,
+      render: (v: boolean) => (v ? 'Da' : 'Ne'),
+    },
+    { title: 'Default', dataIndex: 'defaultValue', width: 140, render: (v: string | null) => v ?? '–' },
+    { title: 'Redoslijed', dataIndex: 'sortOrder', width: 90 },
+  ]
+
+  const fieldsColumnsEditable = [
+    ...fieldsColumnsReadOnly,
+    {
+      title: 'Akcije',
+      width: 260,
+      render: (_: unknown, row: MeterTypeFieldItem) => (
+        <Space>
+          <Button
+            size="small"
+            icon={<ArrowUpOutlined />}
+            onClick={() => handleMoveField(row.id, -1)}
+            disabled={reorderFieldsMutation.isPending}
+          >
+            Gore
+          </Button>
+          <Button
+            size="small"
+            icon={<ArrowDownOutlined />}
+            onClick={() => handleMoveField(row.id, 1)}
+            disabled={reorderFieldsMutation.isPending}
+          >
+            Dolje
+          </Button>
+          <Button size="small" onClick={() => handleOpenEditField(row)}>
+            Uredi
+          </Button>
+          <Button
+            size="small"
+            danger
+            onClick={() => removeFieldMutation.mutate(row.id)}
+            loading={removeFieldMutation.isPending}
+          >
+            Obriši
+          </Button>
+        </Space>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-4">
       {messageContextHolder}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Typography.Title level={3} className="!mb-0">
-            {isCreate ? 'Novi tip brojila' : 'Uredi tip brojila'}
+            {isCreate ? 'Novi tip brojila' : readOnlyMode ? 'Detalji tipa brojila' : 'Uredi tip brojila'}
           </Typography.Title>
           <Typography.Text type="secondary">
-            Definiši tip brojila i dodatna polja koja se vežu za taj tip.
+            {readOnlyMode
+              ? 'Pregled tipa brojila i dodatnih polja (samo čitanje).'
+              : 'Definiši tip brojila i dodatna polja koja se vežu za taj tip.'}
           </Typography.Text>
         </div>
         <Space>
           <Button onClick={() => navigate('/meters')}>Nazad</Button>
-          <Button type="primary" loading={upsertMutation.isPending} onClick={() => typeForm.submit()}>
-            {isCreate ? 'Kreiraj tip' : 'Snimi'}
-          </Button>
+          {!readOnlyMode && (
+            <Button type="primary" loading={upsertMutation.isPending} onClick={() => typeForm.submit()}>
+              {isCreate ? 'Kreiraj tip' : 'Snimi'}
+            </Button>
+          )}
         </Space>
       </div>
 
-      <Form
-        form={typeForm}
-        layout="vertical"
-        onFinish={(values) => upsertMutation.mutate(values)}
-        initialValues={{
-          name: '',
-          manufacturer: '',
-          model: '',
-          type: undefined,
-          maxCurrent: '',
-          notes: '',
-        }}
-        fields={
-          typeQuery.data
-            ? ([
-                { name: 'name', value: typeQuery.data.name },
-                { name: 'manufacturer', value: typeQuery.data.manufacturer ?? '' },
-                { name: 'model', value: typeQuery.data.model ?? '' },
-                { name: 'type', value: typeQuery.data.type },
-                { name: 'maxCurrent', value: typeQuery.data.maxCurrent ?? '' },
-                { name: 'notes', value: typeQuery.data.notes ?? '' },
-              ] as any)
-            : undefined
-        }
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Form.Item name="name" label="Naziv" rules={[{ required: true, message: 'Unesite naziv.' }]}>
-            <Input placeholder="npr. AMM 3.0" />
-          </Form.Item>
-          <Form.Item name="type" label="Tip">
-            <Select allowClear placeholder="Odaberi" options={meterTypeOptions} />
-          </Form.Item>
-          <Form.Item name="manufacturer" label="Proizvođač">
-            <Input placeholder="Opcionalno" />
-          </Form.Item>
-          <Form.Item name="model" label="Model">
-            <Input placeholder="Opcionalno" />
-          </Form.Item>
-          <Form.Item name="maxCurrent" label="Maks. struja (A)">
-            <Input placeholder="Opcionalno" />
-          </Form.Item>
-        </div>
-        <Form.Item name="notes" label="Napomena">
-          <Input.TextArea rows={2} placeholder="Opcionalno" />
-        </Form.Item>
-      </Form>
-
-      <Divider className="!my-2" />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Typography.Title level={5} className="!mb-0">
+      {readOnlyMode ? (
+        <>
+          {typeQuery.isError && (
+            <Typography.Text type="danger">
+              {(typeQuery.error as { response?: { data?: { message?: string } } })?.response?.data
+                ?.message ?? 'Učitavanje tipa nije uspjelo.'}
+            </Typography.Text>
+          )}
+          {typeQuery.isLoading && <Typography.Text type="secondary">Učitavanje…</Typography.Text>}
+          {typeQuery.data && (
+            <Descriptions bordered column={{ xs: 1, sm: 1, md: 2 }} size="small">
+              <Descriptions.Item label="Naziv">{typeQuery.data.name}</Descriptions.Item>
+              <Descriptions.Item label="Jednofazno / Trofazno">
+                {renderMeterPhaseLabel(typeQuery.data.type)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Proizvođač">{typeQuery.data.manufacturer ?? '–'}</Descriptions.Item>
+              <Descriptions.Item label="Model">{typeQuery.data.model ?? '–'}</Descriptions.Item>
+              <Descriptions.Item label="Maks. struja (A)">{typeQuery.data.maxCurrent ?? '–'}</Descriptions.Item>
+              <Descriptions.Item label="Napomena" span={2}>
+                {typeQuery.data.notes ?? '–'}
+              </Descriptions.Item>
+            </Descriptions>
+          )}
+          <Divider className="!my-2" />
+          <Typography.Title level={5} className="!mb-2">
             Dodatna polja
           </Typography.Title>
-          <Typography.Text type="secondary">
-            Polja su aktivna tek nakon što tip bude sačuvan.
-          </Typography.Text>
-        </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          disabled={!definitionId}
-          onClick={handleOpenCreateField}
-        >
-          Dodaj polje
-        </Button>
-      </div>
+          <Typography.Paragraph type="secondary" className="!mb-4 !mt-0">
+            Polja koja se prikupljaju za ovaj tip brojila.
+          </Typography.Paragraph>
+          <Table<MeterTypeFieldItem>
+            rowKey="id"
+            loading={fieldsQuery.isLoading}
+            dataSource={fields}
+            pagination={false}
+            columns={fieldsColumnsReadOnly}
+          />
+        </>
+      ) : (
+        <>
+          <Form
+            form={typeForm}
+            layout="vertical"
+            onFinish={(values) => upsertMutation.mutate(values)}
+            initialValues={{
+              name: '',
+              manufacturer: '',
+              model: '',
+              type: undefined,
+              maxCurrent: '',
+              notes: '',
+            }}
+            fields={
+              typeQuery.data
+                ? ([
+                    { name: 'name', value: typeQuery.data.name },
+                    { name: 'manufacturer', value: typeQuery.data.manufacturer ?? '' },
+                    { name: 'model', value: typeQuery.data.model ?? '' },
+                    { name: 'type', value: typeQuery.data.type },
+                    { name: 'maxCurrent', value: typeQuery.data.maxCurrent ?? '' },
+                    { name: 'notes', value: typeQuery.data.notes ?? '' },
+                  ] as any)
+                : undefined
+            }
+          >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Form.Item name="name" label="Naziv" rules={[{ required: true, message: 'Unesite naziv.' }]}>
+                <Input placeholder="npr. AMM 3.0" />
+              </Form.Item>
+              <Form.Item name="type" label="Tip">
+                <Select allowClear placeholder="Odaberi" options={meterTypeOptions} />
+              </Form.Item>
+              <Form.Item name="manufacturer" label="Proizvođač">
+                <Input placeholder="Opcionalno" />
+              </Form.Item>
+              <Form.Item name="model" label="Model">
+                <Input placeholder="Opcionalno" />
+              </Form.Item>
+              <Form.Item name="maxCurrent" label="Maks. struja (A)">
+                <Input placeholder="Opcionalno" />
+              </Form.Item>
+            </div>
+            <Form.Item name="notes" label="Napomena">
+              <Input.TextArea rows={2} placeholder="Opcionalno" />
+            </Form.Item>
+          </Form>
 
-      <Table<MeterTypeFieldItem>
-        rowKey="id"
-        loading={fieldsQuery.isLoading}
-        dataSource={fields}
-        pagination={false}
-        columns={[
-          { title: 'Name', dataIndex: 'name', width: 180 },
-          { title: 'Label', dataIndex: 'label' },
-          { title: 'Type', dataIndex: 'fieldType', width: 110 },
-          { title: 'Required', dataIndex: 'isRequired', width: 100, render: (v: boolean) => (v ? 'Da' : 'Ne') },
-          {
-            title: 'Operator fill',
-            dataIndex: 'isOperatorFillable',
-            width: 120,
-            render: (v: boolean) => (v ? 'Da' : 'Ne'),
-          },
-          { title: 'Default', dataIndex: 'defaultValue', width: 140, render: (v: string | null) => v ?? '–' },
-          { title: 'Sort', dataIndex: 'sortOrder', width: 70 },
-          {
-            title: 'Akcije',
-            width: 260,
-            render: (_: unknown, row) => (
-              <Space>
-                <Button
-                  size="small"
-                  icon={<ArrowUpOutlined />}
-                  onClick={() => handleMoveField(row.id, -1)}
-                  disabled={reorderFieldsMutation.isPending}
-                >
-                  Gore
-                </Button>
-                <Button
-                  size="small"
-                  icon={<ArrowDownOutlined />}
-                  onClick={() => handleMoveField(row.id, 1)}
-                  disabled={reorderFieldsMutation.isPending}
-                >
-                  Dolje
-                </Button>
-                <Button size="small" onClick={() => handleOpenEditField(row)}>
-                  Uredi
-                </Button>
-                <Button
-                  size="small"
-                  danger
-                  onClick={() => removeFieldMutation.mutate(row.id)}
-                  loading={removeFieldMutation.isPending}
-                >
-                  Obriši
-                </Button>
-              </Space>
-            ),
-          },
-        ]}
-      />
+          <Divider className="!my-2" />
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <Typography.Title level={5} className="!mb-0">
+                Dodatna polja
+              </Typography.Title>
+              <Typography.Text type="secondary">
+                Polja su aktivna tek nakon što tip bude sačuvan.
+              </Typography.Text>
+            </div>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              disabled={!definitionId}
+              onClick={handleOpenCreateField}
+            >
+              Dodaj polje
+            </Button>
+          </div>
+
+          <Table<MeterTypeFieldItem>
+            rowKey="id"
+            loading={fieldsQuery.isLoading}
+            dataSource={fields}
+            pagination={false}
+            columns={fieldsColumnsEditable}
+          />
+        </>
+      )}
 
       <Drawer
         title={editingField ? 'Uredi polje' : 'Novo polje'}

@@ -9,6 +9,7 @@ import { UpdateSettingDto } from './dto/update-setting.dto';
 import { SettingsService } from './settings.service';
 import { Request } from 'express';
 import { UpdateMySettingsDto } from './dto/update-my-settings.dto';
+import { UpdateNotificationChannelsDto } from './dto/update-notification-channels.dto';
 
 @ApiTags('settings')
 @ApiBearerAuth()
@@ -22,6 +23,30 @@ export class SettingsController {
   @ApiOperation({ summary: 'Feature flags and configuration status (for UI)' })
   getFeatures() {
     return this.settingsService.getFeatures();
+  }
+
+  @Get('notifications')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Globalne postavke notifikacija (push/email/in-app)' })
+  getNotificationChannelSettings() {
+    return this.settingsService.getNotificationChannelSettings();
+  }
+
+  @Patch('notifications')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Ažuriraj globalne postavke notifikacija (push/email/in-app)' })
+  setNotificationChannelSettings(
+    @Body() dto: UpdateNotificationChannelsDto,
+    @CurrentUser() user: { id: string },
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    return this.settingsService.setNotificationChannelSettings(dto, {
+      userId: user.id,
+      ipAddress,
+    });
   }
 
   @Get()

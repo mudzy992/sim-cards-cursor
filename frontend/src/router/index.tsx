@@ -100,7 +100,7 @@ export const router = createBrowserRouter([
           {
             path: '/meter-types/:id',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN']}>
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <MeterTypeUpsertPage />
               </RoleGuard>
             ),

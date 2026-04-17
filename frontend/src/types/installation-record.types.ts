@@ -31,12 +31,15 @@ export type InstallationRecordItem = {
   meter?: {
     id: string;
     serialNumber: string;
+    meterTypeDefinitionId?: string;
     installationAddress?: string | null;
     installationDate?: string | null;
     city?: string | null;
     municipality?: string | null;
+    measuringPoint?: string | null;
     latitude?: number | null;
     longitude?: number | null;
+    dynamicFieldValues?: Record<string, unknown> | null;
     meterTypeDefinition?: { name: string } | null;
     simCard?: {
       id: string;

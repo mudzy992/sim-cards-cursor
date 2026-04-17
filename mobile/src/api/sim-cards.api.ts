@@ -1,6 +1,8 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
 import { axiosInstance } from './axios.instance';
+import { useAuthStore } from '@/store/auth.store'
+import { offlineCache } from '@/offline/offline-cache'
+import { enqueueOutboxItem } from '@/offline/outbox'
 
 export type MobileSimCard = {
   id: string;
@@ -23,52 +25,10 @@ export type MobileSimCard = {
   fromOfflineCache?: boolean;
 };
 
-type OfflineSimCardEntry = {
-  iccid: string;
-  data: MobileSimCard;
-  cachedAt: string;
-};
-
-const OFFLINE_SIM_CARDS_KEY = 'sim_tracker_offline_sim_cards_v1';
-
-async function loadOfflineSimCards(): Promise<OfflineSimCardEntry[]> {
-  const raw = await SecureStore.getItemAsync(OFFLINE_SIM_CARDS_KEY);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed as OfflineSimCardEntry[];
-  } catch {
-    return [];
-  }
-}
-
-async function saveOfflineSimCards(entries: OfflineSimCardEntry[]): Promise<void> {
-  if (!entries.length) {
-    await SecureStore.deleteItemAsync(OFFLINE_SIM_CARDS_KEY);
-    return;
-  }
-  await SecureStore.setItemAsync(OFFLINE_SIM_CARDS_KEY, JSON.stringify(entries));
-}
-
-async function upsertOfflineSimCard(card: MobileSimCard): Promise<void> {
-  if (!card.iccid) return;
-  const existing = await loadOfflineSimCards();
-  const now = new Date().toISOString();
-  const filtered = existing.filter((e) => e.iccid !== card.iccid);
-  filtered.push({
-    iccid: card.iccid,
-    data: { ...card, fromOfflineCache: undefined },
-    cachedAt: now,
-  });
-  await saveOfflineSimCards(filtered);
-}
-
-async function getOfflineSimCardByIccid(iccid: string): Promise<MobileSimCard | null> {
-  const existing = await loadOfflineSimCards();
-  const found = existing.find((e) => e.iccid === iccid);
-  return found ? { ...found.data, fromOfflineCache: true } : null;
+function requireUser() {
+  const user = useAuthStore.getState().user
+  if (!user) throw new Error('Not authenticated')
+  return user
 }
 
 export const simCardsApi = {
@@ -78,13 +38,14 @@ export const simCardsApi = {
   },
 
   scanByIccidWithOffline: async (iccid: string): Promise<MobileSimCard> => {
+    const user = requireUser()
     try {
       const online = await simCardsApi.scanByIccid(iccid);
-      await upsertOfflineSimCard(online);
+      await offlineCache.offlineSimInventory.upsert(user, online)
       return { ...online, fromOfflineCache: false };
     } catch (error) {
       if (axios.isAxiosError(error) && !error.response) {
-        const cached = await getOfflineSimCardByIccid(iccid);
+        const cached = await offlineCache.offlineSimInventory.findByIccid(user, iccid)
         if (cached) {
           return cached;
         }
@@ -93,12 +54,87 @@ export const simCardsApi = {
     }
   },
 
-  claimById: async (id: string): Promise<MobileSimCard> => {
-    const response = await axiosInstance.post(`/sim-cards/${id}/claim`);
-    return response.data.data;
+  listOfflineInventory: async (): Promise<MobileSimCard[]> => {
+    const user = requireUser()
+    return (await offlineCache.offlineSimInventory.get(user))?.data ?? []
   },
-  myAssigned: async () => {
-    const response = await axiosInstance.get('/sim-cards/my-assigned');
-    return response.data.data;
+
+  removeOfflineInventoryByIccid: async (iccid: string): Promise<void> => {
+    const user = requireUser()
+    await offlineCache.offlineSimInventory.removeByIccid(user, iccid)
+  },
+
+  clearOfflineInventory: async (): Promise<void> => {
+    const user = requireUser()
+    await offlineCache.offlineSimInventory.clear(user)
+  },
+
+  claimById: async (id: string): Promise<MobileSimCard> => {
+    const user = requireUser()
+    try {
+      const response = await axiosInstance.post(`/sim-cards/${id}/claim`)
+      const claimed = response.data.data as MobileSimCard
+      await offlineCache.offlineSimInventory.upsert(user, claimed)
+      return claimed
+    } catch (error) {
+      if (axios.isAxiosError(error) && !error.response) {
+        await enqueueOutboxItem(user, {
+          kind: 'SIM_CARD_CLAIM',
+          request: { method: 'POST', url: `/sim-cards/${id}/claim`, body: {} },
+          meta: { simCardId: id },
+        })
+
+        const existing = (await offlineCache.offlineSimInventory.get(user))?.data ?? []
+        const next = existing.map((c) => {
+          if (c.id !== id) return c
+          return {
+            ...c,
+            status: 'ASSIGNED',
+            assignedTo: {
+              id: user.id,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              email: user.email,
+            },
+            fromOfflineCache: true,
+          }
+        })
+        await offlineCache.offlineSimInventory.set(user, next)
+
+        const updated = next.find((c) => c.id === id)
+        if (updated) return updated
+
+        return {
+          id,
+          iccid: '',
+          ipAddress: '',
+          status: 'ASSIGNED',
+          assignedTo: {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+          },
+          fromOfflineCache: true,
+        }
+      }
+      throw error
+    }
+  },
+
+  myAssigned: async (): Promise<MobileSimCard[]> => {
+    const user = requireUser()
+    try {
+      const response = await axiosInstance.get('/sim-cards/my-assigned')
+      const data = response.data.data
+      const list = Array.isArray(data) ? (data as MobileSimCard[]) : []
+      await offlineCache.myAssignedSimCards.set(user, list)
+      return list
+    } catch (error) {
+      if (axios.isAxiosError(error) && !error.response) {
+        return (await offlineCache.myAssignedSimCards.get(user))?.data ?? []
+      }
+      throw error
+    }
   },
 };

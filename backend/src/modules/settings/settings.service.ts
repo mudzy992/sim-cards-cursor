@@ -10,6 +10,13 @@ type SettingChangeContext = {
   ipAddress?: string;
 };
 
+const SETTINGS_KEYS = {
+  mobilePushCompat: 'mobile.push.enabled',
+  notificationsPushEnabled: 'notifications.push.enabled',
+  notificationsEmailEnabled: 'notifications.email.enabled',
+  notificationsInAppEnabled: 'notifications.inApp.enabled',
+} as const;
+
 export type UserTourState = {
   web?: {
     systemAdmin?: {
@@ -67,13 +74,19 @@ export class SettingsService {
   }
 
   async isMobilePushEnabled(): Promise<boolean> {
-    return this.getBoolean('mobile.push.enabled', true);
+    const notificationsPushEnabled = await this.getBoolean(
+      SETTINGS_KEYS.notificationsPushEnabled,
+      true,
+    );
+    const compatMobilePushEnabled = await this.getBoolean(
+      SETTINGS_KEYS.mobilePushCompat,
+      true,
+    );
+    return notificationsPushEnabled && compatMobilePushEnabled;
   }
 
   async isPushCampaignsEnabled(): Promise<boolean> {
-    const mobilePush = await this.isMobilePushEnabled();
-    const pushEnabled = await this.getBoolean('notifications.mobile.pushEnabled', true);
-    return mobilePush && pushEnabled;
+    return this.isMobilePushEnabled();
   }
 
   async getFeatures(): Promise<{
@@ -106,8 +119,10 @@ export class SettingsService {
     const requiredKeys = [
       'email.enabled',
       'smtp.provider',
-      'mobile.push.enabled',
-      'notifications.mobile.pushEnabled',
+      SETTINGS_KEYS.mobilePushCompat,
+      SETTINGS_KEYS.notificationsPushEnabled,
+      SETTINGS_KEYS.notificationsEmailEnabled,
+      SETTINGS_KEYS.notificationsInAppEnabled,
     ];
     const existing = await this.prisma.appSetting.findMany({
       where: { key: { in: requiredKeys } },
@@ -134,14 +149,86 @@ export class SettingsService {
     enabled: boolean,
     ctx?: SettingChangeContext,
   ): Promise<AppSetting> {
-    return this.upsert(
-      'mobile.push.enabled',
+    const value = enabled ? 'true' : 'false';
+    await this.upsert(
+      SETTINGS_KEYS.notificationsPushEnabled,
       {
-        value: enabled ? 'true' : 'false',
-        description: 'Globalni toggle za mobilne push notifikacije (offline/online okruženje).',
+        value,
+        description: 'Globalni toggle za push notifikacije (mobile).',
       },
       ctx,
     );
+    return this.upsert(
+      SETTINGS_KEYS.mobilePushCompat,
+      {
+        value,
+        description:
+          'Kompatibilnost: globalni toggle koji koristi endpoint /settings/mobile-push.',
+      },
+      ctx,
+    );
+  }
+
+  async getNotificationChannelSettings(): Promise<{
+    pushEnabled: boolean;
+    emailEnabled: boolean;
+    inAppEnabled: boolean;
+  }> {
+    const pushEnabled = await this.getBoolean(SETTINGS_KEYS.notificationsPushEnabled, true);
+    const emailEnabled = await this.getBoolean(SETTINGS_KEYS.notificationsEmailEnabled, true);
+    const inAppEnabled = await this.getBoolean(SETTINGS_KEYS.notificationsInAppEnabled, true);
+    return { pushEnabled, emailEnabled, inAppEnabled };
+  }
+
+  async setNotificationChannelSettings(
+    patch: Partial<{ pushEnabled: boolean; emailEnabled: boolean; inAppEnabled: boolean }>,
+    ctx?: SettingChangeContext,
+  ): Promise<{
+    pushEnabled: boolean;
+    emailEnabled: boolean;
+    inAppEnabled: boolean;
+  }> {
+    const current = await this.getNotificationChannelSettings();
+    const next = {
+      pushEnabled: patch.pushEnabled ?? current.pushEnabled,
+      emailEnabled: patch.emailEnabled ?? current.emailEnabled,
+      inAppEnabled: patch.inAppEnabled ?? current.inAppEnabled,
+    };
+
+    const upserts: Array<Promise<AppSetting>> = [];
+    if (patch.pushEnabled !== undefined) {
+      upserts.push(this.setMobilePushEnabled(next.pushEnabled, ctx));
+    }
+    if (patch.emailEnabled !== undefined) {
+      upserts.push(
+        this.upsert(
+          SETTINGS_KEYS.notificationsEmailEnabled,
+          {
+            value: next.emailEnabled ? 'true' : 'false',
+            description: 'Globalni toggle za email notifikacije.',
+          },
+          ctx,
+        ),
+      );
+    }
+    if (patch.inAppEnabled !== undefined) {
+      upserts.push(
+        this.upsert(
+          SETTINGS_KEYS.notificationsInAppEnabled,
+          {
+            value: next.inAppEnabled ? 'true' : 'false',
+            description: 'Globalni toggle za in-app notifikacije (web + mobile).',
+          },
+          ctx,
+        ),
+      );
+    }
+
+    if (upserts.length > 0) {
+      await Promise.all(upserts);
+    }
+
+    return this.getNotificationChannelSettings();
   }
 
   private getUserTourKey(userId: string): string {

@@ -1,4 +1,5 @@
 export type MeterType = 'SINGLE_PHASE' | 'THREE_PHASE';
+export type MeterSimCardState = 'INSTALLED' | 'NO_SIM';
 
 export type MeterTypeDefinitionRef = {
   id: string;
@@ -13,8 +14,11 @@ export type MeterItem = {
   id: string;
   serialNumber: string;
   meterTypeDefinitionId: string;
+  branchId?: string | null;
   meterTypeDefinition?: MeterTypeDefinitionRef | null;
   simCard?: { id: string; iccid: string; status: string; ipAddress?: string } | null;
+  simCardState?: MeterSimCardState;
+  noSimReason?: string | null;
   year?: number | null;
   notes?: string | null;
   installationAddress?: string | null;
@@ -56,6 +60,8 @@ export type CreateMeterInput = {
   measuringPoint?: string;
   dynamicFieldValues?: Record<string, unknown>;
   simCardId?: string;
+  simCardState?: MeterSimCardState;
+  noSimReason?: string;
 };
 
 export type UpdateMeterInput = Partial<CreateMeterInput>;

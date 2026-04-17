@@ -5,10 +5,14 @@ export const colors = {
   onPrimary: '#ffffff',
   link: '#FF5722',
   disabled: '#94a3b8',
-  textMuted: '#64748b',
-  border: '#e2e8f0',
+  background: '#F6F7F9',
+  textMuted: '#6b7280',
+  border: '#e5e7eb',
   text: '#0f172a',
   surface: '#ffffff',
   surfaceMuted: '#f8fafc',
+  danger: '#dc2626',
+  warningSurface: '#fef3c7',
+  warningBorder: '#f59e0b',
 } as const
 

@@ -12,12 +12,16 @@ export default function TabsLayout() {
           headerShown: true,
           headerStyle: {
             backgroundColor: colors.surface,
+            height: 52,
           },
           headerTintColor: colors.text,
           headerTitleStyle: {
             color: colors.text,
+            fontSize: 16,
           },
+          headerTitleAlign: 'center',
           tabBarActiveTintColor: colors.primary,
+          tabBarHideOnKeyboard: true,
         }}
       >
       <Tabs.Screen
@@ -53,6 +57,15 @@ export default function TabsLayout() {
           title: 'Demontaža',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="construct" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="install"
+        options={{
+          title: 'Ugradnja',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="hardware-chip-outline" size={size} color={color} />
           ),
         }}
       />

@@ -13,9 +13,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { activityLogApi } from '@/api/activity-log.api';
+import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import { useAuthStore } from '@/store/auth.store';
 import type { InstallationRecordItem } from '@/types/installation-record.types';
 import { RecordPhotoImage } from '@/components/installation-records/RecordPhotoImage';
+import type { MeterTypeFieldItem } from '@/types/meter-type-field.types';
+import { buildOsmEmbedUrl } from '@/utils/osm.utils'
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Nacrt',
@@ -44,6 +47,15 @@ export default function InstallationRecordDetailPage() {
     queryFn: () => installationRecordsApi.getById(id!),
     enabled: Boolean(id),
   });
+
+  const meterTypeFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', 'fields', recordQuery.data?.meter?.meterTypeDefinitionId],
+    queryFn: () =>
+      meterTypeDefinitionsApi.listFields(
+        (recordQuery.data as InstallationRecordItem).meter!.meterTypeDefinitionId!,
+      ),
+    enabled: Boolean(recordQuery.data?.meter?.meterTypeDefinitionId),
+  })
 
   const permissionsQuery = useQuery({
     queryKey: ['installation-record-permissions', id],
@@ -143,6 +155,18 @@ export default function InstallationRecordDetailPage() {
     );
   }
 
+  const formatDynamicFieldValue = (field: MeterTypeFieldItem, raw: unknown) => {
+    if (raw === undefined || raw === null || raw === '') return null
+    if (field.fieldType === 'BOOLEAN') {
+      return raw === true || raw === 'true' ? 'Da' : 'Ne'
+    }
+    if (field.fieldType === 'DATE') {
+      const d = new Date(String(raw))
+      return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString('bs-BA')
+    }
+    return String(raw)
+  }
+
   if (recordQuery.isError) {
     return (
       <Typography.Text type="danger">
@@ -192,33 +216,6 @@ export default function InstallationRecordDetailPage() {
           <Descriptions.Item label="Status">
             <Tag color={statusColor[record.status]}>{statusLabel[record.status]}</Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="ICCID">{record.meter?.simCard?.iccid ?? '–'}</Descriptions.Item>
-          <Descriptions.Item label="Brojilo">
-            {record.meter
-              ? `${record.meter.serialNumber}${record.meter.meterTypeDefinition ? ` (${record.meter.meterTypeDefinition.name})` : ''}`
-              : '–'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Adresa ugradnje">
-            {record.meter?.installationAddress ?? '–'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Grad / Općina">
-            {[record.meter?.city, record.meter?.municipality].filter(Boolean).join(', ') || '–'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Datum ugradnje">
-            {record.meter?.installationDate
-              ? new Date(record.meter.installationDate).toLocaleDateString()
-              : '–'}
-          </Descriptions.Item>
-          {(record.meter?.latitude != null || record.meter?.longitude != null) && (
-            <>
-              <Descriptions.Item label="GPS širina">
-                {record.meter?.latitude != null ? String(record.meter.latitude) : '–'}
-              </Descriptions.Item>
-              <Descriptions.Item label="GPS dužina">
-                {record.meter?.longitude != null ? String(record.meter.longitude) : '–'}
-              </Descriptions.Item>
-            </>
-          )}
           <Descriptions.Item label="Instalirao">
             {record.installedBy
               ? `${record.installedBy.firstName} ${record.installedBy.lastName}`
@@ -240,17 +237,84 @@ export default function InstallationRecordDetailPage() {
         </Descriptions>
       </Card>
 
+      <Card title="Podaci o brojilu">
+        <Descriptions column={1} bordered size="small">
+          <Descriptions.Item label="Serijski broj">{record.meter?.serialNumber ?? '–'}</Descriptions.Item>
+          <Descriptions.Item label="Tip brojila">
+            {record.meter?.meterTypeDefinition?.name ?? '–'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Lokacija instalacije">
+            {record.meter?.installationAddress ?? '–'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Grad / Općina">
+            {[record.meter?.city, record.meter?.municipality].filter(Boolean).join(', ') || '–'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Datum instalacije">
+            {record.meter?.installationDate
+              ? new Date(record.meter.installationDate).toISOString().slice(0, 10)
+              : '–'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Mjerno mjesto">
+            {record.meter?.measuringPoint ?? '–'}
+          </Descriptions.Item>
+          {(record.meter?.latitude != null || record.meter?.longitude != null) && (
+            <>
+              <Descriptions.Item label="GPS širina">
+                {record.meter?.latitude != null ? String(record.meter.latitude) : '–'}
+              </Descriptions.Item>
+              <Descriptions.Item label="GPS dužina">
+                {record.meter?.longitude != null ? String(record.meter.longitude) : '–'}
+              </Descriptions.Item>
+            </>
+          )}
+          <Descriptions.Item label="Status SIM-a">
+            {record.meter?.simCard ? 'Ugrađena' : 'Bez kartice'}
+          </Descriptions.Item>
+          {record.meter?.simCard && (
+            <>
+              <Descriptions.Item label="ICCID">
+                {record.meter.simCard.iccid ?? '–'}
+              </Descriptions.Item>
+              <Descriptions.Item label="IP adresa">
+                {record.meter.simCard.ipAddress ?? '–'}
+              </Descriptions.Item>
+            </>
+          )}
+          {(record.meter?.dynamicFieldValues &&
+            Object.keys(record.meter.dynamicFieldValues).length > 0 &&
+            (meterTypeFieldsQuery.data ?? []).some((f) => {
+              const vals = record.meter?.dynamicFieldValues as Record<string, unknown>
+              const v = vals?.[f.name]
+              return v !== undefined && v !== null && v !== ''
+            })) && (
+            <>
+              {(meterTypeFieldsQuery.data ?? [])
+                .slice()
+                .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                .map((field) => {
+                  const vals = (record.meter?.dynamicFieldValues ?? {}) as Record<string, unknown>
+                  const display = formatDynamicFieldValue(field, vals[field.name])
+                  if (!display) return null
+                  return (
+                    <Descriptions.Item key={field.id} label={field.label}>
+                      {display}
+                    </Descriptions.Item>
+                  )
+                })}
+            </>
+          )}
+        </Descriptions>
+      </Card>
+
       {(record.meter?.latitude != null && record.meter?.longitude != null) && (
         <Card title="Lokacija na mapi">
           <iframe
             title="Lokacija ugradnje"
-            src={`https://www.openstreetmap.org/export/embed.html?bbox=${
-              Number(record.meter.longitude) - 0.01
-            },${Number(record.meter.latitude) - 0.01},${
-              Number(record.meter.longitude) + 0.01
-            },${Number(record.meter.latitude) + 0.01}&layer=mapnik&marker=${record.meter.latitude},${
-              record.meter.longitude
-            }`}
+            src={buildOsmEmbedUrl({
+              latitude: Number(record.meter.latitude),
+              longitude: Number(record.meter.longitude),
+              radiusMeters: 50,
+            })}
             width="100%"
             height="280"
             style={{ border: 0, borderRadius: 8 }}

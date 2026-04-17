@@ -24,12 +24,14 @@ import { usersApi } from '@/api/users.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { demountTasksApi } from '@/api/demount-tasks.api';
+import { installTasksApi } from '@/api/install-tasks.api';
 import InstallationRecordCreateForm from '@/components/installation-records/InstallationRecordCreateForm';
 import type { CreateMeterInput, MeterItem, MeterType, UpdateMeterInput } from '@/types/meter.types';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 import type {
   MeterTypeDefinitionItem,
 } from '@/types/meter-type-definition.types';
+import { buildOsmEmbedUrl } from '@/utils/osm.utils'
 
 const meterTypeOptions: { label: string; value: MeterType }[] = [
   { label: 'Jednofazno', value: 'SINGLE_PHASE' },
@@ -69,9 +71,14 @@ export default function MetersListPage() {
   const [demountMeter, setDemountMeter] = useState<MeterItem | null>(null);
   const [demountOperatorId, setDemountOperatorId] = useState<string>('');
   const [demountNotes, setDemountNotes] = useState('');
+  const [installDrawerOpen, setInstallDrawerOpen] = useState(false);
+  const [installMeter, setInstallMeter] = useState<MeterItem | null>(null);
+  const [installOperatorId, setInstallOperatorId] = useState<string>('');
+  const [installNotes, setInstallNotes] = useState('');
 
   const [meterForm] = Form.useForm<MeterFormValues>();
   const userRole = useAuthStore((s) => s.user?.role);
+  const user = useAuthStore((s) => s.user);
 
   const selectedEditMeterTypeDefinitionId = Form.useWatch('meterTypeDefinitionId', meterForm) as
     | string
@@ -81,6 +88,12 @@ export default function MetersListPage() {
     queryKey: ['meter-type-definitions', 'fields', selectedEditMeterTypeDefinitionId],
     queryFn: () => meterTypeDefinitionsApi.listFields(selectedEditMeterTypeDefinitionId!),
     enabled: Boolean(selectedEditMeterTypeDefinitionId) && Boolean(editingMeter),
+  })
+
+  const detailMeterTypeFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', 'fields', detailMeter?.meterTypeDefinitionId],
+    queryFn: () => meterTypeDefinitionsApi.listFields(detailMeter!.meterTypeDefinitionId),
+    enabled: Boolean(detailMeter?.meterTypeDefinitionId),
   })
 
   const listQuery = useQuery({
@@ -107,7 +120,7 @@ export default function MetersListPage() {
   const operatorsQuery = useQuery({
     queryKey: ['users', 'operators'],
     queryFn: () => usersApi.list({ role: 'USER', limit: 100 }),
-    enabled: demountDrawerOpen,
+    enabled: demountDrawerOpen || installDrawerOpen,
   });
 
   const createDemountMutation = useMutation({
@@ -119,6 +132,24 @@ export default function MetersListPage() {
       setDemountMeter(null);
       setDemountOperatorId('');
       setDemountNotes('');
+    },
+    onError: (err: unknown) => {
+      messageApi.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Kreiranje zadatka nije uspjelo.',
+      );
+    },
+  });
+
+  const createInstallMutation = useMutation({
+    mutationFn: (payload: { meterId: string; assignedToId: string; notes?: string }) =>
+      installTasksApi.create(payload),
+    onSuccess: () => {
+      messageApi.success('Zadatak ugradnje SIM-a je kreiran.');
+      setInstallDrawerOpen(false);
+      setInstallMeter(null);
+      setInstallOperatorId('');
+      setInstallNotes('');
     },
     onError: (err: unknown) => {
       messageApi.error(
@@ -179,23 +210,6 @@ export default function MetersListPage() {
     },
   });
 
-  const deleteMeterMutation = useMutation({
-    mutationFn: (id: string) => metersApi.remove(id),
-    onSuccess: () => {
-      messageApi.success('Brojilo je obrisano.');
-      setDetailMeter(null);
-      void queryClient.invalidateQueries({ queryKey: ['meters', 'list'] });
-    },
-    onError: (err: unknown) => {
-      const msg =
-        typeof (err as { response?: { data?: { message?: string } } })?.response?.data?.message ===
-        'string'
-          ? (err as { response: { data: { message: string } } }).response.data.message
-          : 'Brisanje brojila nije uspjelo.';
-      messageApi.error(msg);
-    },
-  });
-
   const deleteTypeMutation = useMutation({
     mutationFn: (id: string) => meterTypeDefinitionsApi.remove(id),
     onSuccess: () => {
@@ -245,6 +259,7 @@ export default function MetersListPage() {
     navigate(`/meter-types/${record.id}`)
   }
 
+
   function handleMeterSubmit(values: MeterFormValues) {
     const payload: Parameters<typeof metersApi.create>[0] = {
       serialNumber: values.serialNumber,
@@ -281,11 +296,33 @@ export default function MetersListPage() {
     return <Input disabled={!isDynamicFieldEditable(field)} />
   }
 
+  const formatDynamicFieldValue = (field: MeterTypeFieldItem, raw: unknown) => {
+    if (raw === undefined || raw === null || raw === '') return null
+    if (field.fieldType === 'BOOLEAN') {
+      return raw === true || raw === 'true' ? 'Da' : 'Ne'
+    }
+    if (field.fieldType === 'DATE') {
+      const d = new Date(String(raw))
+      return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString('bs-BA')
+    }
+    return String(raw)
+  }
+
   const meterRows = listQuery.data?.items ?? [];
   const typeRows = typesListQuery.data ?? [];
   const recordsForMeter = recordsByMeterQuery.data?.items ?? [];
   const renderType = (t: MeterType) =>
     t === 'SINGLE_PHASE' ? 'Jednofazno' : t === 'THREE_PHASE' ? 'Trofazno' : t;
+
+  const canCreateInstallTaskForMeter = (m: MeterItem | null) => {
+    if (!m) return false
+    const isNoSim = m.simCardState === 'NO_SIM' || !m.simCard
+    if (!isNoSim) return false
+    if (userRole === 'SYSTEM_ADMIN' || userRole === 'DIST_ADMIN') return true
+    const moderated = user?.branchModeratorBranchIds ?? []
+    const branchId = m.branchId ?? ''
+    return Boolean(branchId) && moderated.includes(branchId)
+  }
 
   return (
     <div
@@ -433,23 +470,6 @@ export default function MetersListPage() {
                           <Button type="link" size="small" onClick={() => openMeterEdit(record)}>
                             Uredi
                           </Button>
-                          <Popconfirm
-                            title="Obrisati brojilo?"
-                            description="Ova akcija se ne može poništiti."
-                            onConfirm={() => deleteMeterMutation.mutate(record.id)}
-                            okText="Da, obriši"
-                            cancelText="Odustani"
-                            okButtonProps={{ danger: true }}
-                          >
-                            <Button
-                              type="link"
-                              size="small"
-                              danger
-                              disabled={deleteMeterMutation.isPending}
-                            >
-                              Obriši
-                            </Button>
-                          </Popconfirm>
                         </Space>
                       ),
                     },
@@ -472,14 +492,16 @@ export default function MetersListPage() {
                   <Typography.Text type="secondary">
                     Katalog tipova brojila (npr. ME84, AMM 3.0). Jedan tip može imati više brojila.
                   </Typography.Text>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={openTypeCreate}
-                    data-tour-id="meters-new-type"
-                  >
-                    Novi tip brojila
-                  </Button>
+                  {userRole === 'SYSTEM_ADMIN' && (
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={openTypeCreate}
+                      data-tour-id="meters-new-type"
+                    >
+                      Novi tip brojila
+                    </Button>
+                  )}
                 </div>
                 <Table<MeterTypeDefinitionItem>
                   rowKey="id"
@@ -515,30 +537,36 @@ export default function MetersListPage() {
                     {
                       title: 'Akcije',
                       key: 'actions',
-                      width: 140,
+                      width: 160,
                       render: (_, record) => (
                         <Space>
-                          {userRole === 'SYSTEM_ADMIN' && (
+                          {userRole === 'SYSTEM_ADMIN' ? (
+                            <>
+                              <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
+                                Uredi
+                              </Button>
+                              <Popconfirm
+                                title="Obrisati tip brojila?"
+                                onConfirm={() => deleteTypeMutation.mutate(record.id)}
+                                okText="Da"
+                                cancelText="Ne"
+                                okButtonProps={{ danger: true }}
+                              >
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  danger
+                                  disabled={deleteTypeMutation.isPending}
+                                >
+                                  Obriši
+                                </Button>
+                              </Popconfirm>
+                            </>
+                          ) : (
                             <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
-                              Uredi
+                              Detalji
                             </Button>
                           )}
-                          <Popconfirm
-                            title="Obrisati tip brojila?"
-                            onConfirm={() => deleteTypeMutation.mutate(record.id)}
-                            okText="Da"
-                            cancelText="Ne"
-                            okButtonProps={{ danger: true }}
-                          >
-                            <Button
-                              type="link"
-                              size="small"
-                              danger
-                              disabled={userRole !== 'SYSTEM_ADMIN'}
-                            >
-                              Obriši
-                            </Button>
-                          </Popconfirm>
                         </Space>
                       ),
                     },
@@ -572,6 +600,17 @@ export default function MetersListPage() {
                     Demontiraj SIM
                   </Button>
                 )}
+              {canCreateInstallTaskForMeter(detailMeter) && (
+                <Button
+                  size="small"
+                  onClick={() => {
+                    setInstallMeter(detailMeter)
+                    setInstallDrawerOpen(true)
+                  }}
+                >
+                  Pošalji ugradnju SIM
+                </Button>
+              )}
               <Button type="primary" size="small" onClick={() => openMeterEdit(detailMeter)}>
                 Uredi
               </Button>
@@ -629,6 +668,11 @@ export default function MetersListPage() {
               <Descriptions.Item label="Napomena">
                 {detailMeter.notes ?? '–'}
               </Descriptions.Item>
+              <Descriptions.Item label="Status SIM-a">
+                {detailMeter.simCardState === 'NO_SIM' || !detailMeter.simCard
+                  ? `Bez kartice${detailMeter.noSimReason ? ` (${detailMeter.noSimReason})` : ''}`
+                  : 'Ugrađena'}
+              </Descriptions.Item>
               {(detailMeter as MeterItem & { simCard?: { id: string; iccid: string; ipAddress?: string } }).simCard && (
                 <>
                   <Descriptions.Item label="IP adresa">
@@ -643,6 +687,29 @@ export default function MetersListPage() {
                   </Descriptions.Item>
                 </>
               )}
+              {(detailMeter.dynamicFieldValues &&
+                Object.keys(detailMeter.dynamicFieldValues).length > 0 &&
+                (detailMeterTypeFieldsQuery.data ?? []).some((f) => {
+                  const vals = detailMeter.dynamicFieldValues as Record<string, unknown>
+                  const v = vals[f.name]
+                  return v !== undefined && v !== null && v !== ''
+                })) && (
+                <>
+                  {(detailMeterTypeFieldsQuery.data ?? [])
+                    .slice()
+                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                    .map((field) => {
+                      const vals = (detailMeter.dynamicFieldValues ?? {}) as Record<string, unknown>
+                      const display = formatDynamicFieldValue(field, vals[field.name])
+                      if (!display) return null
+                      return (
+                        <Descriptions.Item key={field.id} label={field.label}>
+                          {display}
+                        </Descriptions.Item>
+                      )
+                    })}
+                </>
+              )}
             </Descriptions>
             {(detailMeter as MeterItem).latitude != null &&
               (detailMeter as MeterItem).longitude != null && (
@@ -650,13 +717,11 @@ export default function MetersListPage() {
                   <Typography.Title level={5}>Lokacija na mapi</Typography.Title>
                   <iframe
                     title="Lokacija brojila"
-                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${
-                      Number((detailMeter as MeterItem).longitude) - 0.01
-                    },${Number((detailMeter as MeterItem).latitude) - 0.01},${
-                      Number((detailMeter as MeterItem).longitude) + 0.01
-                    },${Number((detailMeter as MeterItem).latitude) + 0.01}&layer=mapnik&marker=${
-                      (detailMeter as MeterItem).latitude
-                    },${(detailMeter as MeterItem).longitude}`}
+                    src={buildOsmEmbedUrl({
+                      latitude: Number((detailMeter as MeterItem).latitude),
+                      longitude: Number((detailMeter as MeterItem).longitude),
+                      radiusMeters: 50,
+                    })}
                     width="100%"
                     height="240"
                     style={{ border: 0, borderRadius: 8 }}
@@ -811,6 +876,84 @@ export default function MetersListPage() {
               setEditingMeter(null);
             }}
           />
+        )}
+      </Drawer>
+
+      <Drawer
+        title="Zadatak ugradnje SIM kartice"
+        open={installDrawerOpen}
+        width={520}
+        onClose={() => {
+          setInstallDrawerOpen(false)
+          setInstallMeter(null)
+          setInstallOperatorId('')
+          setInstallNotes('')
+        }}
+        destroyOnClose
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setInstallDrawerOpen(false)
+                setInstallMeter(null)
+                setInstallOperatorId('')
+                setInstallNotes('')
+              }}
+            >
+              Odustani
+            </Button>
+            <Button
+              type="primary"
+              loading={createInstallMutation.isPending}
+              onClick={() => {
+                if (!installMeter || !installOperatorId) return
+                createInstallMutation.mutate({
+                  meterId: installMeter.id,
+                  assignedToId: installOperatorId,
+                  notes: installNotes || undefined,
+                })
+              }}
+            >
+              Kreiraj zadatak
+            </Button>
+          </div>
+        }
+      >
+        {installMeter && (
+          <Space direction="vertical" className="w-full" size="middle">
+            <Typography.Text>
+              Brojilo: {installMeter.serialNumber}
+              {installMeter.simCardState === 'NO_SIM' ? ' – status: Bez kartice' : ''}
+            </Typography.Text>
+            <Form.Item label="Operator (kojem šaljete zadatak)" required>
+              <Select
+                placeholder="Odaberite operatora"
+                value={installOperatorId || undefined}
+                onChange={setInstallOperatorId}
+                options={
+                  operatorsQuery.data?.items
+                    ?.filter((u) => u.role === 'USER')
+                    .map((u) => ({
+                      label: `${u.firstName} ${u.lastName} (${u.email})`,
+                      value: u.id,
+                    })) ?? []
+                }
+                loading={operatorsQuery.isLoading}
+                showSearch
+                filterOption={(input, opt) =>
+                  (opt?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+            <Form.Item label="Napomena">
+              <Input.TextArea
+                rows={2}
+                value={installNotes}
+                onChange={(e) => setInstallNotes(e.target.value)}
+                placeholder="Opcionalno"
+              />
+            </Form.Item>
+          </Space>
         )}
       </Drawer>
 

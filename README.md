@@ -42,3 +42,20 @@ npm run start
 ## Notes
 - Backend expects MySQL connection via `DATABASE_URL`.
 - Seed script creates admin user using env variables in `backend/.env`.
+
+## Notification settings (verification)
+
+### Web (global admin switches)
+- Open `Settings` page as `SYSTEM_ADMIN`.
+- In **Notifikacije**:
+  - Turn **Push notifikacije (mobile)** OFF → backend updates settings; push campaigns sending will be blocked.
+  - Turn **Email notifikacije** OFF → backend email sending is skipped even if SMTP is configured.
+  - Turn **In-app notifikacije** OFF → backend stops creating/emitting in-app notifications.
+
+### Mobile (push token behavior)
+- With **Push OFF** (web setting):
+  - App must **not** request notification permission
+  - App must **not** call `getExpoPushTokenAsync`
+  - App must **not** call `POST /push-tokens/register`
+- Offline / cannot reach backend:
+  - App uses last cached value of the setting; if no cache exists it defaults to **Push OFF** (fail-closed).

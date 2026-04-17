@@ -54,14 +54,14 @@ export class MeterTypeDefinitionsController {
   }
 
   @Post()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Kreiraj tip brojila' })
   create(@Body() dto: CreateMeterTypeDefinitionDto) {
     return this.meterTypeDefinitionsService.create(dto);
   }
 
   @Patch(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Ažuriraj tip brojila' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -71,7 +71,7 @@ export class MeterTypeDefinitionsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Obriši tip brojila' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.meterTypeDefinitionsService.remove(id);

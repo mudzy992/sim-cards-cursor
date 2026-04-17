@@ -11,6 +11,7 @@ import { Expo, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationsService } from 'src/modules/notifications/notifications.service';
 import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
+import { SettingsService } from '../settings/settings.service';
 
 export type CreateCampaignInput = {
   actor: ScopeContext & { id: string };
@@ -30,6 +31,7 @@ export class PushCampaignsService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService,
+    private readonly settings: SettingsService,
   ) {}
 
   async createDraft(input: CreateCampaignInput) {
@@ -79,6 +81,15 @@ export class PushCampaignsService {
 
     if (campaign.status !== PushCampaignStatus.DRAFT) {
       throw new BadRequestException('Campaign already sent');
+    }
+
+    const { pushEnabled } = await this.settings.getNotificationChannelSettings();
+    if (!pushEnabled) {
+      await this.prisma.pushCampaign.update({
+        where: { id },
+        data: { status: PushCampaignStatus.FAILED, sentAt: new Date() },
+      });
+      throw new BadRequestException('Push notifications are disabled by settings');
     }
 
     await this.prisma.pushCampaign.update({

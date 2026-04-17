@@ -3,12 +3,22 @@ import type { ApiEnvelope } from '@/types/common.types';
 
 export type DemountTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
+export type DemountTaskType = 'DEMOUNT_METER' | 'DEMOUNT_SIM';
+
+export type DemountCompletionResolution =
+  | 'FULL_DEMOUNT'
+  | 'REPLACE_SIM'
+  | 'REMOVE_SIM_ONLY';
+
 export type DemountTaskItem = {
   id: string;
   meterId: string;
   assignedToId: string;
   createdById: string;
   status: DemountTaskStatus;
+  taskType?: DemountTaskType;
+  completionResolution?: DemountCompletionResolution | null;
+  completionReason?: string | null;
   notes?: string | null;
   completedAt?: string | null;
   createdAt: string;
@@ -38,6 +48,7 @@ export const demountTasksApi = {
     meterId: string;
     assignedToId: string;
     notes?: string;
+    taskType?: DemountTaskType;
   }): Promise<DemountTaskItem> => {
     const response = await axiosInstance.post<ApiEnvelope<DemountTaskItem>>(
       '/demount-tasks',

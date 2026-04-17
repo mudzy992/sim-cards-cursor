@@ -8,7 +8,13 @@ import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateInstallationRecordDto } from './dto/create-installation-record.dto';
 import { UpdateInstallationRecordDto } from './dto/update-installation-record.dto';
-import { Prisma, InstallationRecord, RecordStatus, SimCardStatus } from '@prisma/client';
+import {
+  MeterSimCardState,
+  Prisma,
+  InstallationRecord,
+  RecordStatus,
+  SimCardStatus,
+} from '@prisma/client';
 import { InstallationRecordFilterDto } from './dto/installation-record-filter.dto';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { RecordNumberGenerator } from 'src/common/utils/record-number.generator';
@@ -47,6 +53,15 @@ export class InstallationRecordsService {
     createInstallationRecordDto: CreateInstallationRecordDto,
     ctx?: InstallationRecordContext,
   ): Promise<InstallationRecord> {
+    if (createInstallationRecordDto.clientRequestId) {
+      const existing = await this.prisma.installationRecord.findUnique({
+        where: { clientRequestId: createInstallationRecordDto.clientRequestId },
+      })
+      if (existing) {
+        return existing
+      }
+    }
+
     let meterId: string;
 
     if (createInstallationRecordDto.meterId) {
@@ -123,7 +138,11 @@ export class InstallationRecordsService {
     await this.prisma.$transaction(async (tx) => {
       await tx.meter.update({
         where: { id: meterId },
-        data: { simCardId },
+        data: {
+          simCardId,
+          simCardState: MeterSimCardState.INSTALLED,
+          noSimReason: null,
+        },
       });
       await tx.simCard.update({
         where: { id: simCardId },
@@ -141,6 +160,7 @@ export class InstallationRecordsService {
     const record = await this.prisma.installationRecord.create({
       data: {
         recordNumber,
+        clientRequestId: createInstallationRecordDto.clientRequestId ?? undefined,
         meterId,
         installedById: createInstallationRecordDto.installedById,
         notes: createInstallationRecordDto.notes,

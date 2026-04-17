@@ -7,6 +7,14 @@ import { SettingsService } from './settings.service';
 export class SettingsPublicController {
   constructor(private readonly settingsService: SettingsService) {}
 
+  @Get('notifications')
+  @ApiOperation({
+    summary: 'Dohvati globalne postavke notifikacija (push/email/in-app) (public)',
+  })
+  getNotificationChannelSettings() {
+    return this.settingsService.getNotificationChannelSettings();
+  }
+
   @Get('mobile-push')
   @ApiOperation({ summary: 'Dohvati globalni status mobilnih push notifikacija (public)' })
   async getMobilePush() {

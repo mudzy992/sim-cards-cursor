@@ -71,11 +71,17 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
   await configureNotificationHandlerAsync(Notifications);
   await configureChannels(Notifications);
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
+  const existingPermission = await Notifications.getPermissionsAsync();
+  const existingStatus =
+    typeof existingPermission === 'string'
+      ? existingPermission
+      : (existingPermission as { status?: string })?.status;
+  let finalStatus = existingStatus ?? 'undetermined';
   if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
+    const requested = await Notifications.requestPermissionsAsync();
+    const requestedStatus =
+      typeof requested === 'string' ? requested : (requested as { status?: string })?.status;
+    finalStatus = requestedStatus ?? finalStatus;
   }
   if (finalStatus !== 'granted') {
     console.warn('[Push] Permission not granted:', finalStatus);

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Notification } from '@prisma/client';
 import { NotificationsGateway } from './notifications.gateway';
+import { SettingsService } from '../settings/settings.service';
 
 export interface CreateNotificationDto {
   userId: string;
@@ -16,9 +17,14 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gateway: NotificationsGateway,
+    private readonly settings: SettingsService,
   ) {}
 
-  async create(dto: CreateNotificationDto): Promise<Notification> {
+  async create(dto: CreateNotificationDto): Promise<Notification | null> {
+    const { inAppEnabled } = await this.settings.getNotificationChannelSettings();
+    if (!inAppEnabled) {
+      return null;
+    }
     const notification = await this.prisma.notification.create({
       data: {
         userId: dto.userId,
