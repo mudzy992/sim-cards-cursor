@@ -51,6 +51,9 @@ export default function CreateRecordScreen() {
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [dynamicFieldValues, setDynamicFieldValues] = useState<Record<string, unknown>>({});
+  const [clientRequestId] = useState(
+    () => `crid_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+  )
 
   const meterTypeFieldsQuery = useQuery({
     queryKey: ['meter-type-definitions', meterTypeId, 'fields'],
@@ -93,6 +96,7 @@ export default function CreateRecordScreen() {
     return {
       simCardId,
       installedById: userId,
+      clientRequestId,
       meterTypeDefinitionId: meterTypeId,
       serialNumber: serialNumber.trim(),
       year: Number.isFinite(yearNum) ? yearNum : undefined,

@@ -185,24 +185,9 @@ export class MetersService {
   }
 
   async remove(id: string, scope?: ScopeContext | null): Promise<Meter> {
-    const scopeClause = scopeWhere(scope, { branchIdField: 'branchId' });
-    if (scopeClause) {
-      const exists = await this.prisma.meter.findFirst({
-        where: { id, AND: [scopeClause] },
-        select: { id: true },
-      });
-      if (!exists) throw new NotFoundException(`Meter with ID ${id} not found`);
-    }
-    try {
-      return await this.prisma.meter.delete({
-        where: { id },
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        throw new NotFoundException(`Meter with ID ${id} not found`);
-      }
-      throw error;
-    }
+    throw new BadRequestException(
+      'Brisanje brojila nije dozvoljeno. Ispravke se rade kroz izmjene uz logovanje i proceduru demontaže.',
+    );
   }
 
   /** Sva brojila – pri kreiranju zapisnika bira se brojilo i SIM (zapisnik = pridruživanje SIM brojilu). */

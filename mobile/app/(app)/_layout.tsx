@@ -2,6 +2,7 @@ import { Redirect, Stack } from 'expo-router';
 import { useAuthStore } from '@/store/auth.store';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAppUpdateGate } from '@/hooks/useAppUpdateGate';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { colors } from '@/theme/colors';
 import { useEffect, useRef } from 'react';
 import {
@@ -17,6 +18,7 @@ const PrivateLayout = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   usePushNotifications();
+  useOfflineSync();
   const { state: updateState, actions } = useAppUpdateGate();
   const shownOptionalRef = useRef(false);
 
@@ -106,6 +108,8 @@ const PrivateLayout = () => {
       <Stack.Screen name="record-details" options={{ title: 'Detalji zapisnika' }} />
       <Stack.Screen name="scan-result" options={{ title: 'Rezultat skena' }} />
       <Stack.Screen name="create-record" options={{ title: 'Novi zapisnik' }} />
+      <Stack.Screen name="offline-inventory" options={{ title: 'Offline inventar' }} />
+      <Stack.Screen name="outbox" options={{ title: 'Neposlato' }} />
       <Stack.Screen name="notifications" options={{ title: 'Notifikacije' }} />
     </Stack>
   );

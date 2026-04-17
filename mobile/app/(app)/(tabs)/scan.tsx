@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAudioPlayer } from 'expo-audio';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,6 +8,23 @@ import { colors } from '@/theme/colors';
 
 export default function ScanScreen() {
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{
+    afterScan?: string
+    demountTaskId?: string
+    installTaskId?: string
+  }>();
+  const afterScan =
+    typeof routeParams.afterScan === 'string'
+      ? routeParams.afterScan
+      : routeParams.afterScan?.[0];
+  const demountTaskId =
+    typeof routeParams.demountTaskId === 'string'
+      ? routeParams.demountTaskId
+      : routeParams.demountTaskId?.[0];
+  const installTaskId =
+    typeof routeParams.installTaskId === 'string'
+      ? routeParams.installTaskId
+      : routeParams.installTaskId?.[0];
   const [permission, requestPermission] = useCameraPermissions();
   const [manualIccid, setManualIccid] = useState('');
   const [scanError, setScanError] = useState<string | null>(null);
@@ -30,12 +47,33 @@ export default function ScanScreen() {
       }
 
       setHasScanned(true);
+      if (afterScan === 'demount' && demountTaskId) {
+        router.replace({
+          pathname: '/(app)/(tabs)/demount',
+          params: { pickedIccid: iccid, wizardTaskId: demountTaskId },
+        });
+        return;
+      }
+      if (afterScan === 'install' && installTaskId) {
+        router.replace({
+          pathname: '/(app)/(tabs)/install',
+          params: { pickedIccid: iccid, wizardTaskId: installTaskId },
+        });
+        return;
+      }
+      if (afterScan === 'inventory') {
+        router.replace({
+          pathname: '/(app)/offline-inventory',
+          params: { pickedIccid: iccid },
+        })
+        return
+      }
       router.push({
         pathname: '/(app)/scan-result',
         params: { iccid },
       });
     },
-    [router],
+    [router, afterScan, demountTaskId, installTaskId],
   );
 
   const handleBarcodeScanned = useCallback(

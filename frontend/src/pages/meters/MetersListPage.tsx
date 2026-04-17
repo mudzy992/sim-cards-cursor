@@ -210,23 +210,6 @@ export default function MetersListPage() {
     },
   });
 
-  const deleteMeterMutation = useMutation({
-    mutationFn: (id: string) => metersApi.remove(id),
-    onSuccess: () => {
-      messageApi.success('Brojilo je obrisano.');
-      setDetailMeter(null);
-      void queryClient.invalidateQueries({ queryKey: ['meters', 'list'] });
-    },
-    onError: (err: unknown) => {
-      const msg =
-        typeof (err as { response?: { data?: { message?: string } } })?.response?.data?.message ===
-        'string'
-          ? (err as { response: { data: { message: string } } }).response.data.message
-          : 'Brisanje brojila nije uspjelo.';
-      messageApi.error(msg);
-    },
-  });
-
   const deleteTypeMutation = useMutation({
     mutationFn: (id: string) => meterTypeDefinitionsApi.remove(id),
     onSuccess: () => {
@@ -487,23 +470,6 @@ export default function MetersListPage() {
                           <Button type="link" size="small" onClick={() => openMeterEdit(record)}>
                             Uredi
                           </Button>
-                          <Popconfirm
-                            title="Obrisati brojilo?"
-                            description="Ova akcija se ne može poništiti."
-                            onConfirm={() => deleteMeterMutation.mutate(record.id)}
-                            okText="Da, obriši"
-                            cancelText="Odustani"
-                            okButtonProps={{ danger: true }}
-                          >
-                            <Button
-                              type="link"
-                              size="small"
-                              danger
-                              disabled={deleteMeterMutation.isPending}
-                            >
-                              Obriši
-                            </Button>
-                          </Popconfirm>
                         </Space>
                       ),
                     },
