@@ -5,7 +5,7 @@ import { useAppUpdateGate } from '@/hooks/useAppUpdateGate';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { OfflineBanner } from '@/components/common/OfflineBanner'
 import { colors } from '@/theme/colors';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
   ActivityIndicator,
@@ -14,9 +14,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useConnectivity } from '@/hooks/useConnectivity'
 
 const PrivateLayout = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { isOnline } = useConnectivity()
+  const [offlineBannerHeight, setOfflineBannerHeight] = useState(0)
 
   usePushNotifications();
   useOfflineSync();
@@ -93,31 +96,33 @@ const PrivateLayout = () => {
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      <Stack
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: colors.surface,
-          },
-          headerTintColor: colors.text,
-          headerTitleStyle: {
-            color: colors.text,
-            fontSize: 16,
-          },
-          headerTitleAlign: 'center',
-          headerLargeTitle: false,
-          statusBarStyle: 'dark',
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="record-details" options={{ title: 'Detalji zapisnika' }} />
-        <Stack.Screen name="scan-result" options={{ title: 'Rezultat skena' }} />
-        <Stack.Screen name="create-record" options={{ title: 'Novi zapisnik' }} />
-        <Stack.Screen name="offline-inventory" options={{ title: 'Offline inventar' }} />
-        <Stack.Screen name="outbox" options={{ title: 'Neposlato' }} />
-        <Stack.Screen name="notifications" options={{ title: 'Notifikacije' }} />
-      </Stack>
-      <OfflineBanner />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <OfflineBanner onHeight={setOfflineBannerHeight} />
+      <View style={{ flex: 1, paddingTop: isOnline ? 0 : 24 }}>
+        <Stack
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: colors.surface,
+            },
+            headerTintColor: colors.text,
+            headerTitleStyle: {
+              color: colors.text,
+              fontSize: 16,
+            },
+            headerTitleAlign: 'center',
+            headerLargeTitle: false,
+            statusBarStyle: 'dark',
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="record-details" options={{ title: 'Detalji zapisnika' }} />
+          <Stack.Screen name="scan-result" options={{ title: 'Rezultat skena' }} />
+          <Stack.Screen name="create-record" options={{ title: 'Novi zapisnik' }} />
+          <Stack.Screen name="offline-inventory" options={{ title: 'Offline inventar' }} />
+          <Stack.Screen name="outbox" options={{ title: 'Neposlato' }} />
+          <Stack.Screen name="notifications" options={{ title: 'Notifikacije' }} />
+        </Stack>
+      </View>
     </View>
   );
 };

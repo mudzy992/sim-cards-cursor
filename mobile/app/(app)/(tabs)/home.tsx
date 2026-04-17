@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/auth.store';
@@ -13,6 +13,9 @@ import { offlineCache } from '@/offline/offline-cache'
 import { listOutbox } from '@/offline/outbox'
 import { syncMeterTypesOfflineCache } from '@/offline/meter-types-sync'
 import { colors } from '@/theme/colors';
+import { Card } from '@/components/common/Card'
+import { Screen } from '@/components/common/Screen'
+import { ScreenHeader } from '@/components/common/ScreenHeader'
 
 function StatCard({
   title,
@@ -26,24 +29,22 @@ function StatCard({
   hint?: string;
 }) {
   return (
-    <View
+    <Card
       style={{
-        backgroundColor: '#f8fafc',
-        padding: 16,
-        borderRadius: 12,
         flex: 1,
         minWidth: '45%',
+        padding: 14,
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <Ionicons name={icon} size={20} color={colors.primary} />
         <Text style={{ fontSize: 12, color: colors.textMuted }}>{title}</Text>
       </View>
-      <Text style={{ fontSize: 24, fontWeight: '700', color: '#0f172a' }}>{value}</Text>
+      <Text style={{ fontSize: 26, fontWeight: '800', color: colors.text }}>{value}</Text>
       {hint ? (
         <Text style={{ marginTop: 4, fontSize: 12, color: colors.textMuted }}>{hint}</Text>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
@@ -111,48 +112,48 @@ export default function HomeScreen() {
   });
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View>
-          <Text style={{ fontSize: 22, fontWeight: '700', color: '#0f172a' }}>
-            Dobrodošao/la, {user?.firstName ?? 'Korisnik'}
-          </Text>
-          <Text style={{ fontSize: 14, color: colors.textMuted, marginTop: 4 }}>
-            Pregled statistika i aktivnosti
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => router.push('/notifications')}
-          style={{
-            padding: 10,
-            backgroundColor: '#f1f5f9',
-            borderRadius: 12,
-            position: 'relative',
-          }}
-        >
-          <Ionicons name="notifications-outline" size={24} color={colors.primary} />
-          {unreadCount > 0 && (
-            <View
-              style={{
-                position: 'absolute',
-                top: 4,
-                right: 4,
-                backgroundColor: '#dc2626',
-                borderRadius: 10,
-                minWidth: 18,
-                height: 18,
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: 4,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader
+        title={`Dobrodošao/la, ${user?.firstName ?? 'Korisnik'}`}
+        subtitle="Pregled statistika i aktivnosti"
+        right={
+          <Pressable
+            onPress={() => router.push('/notifications')}
+            style={{
+              padding: 10,
+              backgroundColor: colors.surfaceMuted,
+              borderRadius: 12,
+              position: 'relative',
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <Ionicons name="notifications-outline" size={22} color={colors.primary} />
+            {unreadCount > 0 && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  backgroundColor: colors.danger,
+                  borderRadius: 10,
+                  minWidth: 18,
+                  height: 18,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 4,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        }
+      />
+
+      <Screen scroll contentStyle={{ paddingTop: 14, gap: 16 }}>
 
       {isLoading ? (
         <View style={{ padding: 32, alignItems: 'center' }}>
@@ -160,9 +161,14 @@ export default function HomeScreen() {
         </View>
       ) : operatorStats ? (
         <View style={{ gap: 12 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: '#334155' }}>
-            Statistike
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', letterSpacing: 0.4, color: colors.textMuted }}>
+              STATISTIKE
+            </Text>
+            {operatorStats.isStale ? (
+              <Text style={{ fontSize: 12, color: colors.textMuted }}>Može biti zastario</Text>
+            ) : null}
+          </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <StatCard
               title="Offline SIM"
@@ -209,26 +215,11 @@ export default function HomeScreen() {
               <Text style={{ color: '#fff', fontWeight: '800' }}>Sync tipova brojila</Text>
             </Pressable>
           ) : null}
-          {operatorStats.isStale && (
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-              Prikaz može biti zastario (offline ili backend nedostupan).
-            </Text>
-          )}
         </View>
       ) : null}
 
       {!miniTour.loading && miniTour.visible && (
-        <View
-          style={{
-            marginTop: 8,
-            padding: 14,
-            borderRadius: 12,
-            backgroundColor: '#eef2ff',
-            borderWidth: 1,
-            borderColor: '#c7d2fe',
-            gap: 8,
-          }}
-        >
+        <Card style={{ padding: 14, gap: 8, backgroundColor: '#eef2ff', borderColor: '#c7d2fe' }}>
           <Text style={{ fontSize: 14, fontWeight: '700', color: '#1e293b' }}>
             Kratki vodič kroz aplikaciju
           </Text>
@@ -255,8 +246,9 @@ export default function HomeScreen() {
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Card>
       )}
-    </ScrollView>
+      </Screen>
+    </View>
   );
 }

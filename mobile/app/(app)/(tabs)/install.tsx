@@ -5,7 +5,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,6 +22,8 @@ import { simCardsApi } from '@/api/sim-cards.api'
 import { useAuthStore } from '@/store/auth.store'
 import { listOutbox } from '@/offline/outbox'
 import { colors } from '@/theme/colors'
+import { ScreenHeader } from '@/components/common/ScreenHeader'
+import { Card } from '@/components/common/Card'
 
 const statusLabels: Record<InstallTaskStatus, string> = {
   PENDING: 'Čeka',
@@ -186,15 +190,15 @@ export default function InstallScreen() {
   }
 
   return (
-    <View style={{ flex: 1, padding: 16, gap: 8 }}>
-      <Text style={{ fontSize: 20, fontWeight: '700' }}>Ugradnja SIM</Text>
-      <Text style={{ color: colors.textMuted }}>
-        Zadaci koje je moderator poslao za brojila bez SIM kartice.
-      </Text>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader
+        title="Ugradnja SIM"
+        subtitle="Zadaci koje je moderator poslao za brojila bez SIM kartice."
+      />
 
       {error ? (
-        <View style={{ gap: 8 }}>
-          <Text style={{ color: '#dc2626' }}>{error}</Text>
+        <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 8 }}>
+          <Text style={{ color: colors.danger, fontWeight: '700' }}>{error}</Text>
           <Pressable
             onPress={() => void load(true)}
             style={{
@@ -202,10 +206,10 @@ export default function InstallScreen() {
               backgroundColor: colors.primary,
               paddingHorizontal: 12,
               paddingVertical: 8,
-              borderRadius: 8,
+              borderRadius: 10,
             }}
           >
-            <Text style={{ color: '#fff' }}>Pokušaj ponovo</Text>
+            <Text style={{ color: '#fff', fontWeight: '800' }}>Pokušaj ponovo</Text>
           </Pressable>
         </View>
       ) : null}
@@ -213,32 +217,25 @@ export default function InstallScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 20 }}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
         }
         ListEmptyComponent={
-          <Text style={{ color: '#64748b', marginTop: 24, textAlign: 'center' }}>
+          <Text style={{ color: colors.textMuted, marginTop: 24, textAlign: 'center' }}>
             Nema zadataka ugradnje.
           </Text>
         }
         renderItem={({ item }) => (
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 8,
-            }}
-          >
+          <Card style={{ marginBottom: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ fontWeight: '700', fontSize: 16 }}>
+                <Text style={{ fontWeight: '800', fontSize: 16, color: colors.text }}>
                   {item.meter?.serialNumber ?? 'Brojilo'}
                 </Text>
                 {pendingTaskIds.has(item.id) ? (
                   <View style={{ backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#991b1b' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#991b1b' }}>
                       Neposlato
                     </Text>
                   </View>
@@ -254,13 +251,13 @@ export default function InstallScreen() {
                         : '#fef3c7',
                   paddingHorizontal: 8,
                   paddingVertical: 4,
-                  borderRadius: 6,
+                  borderRadius: 8,
                 }}
               >
                 <Text
                   style={{
                     fontSize: 12,
-                    fontWeight: '600',
+                    fontWeight: '800',
                     color:
                       item.status === 'COMPLETED'
                         ? '#166534'
@@ -275,7 +272,7 @@ export default function InstallScreen() {
             </View>
 
             {item.notes ? (
-              <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 4 }}>
+              <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 4 }}>
                 Napomena: {item.notes}
               </Text>
             ) : null}
@@ -295,7 +292,7 @@ export default function InstallScreen() {
                     backgroundColor: pressed ? colors.primaryPressed : colors.primary,
                     paddingHorizontal: 12,
                     paddingVertical: 8,
-                    borderRadius: 8,
+                    borderRadius: 10,
                     opacity: updatingId === item.id ? 0.7 : 1,
                   })}
                 >
@@ -312,7 +309,7 @@ export default function InstallScreen() {
                       backgroundColor: pressed ? '#94a3b8' : '#64748b',
                       paddingHorizontal: 12,
                       paddingVertical: 8,
-                      borderRadius: 8,
+                      borderRadius: 10,
                       opacity: updatingId === item.id ? 0.7 : 1,
                     })}
                   >
@@ -339,7 +336,7 @@ export default function InstallScreen() {
                       backgroundColor: pressed ? colors.primaryPressed : colors.primary,
                       paddingHorizontal: 12,
                       paddingVertical: 8,
-                      borderRadius: 8,
+                      borderRadius: 10,
                       opacity: updatingId === item.id ? 0.7 : 1,
                     })}
                   >
@@ -358,7 +355,7 @@ export default function InstallScreen() {
                 ))}
               </View>
             ) : null}
-          </View>
+          </Card>
         )}
       />
 
@@ -370,24 +367,33 @@ export default function InstallScreen() {
             justifyContent: 'flex-end',
           }}
         >
-          <View
-            style={{
-              backgroundColor: '#fff',
-              borderTopLeftRadius: 16,
-              borderTopRightRadius: 16,
-              maxHeight: '88%',
-              padding: 16,
-              gap: 12,
-            }}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+            keyboardVerticalOffset={0}
           >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 18, fontWeight: '700' }}>Završetak ugradnje</Text>
-              <Pressable onPress={() => setWizard(null)} hitSlop={12} accessibilityLabel="Zatvori">
-                <Ionicons name="close" size={26} color="#64748b" />
-              </Pressable>
-            </View>
-            {wizard ? (
-              <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12 }}>
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderTopLeftRadius: 18,
+                borderTopRightRadius: 18,
+                maxHeight: '88%',
+                padding: 16,
+                gap: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>Završetak ugradnje</Text>
+                <Pressable onPress={() => setWizard(null)} hitSlop={12} accessibilityLabel="Zatvori">
+                  <Ionicons name="close" size={26} color={colors.textMuted} />
+                </Pressable>
+              </View>
+              {wizard ? (
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
+                >
                 <Text style={{ color: colors.textMuted }}>
                   Brojilo: {wizard.task.meter?.serialNumber ?? wizard.task.meterId}
                 </Text>
@@ -424,10 +430,11 @@ export default function InstallScreen() {
                     style={{
                       borderWidth: 1,
                       borderColor: colors.border,
-                      borderRadius: 10,
+                      borderRadius: 12,
                       padding: 12,
                       minHeight: 80,
                       textAlignVertical: 'top',
+                      backgroundColor: colors.surface,
                     }}
                   />
                 </View>
@@ -437,7 +444,7 @@ export default function InstallScreen() {
                   style={({ pressed }) => ({
                     backgroundColor: pressed ? colors.primaryPressed : colors.primary,
                     padding: 14,
-                    borderRadius: 10,
+                    borderRadius: 12,
                     alignItems: 'center',
                     opacity: wizardSubmitting ? 0.7 : 1,
                   })}
@@ -448,9 +455,10 @@ export default function InstallScreen() {
                     <Text style={{ color: '#fff', fontWeight: '700' }}>Potvrdi ugradnju</Text>
                   )}
                 </Pressable>
-              </ScrollView>
-            ) : null}
-          </View>
+                </ScrollView>
+              ) : null}
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>

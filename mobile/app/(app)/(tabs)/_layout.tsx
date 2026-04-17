@@ -21,6 +21,7 @@ export default function TabsLayout() {
           },
           headerTitleAlign: 'center',
           tabBarActiveTintColor: colors.primary,
+          tabBarHideOnKeyboard: true,
         }}
       >
       <Tabs.Screen

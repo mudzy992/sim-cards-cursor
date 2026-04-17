@@ -20,6 +20,9 @@ import { meterTypeDefinitionsApi, type MeterTypeFieldItem } from '@/api/meter-ty
 import { useAuthStore } from '@/store/auth.store';
 import { useConnectivity } from '@/hooks/useConnectivity'
 import { colors } from '@/theme/colors';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
+import { ScreenHeader } from '@/components/common/ScreenHeader'
+import { Card } from '@/components/common/Card'
 
 export default function CreateRecordScreen() {
   const router = useRouter();
@@ -206,12 +209,16 @@ export default function CreateRecordScreen() {
   }
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
-      <Text style={{ fontSize: 18, fontWeight: '700' }}>Novi zapisnik ugradnje</Text>
-      <Text style={{ fontSize: 14, color: '#64748b', marginBottom: 4 }}>
-        Unesite podatke o brojilu koje montirate. Serijski broj i lokacija se
-        unose na terenu pri montaži.
-      </Text>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader
+        title="Novi zapisnik"
+        subtitle="Unesite podatke o brojilu i lokaciji. Obavezno: tip brojila i serijski broj."
+      />
+      <KeyboardAwareScrollView
+        bottomOffset={62}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 24, gap: 12 }}
+        keyboardShouldPersistTaps="handled"
+      >
 
       <View>
         <Text style={{ marginBottom: 4, fontWeight: '600' }}>Tip brojila *</Text>
@@ -276,26 +283,18 @@ export default function CreateRecordScreen() {
           inputMode="numeric"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
 
       {meterTypeId ? (
-        <View
-          style={{
-            borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 10,
-            padding: 12,
-            gap: 10,
-            backgroundColor: '#fff',
-          }}
-        >
-          <Text style={{ fontWeight: '700', color: '#0f172a' }}>Dodatna polja</Text>
+        <Card style={{ padding: 12, gap: 10 }}>
+          <Text style={{ fontWeight: '800', color: colors.text }}>Dodatna polja</Text>
 
           {meterTypeFieldsQuery.isLoading ? (
             <View style={{ paddingVertical: 8 }}>
@@ -312,7 +311,7 @@ export default function CreateRecordScreen() {
                 : [];
 
               if (fields.length === 0) {
-                return <Text style={{ color: '#64748b' }}>Nema dodatnih polja.</Text>;
+                return <Text style={{ color: colors.textMuted }}>Nema dodatnih polja.</Text>;
               }
 
               const renderField = (f: MeterTypeFieldItem) => {
@@ -377,10 +376,11 @@ export default function CreateRecordScreen() {
                       keyboardType={f.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'}
                       style={{
                         borderWidth: 1,
-                        borderColor: '#e2e8f0',
-                        borderRadius: 8,
+                        borderColor: colors.border,
+                        borderRadius: 12,
                         padding: 12,
                         fontSize: 16,
+                        backgroundColor: colors.surface,
                       }}
                     />
                   </View>
@@ -397,7 +397,7 @@ export default function CreateRecordScreen() {
               );
             })()
           )}
-        </View>
+        </Card>
       ) : null}
 
       <View>
@@ -409,10 +409,11 @@ export default function CreateRecordScreen() {
           keyboardType="number-pad"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -425,10 +426,11 @@ export default function CreateRecordScreen() {
           placeholder="Ulica, broj, mjesto"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -442,10 +444,11 @@ export default function CreateRecordScreen() {
             placeholder="Grad"
             style={{
               borderWidth: 1,
-              borderColor: '#e2e8f0',
-              borderRadius: 8,
+              borderColor: colors.border,
+              borderRadius: 12,
               padding: 12,
               fontSize: 16,
+              backgroundColor: colors.surface,
             }}
           />
         </View>
@@ -458,11 +461,11 @@ export default function CreateRecordScreen() {
             editable={userRole !== 'USER'}
             style={{
               borderWidth: 1,
-              borderColor: '#e2e8f0',
-              borderRadius: 8,
+              borderColor: colors.border,
+              borderRadius: 12,
               padding: 12,
               fontSize: 16,
-              backgroundColor: userRole === 'USER' ? '#f8fafc' : undefined,
+              backgroundColor: userRole === 'USER' ? colors.surfaceMuted : colors.surface,
             }}
           />
         </View>
@@ -478,10 +481,11 @@ export default function CreateRecordScreen() {
           inputMode="numeric"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -494,10 +498,11 @@ export default function CreateRecordScreen() {
           placeholder="YYYY-MM-DD"
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+            borderColor: colors.border,
+            borderRadius: 12,
             padding: 12,
             fontSize: 16,
+            backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -516,10 +521,11 @@ export default function CreateRecordScreen() {
               keyboardType="decimal-pad"
               style={{
                 borderWidth: 1,
-                borderColor: '#e2e8f0',
-                borderRadius: 8,
+                borderColor: colors.border,
+                borderRadius: 12,
                 padding: 12,
                 fontSize: 16,
+                backgroundColor: colors.surface,
               }}
             />
           </View>
@@ -532,10 +538,11 @@ export default function CreateRecordScreen() {
               keyboardType="decimal-pad"
               style={{
                 borderWidth: 1,
-                borderColor: '#e2e8f0',
-                borderRadius: 8,
+                borderColor: colors.border,
+                borderRadius: 12,
                 padding: 12,
                 fontSize: 16,
+                backgroundColor: colors.surface,
               }}
             />
           </View>
@@ -677,11 +684,12 @@ export default function CreateRecordScreen() {
           multiline
           style={{
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            borderRadius: 8,
+          borderColor: colors.border,
+          borderRadius: 12,
             padding: 12,
             fontSize: 16,
             minHeight: 60,
+          backgroundColor: colors.surface,
           }}
         />
       </View>
@@ -714,6 +722,7 @@ export default function CreateRecordScreen() {
       >
         <Text style={{ color: '#64748b' }}>Odustani</Text>
       </Pressable>
-    </ScrollView>
+      </KeyboardAwareScrollView>
+    </View>
   );
 }

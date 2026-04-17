@@ -15,6 +15,8 @@ import type { InstallationRecordItem } from '@/api/installation-records.api';
 import { useConnectivity } from '@/hooks/useConnectivity'
 import { OfflineRequiredNotice } from '@/components/common/OfflineRequiredNotice'
 import { colors } from '@/theme/colors';
+import { ScreenHeader } from '@/components/common/ScreenHeader'
+import { Card } from '@/components/common/Card'
 
 const statusLabels: Record<string, string> = {
   DRAFT: 'Nacrt',
@@ -78,15 +80,15 @@ export default function RecordsScreen() {
   }
 
   return (
-    <View style={{ flex: 1, padding: 16, gap: 8 }}>
-      <Text style={{ fontSize: 20, fontWeight: '700' }}>Moji zapisnici</Text>
-      <Text style={{ color: colors.textMuted }}>
-        Pregled zapisnika ugradnje koje ste kreirali.
-      </Text>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader
+        title="Moji zapisnici"
+        subtitle="Pregled zapisnika ugradnje koje ste kreirali."
+      />
 
       {error ? (
-        <View style={{ gap: 8 }}>
-          <Text style={{ color: '#dc2626' }}>{error}</Text>
+        <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 8 }}>
+          <Text style={{ color: colors.danger, fontWeight: '700' }}>{error}</Text>
           <Pressable
             onPress={() => void load(true)}
             style={{
@@ -94,10 +96,10 @@ export default function RecordsScreen() {
               backgroundColor: colors.primary,
               paddingHorizontal: 12,
               paddingVertical: 8,
-              borderRadius: 8,
+              borderRadius: 10,
             }}
           >
-            <Text style={{ color: '#fff' }}>Pokušaj ponovo</Text>
+            <Text style={{ color: '#fff', fontWeight: '800' }}>Pokušaj ponovo</Text>
           </Pressable>
         </View>
       ) : null}
@@ -105,11 +107,12 @@ export default function RecordsScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 20 }}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
         }
         ListEmptyComponent={
-          <Text style={{ color: '#64748b', marginTop: 24, textAlign: 'center' }}>
+          <Text style={{ color: colors.textMuted, marginTop: 24, textAlign: 'center' }}>
             Nema zapisnika.
           </Text>
         }
@@ -121,14 +124,8 @@ export default function RecordsScreen() {
                 params: { id: item.id },
               })
             }
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 8,
-            }}
           >
+            <Card style={{ marginBottom: 10 }}>
             <View
             style={{
               flexDirection: 'row',
@@ -136,7 +133,7 @@ export default function RecordsScreen() {
               justifyContent: 'space-between',
             }}
           >
-            <Text style={{ fontWeight: '700' }}>{item.recordNumber}</Text>
+            <Text style={{ fontWeight: '800', color: colors.text }}>{item.recordNumber}</Text>
               <Text style={{ color: colors.link, fontWeight: '600' }}>Detalji</Text>
             </View>
             <Text style={{ color: colors.textMuted, fontSize: 14 }}>
@@ -151,14 +148,15 @@ export default function RecordsScreen() {
                   backgroundColor: colors.surfaceMuted,
                   paddingHorizontal: 8,
                   paddingVertical: 4,
-                  borderRadius: 6,
+                  borderRadius: 8,
                 }}
               >
-                <Text style={{ fontSize: 12, color: '#475569' }}>
+                <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '700' }}>
                   {statusLabels[item.status] ?? item.status}
                 </Text>
               </View>
             </View>
+            </Card>
           </Pressable>
         )}
       />

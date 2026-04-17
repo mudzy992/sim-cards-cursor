@@ -3,6 +3,7 @@ import { Slot } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuthStore } from '@/store/auth.store';
+import { KeyboardProvider } from 'react-native-keyboard-controller'
 
 const queryClient = new QueryClient();
 
@@ -23,8 +24,10 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Slot />
-    </QueryClientProvider>
+    <KeyboardProvider>
+      <QueryClientProvider client={queryClient}>
+        <Slot />
+      </QueryClientProvider>
+    </KeyboardProvider>
   );
 }

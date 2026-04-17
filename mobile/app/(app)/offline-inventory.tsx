@@ -5,6 +5,8 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   Text,
@@ -17,6 +19,8 @@ import { useAuthStore } from '@/store/auth.store'
 import { reconcileOfflineSimInventory } from '@/offline/sim-inventory-reconcile'
 import { useConnectivity } from '@/hooks/useConnectivity'
 import { colors } from '@/theme/colors'
+import { ScreenHeader } from '@/components/common/ScreenHeader'
+import { Card } from '@/components/common/Card'
 
 export default function OfflineInventoryScreen() {
   const router = useRouter()
@@ -95,114 +99,128 @@ export default function OfflineInventoryScreen() {
   }
 
   return (
-    <View style={{ flex: 1, padding: 16, gap: 10 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View style={{ flex: 1, paddingRight: 12 }}>
-          <Text style={{ fontSize: 20, fontWeight: '700' }}>Offline inventar</Text>
-          <Text style={{ color: colors.textMuted, marginTop: 2 }}>
-            Skeniraj SIM kartice prije terena. Wizard-i koriste ovaj inventar kada nema mreže.
-          </Text>
-        </View>
-        <Pressable
-          onPress={() =>
-            router.push({ pathname: '/(app)/(tabs)/scan', params: { afterScan: 'inventory' } })
-          }
-          accessibilityLabel="Skeniraj SIM za offline inventar"
-          style={({ pressed }) => ({
-            backgroundColor: pressed ? colors.primaryPressed : colors.primary,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            borderRadius: 12,
-          })}
-        >
-          <Ionicons name="scan" size={22} color="#fff" />
-        </Pressable>
-      </View>
-
-      {error ? <Text style={{ color: '#dc2626' }}>{error}</Text> : null}
-
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Pretraga ICCID ili IP"
-        autoCapitalize="none"
-        style={{
-          borderWidth: 1,
-          borderColor: colors.border,
-          borderRadius: 12,
-          padding: 12,
-        }}
-      />
-
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.iccid}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />}
-        ListEmptyComponent={
-          <Text style={{ color: colors.textMuted, marginTop: 24, textAlign: 'center' }}>
-            Offline inventar je prazan. Skeniraj SIM kartice koje nosiš na teren.
-          </Text>
-        }
-        renderItem={({ item }) => (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader
+        title="Offline inventar"
+        subtitle="Skeniraj SIM prije terena. Wizard-i koriste inventar kada nema mreže."
+        right={
           <Pressable
-            onLongPress={() => {
-              Alert.alert('Ukloni', `Ukloniti ${item.iccid} iz offline inventara?`, [
-                { text: 'Odustani', style: 'cancel' },
-                {
-                  text: 'Ukloni',
-                  style: 'destructive',
-                  onPress: () =>
-                    void (async () => {
-                      await simCardsApi.removeOfflineInventoryByIccid(item.iccid)
-                      void load(true)
-                    })(),
-                },
-              ])
-            }}
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
+            onPress={() =>
+              router.push({ pathname: '/(app)/(tabs)/scan', params: { afterScan: 'inventory' } })
+            }
+            accessibilityLabel="Skeniraj SIM za offline inventar"
+            style={({ pressed }) => ({
+              backgroundColor: pressed ? colors.primaryPressed : colors.primary,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
               borderRadius: 12,
-              padding: 12,
-              marginBottom: 8,
-              backgroundColor: colors.surface,
-            }}
+            })}
           >
-            <Text style={{ fontWeight: '700' }}>{item.iccid}</Text>
-            <Text style={{ color: colors.textMuted, marginTop: 2 }}>IP: {item.ipAddress ?? '–'}</Text>
-            <Text style={{ color: colors.textMuted, marginTop: 2 }}>
-              Status: {item.status ?? '–'}
-            </Text>
+            <Ionicons name="scan" size={22} color="#fff" />
           </Pressable>
-        )}
+        }
       />
 
-      <Pressable
-        onPress={() => {
-          Alert.alert('Obriši sve', 'Obrisati kompletan offline inventar?', [
-            { text: 'Odustani', style: 'cancel' },
-            {
-              text: 'Obriši',
-              style: 'destructive',
-              onPress: () =>
-                void (async () => {
-                  await simCardsApi.clearOfflineInventory()
-                  void load(true)
-                })(),
-            },
-          ])
-        }}
-        style={{
-          borderWidth: 1,
-          borderColor: '#fecaca',
-          backgroundColor: '#fff',
-          borderRadius: 12,
-          padding: 12,
-          alignItems: 'center',
-        }}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={0}
       >
-        <Text style={{ color: '#b91c1c', fontWeight: '700' }}>Obriši inventar</Text>
-      </Pressable>
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.iccid}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 24 }}
+          ListHeaderComponent={
+            <View style={{ gap: 10 }}>
+              {error ? <Text style={{ color: colors.danger, fontWeight: '700' }}>{error}</Text> : null}
+
+              <Card style={{ padding: 12, gap: 8 }}>
+                <Text style={{ fontSize: 12, fontWeight: '800', letterSpacing: 0.4, color: colors.textMuted }}>
+                  PRETRAGA
+                </Text>
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="ICCID ili IP"
+                  autoCapitalize="none"
+                  style={{
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 12,
+                    padding: 12,
+                    backgroundColor: colors.surface,
+                    color: colors.text,
+                    fontWeight: '700',
+                  }}
+                />
+              </Card>
+            </View>
+          }
+          ListEmptyComponent={
+            <Text style={{ color: colors.textMuted, marginTop: 24, textAlign: 'center' }}>
+              Offline inventar je prazan. Skeniraj SIM kartice koje nosiš na teren.
+            </Text>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              onLongPress={() => {
+                Alert.alert('Ukloni', `Ukloniti ${item.iccid} iz offline inventara?`, [
+                  { text: 'Odustani', style: 'cancel' },
+                  {
+                    text: 'Ukloni',
+                    style: 'destructive',
+                    onPress: () =>
+                      void (async () => {
+                        await simCardsApi.removeOfflineInventoryByIccid(item.iccid)
+                        void load(true)
+                      })(),
+                  },
+                ])
+              }}
+              style={({ pressed }) => ({ opacity: pressed ? 0.95 : 1 })}
+            >
+              <Card style={{ marginBottom: 10 }}>
+                <Text style={{ fontWeight: '800', color: colors.text }}>{item.iccid}</Text>
+                <Text style={{ color: colors.textMuted, marginTop: 2 }}>IP: {item.ipAddress ?? '–'}</Text>
+                <Text style={{ color: colors.textMuted, marginTop: 2 }}>
+                  Status: {item.status ?? '–'}
+                </Text>
+              </Card>
+            </Pressable>
+          )}
+          ListFooterComponent={
+            <Pressable
+              onPress={() => {
+                Alert.alert('Obriši sve', 'Obrisati kompletan offline inventar?', [
+                  { text: 'Odustani', style: 'cancel' },
+                  {
+                    text: 'Obriši',
+                    style: 'destructive',
+                    onPress: () =>
+                      void (async () => {
+                        await simCardsApi.clearOfflineInventory()
+                        void load(true)
+                      })(),
+                  },
+                ])
+              }}
+              style={{
+                marginTop: 4,
+                borderWidth: 1,
+                borderColor: '#fecaca',
+                backgroundColor: '#fff',
+                borderRadius: 12,
+                padding: 12,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#b91c1c', fontWeight: '800' }}>Obriši inventar</Text>
+            </Pressable>
+          }
+        />
+      </KeyboardAvoidingView>
     </View>
   )
 }
