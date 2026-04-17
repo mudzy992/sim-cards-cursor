@@ -15,6 +15,7 @@ import { colors } from '@/theme/colors'
 
 const kindLabel: Record<string, string> = {
   INSTALLATION_RECORD_CREATE: 'Kreiranje zapisnika',
+  SIM_CARD_CLAIM: 'Zaduživanje SIM kartice',
   DEMOUNT_TASK_UPDATE_STATUS: 'Demontaža: status',
   DEMOUNT_TASK_COMPLETE: 'Demontaža: završetak',
   INSTALL_TASK_UPDATE_STATUS: 'Ugradnja: status',

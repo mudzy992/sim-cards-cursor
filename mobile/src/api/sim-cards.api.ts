@@ -2,6 +2,7 @@ import axios from 'axios';
 import { axiosInstance } from './axios.instance';
 import { useAuthStore } from '@/store/auth.store'
 import { offlineCache } from '@/offline/offline-cache'
+import { enqueueOutboxItem } from '@/offline/outbox'
 
 export type MobileSimCard = {
   id: string;
@@ -69,8 +70,56 @@ export const simCardsApi = {
   },
 
   claimById: async (id: string): Promise<MobileSimCard> => {
-    const response = await axiosInstance.post(`/sim-cards/${id}/claim`);
-    return response.data.data;
+    const user = requireUser()
+    try {
+      const response = await axiosInstance.post(`/sim-cards/${id}/claim`)
+      const claimed = response.data.data as MobileSimCard
+      await offlineCache.offlineSimInventory.upsert(user, claimed)
+      return claimed
+    } catch (error) {
+      if (axios.isAxiosError(error) && !error.response) {
+        await enqueueOutboxItem(user, {
+          kind: 'SIM_CARD_CLAIM',
+          request: { method: 'POST', url: `/sim-cards/${id}/claim`, body: {} },
+          meta: { simCardId: id },
+        })
+
+        const existing = (await offlineCache.offlineSimInventory.get(user))?.data ?? []
+        const next = existing.map((c) => {
+          if (c.id !== id) return c
+          return {
+            ...c,
+            status: 'ASSIGNED',
+            assignedTo: {
+              id: user.id,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              email: user.email,
+            },
+            fromOfflineCache: true,
+          }
+        })
+        await offlineCache.offlineSimInventory.set(user, next)
+
+        const updated = next.find((c) => c.id === id)
+        if (updated) return updated
+
+        return {
+          id,
+          iccid: '',
+          ipAddress: '',
+          status: 'ASSIGNED',
+          assignedTo: {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+          },
+          fromOfflineCache: true,
+        }
+      }
+      throw error
+    }
   },
 
   myAssigned: async (): Promise<MobileSimCard[]> => {

@@ -1,12 +1,14 @@
 import axios from 'axios'
 import type { AuthUser } from '@/types/auth.types'
 import { axiosInstance } from '@/api/axios.instance'
+import { installationRecordsApi } from '@/api/installation-records.api'
 import { deletePersistedJson, readPersistedJson, writePersistedJson } from './persisted-json'
 
 export type OutboxStatus = 'PENDING' | 'SENDING' | 'FAILED' | 'SENT'
 
 export type OutboxKind =
   | 'INSTALLATION_RECORD_CREATE'
+  | 'SIM_CARD_CLAIM'
   | 'DEMOUNT_TASK_UPDATE_STATUS'
   | 'DEMOUNT_TASK_COMPLETE'
   | 'INSTALL_TASK_UPDATE_STATUS'
@@ -31,6 +33,7 @@ export type OutboxItem = {
     meterId?: string
     simCardId?: string
     recordNumber?: string
+    localPhotoUris?: string[]
   }
 }
 
@@ -146,6 +149,18 @@ function toErrorMessage(error: unknown): string {
 }
 
 async function sendOne(item: OutboxItem): Promise<void> {
+  if (item.kind === 'INSTALLATION_RECORD_CREATE' && item.meta?.localPhotoUris?.length) {
+    const body = item.request.body as any
+    const uploaded: string[] = []
+    for (const uri of item.meta.localPhotoUris) {
+      const path = await installationRecordsApi.uploadPhoto(uri)
+      uploaded.push(path)
+    }
+    item.request.body = {
+      ...body,
+      photos: Array.isArray(body?.photos) ? [...body.photos, ...uploaded] : uploaded,
+    }
+  }
   if (item.request.method === 'POST') {
     await axiosInstance.post(item.request.url, item.request.body)
     return

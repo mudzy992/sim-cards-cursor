@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { syncOutbox } from '@/offline/outbox'
+import { reconcileOfflineSimInventory } from '@/offline/sim-inventory-reconcile'
 import { useConnectivity } from './useConnectivity'
 
 export function useOfflineSync(): { isOnline: boolean } {
@@ -20,6 +21,7 @@ export function useOfflineSync(): { isOnline: boolean } {
     void (async () => {
       try {
         await syncOutbox(user, { maxItems: 50 })
+        await reconcileOfflineSimInventory(user)
       } finally {
         isSyncingRef.current = false
       }

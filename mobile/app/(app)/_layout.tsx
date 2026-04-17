@@ -3,13 +3,14 @@ import { useAuthStore } from '@/store/auth.store';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAppUpdateGate } from '@/hooks/useAppUpdateGate';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { OfflineBanner } from '@/components/common/OfflineBanner'
 import { colors } from '@/theme/colors';
 import { useEffect, useRef } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context'
 import {
   ActivityIndicator,
   Alert,
   Button,
-  SafeAreaView,
   Text,
   View,
 } from 'react-native';
@@ -92,26 +93,32 @@ const PrivateLayout = () => {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.surface,
-        },
-        headerTintColor: colors.text,
-        headerTitleStyle: {
-          color: colors.text,
-        },
-        statusBarStyle: 'dark',
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="record-details" options={{ title: 'Detalji zapisnika' }} />
-      <Stack.Screen name="scan-result" options={{ title: 'Rezultat skena' }} />
-      <Stack.Screen name="create-record" options={{ title: 'Novi zapisnik' }} />
-      <Stack.Screen name="offline-inventory" options={{ title: 'Offline inventar' }} />
-      <Stack.Screen name="outbox" options={{ title: 'Neposlato' }} />
-      <Stack.Screen name="notifications" options={{ title: 'Notifikacije' }} />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: colors.surface,
+          },
+          headerTintColor: colors.text,
+          headerTitleStyle: {
+            color: colors.text,
+            fontSize: 16,
+          },
+          headerTitleAlign: 'center',
+          headerLargeTitle: false,
+          statusBarStyle: 'dark',
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="record-details" options={{ title: 'Detalji zapisnika' }} />
+        <Stack.Screen name="scan-result" options={{ title: 'Rezultat skena' }} />
+        <Stack.Screen name="create-record" options={{ title: 'Novi zapisnik' }} />
+        <Stack.Screen name="offline-inventory" options={{ title: 'Offline inventar' }} />
+        <Stack.Screen name="outbox" options={{ title: 'Neposlato' }} />
+        <Stack.Screen name="notifications" options={{ title: 'Notifikacije' }} />
+      </Stack>
+      <OfflineBanner />
+    </View>
   );
 };
 

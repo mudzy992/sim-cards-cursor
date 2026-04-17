@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { installationRecordsApi, queueInstallationRecord, type CreateInstallationRecordPayload } from '@/api/installation-records.api';
 import { meterTypeDefinitionsApi, type MeterTypeFieldItem } from '@/api/meter-type-definitions.api';
 import { useAuthStore } from '@/store/auth.store';
+import { useConnectivity } from '@/hooks/useConnectivity'
 import { colors } from '@/theme/colors';
 
 export default function CreateRecordScreen() {
@@ -27,6 +28,7 @@ export default function CreateRecordScreen() {
   const userId = useAuthStore((state) => state.user?.id);
   const userBranch = useAuthStore((state) => state.user?.branch);
   const userRole = useAuthStore((state) => state.user?.role);
+  const { isOnline } = useConnectivity()
 
   const [meterTypeId, setMeterTypeId] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -48,6 +50,7 @@ export default function CreateRecordScreen() {
   const [longitude, setLongitude] = useState('');
   const [notes, setNotes] = useState('');
   const [photoPaths, setPhotoPaths] = useState<string[]>([]);
+  const [localPhotoUris, setLocalPhotoUris] = useState<string[]>([])
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [dynamicFieldValues, setDynamicFieldValues] = useState<Record<string, unknown>>({});
@@ -111,6 +114,7 @@ export default function CreateRecordScreen() {
       dynamicFieldValues: Object.keys(dynamicFieldValues).length > 0 ? dynamicFieldValues : undefined,
       notes: notes.trim() || undefined,
       photos: photoPaths.length > 0 ? photoPaths : undefined,
+      ...(localPhotoUris.length > 0 ? { localPhotoUris } : {}),
     };
   };
 
@@ -609,9 +613,17 @@ export default function CreateRecordScreen() {
               if (result.canceled || !result.assets[0]?.uri) return;
               setIsUploadingPhoto(true);
               try {
+                if (!isOnline) {
+                  setLocalPhotoUris((p) => [...p, result.assets[0].uri])
+                  return
+                }
                 const path = await installationRecordsApi.uploadPhoto(result.assets[0].uri);
                 setPhotoPaths((p) => [...p, path]);
               } catch (err) {
+                if (axios.isAxiosError(err) && !err.response) {
+                  setLocalPhotoUris((p) => [...p, result.assets[0].uri])
+                  return
+                }
                 Alert.alert(
                   'Greška',
                   axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
@@ -646,6 +658,11 @@ export default function CreateRecordScreen() {
           {photoPaths.length > 0 && (
             <Text style={{ color: '#64748b', fontSize: 14 }}>
               Dodano: {photoPaths.length}
+            </Text>
+          )}
+          {localPhotoUris.length > 0 && (
+            <Text style={{ color: '#b45309', fontSize: 14 }}>
+              Na čekanju (offline): {localPhotoUris.length}
             </Text>
           )}
         </View>

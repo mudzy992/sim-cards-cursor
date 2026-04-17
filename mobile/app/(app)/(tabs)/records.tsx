@@ -12,6 +12,8 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { installationRecordsApi, syncOfflineInstallationRecords } from '@/api/installation-records.api';
 import type { InstallationRecordItem } from '@/api/installation-records.api';
+import { useConnectivity } from '@/hooks/useConnectivity'
+import { OfflineRequiredNotice } from '@/components/common/OfflineRequiredNotice'
 import { colors } from '@/theme/colors';
 
 const statusLabels: Record<string, string> = {
@@ -24,6 +26,7 @@ const statusLabels: Record<string, string> = {
 
 export default function RecordsScreen() {
   const router = useRouter();
+  const { isOnline } = useConnectivity()
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +59,15 @@ export default function RecordsScreen() {
       void load(false);
     }, [load]),
   );
+
+  if (!isOnline) {
+    return (
+      <OfflineRequiredNotice
+        message="Pregled zapisnika zahtijeva internet vezu. Offline možete raditi kroz skeniranje i wizard-e; sve se šalje kasnije."
+        onRetry={() => void load(true)}
+      />
+    )
+  }
 
   if (isLoading) {
     return (

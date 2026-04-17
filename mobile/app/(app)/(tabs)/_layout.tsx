@@ -12,11 +12,14 @@ export default function TabsLayout() {
           headerShown: true,
           headerStyle: {
             backgroundColor: colors.surface,
+            height: 52,
           },
           headerTintColor: colors.text,
           headerTitleStyle: {
             color: colors.text,
+            fontSize: 16,
           },
+          headerTitleAlign: 'center',
           tabBarActiveTintColor: colors.primary,
         }}
       >

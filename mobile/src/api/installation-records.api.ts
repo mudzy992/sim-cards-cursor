@@ -102,10 +102,22 @@ function requireUser() {
 
 export async function queueInstallationRecord(payload: CreateInstallationRecordPayload): Promise<void> {
   const user = requireUser()
+  const localPhotoUris = (payload as any)?.localPhotoUris as unknown
+  const sanitizedPayload =
+    localPhotoUris && typeof localPhotoUris === 'object'
+      ? (() => {
+          const { localPhotoUris: _ignored, ...rest } = payload as any
+          return rest as CreateInstallationRecordPayload
+        })()
+      : payload
   await enqueueOutboxItem(user, {
     kind: 'INSTALLATION_RECORD_CREATE',
-    request: { method: 'POST', url: '/installation-records', body: payload },
-    meta: { simCardId: payload.simCardId, meterId: 'meterId' in payload ? payload.meterId : undefined },
+    request: { method: 'POST', url: '/installation-records', body: sanitizedPayload },
+    meta: {
+      simCardId: payload.simCardId,
+      meterId: 'meterId' in payload ? payload.meterId : undefined,
+      localPhotoUris: Array.isArray(localPhotoUris) ? (localPhotoUris as string[]) : undefined,
+    },
   })
 }
 

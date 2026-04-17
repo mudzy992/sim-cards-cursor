@@ -13,10 +13,15 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { simCardsApi, type MobileSimCard } from '@/api/sim-cards.api'
+import { useAuthStore } from '@/store/auth.store'
+import { reconcileOfflineSimInventory } from '@/offline/sim-inventory-reconcile'
+import { useConnectivity } from '@/hooks/useConnectivity'
 import { colors } from '@/theme/colors'
 
 export default function OfflineInventoryScreen() {
   const router = useRouter()
+  const user = useAuthStore((s) => s.user)
+  const { isOnline } = useConnectivity()
   const params = useLocalSearchParams<{ pickedIccid?: string }>()
   const pickedIccid =
     typeof params.pickedIccid === 'string' ? params.pickedIccid : params.pickedIccid?.[0]
@@ -32,6 +37,9 @@ export default function OfflineInventoryScreen() {
     else setIsLoading(true)
     setError(null)
     try {
+      if (refresh && user && isOnline) {
+        await reconcileOfflineSimInventory(user)
+      }
       const list = await simCardsApi.listOfflineInventory()
       setItems(list)
     } catch {
@@ -40,7 +48,7 @@ export default function OfflineInventoryScreen() {
       setIsLoading(false)
       setIsRefreshing(false)
     }
-  }, [])
+  }, [user, isOnline])
 
   useEffect(() => {
     void load(false)
