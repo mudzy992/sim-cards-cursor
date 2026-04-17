@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsUUID, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsInt, IsUUID, IsDateString, IsEnum } from 'class-validator';
+import { MeterSimCardState } from '@prisma/client';
 
 export class CreateMeterDto {
   @ApiProperty()
@@ -73,5 +74,20 @@ export class CreateMeterDto {
   })
   @IsUUID()
   @IsOptional()
-  simCardId?: string;
+  simCardId?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Eksplicitno stanje SIM-a na brojilu',
+    enum: MeterSimCardState,
+  })
+  @IsEnum(MeterSimCardState)
+  @IsOptional()
+  simCardState?: MeterSimCardState;
+
+  @ApiPropertyOptional({
+    description: 'Razlog zašto je brojilo bez SIM (ako je simCardState = NO_SIM)',
+  })
+  @IsString()
+  @IsOptional()
+  noSimReason?: string;
 }

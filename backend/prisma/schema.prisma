@@ -29,6 +29,11 @@ enum SimCardStatus {
   DEACTIVATED
 }
 
+enum MeterSimCardState {
+  INSTALLED
+  NO_SIM
+}
+
 enum MeterType {
   SINGLE_PHASE
   THREE_PHASE
@@ -137,6 +142,8 @@ model User {
   activityLogs      ActivityLog[]
   demountTasksAssigned DemountTask[]     @relation("DemountTasksAssigned")
   demountTasksCreated  DemountTask[]     @relation("DemountTasksCreated")
+  installTasksAssigned InstallTask[]    @relation("InstallTasksAssigned")
+  installTasksCreated  InstallTask[]    @relation("InstallTasksCreated")
   pushTokens        PushToken[]
   pushCampaignsCreated PushCampaign[]    @relation("PushCampaignCreatedBy")
   mobileReleasesCreated MobileAppRelease[] @relation("MobileAppReleaseCreatedBy")
@@ -199,6 +206,8 @@ model Meter {
   meterTypeDefinition       MeterTypeDefinition   @relation(fields: [meterTypeDefinitionId], references: [id], onDelete: Restrict)
   simCardId                 String?              @unique @map("sim_card_id")
   simCard                   SimCard?             @relation(fields: [simCardId], references: [id], onDelete: SetNull)
+  simCardState              MeterSimCardState     @default(NO_SIM) @map("sim_card_state")
+  noSimReason               String?               @map("no_sim_reason") @db.Text
   year                      Int?
   notes                     String?              @db.Text
   installationAddress       String?               @map("installation_address") @db.Text
@@ -213,6 +222,7 @@ model Meter {
   updatedAt                 DateTime              @updatedAt @map("updated_at")
   installationRecords       InstallationRecord[]
   demountTasks              DemountTask[]
+  installTasks              InstallTask[]
 
   @@index([serialNumber])
   @@index([meterTypeDefinitionId])
@@ -239,6 +249,7 @@ model MeterTypeDefinition {
 model InstallationRecord {
   id                        String                @id @default(uuid())
   recordNumber              String                @unique @map("record_number")
+  clientRequestId           String?               @unique @map("client_request_id")
   meterId                   String                @map("meter_id")
   meter                     Meter                 @relation(fields: [meterId], references: [id])
   installedById             String                @map("installed_by_id")
@@ -255,6 +266,7 @@ model InstallationRecord {
   photos                   Json?
   createdAt                DateTime              @default(now()) @map("created_at")
   updatedAt                DateTime              @updatedAt @map("updated_at")
+  installTask              InstallTask?          @relation("InstallTaskInstallationRecord")
 
   @@index([recordNumber])
   @@index([status])
@@ -418,23 +430,66 @@ enum DemountTaskStatus {
   CANCELLED
 }
 
+enum DemountTaskType {
+  DEMOUNT_METER
+  DEMOUNT_SIM
+}
+
+enum DemountCompletionResolution {
+  FULL_DEMOUNT
+  REPLACE_SIM
+  REMOVE_SIM_ONLY
+}
+
+enum InstallTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 model DemountTask {
-  id            String            @id @default(uuid())
-  meterId       String            @map("meter_id")
-  meter         Meter             @relation(fields: [meterId], references: [id], onDelete: Cascade)
-  assignedToId  String            @map("assigned_to_id")
-  assignedTo    User              @relation("DemountTasksAssigned", fields: [assignedToId], references: [id])
-  createdById  String            @map("created_by_id")
-  createdBy    User              @relation("DemountTasksCreated", fields: [createdById], references: [id])
-  status        DemountTaskStatus @default(PENDING)
-  notes         String?           @db.Text
-  completedAt   DateTime?         @map("completed_at")
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
+  id                     String                       @id @default(uuid())
+  meterId                String                       @map("meter_id")
+  meter                  Meter                        @relation(fields: [meterId], references: [id], onDelete: Cascade)
+  assignedToId           String                       @map("assigned_to_id")
+  assignedTo             User                         @relation("DemountTasksAssigned", fields: [assignedToId], references: [id])
+  createdById            String                       @map("created_by_id")
+  createdBy              User                         @relation("DemountTasksCreated", fields: [createdById], references: [id])
+  status                 DemountTaskStatus            @default(PENDING)
+  taskType               DemountTaskType              @default(DEMOUNT_SIM) @map("task_type")
+  completionResolution   DemountCompletionResolution? @map("completion_resolution")
+  completionReason       String?                      @map("completion_reason") @db.Text
+  notes                  String?                      @db.Text
+  completedAt            DateTime?                    @map("completed_at")
+  createdAt              DateTime                     @default(now()) @map("created_at")
+  updatedAt              DateTime                     @updatedAt @map("updated_at")
 
   @@index([assignedToId])
   @@index([status])
   @@map("demount_tasks")
+}
+
+model InstallTask {
+  id                       String            @id @default(uuid())
+  meterId                  String            @map("meter_id")
+  meter                    Meter             @relation(fields: [meterId], references: [id], onDelete: Cascade)
+  assignedToId             String            @map("assigned_to_id")
+  assignedTo               User              @relation("InstallTasksAssigned", fields: [assignedToId], references: [id])
+  createdById              String            @map("created_by_id")
+  createdBy                User              @relation("InstallTasksCreated", fields: [createdById], references: [id])
+  status                   InstallTaskStatus @default(PENDING)
+  notes                    String?           @db.Text
+  installationRecordId     String?           @unique @map("installation_record_id")
+  installationRecord       InstallationRecord? @relation("InstallTaskInstallationRecord", fields: [installationRecordId], references: [id], onDelete: SetNull)
+  completedAt              DateTime?         @map("completed_at")
+  createdAt                DateTime          @default(now()) @map("created_at")
+  updatedAt                DateTime          @updatedAt @map("updated_at")
+
+  @@index([assignedToId])
+  @@index([status])
+  @@index([meterId])
+  @@map("install_tasks")
 }
 
 model BranchModerator {

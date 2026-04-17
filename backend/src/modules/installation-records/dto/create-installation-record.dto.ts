@@ -12,6 +12,13 @@ import {
 } from 'class-validator';
 
 export class CreateInstallationRecordDto {
+  @ApiPropertyOptional({
+    description: 'Idempotency ključ (mobilni offline queue). Ponovni zahtjev sa istim ključem vraća isti zapisnik.',
+  })
+  @IsString()
+  @IsOptional()
+  clientRequestId?: string
+
   @ApiProperty()
   @IsUUID()
   @IsNotEmpty()

@@ -12,6 +12,7 @@ import {
 import { Request } from 'express';
 import { DemountTasksService } from './demount-tasks.service';
 import { CreateDemountTaskDto } from './dto/create-demount-task.dto';
+import { CompleteDemountTaskDto } from './dto/complete-demount-task.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -55,7 +56,7 @@ export class DemountTasksController {
 
   @Patch(':id/status')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
-  @ApiOperation({ summary: 'Ažuriraj status (IN_PROGRESS, COMPLETED)' })
+  @ApiOperation({ summary: 'Ažuriraj status (PENDING, IN_PROGRESS, CANCELLED) — ne koristiti COMPLETED' })
   updateStatus(
     @Param('id') id: string,
     @Body() body: { status: DemountTaskStatus },
@@ -71,5 +72,21 @@ export class DemountTasksController {
       user.id,
       ipAddress,
     );
+  }
+
+  @Post(':id/complete')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Završi zadatak wizardom (rezolucija + obrazloženje + opcionalno nova SIM)' })
+  complete(
+    @Param('id') id: string,
+    @Body() dto: CompleteDemountTaskDto,
+    @CurrentUser() user: User,
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    const scope = toScopeContext({ ...user, role: user.role as UserRole });
+    return this.demountTasksService.complete(id, dto, user.id, ipAddress, scope);
   }
 }

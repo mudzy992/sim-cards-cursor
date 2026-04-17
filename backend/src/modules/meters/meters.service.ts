@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
 import { CreateMeterDto } from './dto/create-meter.dto';
 import { UpdateMeterDto } from './dto/update-meter.dto';
-import { Prisma, Meter } from '@prisma/client';
+import { Meter, MeterSimCardState, Prisma } from '@prisma/client';
 import { MeterFilterDto } from './dto/meter-filter.dto';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
@@ -40,6 +40,20 @@ export class MetersService {
     );
     if (Object.keys(validated).length > 0) {
       data.dynamicFieldValues = validated;
+    }
+
+    if (createMeterDto.simCardState) {
+      if (createMeterDto.simCardState === MeterSimCardState.INSTALLED) {
+        throw new BadRequestException('simCardState=INSTALLED nije dozvoljen bez procesa ugradnje SIM-a.');
+      }
+      data.simCardState = createMeterDto.simCardState;
+      data.noSimReason =
+        createMeterDto.simCardState === MeterSimCardState.NO_SIM
+          ? (createMeterDto.noSimReason ?? null)
+          : null;
+    } else if (createMeterDto.noSimReason) {
+      data.simCardState = MeterSimCardState.NO_SIM;
+      data.noSimReason = createMeterDto.noSimReason;
     }
 
     return this.prisma.meter.create({
@@ -121,6 +135,27 @@ export class MetersService {
       data.installationDate = new Date(data.installationDate as string);
     }
     if (data.branchId !== undefined) (data as Record<string, unknown>).branchId = data.branchId;
+
+    const simCardId = updateMeterDto.simCardId;
+    const simCardState = updateMeterDto.simCardState;
+    if (simCardId) {
+      data.simCardState = MeterSimCardState.INSTALLED;
+      data.noSimReason = null;
+    }
+    if (simCardId === null) {
+      data.simCardState = MeterSimCardState.NO_SIM;
+      data.noSimReason = updateMeterDto.noSimReason ?? null;
+    }
+    if (simCardState) {
+      if (simCardState === MeterSimCardState.INSTALLED && !simCardId) {
+        throw new BadRequestException('simCardState=INSTALLED zahtijeva simCardId.');
+      }
+      if (simCardState === MeterSimCardState.NO_SIM) {
+        data.simCardId = null;
+        data.noSimReason = updateMeterDto.noSimReason ?? null;
+      }
+      data.simCardState = simCardState;
+    }
 
     if (updateMeterDto.dynamicFieldValues !== undefined) {
       const meter = await this.prisma.meter.findUnique({
