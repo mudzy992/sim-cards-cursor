@@ -42,6 +42,7 @@ type MeterFormValues = {
   serialNumber: string;
   meterTypeDefinitionId: string;
   year?: number;
+  calibrationYear?: number;
   notes?: string;
   installationAddress?: string;
   installationDate?: string;
@@ -236,6 +237,7 @@ export default function MetersListPage() {
       serialNumber: record.serialNumber,
       meterTypeDefinitionId: record.meterTypeDefinitionId ?? undefined,
       year: record.year ?? undefined,
+      calibrationYear: record.calibrationYear ?? undefined,
       notes: record.notes ?? undefined,
       installationAddress: (record as MeterItem & { installationAddress?: string }).installationAddress ?? undefined,
       installationDate: (record as MeterItem & { installationDate?: string }).installationDate?.slice(0, 10),
@@ -265,6 +267,7 @@ export default function MetersListPage() {
       serialNumber: values.serialNumber,
       meterTypeDefinitionId: values.meterTypeDefinitionId,
       year: values.year,
+      calibrationYear: values.calibrationYear,
       notes: values.notes,
       installationAddress: values.installationAddress,
       installationDate: values.installationDate,
@@ -453,9 +456,15 @@ export default function MetersListPage() {
                         row.meterTypeDefinition?.model ?? '–',
                     },
                     {
-                      title: 'Godina',
+                      title: 'God. proizv.',
                       dataIndex: 'year',
                       key: 'year',
+                      render: (val: number | null) => (val != null ? String(val) : '–'),
+                    },
+                    {
+                      title: 'God. baždarenja',
+                      dataIndex: 'calibrationYear',
+                      key: 'calibrationYear',
                       render: (val: number | null) => (val != null ? String(val) : '–'),
                     },
                     {
@@ -639,8 +648,11 @@ export default function MetersListPage() {
               <Descriptions.Item label="Maks. struja (A)">
                 {detailMeter.meterTypeDefinition?.maxCurrent ?? '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Godina">
+              <Descriptions.Item label="Godina proizvodnje">
                 {detailMeter.year != null ? String(detailMeter.year) : '–'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Godina baždarenja">
+                {detailMeter.calibrationYear != null ? String(detailMeter.calibrationYear) : '–'}
               </Descriptions.Item>
               <Descriptions.Item label="Lokacija instalacije">
                 {(detailMeter as MeterItem & { installationAddress?: string }).installationAddress ?? '–'}
@@ -807,13 +819,19 @@ export default function MetersListPage() {
                 loading={meterTypesQuery.isLoading}
               />
             </Form.Item>
-            <Form.Item name="year" label="Godina proizvodnje">
-              <InputNumber
-                min={1900}
-                max={2100}
-                placeholder="Opcionalno"
-                style={{ width: '100%' }}
-              />
+            <Form.Item
+              name="year"
+              label="Godina proizvodnje"
+              rules={[{ required: true, message: 'Obavezno.' }]}
+            >
+              <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              name="calibrationYear"
+              label="Godina baždarenja"
+              rules={[{ required: true, message: 'Obavezno.' }]}
+            >
+              <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="installationAddress" label="Lokacija instalacije">
               <Input.TextArea rows={2} placeholder="Adresa ugradnje" />

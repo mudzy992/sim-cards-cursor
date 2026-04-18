@@ -2,12 +2,24 @@ import { axiosInstance } from './axios.instance';
 import type { ApiEnvelope } from '@/types/common.types';
 import type {
   InstallationRecordItem,
+  InstallationRecordKind,
   InstallationRecordsListParams,
   InstallationRecordsResponse,
   RecordStatus,
 } from '@/types/installation-record.types';
 
 const baseUrl = '/installation-records';
+
+export type DemountedMeterInput = {
+  meterTypeDefinitionId: string;
+  serialNumber: string;
+  year: number;
+  calibrationYear: number;
+  dynamicFieldValues?: Record<string, unknown>;
+  notes?: string;
+  hadIntegratedSim?: boolean;
+  noSimNote?: string;
+};
 
 export type CreateInstallationRecordInput =
   | {
@@ -20,9 +32,12 @@ export type CreateInstallationRecordInput =
   | {
       simCardId: string;
       installedById: string;
+      kind?: InstallationRecordKind;
+      demountedMeter?: DemountedMeterInput;
       meterTypeDefinitionId: string;
       serialNumber: string;
-      year?: number;
+      year: number;
+      calibrationYear: number;
       installationAddress?: string;
       installationDate?: string;
       city?: string;

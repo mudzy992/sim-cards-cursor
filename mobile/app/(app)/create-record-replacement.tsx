@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,14 +24,24 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import { ScreenHeader } from '@/components/common/ScreenHeader'
 import { Card } from '@/components/common/Card'
 
-export default function CreateRecordScreen() {
+export default function CreateRecordReplacementScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ simCardId?: string }>();
   const simCardId = params.simCardId?.trim() ?? '';
   const userId = useAuthStore((state) => state.user?.id);
   const userBranch = useAuthStore((state) => state.user?.branch);
   const userRole = useAuthStore((state) => state.user?.role);
-  const { isOnline } = useConnectivity()
+  const { isOnline } = useConnectivity();
+  const [step, setStep] = useState<1 | 2>(1);
+
+  const [dmMeterTypeId, setDmMeterTypeId] = useState('');
+  const [dmSerialNumber, setDmSerialNumber] = useState('');
+  const [dmYear, setDmYear] = useState('');
+  const [dmCalibrationYear, setDmCalibrationYear] = useState('');
+  const [dmDynamicFieldValues, setDmDynamicFieldValues] = useState<Record<string, unknown>>({});
+  const [dmNotes, setDmNotes] = useState('');
+  const [dmHadIntegratedSim, setDmHadIntegratedSim] = useState(false);
+  const [dmNoSimNote, setDmNoSimNote] = useState('');
 
   const [meterTypeId, setMeterTypeId] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -65,7 +75,13 @@ export default function CreateRecordScreen() {
   const meterTypeFieldsQuery = useQuery({
     queryKey: ['meter-type-definitions', meterTypeId, 'fields'],
     queryFn: () => meterTypeDefinitionsApi.listFields(meterTypeId),
-    enabled: Boolean(meterTypeId),
+    enabled: Boolean(meterTypeId) && step === 2,
+  });
+
+  const dmMeterTypeFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', dmMeterTypeId, 'fields', 'dm'],
+    queryFn: () => meterTypeDefinitionsApi.listFields(dmMeterTypeId),
+    enabled: Boolean(dmMeterTypeId),
   });
 
   useEffect(() => {
@@ -73,9 +89,37 @@ export default function CreateRecordScreen() {
     setDynamicFieldValues({});
   }, [meterTypeId]);
 
+  useEffect(() => {
+    if (!dmMeterTypeId) return;
+    setDmDynamicFieldValues({});
+  }, [dmMeterTypeId]);
+
   const buildPayload = (): CreateInstallationRecordPayload => {
     if (!userId || !simCardId || !meterTypeId || !serialNumber.trim()) {
-      throw new Error('Tip brojila i serijski broj su obavezni.');
+      throw new Error('Za novo brojilo: tip i serijski broj su obavezni.');
+    }
+
+    if (!dmMeterTypeId || !dmSerialNumber.trim()) {
+      throw new Error('Demontirano brojilo: tip i serijski broj su obavezni.');
+    }
+
+    const dmYearNum = dmYear ? parseInt(dmYear, 10) : NaN;
+    const dmCalNum = dmCalibrationYear ? parseInt(dmCalibrationYear, 10) : NaN;
+    if (!Number.isFinite(dmYearNum) || !Number.isFinite(dmCalNum)) {
+      throw new Error('Za demontirano brojilo unesite godinu proizvodnje i godinu baždarenja.');
+    }
+
+    const dmFields = Array.isArray(dmMeterTypeFieldsQuery.data) ? dmMeterTypeFieldsQuery.data : [];
+    const dmMissing: string[] = [];
+    for (const f of dmFields) {
+      if (!f.isOperatorFillable || !f.isRequired) continue;
+      const v = dmDynamicFieldValues[f.name];
+      const isEmpty =
+        v === undefined || v === null || (typeof v === 'string' && v.trim().length === 0);
+      if (isEmpty) dmMissing.push(f.label);
+    }
+    if (dmMissing.length > 0) {
+      throw new Error(`Demontirano – obavezna polja: ${dmMissing.join(', ')}`);
     }
 
     const lat = latitude ? parseFloat(latitude) : undefined;
@@ -105,6 +149,7 @@ export default function CreateRecordScreen() {
     }
 
     return {
+      kind: 'METER_REPLACEMENT',
       simCardId,
       installedById: userId,
       clientRequestId,
@@ -112,6 +157,18 @@ export default function CreateRecordScreen() {
       serialNumber: serialNumber.trim(),
       year: yearNum,
       calibrationYear: calibrationNum,
+      demountedMeter: {
+        meterTypeDefinitionId: dmMeterTypeId,
+        serialNumber: dmSerialNumber.trim(),
+        year: dmYearNum,
+        calibrationYear: dmCalNum,
+        ...(Object.keys(dmDynamicFieldValues).length > 0
+          ? { dynamicFieldValues: dmDynamicFieldValues }
+          : {}),
+        ...(dmNotes.trim() ? { notes: dmNotes.trim() } : {}),
+        hadIntegratedSim: dmHadIntegratedSim,
+        ...(dmNoSimNote.trim() ? { noSimNote: dmNoSimNote.trim() } : {}),
+      },
       installationAddress: installationAddress.trim() || undefined,
       installationDate: installationDate || undefined,
       city: city.trim() || undefined,
@@ -154,7 +211,7 @@ export default function CreateRecordScreen() {
         );
         return;
       }
-      Alert.alert('Uspjeh', 'Zapisnik kreiran i poslan na email.', [
+      Alert.alert('Uspjeh', 'Zapisnik o zamjeni brojila kreiran i poslan na email.', [
         { text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') },
       ]);
     },
@@ -164,7 +221,7 @@ export default function CreateRecordScreen() {
           await queueInstallationRecord(buildPayload());
           Alert.alert(
             'Offline režim',
-            'Nema mreže. Zapisnik je sačuvan lokalno i biće automatski poslan kada se veza uspostavi.',
+            'Nema mreže. Zapisnik o zamjeni je sačuvan lokalno i biće automatski poslan kada se veza uspostavi.',
             [{ text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') }],
           );
           return;
@@ -183,8 +240,35 @@ export default function CreateRecordScreen() {
 
   const meterTypeOptions = Array.isArray(meterTypesQuery.data) ? meterTypesQuery.data : [];
   const canSubmit = Boolean(
-    simCardId && meterTypeId && serialNumber.trim() && userId,
+    step === 2 && simCardId && meterTypeId && serialNumber.trim() && userId,
   );
+
+  const handleStep1Next = () => {
+    if (!dmMeterTypeId || !dmSerialNumber.trim()) {
+      Alert.alert('Greška', 'Odaberite tip i unesite serijski broj demontiranog brojila.');
+      return;
+    }
+    const y = dmYear ? parseInt(dmYear, 10) : NaN;
+    const c = dmCalibrationYear ? parseInt(dmCalibrationYear, 10) : NaN;
+    if (!Number.isFinite(y) || !Number.isFinite(c)) {
+      Alert.alert('Greška', 'Unesite godinu proizvodnje i godinu baždarenja za demontirano brojilo.');
+      return;
+    }
+    const dmFields = Array.isArray(dmMeterTypeFieldsQuery.data) ? dmMeterTypeFieldsQuery.data : [];
+    const missing: string[] = [];
+    for (const f of dmFields) {
+      if (!f.isOperatorFillable || !f.isRequired) continue;
+      const v = dmDynamicFieldValues[f.name];
+      const isEmpty =
+        v === undefined || v === null || (typeof v === 'string' && v.trim().length === 0);
+      if (isEmpty) missing.push(f.label);
+    }
+    if (missing.length > 0) {
+      Alert.alert('Greška', `Obavezna polja (demontirano): ${missing.join(', ')}`);
+      return;
+    }
+    setStep(2);
+  };
   const typesError =
     meterTypesQuery.isError ||
     (meterTypesQuery.data === undefined &&
@@ -214,20 +298,319 @@ export default function CreateRecordScreen() {
     );
   }
 
+  type MeterFieldsQueryState = {
+    data: MeterTypeFieldItem[] | undefined;
+    isLoading: boolean;
+    isError: boolean;
+  };
+
+  const renderDynamicFieldsBlock = (
+    fieldsQuery: MeterFieldsQueryState,
+    values: Record<string, unknown>,
+    setValues: (v: React.SetStateAction<Record<string, unknown>>) => void,
+    typeId: string,
+  ) => {
+    if (!typeId) return null;
+    return (
+      <Card style={{ padding: 12, gap: 10 }}>
+        <Text style={{ fontWeight: '800', color: colors.text }}>Dodatna polja</Text>
+        {fieldsQuery.isLoading ? (
+          <View style={{ paddingVertical: 8 }}>
+            <ActivityIndicator size="small" />
+          </View>
+        ) : fieldsQuery.isError ? (
+          <Text style={{ color: '#dc2626' }}>Nije moguće učitati dodatna polja za odabrani tip brojila.</Text>
+        ) : (
+          (() => {
+            const fields = Array.isArray(fieldsQuery.data) ? fieldsQuery.data : [];
+            if (fields.length === 0) {
+              return <Text style={{ color: colors.textMuted }}>Nema dodatnih polja.</Text>;
+            }
+            const renderField = (f: MeterTypeFieldItem) => {
+              const requiredMark = f.isRequired ? ' *' : '';
+              const current = values[f.name];
+              if (!f.isOperatorFillable) {
+                return (
+                  <View key={f.id} style={{ gap: 4 }}>
+                    <Text style={{ fontWeight: '600' }}>{f.label}</Text>
+                    <Text style={{ color: '#64748b' }}>{f.defaultValue ?? '—'}</Text>
+                  </View>
+                );
+              }
+              if (f.fieldType === 'BOOLEAN') {
+                const boolValue = current === true || current === 'true';
+                return (
+                  <View
+                    key={f.id}
+                    style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                  >
+                    <Text style={{ fontWeight: '600' }}>
+                      {f.label}
+                      {requiredMark}
+                    </Text>
+                    <Switch
+                      value={boolValue}
+                      onValueChange={(v) => setValues((prev) => ({ ...prev, [f.name]: v }))}
+                    />
+                  </View>
+                );
+              }
+              const textValue =
+                typeof current === 'string' || typeof current === 'number' ? String(current) : '';
+              return (
+                <View key={f.id} style={{ gap: 4 }}>
+                  <Text style={{ fontWeight: '600' }}>
+                    {f.label}
+                    {requiredMark}
+                  </Text>
+                  <TextInput
+                    value={textValue}
+                    onChangeText={(v) => {
+                      if (f.fieldType === 'NUMBER') {
+                        const normalized = v.replace(',', '.');
+                        const num = normalized.length > 0 ? Number(normalized) : undefined;
+                        setValues((prev) => ({
+                          ...prev,
+                          [f.name]: Number.isFinite(num) ? num : v,
+                        }));
+                        return;
+                      }
+                      setValues((prev) => ({ ...prev, [f.name]: v }));
+                    }}
+                    placeholder={f.fieldType === 'DATE' ? 'YYYY-MM-DD' : ''}
+                    keyboardType={f.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 12,
+                      padding: 12,
+                      fontSize: 16,
+                      backgroundColor: colors.surface,
+                    }}
+                  />
+                </View>
+              );
+            };
+            return (
+              <View style={{ gap: 12 }}>
+                {fields
+                  .slice()
+                  .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                  .map(renderField)}
+              </View>
+            );
+          })()
+        )}
+      </Card>
+    );
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScreenHeader
-        title="Novi zapisnik"
-        subtitle="Unesite podatke o brojilu i lokaciji. Obavezno: tip brojila i serijski broj."
+        title={step === 1 ? 'Zamjena brojila – korak 1' : 'Zamjena brojila – korak 2'}
+        subtitle={
+          step === 1
+            ? 'Unesite podatke o demontiranom brojilu.'
+            : 'Unesite podatke o novom brojilu i lokaciji (SIM je već zadužen).'
+        }
       />
       <KeyboardAwareScrollView
         bottomOffset={62}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 24, gap: 12 }}
         keyboardShouldPersistTaps="handled"
       >
-
+        {step === 1 ? (
+          <>
+            <View>
+              <Text style={{ marginBottom: 4, fontWeight: '600' }}>Tip demontiranog brojila *</Text>
+              <View style={{ borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, minHeight: 52 }}>
+                {meterTypesQuery.isLoading ? (
+                  <View style={{ padding: 12 }}>
+                    <ActivityIndicator size="small" />
+                  </View>
+                ) : typesError ? (
+                  <View style={{ padding: 12 }}>
+                    <Text style={{ color: '#dc2626', fontSize: 14 }}>
+                      Nije moguće učitati tipove brojila. Provjerite mrežu i pokušajte ponovo.
+                    </Text>
+                  </View>
+                ) : meterTypeOptions.length === 0 ? (
+                  <View style={{ padding: 12 }}>
+                    <Text style={{ color: '#64748b', fontSize: 14 }}>
+                      Nema definisanih tipova brojila. Administrator ih dodaje u aplikaciji.
+                    </Text>
+                  </View>
+                ) : (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingVertical: 8, paddingHorizontal: 4 }}
+                  >
+                    {meterTypeOptions.map((t) => (
+                      <Pressable
+                        key={t.id}
+                        onPress={() => setDmMeterTypeId(t.id)}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 12,
+                          marginHorizontal: 4,
+                          borderRadius: 8,
+                          backgroundColor: dmMeterTypeId === t.id ? colors.primary : colors.surfaceMuted,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: dmMeterTypeId === t.id ? '#fff' : '#334155',
+                            fontWeight: dmMeterTypeId === t.id ? '700' : '400',
+                            fontSize: 15,
+                          }}
+                        >
+                          {t.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            </View>
+            <View>
+              <Text style={{ marginBottom: 4, fontWeight: '600' }}>Serijski broj demontiranog *</Text>
+              <TextInput
+                value={dmSerialNumber}
+                onChangeText={setDmSerialNumber}
+                placeholder="Serijski broj sa brojila koje se demontira"
+                keyboardType="number-pad"
+                inputMode="numeric"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: colors.surface,
+                }}
+              />
+            </View>
+            {dmMeterTypeId
+              ? renderDynamicFieldsBlock(
+                  {
+                    data: dmMeterTypeFieldsQuery.data,
+                    isLoading: dmMeterTypeFieldsQuery.isLoading,
+                    isError: dmMeterTypeFieldsQuery.isError,
+                  },
+                  dmDynamicFieldValues,
+                  setDmDynamicFieldValues,
+                  dmMeterTypeId,
+                )
+              : null}
+            <View>
+              <Text style={{ marginBottom: 4, fontWeight: '600' }}>Godina proizvodnje (demontirano) *</Text>
+              <TextInput
+                value={dmYear}
+                onChangeText={setDmYear}
+                placeholder="npr. 2018"
+                keyboardType="number-pad"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: colors.surface,
+                }}
+              />
+            </View>
+            <View>
+              <Text style={{ marginBottom: 4, fontWeight: '600' }}>Godina baždarenja (demontirano) *</Text>
+              <TextInput
+                value={dmCalibrationYear}
+                onChangeText={setDmCalibrationYear}
+                placeholder="npr. 2024"
+                keyboardType="number-pad"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: colors.surface,
+                }}
+              />
+            </View>
+            <View>
+              <Text style={{ marginBottom: 4, fontWeight: '600' }}>Napomena (demontirano brojilo)</Text>
+              <TextInput
+                value={dmNotes}
+                onChangeText={setDmNotes}
+                placeholder="Opcionalno"
+                multiline
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  padding: 12,
+                  fontSize: 16,
+                  minHeight: 60,
+                  backgroundColor: colors.surface,
+                }}
+              />
+            </View>
+            <View
+              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <Text style={{ fontWeight: '600', flex: 1, paddingRight: 12 }}>
+                Staro brojilo ima ugrađenu SIM karticu
+              </Text>
+              <Switch value={dmHadIntegratedSim} onValueChange={setDmHadIntegratedSim} />
+            </View>
+            <View>
+              <Text style={{ marginBottom: 4, fontWeight: '600' }}>Napomena (SIM na starom brojilu)</Text>
+              <TextInput
+                value={dmNoSimNote}
+                onChangeText={setDmNoSimNote}
+                placeholder="Opcionalno – npr. nema ugrađene SIM"
+                multiline
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  padding: 12,
+                  fontSize: 16,
+                  minHeight: 52,
+                  backgroundColor: colors.surface,
+                }}
+              />
+            </View>
+            <Pressable
+              onPress={handleStep1Next}
+              style={{
+                backgroundColor: colors.primary,
+                padding: 14,
+                borderRadius: 10,
+                alignItems: 'center',
+                marginTop: 8,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Dalje – novo brojilo</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.back()}
+              style={{
+                padding: 14,
+                borderRadius: 10,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+              }}
+            >
+              <Text style={{ color: '#64748b' }}>Odustani</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
       <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Tip brojila *</Text>
+        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Tip novog brojila *</Text>
         <View style={{ borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, minHeight: 52 }}>
           {meterTypesQuery.isLoading ? (
             <View style={{ padding: 12 }}>
@@ -280,7 +663,7 @@ export default function CreateRecordScreen() {
       </View>
 
       <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Serijski broj brojila *</Text>
+        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Serijski broj novog brojila *</Text>
         <TextInput
           value={serialNumber}
           onChangeText={setSerialNumber}
@@ -298,113 +681,18 @@ export default function CreateRecordScreen() {
         />
       </View>
 
-      {meterTypeId ? (
-        <Card style={{ padding: 12, gap: 10 }}>
-          <Text style={{ fontWeight: '800', color: colors.text }}>Dodatna polja</Text>
-
-          {meterTypeFieldsQuery.isLoading ? (
-            <View style={{ paddingVertical: 8 }}>
-              <ActivityIndicator size="small" />
-            </View>
-          ) : meterTypeFieldsQuery.isError ? (
-            <Text style={{ color: '#dc2626' }}>
-              Nije moguće učitati dodatna polja za odabrani tip brojila.
-            </Text>
-          ) : (
-            (() => {
-              const fields = Array.isArray(meterTypeFieldsQuery.data)
-                ? meterTypeFieldsQuery.data
-                : [];
-
-              if (fields.length === 0) {
-                return <Text style={{ color: colors.textMuted }}>Nema dodatnih polja.</Text>;
-              }
-
-              const renderField = (f: MeterTypeFieldItem) => {
-                const requiredMark = f.isRequired ? ' *' : '';
-                const current = dynamicFieldValues[f.name];
-
-                if (!f.isOperatorFillable) {
-                  return (
-                    <View key={f.id} style={{ gap: 4 }}>
-                      <Text style={{ fontWeight: '600' }}>{f.label}</Text>
-                      <Text style={{ color: '#64748b' }}>
-                        {f.defaultValue ?? '—'}
-                      </Text>
-                    </View>
-                  );
-                }
-
-                if (f.fieldType === 'BOOLEAN') {
-                  const boolValue = current === true || current === 'true';
-                  return (
-                    <View key={f.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontWeight: '600' }}>
-                        {f.label}
-                        {requiredMark}
-                      </Text>
-                      <Switch
-                        value={boolValue}
-                        onValueChange={(v) =>
-                          setDynamicFieldValues((prev) => ({ ...prev, [f.name]: v }))
-                        }
-                      />
-                    </View>
-                  );
-                }
-
-                const textValue =
-                  typeof current === 'string' || typeof current === 'number'
-                    ? String(current)
-                    : '';
-
-                return (
-                  <View key={f.id} style={{ gap: 4 }}>
-                    <Text style={{ fontWeight: '600' }}>
-                      {f.label}
-                      {requiredMark}
-                    </Text>
-                    <TextInput
-                      value={textValue}
-                      onChangeText={(v) => {
-                        if (f.fieldType === 'NUMBER') {
-                          const normalized = v.replace(',', '.');
-                          const num = normalized.length > 0 ? Number(normalized) : undefined;
-                          setDynamicFieldValues((prev) => ({
-                            ...prev,
-                            [f.name]: Number.isFinite(num) ? num : v,
-                          }));
-                          return;
-                        }
-                        setDynamicFieldValues((prev) => ({ ...prev, [f.name]: v }));
-                      }}
-                      placeholder={f.fieldType === 'DATE' ? 'YYYY-MM-DD' : ''}
-                      keyboardType={f.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'}
-                      style={{
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        borderRadius: 12,
-                        padding: 12,
-                        fontSize: 16,
-                        backgroundColor: colors.surface,
-                      }}
-                    />
-                  </View>
-                );
-              };
-
-              return (
-                <View style={{ gap: 12 }}>
-                  {fields
-                    .slice()
-                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-                    .map(renderField)}
-                </View>
-              );
-            })()
-          )}
-        </Card>
-      ) : null}
+      {meterTypeId
+        ? renderDynamicFieldsBlock(
+            {
+              data: meterTypeFieldsQuery.data,
+              isLoading: meterTypeFieldsQuery.isLoading,
+              isError: meterTypeFieldsQuery.isError,
+            },
+            dynamicFieldValues,
+            setDynamicFieldValues,
+            meterTypeId,
+          )
+        : null}
 
       <View>
         <Text style={{ marginBottom: 4, fontWeight: '600' }}>Godina proizvodnje *</Text>
@@ -719,6 +1007,20 @@ export default function CreateRecordScreen() {
       </View>
 
       <Pressable
+        onPress={() => setStep(1)}
+        style={{
+          padding: 14,
+          borderRadius: 10,
+          alignItems: 'center',
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginTop: 4,
+        }}
+      >
+        <Text style={{ color: colors.text }}>Natrag na demontirano brojilo</Text>
+      </Pressable>
+
+      <Pressable
         disabled={!canSubmit || createMutation.isPending}
         onPress={() => createMutation.mutate()}
         style={{
@@ -730,7 +1032,7 @@ export default function CreateRecordScreen() {
         }}
       >
         <Text style={{ color: '#fff', fontWeight: '600' }}>
-          {createMutation.isPending ? 'Kreiranje...' : 'Kreiraj zapisnik'}
+          {createMutation.isPending ? 'Kreiranje...' : 'Kreiraj zapisnik zamjene'}
         </Text>
       </Pressable>
 
@@ -746,6 +1048,8 @@ export default function CreateRecordScreen() {
       >
         <Text style={{ color: '#64748b' }}>Odustani</Text>
       </Pressable>
+          </>
+        )}
       </KeyboardAwareScrollView>
     </View>
   );

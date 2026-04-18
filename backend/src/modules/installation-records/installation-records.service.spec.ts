@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { RecordStatus, UserRole } from '@prisma/client';
+import { InstallationRecordKind, RecordStatus, UserRole } from '@prisma/client';
 import { RecordNumberGenerator } from 'src/common/utils/record-number.generator';
 import { PdfGeneratorService } from 'src/common/utils/pdf-generator.service';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -141,6 +141,84 @@ describe('InstallationRecordsService', () => {
       await expect(
         service.retrySendEmail('rec-1', { userId: 'user-1' }),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('create', () => {
+    it('rejects NEW_CONNECTION when demountedMeter is present', async () => {
+      prismaMock.installationRecord.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.create({
+          simCardId: 'sim-1',
+          installedById: 'user-1',
+          kind: InstallationRecordKind.NEW_CONNECTION,
+          demountedMeter: {
+            meterTypeDefinitionId: 'type-old',
+            serialNumber: 'OLD-1',
+            year: 2010,
+            calibrationYear: 2015,
+          } as never,
+          meterTypeDefinitionId: 'type-new',
+          serialNumber: 'NEW-1',
+          year: 2024,
+          calibrationYear: 2025,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('creates installation record for METER_REPLACEMENT with snapshot', async () => {
+      prismaMock.installationRecord.findUnique.mockResolvedValue(null);
+      prismaMock.meterTypeDefinition.findUnique.mockImplementation((args: { where: { id: string } }) =>
+        Promise.resolve({ id: args.where.id, name: 'Type' }),
+      );
+      prismaMock.meter.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ simCardId: null });
+      prismaMock.meter.create.mockResolvedValue({ id: 'meter-new' });
+      prismaMock.simCard.findUnique.mockResolvedValue({ id: 'sim-1' });
+      prismaMock.installationRecord.create.mockResolvedValue({
+        id: 'rec-x',
+        recordNumber: 'REC-001',
+        kind: InstallationRecordKind.METER_REPLACEMENT,
+        demountedMeterSnapshot: { serialNumber: 'OLD-1' },
+        meterId: 'meter-new',
+        installedById: 'user-1',
+        status: RecordStatus.DRAFT,
+      });
+
+      const dto = {
+        simCardId: 'sim-1',
+        installedById: 'user-1',
+        kind: InstallationRecordKind.METER_REPLACEMENT,
+        demountedMeter: {
+          meterTypeDefinitionId: 'type-old',
+          serialNumber: 'OLD-1',
+          year: 2010,
+          calibrationYear: 2015,
+        },
+        meterTypeDefinitionId: 'type-new',
+        serialNumber: 'NEW-1',
+        year: 2024,
+        calibrationYear: 2025,
+      };
+
+      const result = await service.create(dto as never);
+
+      expect(prismaMock.installationRecord.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            kind: InstallationRecordKind.METER_REPLACEMENT,
+            demountedMeterSnapshot: expect.objectContaining({
+              serialNumber: 'OLD-1',
+              year: 2010,
+              calibrationYear: 2015,
+            }),
+            meterId: 'meter-new',
+          }),
+        }),
+      );
+      expect(result.id).toBe('rec-x');
     });
   });
 

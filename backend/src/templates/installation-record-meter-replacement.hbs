@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Zapisnik o zamjeni brojila</title>
+  <style>
+    body { font-family: sans-serif; font-size: 12px; }
+    .container { padding: 20px; }
+    .header { text-align: center; margin-bottom: 24px; }
+    .section { margin-bottom: 24px; }
+    .section h2 { font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #333; }
+    .details table { width: 100%; border-collapse: collapse; }
+    .details th, .details td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    .details th { background-color: #f2f2f2; width: 38%; }
+    .empty { color: #888; }
+    .highlight { font-weight: bold; background-color: #f9f9f9; }
+    .two-col { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+    .two-col td { width: 50%; vertical-align: top; padding: 0 8px 0 0; }
+    .two-col td:last-child { padding-right: 0; padding-left: 8px; }
+    .col-title { font-weight: bold; margin-bottom: 6px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Zapisnik o zamjeni brojila broj: {{recordNumber}}</h1>
+    </div>
+
+    <div class="section">
+      <h2>Brojila</h2>
+      <table class="two-col">
+        <tr>
+          <td>
+            <div class="col-title">Demontirano brojilo</div>
+            <div class="details">
+              <table>
+                {{#if demountedMeter}}
+                <tr><th>Serijski broj</th><td>{{demountedMeter.serialNumber}}</td></tr>
+                <tr><th>Tip brojila (naziv)</th><td>{{#if demountedMeter.typeName}}{{demountedMeter.typeName}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Proizvođač</th><td>{{#if demountedMeter.typeManufacturer}}{{demountedMeter.typeManufacturer}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Model</th><td>{{#if demountedMeter.typeModel}}{{demountedMeter.typeModel}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Jednofazno / Trofazno</th><td>{{#if demountedMeter.typePhase}}{{demountedMeter.typePhase}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Maks. struja (A)</th><td>{{#if demountedMeter.typeMaxCurrent}}{{demountedMeter.typeMaxCurrent}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Godina proizvodnje</th><td>{{#if demountedMeter.year}}{{demountedMeter.year}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Godina baždarenja</th><td>{{#if demountedMeter.calibrationYear}}{{demountedMeter.calibrationYear}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Ugrađena SIM</th><td>{{demountedMeter.hadIntegratedSimText}}</td></tr>
+                <tr><th>Napomena (SIM / staro brojilo)</th><td>{{#if demountedMeter.noSimNote}}{{demountedMeter.noSimNote}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Napomena (brojilo)</th><td>{{#if demountedMeter.notes}}{{demountedMeter.notes}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                {{else}}
+                <tr><td colspan="2"><span class="empty">Nema podataka</span></td></tr>
+                {{/if}}
+              </table>
+            </div>
+          </td>
+          <td>
+            <div class="col-title">Novo brojilo (ugrađeno)</div>
+            <div class="details">
+              <table>
+                {{#if meter}}
+                <tr><th>Serijski broj</th><td>{{meter.serialNumber}}</td></tr>
+                <tr><th>Tip brojila (naziv)</th><td>{{#if meter.typeName}}{{meter.typeName}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Proizvođač</th><td>{{#if meter.typeManufacturer}}{{meter.typeManufacturer}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Model</th><td>{{#if meter.typeModel}}{{meter.typeModel}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Jednofazno / Trofazno</th><td>{{#if meter.typePhase}}{{meter.typePhase}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Maks. struja (A)</th><td>{{#if meter.typeMaxCurrent}}{{meter.typeMaxCurrent}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Godina proizvodnje</th><td>{{#if meter.year}}{{meter.year}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Godina baždarenja</th><td>{{#if meter.calibrationYear}}{{meter.calibrationYear}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                <tr><th>Napomena (brojilo)</th><td>{{#if meter.notes}}{{meter.notes}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+                {{else}}
+                <tr><td colspan="2"><span class="empty">Nema podataka o brojilu</span></td></tr>
+                {{/if}}
+              </table>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    {{#if hasDemountedDynamicFields}}
+    <div class="section">
+      <h2>Dodatna polja – demontirano brojilo</h2>
+      <table class="details">
+        {{#each demountedDynamicFields}}
+        <tr><th>{{this.label}}</th><td>{{this.value}}</td></tr>
+        {{/each}}
+      </table>
+    </div>
+    {{/if}}
+
+    {{#if hasDynamicFields}}
+    <div class="section">
+      <h2>Dodatna polja – novo brojilo</h2>
+      <table class="details">
+        {{#each dynamicFields}}
+        <tr><th>{{this.label}}</th><td>{{this.value}}</td></tr>
+        {{/each}}
+      </table>
+    </div>
+    {{/if}}
+
+    <div class="section">
+      <h2>Lokacija i mjerno mjesto</h2>
+      <table class="details">
+        <tr><th>Lokacija instalacije</th><td>{{#if installationAddress}}{{installationAddress}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        <tr><th>Datum instalacije</th><td>{{#if installationDate}}{{installationDate}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        <tr><th>Mjerno mjesto (MM)</th><td>{{#if measuringPoint}}{{measuringPoint}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        <tr><th>Grad / Mjesto</th><td>{{#if city}}{{city}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        <tr><th>Općina</th><td>{{#if municipality}}{{municipality}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        {{#if meter.latitude}}<tr><th>GPS širina</th><td>{{meter.latitude}}</td></tr>{{/if}}
+        {{#if meter.longitude}}<tr><th>GPS dužina</th><td>{{meter.longitude}}</td></tr>{{/if}}
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Podaci o SIM kartici (nova ugradnja)</h2>
+      <table class="details">
+        {{#if simCard}}
+        <tr><th>ICCID</th><td>{{simCard.iccid}}</td></tr>
+        <tr class="highlight"><th>EPBIH IP (unesite u brojilo)</th><td>{{simCard.ipAddress}}</td></tr>
+        <tr><th>Javna IP adresa</th><td>{{#if simCard.publicIpAddress}}{{simCard.publicIpAddress}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        <tr><th>Broj telefona</th><td>{{#if simCard.phoneNumber}}{{simCard.phoneNumber}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        <tr><th>APN</th><td>{{#if simCard.apn}}{{simCard.apn}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        <tr><th>Kome je dodijeljena</th><td>{{#if simCard.assignedTo}}{{simCard.assignedTo}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        {{else}}
+        <tr><td colspan="2"><span class="empty">Nema podataka o SIM kartici</span></td></tr>
+        {{/if}}
+      </table>
+    </div>
+
+    {{#if hasPhotos}}
+    <div class="section">
+      <h2>Fotografije</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        {{#each photoDataUrls}}
+        <img src="{{this}}" alt="Fotografija" style="max-width: 120px; max-height: 120px; object-fit: cover; border: 1px solid #ddd;" />
+        {{/each}}
+      </div>
+    </div>
+    {{/if}}
+
+    <div class="section">
+      <h2>Zapisnik</h2>
+      <table class="details">
+        <tr><th>Instalater</th><td>{{installedBy.firstName}} {{installedBy.lastName}}</td></tr>
+        {{#if notes}}
+        <tr><th>Napomena</th><td>{{notes}}</td></tr>
+        {{/if}}
+      </table>
+    </div>
+  </div>
+</body>
+</html>

@@ -7,6 +7,10 @@ import { Meter, MeterSimCardState, Prisma } from '@prisma/client';
 import { MeterFilterDto } from './dto/meter-filter.dto';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
+import {
+  assertMeterYearsPairIfPartial,
+  assertMeterYearsRequired,
+} from 'src/common/utils/meter-years.util';
 
 @Injectable()
 export class MetersService {
@@ -16,11 +20,17 @@ export class MetersService {
   ) {}
 
   async create(createMeterDto: CreateMeterDto): Promise<Meter> {
+    assertMeterYearsRequired(
+      createMeterDto.year,
+      createMeterDto.calibrationYear,
+      'brojilo',
+    );
     const data: Record<string, unknown> = {
       serialNumber: createMeterDto.serialNumber,
       meterTypeDefinitionId: createMeterDto.meterTypeDefinitionId,
     };
     if (createMeterDto.year != null) data.year = createMeterDto.year;
+    if (createMeterDto.calibrationYear != null) data.calibrationYear = createMeterDto.calibrationYear;
     if (createMeterDto.notes != null) data.notes = createMeterDto.notes;
     if (createMeterDto.installationAddress != null)
       data.installationAddress = createMeterDto.installationAddress;
@@ -130,6 +140,17 @@ export class MetersService {
       });
       if (!exists) throw new NotFoundException(`Meter with ID ${id} not found`);
     }
+    const currentYears = await this.prisma.meter.findUnique({
+      where: { id },
+      select: { year: true, calibrationYear: true },
+    });
+    const mergedYear =
+      updateMeterDto.year !== undefined ? updateMeterDto.year : currentYears?.year ?? undefined;
+    const mergedCalibration =
+      updateMeterDto.calibrationYear !== undefined
+        ? updateMeterDto.calibrationYear
+        : currentYears?.calibrationYear ?? undefined;
+    assertMeterYearsPairIfPartial(mergedYear, mergedCalibration);
     const data: Record<string, unknown> = { ...updateMeterDto };
     if (data.installationDate && typeof data.installationDate === 'string') {
       data.installationDate = new Date(data.installationDate as string);

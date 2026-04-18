@@ -118,6 +118,7 @@ const PrivateLayout = () => {
           <Stack.Screen name="record-details" options={{ title: 'Detalji zapisnika' }} />
           <Stack.Screen name="scan-result" options={{ title: 'Rezultat skena' }} />
           <Stack.Screen name="create-record" options={{ title: 'Novi zapisnik' }} />
+          <Stack.Screen name="create-record-replacement" options={{ title: 'Zamjena brojila' }} />
           <Stack.Screen name="offline-inventory" options={{ title: 'Offline inventar' }} />
           <Stack.Screen name="outbox" options={{ title: 'Neposlato' }} />
           <Stack.Screen name="notifications" options={{ title: 'Notifikacije' }} />

@@ -20,6 +20,7 @@ export type MeterItem = {
   simCardState?: MeterSimCardState;
   noSimReason?: string | null;
   year?: number | null;
+  calibrationYear?: number | null;
   notes?: string | null;
   installationAddress?: string | null;
   installationDate?: string | null;
@@ -52,6 +53,7 @@ export type CreateMeterInput = {
   serialNumber: string;
   meterTypeDefinitionId: string;
   year?: number;
+  calibrationYear?: number;
   notes?: string;
   installationAddress?: string;
   installationDate?: string;

@@ -23,6 +23,11 @@ export class CreateMeterDto {
   @IsOptional()
   year?: number;
 
+  @ApiPropertyOptional({ description: 'Godina baždarenja' })
+  @IsInt()
+  @IsOptional()
+  calibrationYear?: number;
+
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()

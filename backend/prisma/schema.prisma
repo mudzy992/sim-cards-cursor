@@ -47,6 +47,11 @@ enum RecordStatus {
   LEGACY_COMPLETED
 }
 
+enum InstallationRecordKind {
+  NEW_CONNECTION
+  METER_REPLACEMENT
+}
+
 enum ShipmentStatus {
   RECEIVED
   PROCESSING
@@ -209,6 +214,7 @@ model Meter {
   simCardState              MeterSimCardState     @default(NO_SIM) @map("sim_card_state")
   noSimReason               String?               @map("no_sim_reason") @db.Text
   year                      Int?
+  calibrationYear           Int?                 @map("calibration_year")
   notes                     String?              @db.Text
   installationAddress       String?               @map("installation_address") @db.Text
   installationDate          DateTime?             @map("installation_date")
@@ -250,6 +256,8 @@ model InstallationRecord {
   id                        String                @id @default(uuid())
   recordNumber              String                @unique @map("record_number")
   clientRequestId           String?               @unique @map("client_request_id")
+  kind                      InstallationRecordKind @default(NEW_CONNECTION) @map("kind")
+  demountedMeterSnapshot    Json?                 @map("demounted_meter_snapshot")
   meterId                   String                @map("meter_id")
   meter                     Meter                 @relation(fields: [meterId], references: [id])
   installedById             String                @map("installed_by_id")

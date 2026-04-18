@@ -43,7 +43,8 @@
         <tr><th>Model</th><td>{{#if meter.typeModel}}{{meter.typeModel}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         <tr><th>Jednofazno / Trofazno</th><td>{{#if meter.typePhase}}{{meter.typePhase}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         <tr><th>Maks. struja (A)</th><td>{{#if meter.typeMaxCurrent}}{{meter.typeMaxCurrent}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
-        <tr><th>Godina</th><td>{{#if meter.year}}{{meter.year}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        <tr><th>Godina proizvodnje</th><td>{{#if meter.year}}{{meter.year}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
+        <tr><th>Godina baždarenja</th><td>{{#if meter.calibrationYear}}{{meter.calibrationYear}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         <tr><th>Lokacija instalacije</th><td>{{#if meter.installationAddress}}{{meter.installationAddress}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         <tr><th>Datum instalacije</th><td>{{#if meter.installationDate}}{{meter.installationDate}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         <tr><th>Mjerno mjesto (MM)</th><td>{{#if meter.measuringPoint}}{{meter.measuringPoint}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
