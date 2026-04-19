@@ -407,6 +407,30 @@ export class SimCardsService {
     return result;
   }
 
+  async listEvents(id: string, scope?: ScopeContext | null) {
+    await this.ensureSimCardExists(id, scope);
+    const events = await this.prisma.simEvent.findMany({
+      where: { simCardId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+    const userIds = [...new Set(events.map((e) => e.userId).filter((uid): uid is string => Boolean(uid)))];
+    const users =
+      userIds.length > 0
+        ? await this.prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          })
+        : [];
+    const userById = new Map(users.map((u) => [u.id, u] as const));
+    return events.map((e) => ({
+      id: e.id,
+      type: e.type,
+      createdAt: e.createdAt,
+      metadata: e.metadata,
+      user: e.userId ? userById.get(e.userId) ?? null : null,
+    }));
+  }
+
   private async ensureSimCardExists(id: string, scope?: ScopeContext | null): Promise<void> {
     const scopeClause = scopeWhere(scope, { viaShipment: true });
     const exists = await this.prisma.simCard.findFirst({

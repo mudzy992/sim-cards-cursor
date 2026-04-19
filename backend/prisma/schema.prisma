@@ -213,6 +213,7 @@ model Meter {
   simCard                   SimCard?             @relation(fields: [simCardId], references: [id], onDelete: SetNull)
   simCardState              MeterSimCardState     @default(NO_SIM) @map("sim_card_state")
   noSimReason               String?               @map("no_sim_reason") @db.Text
+  lastSimDemountCategory    MeterDemountCategory? @map("last_sim_demount_category")
   year                      Int?
   calibrationYear           Int?                 @map("calibration_year")
   notes                     String?              @db.Text
@@ -449,6 +450,18 @@ enum DemountCompletionResolution {
   REMOVE_SIM_ONLY
 }
 
+enum RemovedSimDisposition {
+  MARK_DEFECTIVE
+  RETURN_TO_STOCK
+}
+
+enum MeterDemountCategory {
+  METER_FAULTY
+  TEMPORARY_REMOVAL
+  MAINTENANCE
+  OTHER
+}
+
 enum InstallTaskStatus {
   PENDING
   IN_PROGRESS
@@ -468,6 +481,8 @@ model DemountTask {
   taskType               DemountTaskType              @default(DEMOUNT_SIM) @map("task_type")
   completionResolution   DemountCompletionResolution? @map("completion_resolution")
   completionReason       String?                      @map("completion_reason") @db.Text
+  removedSimDisposition  RemovedSimDisposition?       @map("removed_sim_disposition")
+  meterDemountCategory   MeterDemountCategory?        @map("meter_demount_category")
   notes                  String?                      @db.Text
   completedAt            DateTime?                    @map("completed_at")
   createdAt              DateTime                     @default(now()) @map("created_at")

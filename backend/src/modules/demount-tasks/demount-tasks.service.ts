@@ -10,7 +10,9 @@ import { CompleteDemountTaskDto } from './dto/complete-demount-task.dto';
 import {
   DemountTaskStatus,
   DemountCompletionResolution,
+  MeterDemountCategory,
   MeterSimCardState,
+  RemovedSimDisposition,
   SimCardStatus,
   Prisma,
 } from '@prisma/client';
@@ -191,6 +193,9 @@ export class DemountTasksService {
       throw new BadRequestException('Brojilo više nema SIM karticu; zadatak se ne može završiti ovim tokom.');
     }
     const meterDistributionId = meter.branch?.distributionId ?? null;
+    const oldSimRemoval = this.buildOldSimRemovalUpdate(
+      dto.removedSimDisposition as RemovedSimDisposition,
+    );
     if (dto.resolution === DemountCompletionResolution.REPLACE_SIM) {
       if (!dto.newSimCardId) {
         throw new BadRequestException('Za zamjenu SIM-a navedite novu SIM karticu (newSimCardId).');
@@ -210,11 +215,7 @@ export class DemountTasksService {
         });
         await tx.simCard.update({
           where: { id: oldSimId },
-          data: {
-            status: SimCardStatus.DEMOUNTED,
-            assignedToId: null,
-            assignedAt: null,
-          },
+          data: oldSimRemoval,
         });
         await tx.simCard.update({
           where: { id: dto.newSimCardId },
@@ -227,6 +228,8 @@ export class DemountTasksService {
             completedAt: new Date(),
             completionResolution: dto.resolution,
             completionReason: dto.reason,
+            removedSimDisposition: dto.removedSimDisposition as RemovedSimDisposition,
+            meterDemountCategory: (dto.meterDemountCategory ?? null) as MeterDemountCategory | null,
           },
         });
       });
@@ -241,6 +244,7 @@ export class DemountTasksService {
             resolution: dto.resolution,
             demountTaskId: task.id,
             replacedBySimCardId: dto.newSimCardId,
+            removedSimDisposition: dto.removedSimDisposition,
           } as Prisma.InputJsonValue,
         },
       });
@@ -259,6 +263,11 @@ export class DemountTasksService {
         },
       });
     } else {
+      if (!dto.meterDemountCategory) {
+        throw new BadRequestException(
+          'Za ovu rezoluciju navedite kategoriju demontaže brojila (bez SIM-a).',
+        );
+      }
       await this.prisma.$transaction(async (tx) => {
         await tx.meter.update({
           where: { id: meter.id },
@@ -266,15 +275,12 @@ export class DemountTasksService {
             simCardId: null,
             simCardState: MeterSimCardState.NO_SIM,
             noSimReason: dto.reason,
+            lastSimDemountCategory: dto.meterDemountCategory as MeterDemountCategory,
           },
         });
         await tx.simCard.update({
           where: { id: oldSimId },
-          data: {
-            status: SimCardStatus.DEMOUNTED,
-            assignedToId: null,
-            assignedAt: null,
-          },
+          data: oldSimRemoval,
         });
         await tx.demountTask.update({
           where: { id: task.id },
@@ -283,6 +289,8 @@ export class DemountTasksService {
             completedAt: new Date(),
             completionResolution: dto.resolution,
             completionReason: dto.reason,
+            removedSimDisposition: dto.removedSimDisposition,
+            meterDemountCategory: dto.meterDemountCategory,
           },
         });
       });
@@ -297,6 +305,8 @@ export class DemountTasksService {
             resolution: dto.resolution,
             demountTaskId: task.id,
             meterId: meter.id,
+            removedSimDisposition: dto.removedSimDisposition,
+            meterDemountCategory: dto.meterDemountCategory,
           } as Prisma.InputJsonValue,
         },
       });
@@ -322,6 +332,23 @@ export class DemountTasksService {
         createdBy: true,
       },
     });
+  }
+
+  private buildOldSimRemovalUpdate(
+    disposition: RemovedSimDisposition,
+  ): { status: SimCardStatus; assignedToId: null; assignedAt: null } {
+    if (disposition === RemovedSimDisposition.MARK_DEFECTIVE) {
+      return {
+        status: SimCardStatus.DEFECTIVE,
+        assignedToId: null,
+        assignedAt: null,
+      };
+    }
+    return {
+      status: SimCardStatus.AVAILABLE,
+      assignedToId: null,
+      assignedAt: null,
+    };
   }
 
   private async assertSimUsableForReplace(

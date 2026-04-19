@@ -19,6 +19,7 @@ export type MeterItem = {
   simCard?: { id: string; iccid: string; status: string; ipAddress?: string } | null;
   simCardState?: MeterSimCardState;
   noSimReason?: string | null;
+  lastSimDemountCategory?: string | null;
   year?: number | null;
   calibrationYear?: number | null;
   notes?: string | null;
@@ -39,6 +40,7 @@ export type MetersListParams = {
   limit?: number;
   meterTypeDefinitionId?: string;
   serialNumber?: string;
+  simCardState?: MeterSimCardState;
 };
 
 export type MetersResponse = {

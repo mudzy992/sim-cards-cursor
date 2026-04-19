@@ -13,6 +13,14 @@ export type DemountCompletionResolution =
   | 'REPLACE_SIM'
   | 'REMOVE_SIM_ONLY';
 
+export type RemovedSimDisposition = 'MARK_DEFECTIVE' | 'RETURN_TO_STOCK';
+
+export type MeterDemountCategory =
+  | 'METER_FAULTY'
+  | 'TEMPORARY_REMOVAL'
+  | 'MAINTENANCE'
+  | 'OTHER';
+
 export type DemountTaskItem = {
   id: string;
   meterId: string;
@@ -22,6 +30,8 @@ export type DemountTaskItem = {
   taskType?: DemountTaskType;
   completionResolution?: DemountCompletionResolution | null;
   completionReason?: string | null;
+  removedSimDisposition?: RemovedSimDisposition | null;
+  meterDemountCategory?: MeterDemountCategory | null;
   notes?: string | null;
   completedAt?: string | null;
   createdAt: string;
@@ -40,6 +50,8 @@ export type DemountTaskItem = {
 export type CompleteDemountTaskPayload = {
   resolution: DemountCompletionResolution;
   reason: string;
+  removedSimDisposition: RemovedSimDisposition;
+  meterDemountCategory?: MeterDemountCategory;
   newSimCardId?: string;
 };
 

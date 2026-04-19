@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Card, Descriptions, Space, Tag, Typography } from 'antd';
+import { Button, Card, Descriptions, Space, Tag, Timeline, Typography } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import { simCardsApi } from '@/api/sim-cards.api';
-import { getSimCardStatusLabel } from '@/utils/labels.utils'
+import { getSimCardStatusLabel, getSimEventTypeLabel } from '@/utils/labels.utils';
 
 const statusColor: Record<string, string> = {
   AVAILABLE: 'green',
   ASSIGNED: 'orange',
   INSTALLED: 'blue',
   DEFECTIVE: 'red',
+  DEMOUNTED: 'purple',
   RETURNED: 'gold',
   DEACTIVATED: 'default',
 };
@@ -20,6 +21,12 @@ export default function SimCardDetailsPage() {
   const simCardQuery = useQuery({
     queryKey: ['sim-cards', 'details', id],
     queryFn: () => simCardsApi.getById(id!),
+    enabled: Boolean(id),
+  });
+
+  const eventsQuery = useQuery({
+    queryKey: ['sim-cards', 'details', id, 'events'],
+    queryFn: () => simCardsApi.listEvents(id!),
     enabled: Boolean(id),
   });
 
@@ -67,6 +74,38 @@ export default function SimCardDetailsPage() {
               {new Date(simCard.updatedAt).toLocaleString()}
             </Descriptions.Item>
           </Descriptions>
+        ) : null}
+      </Card>
+
+      <Card title="Kretanje / historija događaja" loading={eventsQuery.isLoading}>
+        {eventsQuery.data && eventsQuery.data.length === 0 ? (
+          <Typography.Text type="secondary">Nema zabilježenih događaja.</Typography.Text>
+        ) : null}
+        {eventsQuery.data && eventsQuery.data.length > 0 ? (
+          <Timeline
+            items={eventsQuery.data.map((ev) => ({
+              key: ev.id,
+              children: (
+                <div>
+                  <Typography.Text strong>{getSimEventTypeLabel(ev.type)}</Typography.Text>
+                  <div className="text-slate-500 text-sm">
+                    {new Date(ev.createdAt).toLocaleString('bs-BA')}
+                    {ev.user
+                      ? ` · ${ev.user.firstName} ${ev.user.lastName}`
+                      : ''}
+                  </div>
+                  {ev.metadata != null && typeof ev.metadata === 'object' ? (
+                    <Typography.Paragraph
+                      className="!mb-0 mt-1 text-xs font-mono text-slate-600"
+                      copyable={{ text: JSON.stringify(ev.metadata) }}
+                    >
+                      {JSON.stringify(ev.metadata)}
+                    </Typography.Paragraph>
+                  ) : null}
+                </div>
+              ),
+            }))}
+          />
         ) : null}
       </Card>
     </Space>

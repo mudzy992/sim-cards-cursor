@@ -11,6 +11,7 @@ import {
   Space,
   Switch,
   Table,
+  Tag,
   Tabs,
   Typography,
   message,
@@ -26,7 +27,13 @@ import { installationRecordsApi } from '@/api/installation-records.api';
 import { demountTasksApi } from '@/api/demount-tasks.api';
 import { installTasksApi } from '@/api/install-tasks.api';
 import InstallationRecordCreateForm from '@/components/installation-records/InstallationRecordCreateForm';
-import type { CreateMeterInput, MeterItem, MeterType, UpdateMeterInput } from '@/types/meter.types';
+import type {
+  CreateMeterInput,
+  MeterItem,
+  MeterSimCardState,
+  MeterType,
+  UpdateMeterInput,
+} from '@/types/meter.types';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 import type {
   MeterTypeDefinitionItem,
@@ -65,6 +72,9 @@ export default function MetersListPage() {
   const [filterTypeId, setFilterTypeId] = useState<string | undefined>(undefined);
   const [serialSearchInput, setSerialSearchInput] = useState('');
   const [serialNumberFilter, setSerialNumberFilter] = useState<string | undefined>(undefined);
+  const [filterSimCardState, setFilterSimCardState] = useState<MeterSimCardState | undefined>(
+    undefined,
+  );
   const [meterDrawerOpen, setMeterDrawerOpen] = useState(false);
   const [editingMeter, setEditingMeter] = useState<MeterItem | null>(null);
   const [detailMeter, setDetailMeter] = useState<MeterItem | null>(null);
@@ -98,12 +108,13 @@ export default function MetersListPage() {
   })
 
   const listQuery = useQuery({
-    queryKey: ['meters', 'list', pagination, filterTypeId, serialNumberFilter],
+    queryKey: ['meters', 'list', pagination, filterTypeId, serialNumberFilter, filterSimCardState],
     queryFn: () =>
       metersApi.list({
         ...pagination,
         meterTypeDefinitionId: filterTypeId,
         serialNumber: serialNumberFilter,
+        simCardState: filterSimCardState,
       }),
   });
 
@@ -368,6 +379,20 @@ export default function MetersListPage() {
                       onChange={setFilterTypeId}
                       style={{ minWidth: 220 }}
                     />
+                    <Select
+                      allowClear
+                      placeholder="SIM na brojilu"
+                      style={{ minWidth: 180 }}
+                      value={filterSimCardState}
+                      onChange={(v) => {
+                        setFilterSimCardState(v);
+                        setPagination((p) => ({ ...p, page: 1 }));
+                      }}
+                      options={[
+                        { label: 'Bez SIM', value: 'NO_SIM' },
+                        { label: 'SIM ugrađena', value: 'INSTALLED' },
+                      ]}
+                    />
                     <Input
                       placeholder="Serijski broj"
                       value={serialSearchInput}
@@ -386,12 +411,13 @@ export default function MetersListPage() {
                     >
                       Pretraži
                     </Button>
-                    {(serialNumberFilter || filterTypeId) && (
+                    {(serialNumberFilter || filterTypeId || filterSimCardState) && (
                       <Button
                         onClick={() => {
                           setSerialSearchInput('');
                           setSerialNumberFilter(undefined);
                           setFilterTypeId(undefined);
+                          setFilterSimCardState(undefined);
                           setPagination(defaultPagination);
                         }}
                       >
@@ -466,6 +492,19 @@ export default function MetersListPage() {
                       dataIndex: 'calibrationYear',
                       key: 'calibrationYear',
                       render: (val: number | null) => (val != null ? String(val) : '–'),
+                    },
+                    {
+                      title: 'SIM',
+                      key: 'sim',
+                      width: 130,
+                      render: (_: unknown, row: MeterItem) => {
+                        const noSim = row.simCardState === 'NO_SIM' || !row.simCard;
+                        return (
+                          <Tag color={noSim ? 'warning' : 'success'}>
+                            {noSim ? 'Bez SIM' : 'SIM ugrađena'}
+                          </Tag>
+                        );
+                      },
                     },
                     {
                       title: 'Akcije',

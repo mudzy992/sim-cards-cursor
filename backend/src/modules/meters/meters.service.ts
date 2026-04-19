@@ -75,12 +75,15 @@ export class MetersService {
     filter: MeterFilterDto,
     scope?: ScopeContext | null,
   ): Promise<PaginatedResult<Meter & { meterTypeDefinition?: unknown }>> {
-    const { page, limit, meterTypeDefinitionId, serialNumber } = filter;
+    const { page, limit, meterTypeDefinitionId, serialNumber, simCardState } = filter;
     const skip = (page - 1) * limit;
     const where: Record<string, unknown> = {};
     if (meterTypeDefinitionId) where.meterTypeDefinitionId = meterTypeDefinitionId;
     if (serialNumber?.trim()) {
       where.serialNumber = { contains: serialNumber.trim() };
+    }
+    if (simCardState) {
+      where.simCardState = simCardState;
     }
     const scopeClause = scopeWhere(scope, { branchIdField: 'branchId' });
     if (scopeClause) {

@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { MeterSimCardState } from '@prisma/client';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 export class MeterFilterDto extends PaginationDto {
@@ -12,4 +13,9 @@ export class MeterFilterDto extends PaginationDto {
   @IsOptional()
   @IsString()
   serialNumber?: string;
+
+  @ApiPropertyOptional({ enum: MeterSimCardState, description: 'Filter po stanju SIM-a na brojilu' })
+  @IsOptional()
+  @IsEnum(MeterSimCardState)
+  simCardState?: MeterSimCardState;
 }

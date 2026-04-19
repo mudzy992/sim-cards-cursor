@@ -8,6 +8,7 @@ import { scopeWhere, type ScopeContext } from 'src/common/utils/scope-filter.uti
 import { PrismaService } from 'src/prisma/prisma.service'
 import { ActivityLogService } from '../activity-log/activity-log.service'
 import { InstallationRecordsService } from '../installation-records/installation-records.service'
+import { SimCardsService } from '../sim-cards/sim-cards.service'
 import { CreateInstallTaskDto } from './dto/create-install-task.dto'
 import { CompleteInstallTaskDto } from './dto/complete-install-task.dto'
 
@@ -17,6 +18,7 @@ export class InstallTasksService {
     private readonly prisma: PrismaService,
     private readonly activityLogService: ActivityLogService,
     private readonly installationRecordsService: InstallationRecordsService,
+    private readonly simCardsService: SimCardsService,
   ) {}
 
   async create(
@@ -195,6 +197,13 @@ export class InstallTasksService {
     if (task.meter.simCardState !== MeterSimCardState.NO_SIM || task.meter.simCardId) {
       throw new BadRequestException('Brojilo više nije u stanju NO_SIM; zadatak se ne može završiti ovim tokom.')
     }
+
+    await this.simCardsService.claim(
+      dto.simCardId,
+      userId,
+      ipAddress ?? '',
+      scope ?? null,
+    )
 
     const record = await this.installationRecordsService.create(
       {

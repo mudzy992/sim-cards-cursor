@@ -105,18 +105,22 @@ export default function InstallScreen() {
     void (async () => {
       try {
         const card = await simCardsApi.scanByIccidWithOffline(rawIccid.trim())
+        const claimed = await simCardsApi.claimById(card.id)
         if (cancelled) return
         setWizard((w) => {
           if (!w || w.task.id !== rawTaskId) return w
           return {
             ...w,
-            pickedSimCardId: card.id,
-            pickedSimIccid: card.iccid,
+            pickedSimCardId: claimed.id,
+            pickedSimIccid: claimed.iccid,
           }
         })
       } catch {
         if (!cancelled) {
-          Alert.alert('Greška', 'Skenirana SIM nije pronađena ili nije dostupna.')
+          Alert.alert(
+            'Greška',
+            'Skenirana SIM nije pronađena, nije dostupna za zaduživanje, ili zaduživanje nije uspjelo.',
+          )
         }
       } finally {
         if (!cancelled) {

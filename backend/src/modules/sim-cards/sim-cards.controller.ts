@@ -75,6 +75,14 @@ export class SimCardsController {
     return this.simCardsService.scanByIccid(iccid, scope);
   }
 
+  @Get(':id/events')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @ApiOperation({ summary: 'Historija događaja (timeline) za SIM karticu' })
+  listEvents(@Param('id') id: string, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
+    const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
+    return this.simCardsService.listEvents(id, scope);
+  }
+
   @Get(':id')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Detalji SIM kartice' })
