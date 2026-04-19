@@ -182,7 +182,7 @@ function SmtpWizardCard(props: { settings: SettingRow[] }) {
 function TemplatesCard() {
   const queryClient = useQueryClient();
   const [messageApi, contextHolder] = message.useMessage();
-  const [selected, setSelected] = useState<string>('installation-record-approval-request');
+  const [selected, setSelected] = useState<string>('installation-record-notification');
   const [content, setContent] = useState<string>('');
   const [previewHtml, setPreviewHtml] = useState<string>('');
 
@@ -202,43 +202,21 @@ function TemplatesCard() {
     }
   }, [currentTemplate]);
 
-  const sampleContext = useMemo(() => {
-    if (selected === 'installation-record-notification') {
-      return {
-        recordNumber: 'TEST-001',
-        recordId: 'test',
-      };
-    }
-    return {
+  const sampleContext = useMemo(
+    () => ({
       recordNumber: 'TEST-001',
       recordId: 'test',
-      meterSerialNumber: 'M-123',
-      ipAddress: '10.0.0.1',
-      installationAddress: 'Test adresa 1',
-      municipality: 'Test općina',
-      installedByName: 'System Admin',
-      appUrl: window.location.origin,
-    };
-  }, [selected]);
+    }),
+    [],
+  );
 
-  const availableFields = useMemo(() => {
-    if (selected === 'installation-record-notification') {
-      return [
-        { key: 'recordNumber', description: 'Broj zapisnika (npr. IR-0001)', example: 'TEST-001' },
-        { key: 'recordId', description: 'ID zapisnika (UUID)', example: 'test' },
-      ];
-    }
-    return [
+  const availableFields = useMemo(
+    () => [
       { key: 'recordNumber', description: 'Broj zapisnika (npr. IR-0001)', example: 'TEST-001' },
       { key: 'recordId', description: 'ID zapisnika (UUID)', example: 'test' },
-      { key: 'meterSerialNumber', description: 'Serijski broj brojila', example: 'M-123' },
-      { key: 'ipAddress', description: 'IP adresa (SIM/brojilo)', example: '10.0.0.1' },
-      { key: 'installationAddress', description: 'Adresa ugradnje', example: 'Test adresa 1' },
-      { key: 'municipality', description: 'Općina / lokacija', example: 'Test općina' },
-      { key: 'installedByName', description: 'Ime instalatera', example: 'System Admin' },
-      { key: 'appUrl', description: 'Base URL web aplikacije', example: window.location.origin },
-    ];
-  }, [selected]);
+    ],
+    [],
+  );
 
   const previewMutation = useMutation({
     mutationFn: async () =>
@@ -419,6 +397,16 @@ export default function EmailSettingsPage() {
       <Typography.Title level={3} className="!mb-0">
         Email postavke
       </Typography.Title>
+
+      <Card className="mb-4">
+        <Space align="start" className="w-full justify-between flex-wrap" size="middle">
+          <Typography.Paragraph type="secondary" className="!mb-0 max-w-2xl">
+            SMTP kredencijali i template-i su odvojeni od općih postavki. Za globalne notifikacijske
+            kanale koristi stranicu Postavke.
+          </Typography.Paragraph>
+          <Button href="/settings">Nazad na postavke</Button>
+        </Space>
+      </Card>
 
       <Tabs
         items={[

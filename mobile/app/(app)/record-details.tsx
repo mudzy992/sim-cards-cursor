@@ -37,6 +37,28 @@ export default function RecordDetailsScreen() {
     enabled: Boolean(meterTypeDefinitionId),
   });
 
+  const demountedDefId =
+    recordQuery.data?.kind === 'METER_REPLACEMENT' &&
+    recordQuery.data?.demountedMeterSnapshot &&
+    typeof (recordQuery.data.demountedMeterSnapshot as Record<string, unknown>).meterTypeDefinitionId ===
+      'string'
+      ? String(
+          (recordQuery.data.demountedMeterSnapshot as Record<string, unknown>).meterTypeDefinitionId,
+        )
+      : '';
+
+  const demountedTypeQuery = useQuery({
+    queryKey: ['mobile-meter-type-definition', demountedDefId],
+    queryFn: () => meterTypeDefinitionsApi.get(demountedDefId),
+    enabled: Boolean(demountedDefId),
+  });
+
+  const demountedFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', demountedDefId, 'fields'],
+    queryFn: () => meterTypeDefinitionsApi.listFields(demountedDefId),
+    enabled: Boolean(demountedDefId),
+  });
+
   const formatDynamicValue = (field: MeterTypeFieldItem, value: unknown): string => {
     const fallback = '–';
     if (value === undefined || value === null) {
@@ -164,7 +186,83 @@ export default function RecordDetailsScreen() {
             {statusLabels[record.status] ?? record.status}
           </Text>
         </View>
+        {record.kind === 'METER_REPLACEMENT' ? (
+          <Text style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>Zamjena brojila</Text>
+        ) : null}
       </View>
+
+      {record.kind === 'METER_REPLACEMENT' && record.demountedMeterSnapshot ? (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 10,
+            padding: 12,
+            gap: 8,
+          }}
+        >
+          <Text style={{ fontWeight: '600', color: '#0f172a' }}>Demontirano brojilo</Text>
+          {(() => {
+            const snap = record.demountedMeterSnapshot as Record<string, unknown>;
+            const serial = typeof snap.serialNumber === 'string' ? snap.serialNumber : '–';
+            const year = snap.year != null ? String(snap.year) : '–';
+            const calYear = snap.calibrationYear != null ? String(snap.calibrationYear) : '–';
+            const hadSim = snap.hadIntegratedSim;
+            const noSimNote = typeof snap.noSimNote === 'string' ? snap.noSimNote : null;
+            return (
+              <>
+                <Text style={{ color: '#475569' }}>Serijski broj: {serial}</Text>
+                <Text style={{ color: '#475569' }}>
+                  Tip: {demountedTypeQuery.data?.name ?? '–'}
+                </Text>
+                <Text style={{ color: '#475569' }}>
+                  Proizvođač: {demountedTypeQuery.data?.manufacturer ?? '–'}
+                </Text>
+                <Text style={{ color: '#475569' }}>Model: {demountedTypeQuery.data?.model ?? '–'}</Text>
+                <Text style={{ color: '#475569' }}>Godina proizvodnje: {year}</Text>
+                <Text style={{ color: '#475569' }}>Godina baždarenja: {calYear}</Text>
+                <Text style={{ color: '#475569' }}>
+                  Ugrađena SIM:{' '}
+                  {hadSim === true ? 'Da' : hadSim === false ? 'Ne' : '–'}
+                </Text>
+                {noSimNote ? (
+                  <Text style={{ color: '#475569' }}>Napomena (SIM): {noSimNote}</Text>
+                ) : null}
+              </>
+            );
+          })()}
+          {demountedFieldsQuery.isLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            (() => {
+              const snap = record.demountedMeterSnapshot as Record<string, unknown>;
+              const dyn = (snap.dynamicFieldValues as Record<string, unknown> | undefined) ?? {};
+              const fields = Array.isArray(demountedFieldsQuery.data) ? demountedFieldsQuery.data : [];
+              if (fields.length === 0) return null;
+              return (
+                <View style={{ gap: 8, marginTop: 4 }}>
+                  {fields
+                    .slice()
+                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                    .map((f) => (
+                      <View key={f.id} style={{ gap: 2 }}>
+                        <Text style={{ fontWeight: '600', color: colors.text }}>{f.label}</Text>
+                        <Text style={{ color: colors.textMuted }}>
+                          {formatDynamicValue(f, dyn[f.name])}
+                        </Text>
+                      </View>
+                    ))}
+                </View>
+              );
+            })()
+          )}
+          {(() => {
+            const snap = record.demountedMeterSnapshot as Record<string, unknown>;
+            const notes = typeof snap.notes === 'string' ? snap.notes : null;
+            return notes ? <Text style={{ color: '#475569' }}>Napomena: {notes}</Text> : null;
+          })()}
+        </View>
+      ) : null}
 
       <View
         style={{
@@ -196,7 +294,9 @@ export default function RecordDetailsScreen() {
           gap: 6,
         }}
       >
-        <Text style={{ fontWeight: '600', color: '#0f172a' }}>Brojilo</Text>
+        <Text style={{ fontWeight: '600', color: '#0f172a' }}>
+          {record.kind === 'METER_REPLACEMENT' ? 'Novo brojilo (ugrađeno)' : 'Brojilo'}
+        </Text>
         <Text style={{ color: '#475569' }}>
           Brojilo: {record.meter?.serialNumber ?? '–'}
         </Text>
@@ -216,56 +316,39 @@ export default function RecordDetailsScreen() {
             ? new Date(record.meter.installationDate).toLocaleDateString()
             : '–'}
         </Text>
+        {meterTypeDefinitionId ? (
+          <>
+            {meterTypeFieldsQuery.isLoading ? (
+              <View style={{ paddingVertical: 8 }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : meterTypeFieldsQuery.isError ? (
+              <Text style={{ color: '#dc2626' }}>Nije moguće učitati polja tipa brojila.</Text>
+            ) : (
+              (() => {
+                const fields = Array.isArray(meterTypeFieldsQuery.data) ? meterTypeFieldsQuery.data : [];
+                if (fields.length === 0) return null;
+                const values = record.meter?.dynamicFieldValues ?? {};
+                return (
+                  <View style={{ gap: 10, marginTop: 8 }}>
+                    {fields
+                      .slice()
+                      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                      .map((f) => (
+                        <View key={f.id} style={{ gap: 2 }}>
+                          <Text style={{ fontWeight: '600', color: colors.text }}>{f.label}</Text>
+                          <Text style={{ color: colors.textMuted }}>
+                            {formatDynamicValue(f, (values as Record<string, unknown>)[f.name])}
+                          </Text>
+                        </View>
+                      ))}
+                  </View>
+                );
+              })()
+            )}
+          </>
+        ) : null}
       </View>
-
-      {meterTypeDefinitionId ? (
-        <View
-          style={{
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 10,
-            padding: 12,
-            gap: 10,
-          }}
-        >
-          <Text style={{ fontWeight: '600', color: colors.text }}>Dodatna polja</Text>
-
-          {meterTypeFieldsQuery.isLoading ? (
-            <View style={{ paddingVertical: 8 }}>
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
-          ) : meterTypeFieldsQuery.isError ? (
-            <Text style={{ color: '#dc2626' }}>Nije moguće učitati dodatna polja.</Text>
-          ) : (
-            (() => {
-              const fields = Array.isArray(meterTypeFieldsQuery.data) ? meterTypeFieldsQuery.data : [];
-              if (fields.length === 0) {
-                return <Text style={{ color: colors.textMuted }}>Nema dodatnih polja.</Text>;
-              }
-
-              const values = record.meter?.dynamicFieldValues ?? {};
-
-              return (
-                <View style={{ gap: 10 }}>
-                  {fields
-                    .slice()
-                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-                    .map((f) => (
-                      <View key={f.id} style={{ gap: 2 }}>
-                        <Text style={{ fontWeight: '600', color: colors.text }}>
-                          {f.label}
-                        </Text>
-                        <Text style={{ color: colors.textMuted }}>
-                          {formatDynamicValue(f, (values as Record<string, unknown>)[f.name])}
-                        </Text>
-                      </View>
-                    ))}
-                </View>
-              );
-            })()
-          )}
-        </View>
-      ) : null}
 
       <View
         style={{

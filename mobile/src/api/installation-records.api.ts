@@ -11,9 +11,13 @@ export type RecordStatus =
   | 'SEP_ACTIVATED'
   | 'LEGACY_COMPLETED';
 
+export type InstallationRecordKind = 'NEW_CONNECTION' | 'METER_REPLACEMENT';
+
 export type InstallationRecordItem = {
   id: string;
   recordNumber: string;
+  kind?: InstallationRecordKind;
+  demountedMeterSnapshot?: Record<string, unknown> | null;
   simCardId?: string;
   meterId?: string;
   installationAddress?: string | null;
@@ -66,8 +70,6 @@ export type InstallationRecordsListResponse = {
   total: number;
   totalPages: number;
 };
-
-export type InstallationRecordKind = 'NEW_CONNECTION' | 'METER_REPLACEMENT';
 
 export type DemountedMeterPayload = {
   meterTypeDefinitionId: string;

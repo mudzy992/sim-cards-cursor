@@ -57,6 +57,26 @@ export default function InstallationRecordDetailPage() {
     enabled: Boolean(recordQuery.data?.meter?.meterTypeDefinitionId),
   })
 
+  const demountedDefId =
+    recordQuery.data?.kind === 'METER_REPLACEMENT' &&
+    recordQuery.data?.demountedMeterSnapshot &&
+    typeof (recordQuery.data.demountedMeterSnapshot as Record<string, unknown>).meterTypeDefinitionId ===
+      'string'
+      ? String((recordQuery.data.demountedMeterSnapshot as Record<string, unknown>).meterTypeDefinitionId)
+      : undefined
+
+  const demountedTypeQuery = useQuery({
+    queryKey: ['meter-type-definitions', demountedDefId],
+    queryFn: () => meterTypeDefinitionsApi.get(demountedDefId!),
+    enabled: Boolean(demountedDefId),
+  })
+
+  const demountedFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', 'fields', demountedDefId],
+    queryFn: () => meterTypeDefinitionsApi.listFields(demountedDefId!),
+    enabled: Boolean(demountedDefId),
+  })
+
   const permissionsQuery = useQuery({
     queryKey: ['installation-record-permissions', id],
     queryFn: () => installationRecordsApi.getPermissions(id!),
@@ -213,6 +233,11 @@ export default function InstallationRecordDetailPage() {
       <Card title="Podaci zapisnika">
         <Descriptions column={1} bordered size="small">
           <Descriptions.Item label="Broj zapisnika">{record.recordNumber}</Descriptions.Item>
+          {record.kind && (
+            <Descriptions.Item label="Vrsta">
+              {record.kind === 'METER_REPLACEMENT' ? 'Zamjena brojila' : 'Novi priključak'}
+            </Descriptions.Item>
+          )}
           <Descriptions.Item label="Status">
             <Tag color={statusColor[record.status]}>{statusLabel[record.status]}</Tag>
           </Descriptions.Item>
@@ -237,6 +262,62 @@ export default function InstallationRecordDetailPage() {
         </Descriptions>
       </Card>
 
+      {record.kind === 'METER_REPLACEMENT' && record.demountedMeterSnapshot && (
+        <Card title="Demontirano brojilo (prije zamjene)">
+          <Descriptions column={1} bordered size="small">
+            {(() => {
+              const snap = record.demountedMeterSnapshot as Record<string, unknown>
+              const serial = typeof snap.serialNumber === 'string' ? snap.serialNumber : '–'
+              const year = snap.year != null ? String(snap.year) : '–'
+              const calYear = snap.calibrationYear != null ? String(snap.calibrationYear) : '–'
+              const hadSim = snap.hadIntegratedSim
+              const noSimNote = typeof snap.noSimNote === 'string' ? snap.noSimNote : null
+              return (
+                <>
+                  <Descriptions.Item label="Serijski broj">{serial}</Descriptions.Item>
+                  <Descriptions.Item label="Tip brojila">
+                    {demountedTypeQuery.data?.name ?? '–'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Proizvođač">
+                    {demountedTypeQuery.data?.manufacturer ?? '–'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Model">{demountedTypeQuery.data?.model ?? '–'}</Descriptions.Item>
+                  <Descriptions.Item label="Godina proizvodnje">{year}</Descriptions.Item>
+                  <Descriptions.Item label="Godina baždarenja">{calYear}</Descriptions.Item>
+                  <Descriptions.Item label="Ugrađena SIM u starom brojilu">
+                    {hadSim === true ? 'Da' : hadSim === false ? 'Ne' : '–'}
+                  </Descriptions.Item>
+                  {noSimNote ? (
+                    <Descriptions.Item label="Napomena (SIM / staro brojilo)">{noSimNote}</Descriptions.Item>
+                  ) : null}
+                </>
+              )
+            })()}
+            {(demountedFieldsQuery.data ?? [])
+              .slice()
+              .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+              .map((field) => {
+                const snap = record.demountedMeterSnapshot as Record<string, unknown>
+                const dyn = (snap.dynamicFieldValues as Record<string, unknown> | undefined) ?? {}
+                const display = formatDynamicFieldValue(field, dyn[field.name])
+                if (!display) return null
+                return (
+                  <Descriptions.Item key={field.id} label={field.label}>
+                    {display}
+                  </Descriptions.Item>
+                )
+              })}
+            {(() => {
+              const snap = record.demountedMeterSnapshot as Record<string, unknown>
+              const notes = typeof snap.notes === 'string' ? snap.notes : null
+              return notes ? (
+                <Descriptions.Item label="Napomena (brojilo)">{notes}</Descriptions.Item>
+              ) : null
+            })()}
+          </Descriptions>
+        </Card>
+      )}
+
       <Card title="Podaci o brojilu">
         <Descriptions column={1} bordered size="small">
           <Descriptions.Item label="Serijski broj">{record.meter?.serialNumber ?? '–'}</Descriptions.Item>
@@ -257,29 +338,6 @@ export default function InstallationRecordDetailPage() {
           <Descriptions.Item label="Mjerno mjesto">
             {record.meter?.measuringPoint ?? '–'}
           </Descriptions.Item>
-          {(record.meter?.latitude != null || record.meter?.longitude != null) && (
-            <>
-              <Descriptions.Item label="GPS širina">
-                {record.meter?.latitude != null ? String(record.meter.latitude) : '–'}
-              </Descriptions.Item>
-              <Descriptions.Item label="GPS dužina">
-                {record.meter?.longitude != null ? String(record.meter.longitude) : '–'}
-              </Descriptions.Item>
-            </>
-          )}
-          <Descriptions.Item label="Status SIM-a">
-            {record.meter?.simCard ? 'Ugrađena' : 'Bez kartice'}
-          </Descriptions.Item>
-          {record.meter?.simCard && (
-            <>
-              <Descriptions.Item label="ICCID">
-                {record.meter.simCard.iccid ?? '–'}
-              </Descriptions.Item>
-              <Descriptions.Item label="IP adresa">
-                {record.meter.simCard.ipAddress ?? '–'}
-              </Descriptions.Item>
-            </>
-          )}
           {(record.meter?.dynamicFieldValues &&
             Object.keys(record.meter.dynamicFieldValues).length > 0 &&
             (meterTypeFieldsQuery.data ?? []).some((f) => {
@@ -301,6 +359,29 @@ export default function InstallationRecordDetailPage() {
                     </Descriptions.Item>
                   )
                 })}
+            </>
+          )}
+          {(record.meter?.latitude != null || record.meter?.longitude != null) && (
+            <>
+              <Descriptions.Item label="GPS širina">
+                {record.meter?.latitude != null ? String(record.meter.latitude) : '–'}
+              </Descriptions.Item>
+              <Descriptions.Item label="GPS dužina">
+                {record.meter?.longitude != null ? String(record.meter.longitude) : '–'}
+              </Descriptions.Item>
+            </>
+          )}
+          <Descriptions.Item label="Status SIM-a">
+            {record.meter?.simCard ? 'Ugrađena' : 'Bez kartice'}
+          </Descriptions.Item>
+          {record.meter?.simCard && (
+            <>
+              <Descriptions.Item label="ICCID">
+                {record.meter.simCard.iccid ?? '–'}
+              </Descriptions.Item>
+              <Descriptions.Item label="IP adresa">
+                {record.meter.simCard.ipAddress ?? '–'}
+              </Descriptions.Item>
             </>
           )}
         </Descriptions>

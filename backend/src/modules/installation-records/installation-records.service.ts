@@ -583,7 +583,6 @@ export class InstallationRecordsService {
           ipAddress: simCard.ipAddress,
           publicIpAddress: simCard.publicIpAddress ?? '',
           phoneNumber: simCard.phoneNumber ?? '',
-          apn: simCard.apn ?? '',
           assignedTo: simCard.assignedTo
             ? `${simCard.assignedTo.firstName} ${simCard.assignedTo.lastName}`
             : '',
@@ -601,8 +600,6 @@ export class InstallationRecordsService {
           city: record.meter.city ?? '',
           municipality: record.meter.municipality ?? '',
           measuringPoint: record.meter.measuringPoint ?? '',
-          latitude: record.meter.latitude != null ? String(record.meter.latitude) : undefined,
-          longitude: record.meter.longitude != null ? String(record.meter.longitude) : undefined,
           typeName: typeDef?.name ?? '',
           typeManufacturer: typeDef?.manufacturer ?? '',
           typeModel: typeDef?.model ?? '',

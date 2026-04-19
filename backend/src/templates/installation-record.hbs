@@ -28,7 +28,6 @@
         <tr class="highlight"><th>EPBIH IP (unesite u brojilo)</th><td>{{simCard.ipAddress}}</td></tr>
         <tr><th>Javna IP adresa</th><td>{{#if simCard.publicIpAddress}}{{simCard.publicIpAddress}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         <tr><th>Broj telefona</th><td>{{#if simCard.phoneNumber}}{{simCard.phoneNumber}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
-        <tr><th>APN</th><td>{{#if simCard.apn}}{{simCard.apn}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         <tr><th>Kome je dodijeljena</th><td>{{#if simCard.assignedTo}}{{simCard.assignedTo}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
       </table>
     </div>
@@ -50,25 +49,17 @@
         <tr><th>Mjerno mjesto (MM)</th><td>{{#if meter.measuringPoint}}{{meter.measuringPoint}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         <tr><th>Grad / Mjesto</th><td>{{#if meter.city}}{{meter.city}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         <tr><th>Općina</th><td>{{#if meter.municipality}}{{meter.municipality}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
-        {{#if meter.latitude}}<tr><th>GPS širina</th><td>{{meter.latitude}}</td></tr>{{/if}}
-        {{#if meter.longitude}}<tr><th>GPS dužina</th><td>{{meter.longitude}}</td></tr>{{/if}}
+        {{#if hasDynamicFields}}
+        {{#each dynamicFields}}
+        <tr><th>{{this.label}}</th><td>{{this.value}}</td></tr>
+        {{/each}}
+        {{/if}}
         <tr><th>Napomena (brojilo)</th><td>{{#if meter.notes}}{{meter.notes}}{{else}}<span class="empty">–</span>{{/if}}</td></tr>
         {{else}}
         <tr><td colspan="2"><span class="empty">Nema podataka o brojilu</span></td></tr>
         {{/if}}
       </table>
     </div>
-
-    {{#if hasDynamicFields}}
-    <div class="section">
-      <h2>Dodatna polja brojila</h2>
-      <table class="details">
-        {{#each dynamicFields}}
-        <tr><th>{{this.label}}</th><td>{{this.value}}</td></tr>
-        {{/each}}
-      </table>
-    </div>
-    {{/if}}
 
     {{#if hasPhotos}}
     <div class="section">
