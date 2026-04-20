@@ -24,7 +24,7 @@ export type MeterDemountCategory =
 export type DemountTaskItem = {
   id: string;
   meterId: string;
-  assignedToId: string;
+  assignedToId: string | null;
   createdById: string;
   status: DemountTaskStatus;
   taskType?: DemountTaskType;
@@ -98,7 +98,11 @@ export const demountTasksApi = {
           meta: { taskId: id },
         })
         const cached = (await offlineCache.demountTasksMy.get(user))?.data ?? []
-        const patched = cached.map((t) => (t.id === id ? { ...t, status } : t))
+        const current = cached.find((t) => t.id === id)
+        const patched =
+          current?.status === 'IN_PROGRESS' && status === 'PENDING'
+            ? cached.filter((t) => t.id !== id)
+            : cached.map((t) => (t.id === id ? { ...t, status } : t))
         await offlineCache.demountTasksMy.set(user, patched)
         return patched.find((t) => t.id === id) ?? ({ id } as DemountTaskItem)
       }

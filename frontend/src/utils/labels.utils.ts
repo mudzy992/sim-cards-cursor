@@ -1,6 +1,7 @@
 import type { UserRole } from '@/types/auth.types'
 import type { UserStatus } from '@/types/user.types'
 import type { SimCardStatus } from '@/types/sim-card.types'
+import type { MeterStatus } from '@/types/meter.types'
 
 export const getUserRoleLabel = (role: UserRole): string => {
   if (role === 'SYSTEM_ADMIN') return 'Sistemski administrator'
@@ -66,6 +67,13 @@ export const getRemovedSimDispositionLabel = (d: string): string => {
     RETURN_TO_STOCK: 'Uklonjena SIM vraćena u zalihe',
   }
   return map[d] ?? d
+}
+
+export const getMeterStatusLabel = (status: MeterStatus): string => {
+  if (status === 'ACTIVE') return 'Aktivno'
+  if (status === 'DEFECTIVE') return 'Neispravno'
+  if (status === 'IN_CALIBRATION') return 'Na baždarenju / servis'
+  return 'Neaktivno'
 }
 
 export const getActivityLogActionLabel = (action: string): string => {

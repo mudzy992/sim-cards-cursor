@@ -189,10 +189,14 @@ export class DemountTasksService {
       throw new BadRequestException('Dozvoljeno je samo: započni nalog ili vrati nalog inicijatoru.');
     }
 
+    const isReturnToInitiator =
+      task.status === DemountTaskStatus.IN_PROGRESS && status === DemountTaskStatus.PENDING
+
     const updated = await this.prisma.demountTask.update({
       where: { id },
       data: {
         status,
+        ...(isReturnToInitiator ? { assignedToId: null } : {}),
       },
       include: {
         meter: { include: { simCard: true, meterTypeDefinition: true } },
@@ -206,7 +210,7 @@ export class DemountTasksService {
       action: 'UPDATE',
       entity: 'demount_task',
       entityId: id,
-      details: { status },
+      details: { status, ...(isReturnToInitiator ? { returnedToInitiator: true } : {}) },
       ipAddress,
     });
 
@@ -261,13 +265,15 @@ export class DemountTasksService {
       details: { status: DemountTaskStatus.CANCELLED },
       ipAddress,
     });
-    await this.notificationsService.create({
-      userId: updated.assignedToId,
-      title: 'Nalog demontaže otkazan',
-      message: `Nalog demontaže za brojilo ${updated.meter?.serialNumber ?? updated.meterId} je otkazan.`,
-      type: 'DEMOUNT_TASK_CANCELLED',
-      link: `/meters/${updated.meterId}`,
-    });
+    if (updated.assignedToId) {
+      await this.notificationsService.create({
+        userId: updated.assignedToId,
+        title: 'Nalog demontaže otkazan',
+        message: `Nalog demontaže za brojilo ${updated.meter?.serialNumber ?? updated.meterId} je otkazan.`,
+        type: 'DEMOUNT_TASK_CANCELLED',
+        link: `/meters/${updated.meterId}`,
+      });
+    }
     return updated;
   }
 

@@ -21,7 +21,7 @@ export type MeterDemountCategory =
 export type DemountTaskItem = {
   id: string;
   meterId: string;
-  assignedToId: string;
+  assignedToId: string | null;
   createdById: string;
   status: DemountTaskStatus;
   taskType?: DemountTaskType;
@@ -82,5 +82,20 @@ export const demountTasksApi = {
       { status },
     );
     return response.data.data;
+  },
+
+  cancel: async (id: string): Promise<DemountTaskItem> => {
+    const response = await axiosInstance.post<ApiEnvelope<DemountTaskItem>>(
+      `/demount-tasks/${id}/cancel`,
+    )
+    return response.data.data
+  },
+
+  reassign: async (id: string, assignedToId: string): Promise<DemountTaskItem> => {
+    const response = await axiosInstance.post<ApiEnvelope<DemountTaskItem>>(
+      `/demount-tasks/${id}/reassign`,
+      { assignedToId },
+    )
+    return response.data.data
   },
 };

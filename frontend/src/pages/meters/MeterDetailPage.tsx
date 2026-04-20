@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Popconfirm,
   Select,
   Space,
   Switch,
@@ -70,10 +71,13 @@ export default function MeterDetailPage() {
   const [installDrawerOpen, setInstallDrawerOpen] = useState(false)
   const [demountDrawerOpen, setDemountDrawerOpen] = useState(false)
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
+  const [reassignDrawerOpen, setReassignDrawerOpen] = useState(false)
+  const [reassignTask, setReassignTask] = useState<{ kind: 'INSTALL' | 'DEMOUNT'; taskId: string } | null>(null)
   const [installOperatorId, setInstallOperatorId] = useState<string>('')
   const [demountOperatorId, setDemountOperatorId] = useState<string>('')
   const [installNotes, setInstallNotes] = useState('')
   const [demountNotes, setDemountNotes] = useState('')
+  const [reassignOperatorId, setReassignOperatorId] = useState<string>('')
   const [demountResolution, setDemountResolution] = useState<DemountCompletionResolution | ''>('')
   const [demountReason, setDemountReason] = useState('')
   const [demountRemovedSimDisposition, setDemountRemovedSimDisposition] = useState<
@@ -152,7 +156,7 @@ export default function MeterDetailPage() {
   const operatorsQuery = useQuery({
     queryKey: ['users', 'operators', 'v1'],
     queryFn: () => usersApi.list({ page: 1, limit: 100, role: 'USER' }),
-    enabled: installDrawerOpen || demountDrawerOpen,
+    enabled: installDrawerOpen || demountDrawerOpen || reassignDrawerOpen,
   })
 
   const updateMeterMutation = useMutation({
@@ -213,6 +217,74 @@ export default function MeterDetailPage() {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
           'Kreiranje zadatka nije uspjelo.',
+      )
+    },
+  })
+
+  const cancelInstallTaskMutation = useMutation({
+    mutationFn: (taskId: string) => installTasksApi.cancel(taskId),
+    onSuccess: async () => {
+      messageApi.success('Nalog ugradnje je otkazan.')
+      await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['meters'] })
+    },
+    onError: (err: unknown) => {
+      messageApi.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Otkazivanje naloga nije uspjelo.',
+      )
+    },
+  })
+
+  const cancelDemountTaskMutation = useMutation({
+    mutationFn: (taskId: string) => demountTasksApi.cancel(taskId),
+    onSuccess: async () => {
+      messageApi.success('Nalog demontaže je otkazan.')
+      await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['meters'] })
+    },
+    onError: (err: unknown) => {
+      messageApi.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Otkazivanje naloga nije uspjelo.',
+      )
+    },
+  })
+
+  const reassignInstallTaskMutation = useMutation({
+    mutationFn: (payload: { taskId: string; assignedToId: string }) =>
+      installTasksApi.reassign(payload.taskId, payload.assignedToId),
+    onSuccess: async () => {
+      messageApi.success('Nalog ugradnje je pre-dodijeljen.')
+      setReassignDrawerOpen(false)
+      setReassignTask(null)
+      setReassignOperatorId('')
+      await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['meters'] })
+    },
+    onError: (err: unknown) => {
+      messageApi.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Pre-dodjela naloga nije uspjela.',
+      )
+    },
+  })
+
+  const reassignDemountTaskMutation = useMutation({
+    mutationFn: (payload: { taskId: string; assignedToId: string }) =>
+      demountTasksApi.reassign(payload.taskId, payload.assignedToId),
+    onSuccess: async () => {
+      messageApi.success('Nalog demontaže je pre-dodijeljen.')
+      setReassignDrawerOpen(false)
+      setReassignTask(null)
+      setReassignOperatorId('')
+      await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['meters'] })
+    },
+    onError: (err: unknown) => {
+      messageApi.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Pre-dodjela naloga nije uspjela.',
       )
     },
   })
@@ -302,7 +374,31 @@ export default function MeterDetailPage() {
                   {openDemountLabel.resolution}
                 </Tag>
               ) : null}
-              {meter.simCard ? (
+              {openDemountTask &&
+              (openDemountTask.status === 'PENDING' || openDemountTask.status === 'IN_PROGRESS') ? (
+                <Space size={4}>
+                  <Button
+                    onClick={() => {
+                      setReassignTask({ kind: 'DEMOUNT', taskId: openDemountTask.id })
+                      setReassignDrawerOpen(true)
+                    }}
+                  >
+                    Pre-dodijeli
+                  </Button>
+                  <Popconfirm
+                    title="Otkaži nalog demontaže?"
+                    okText="Da"
+                    cancelText="Ne"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => cancelDemountTaskMutation.mutate(openDemountTask.id)}
+                  >
+                    <Button danger loading={cancelDemountTaskMutation.isPending}>
+                      Otkaži
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              ) : null}
+              {meter.simCard && !openDemountLabel ? (
                 <Button disabled={meter.status && meter.status !== 'ACTIVE'} onClick={() => setDemountDrawerOpen(true)}>
                   Demontaža
                 </Button>
@@ -321,6 +417,30 @@ export default function MeterDetailPage() {
                     Pošalji na ugradnju
                   </Button>
                 )
+              ) : null}
+              {openInstallTask &&
+              (openInstallTask.status === 'PENDING' || openInstallTask.status === 'IN_PROGRESS') ? (
+                <Space size={4}>
+                  <Button
+                    onClick={() => {
+                      setReassignTask({ kind: 'INSTALL', taskId: openInstallTask.id })
+                      setReassignDrawerOpen(true)
+                    }}
+                  >
+                    Pre-dodijeli
+                  </Button>
+                  <Popconfirm
+                    title="Otkaži nalog ugradnje?"
+                    okText="Da"
+                    cancelText="Ne"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => cancelInstallTaskMutation.mutate(openInstallTask.id)}
+                  >
+                    <Button danger loading={cancelInstallTaskMutation.isPending}>
+                      Otkaži
+                    </Button>
+                  </Popconfirm>
+                </Space>
               ) : null}
               <Button type="primary" onClick={handleOpenEdit}>
                 Uredi
@@ -442,6 +562,78 @@ export default function MeterDetailPage() {
           Timeline za brojilo će biti prikazan kada backend počne logovati aktivnosti sa entity = meter.
         </Typography.Text>
       </Card>
+
+      <Drawer
+        title="Pre-dodijeli nalog"
+        open={reassignDrawerOpen}
+        width={520}
+        onClose={() => {
+          setReassignDrawerOpen(false)
+          setReassignTask(null)
+          setReassignOperatorId('')
+        }}
+        destroyOnClose
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setReassignDrawerOpen(false)
+                setReassignTask(null)
+                setReassignOperatorId('')
+              }}
+            >
+              Odustani
+            </Button>
+            <Button
+              type="primary"
+              disabled={!reassignTask || !reassignOperatorId}
+              loading={reassignInstallTaskMutation.isPending || reassignDemountTaskMutation.isPending}
+              onClick={() => {
+                if (!reassignTask || !reassignOperatorId) return
+                if (reassignTask.kind === 'INSTALL') {
+                  reassignInstallTaskMutation.mutate({
+                    taskId: reassignTask.taskId,
+                    assignedToId: reassignOperatorId,
+                  })
+                  return
+                }
+                reassignDemountTaskMutation.mutate({
+                  taskId: reassignTask.taskId,
+                  assignedToId: reassignOperatorId,
+                })
+              }}
+            >
+              Pre-dodijeli
+            </Button>
+          </div>
+        }
+      >
+        <Space direction="vertical" className="w-full" size="middle">
+          <Typography.Text type="secondary">
+            Odaberite operatora kojem dodjeljujete ovaj nalog.
+          </Typography.Text>
+          <Form.Item label="Operator" required>
+            <Select
+              placeholder="Odaberite operatora"
+              value={reassignOperatorId || undefined}
+              onChange={setReassignOperatorId}
+              options={
+                operatorsQuery.data?.items
+                  ?.filter((u) => u.role === 'USER')
+                  .map((u) => ({
+                    label: `${u.firstName} ${u.lastName} (${u.email})`,
+                    value: u.id,
+                  })) ?? []
+              }
+              loading={operatorsQuery.isLoading}
+              showSearch
+              filterOption={(input, opt) =>
+                (opt?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
+            />
+          </Form.Item>
+        </Space>
+      </Drawer>
 
       <Drawer
         title="Zadatak ugradnje SIM kartice"

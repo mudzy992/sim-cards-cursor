@@ -9,7 +9,7 @@ export type InstallTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCE
 export type InstallTaskItem = {
   id: string
   meterId: string
-  assignedToId: string
+  assignedToId: string | null
   createdById: string
   status: InstallTaskStatus
   notes?: string | null
@@ -89,7 +89,11 @@ export const installTasksApi = {
           meta: { taskId: id },
         })
         const cached = (await offlineCache.installTasksMy.get(user))?.data ?? []
-        const patched = cached.map((t) => (t.id === id ? { ...t, status } : t))
+        const current = cached.find((t) => t.id === id)
+        const patched =
+          current?.status === 'IN_PROGRESS' && status === 'PENDING'
+            ? cached.filter((t) => t.id !== id)
+            : cached.map((t) => (t.id === id ? { ...t, status } : t))
         await offlineCache.installTasksMy.set(user, patched)
         return patched.find((t) => t.id === id) ?? ({ id } as InstallTaskItem)
       }

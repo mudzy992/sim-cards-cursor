@@ -191,9 +191,12 @@ export class InstallTasksService {
       throw new BadRequestException('Dozvoljeno je samo: započni nalog ili vrati nalog inicijatoru.')
     }
 
+    const isReturnToInitiator =
+      task.status === InstallTaskStatus.IN_PROGRESS && status === InstallTaskStatus.PENDING
+
     const updated = await this.prisma.installTask.update({
       where: { id },
-      data: { status },
+      data: { status, ...(isReturnToInitiator ? { assignedToId: null } : {}) },
       include: {
         meter: { include: { meterTypeDefinition: true, simCard: true } },
         assignedTo: true,
@@ -207,7 +210,7 @@ export class InstallTasksService {
       action: 'UPDATE',
       entity: 'install_task',
       entityId: id,
-      details: { status },
+      details: { status, ...(isReturnToInitiator ? { returnedToInitiator: true } : {}) },
       ipAddress,
     })
 
@@ -278,13 +281,15 @@ export class InstallTasksService {
       details: { status: InstallTaskStatus.CANCELLED },
       ipAddress,
     })
-    await this.notificationsService.create({
-      userId: updated.assignedToId,
-      title: 'Nalog ugradnje otkazan',
-      message: `Nalog ugradnje za brojilo ${updated.meter?.serialNumber ?? updated.meterId} je otkazan.`,
-      type: 'INSTALL_TASK_CANCELLED',
-      link: `/meters/${updated.meterId}`,
-    })
+    if (updated.assignedToId) {
+      await this.notificationsService.create({
+        userId: updated.assignedToId,
+        title: 'Nalog ugradnje otkazan',
+        message: `Nalog ugradnje za brojilo ${updated.meter?.serialNumber ?? updated.meterId} je otkazan.`,
+        type: 'INSTALL_TASK_CANCELLED',
+        link: `/meters/${updated.meterId}`,
+      })
+    }
     return updated
   }
 

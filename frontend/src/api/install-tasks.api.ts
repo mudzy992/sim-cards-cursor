@@ -6,7 +6,7 @@ export type InstallTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCE
 export type InstallTaskItem = {
   id: string
   meterId: string
-  assignedToId: string
+  assignedToId: string | null
   createdById: string
   status: InstallTaskStatus
   notes?: string | null
@@ -35,6 +35,29 @@ export const installTasksApi = {
     const response = await axiosInstance.post<ApiEnvelope<InstallTaskItem>>(
       '/install-tasks',
       payload,
+    )
+    return response.data.data
+  },
+
+  updateStatus: async (id: string, status: InstallTaskStatus): Promise<InstallTaskItem> => {
+    const response = await axiosInstance.patch<ApiEnvelope<InstallTaskItem>>(
+      `/install-tasks/${id}/status`,
+      { status },
+    )
+    return response.data.data
+  },
+
+  cancel: async (id: string): Promise<InstallTaskItem> => {
+    const response = await axiosInstance.post<ApiEnvelope<InstallTaskItem>>(
+      `/install-tasks/${id}/cancel`,
+    )
+    return response.data.data
+  },
+
+  reassign: async (id: string, assignedToId: string): Promise<InstallTaskItem> => {
+    const response = await axiosInstance.post<ApiEnvelope<InstallTaskItem>>(
+      `/install-tasks/${id}/reassign`,
+      { assignedToId },
     )
     return response.data.data
   },

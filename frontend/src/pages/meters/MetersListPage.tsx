@@ -47,6 +47,7 @@ import { buildOsmEmbedUrl } from '@/utils/osm.utils'
 import {
   getDemountResolutionLabel,
   getMeterDemountCategoryLabel,
+  getMeterStatusLabel,
   getRemovedSimDispositionLabel,
 } from '@/utils/labels.utils'
 
@@ -523,6 +524,23 @@ export default function MetersListPage() {
                       dataIndex: 'calibrationYear',
                       key: 'calibrationYear',
                       render: (val: number | null) => (val != null ? String(val) : '–'),
+                    },
+                    {
+                      title: 'Status brojila',
+                      key: 'meterStatus',
+                      width: 160,
+                      render: (_: unknown, row: MeterItem) => {
+                        const status = row.status ?? 'ACTIVE'
+                        const color =
+                          status === 'ACTIVE'
+                            ? 'success'
+                            : status === 'DEFECTIVE'
+                              ? 'error'
+                              : status === 'IN_CALIBRATION'
+                                ? 'warning'
+                                : 'default'
+                        return <Tag color={color}>{getMeterStatusLabel(status)}</Tag>
+                      },
                     },
                     {
                       title: 'SIM',
