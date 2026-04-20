@@ -28,6 +28,13 @@ export type MeterItem = {
     createdAt: string;
     assignedTo?: { id: string; firstName: string; lastName: string } | null;
   }>;
+  demountTasks?: Array<{
+    id: string
+    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+    createdAt: string
+    requestedResolution?: string | null
+    assignedTo?: { id: string; firstName: string; lastName: string } | null
+  }>
   year?: number | null;
   calibrationYear?: number | null;
   notes?: string | null;

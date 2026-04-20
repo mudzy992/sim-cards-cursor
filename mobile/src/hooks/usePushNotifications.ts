@@ -7,6 +7,9 @@ import { useAuthStore } from '@/store/auth.store';
 import { pushTokensApi } from '@/api/push-tokens.api';
 import { settingsApi } from '@/api/settings.api';
 import { colors } from '@/theme/colors';
+import { useGlobalBlockingStore } from '@/store/global-blocking.store'
+import { normalizeDeepLink } from '@/utils/deeplink'
+import { useQueryClient } from '@tanstack/react-query'
 
 function resolveProjectId(): string | undefined {
   const fromEnv = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
@@ -114,6 +117,11 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
 export function usePushNotifications() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient()
+  const { isBlocked, queueDeepLink } = useGlobalBlockingStore((s) => ({
+    isBlocked: s.isBlocked,
+    queueDeepLink: s.queueDeepLink,
+  }))
 
   useEffect(() => {
     if (!user) {
@@ -122,6 +130,7 @@ export function usePushNotifications() {
 
     let isMounted = true;
     let responseListener: { remove: () => void } | null = null;
+    let receivedListener: { remove: () => void } | null = null;
 
     (async () => {
       const mobilePushEnabled = await settingsApi.getMobilePushEnabled();
@@ -145,12 +154,18 @@ export function usePushNotifications() {
           const data = response.notification.request.content.data as {
             deepLink?: string;
           };
-          if (data?.deepLink) {
-            router.push(data.deepLink as never);
-          } else {
-            router.push('/(app)/notifications' as never);
+          const normalized = normalizeDeepLink(data?.deepLink) ?? '/notifications'
+          if (isBlocked) {
+            queueDeepLink(normalized)
+            return
           }
+          router.push(normalized as never);
         });
+
+      receivedListener = Notifications.addNotificationReceivedListener(() => {
+        void queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] })
+        void queryClient.invalidateQueries({ queryKey: ['notifications-list'] })
+      })
 
       const token = await registerForPushNotificationsAsync();
       if (!isMounted || !token) return;
@@ -169,6 +184,7 @@ export function usePushNotifications() {
     return () => {
       isMounted = false;
       responseListener?.remove();
+      receivedListener?.remove();
     };
-  }, [router, user]);
+  }, [isBlocked, queryClient, queueDeepLink, router, user]);
 }

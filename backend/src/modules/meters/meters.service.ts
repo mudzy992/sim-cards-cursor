@@ -133,6 +133,14 @@ export class MetersService {
             assignedTo: { select: { id: true, firstName: true, lastName: true } },
           },
         },
+        demountTasks: {
+          where: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            assignedTo: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
       },
     });
 

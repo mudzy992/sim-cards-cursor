@@ -24,7 +24,12 @@ import { metersApi } from '@/api/meters.api';
 import { usersApi } from '@/api/users.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import { installationRecordsApi } from '@/api/installation-records.api';
-import { demountTasksApi } from '@/api/demount-tasks.api';
+import {
+  demountTasksApi,
+  type DemountCompletionResolution,
+  type MeterDemountCategory,
+  type RemovedSimDisposition,
+} from '@/api/demount-tasks.api';
 import { installTasksApi } from '@/api/install-tasks.api';
 import InstallationRecordCreateForm from '@/components/installation-records/InstallationRecordCreateForm';
 import type {
@@ -39,6 +44,11 @@ import type {
   MeterTypeDefinitionItem,
 } from '@/types/meter-type-definition.types';
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
+import {
+  getDemountResolutionLabel,
+  getMeterDemountCategoryLabel,
+  getRemovedSimDispositionLabel,
+} from '@/utils/labels.utils'
 
 const meterTypeOptions: { label: string; value: MeterType }[] = [
   { label: 'Jednofazno', value: 'SINGLE_PHASE' },
@@ -83,6 +93,14 @@ export default function MetersListPage() {
   const [demountMeter, setDemountMeter] = useState<MeterItem | null>(null);
   const [demountOperatorId, setDemountOperatorId] = useState<string>('');
   const [demountNotes, setDemountNotes] = useState('');
+  const [demountResolution, setDemountResolution] = useState<DemountCompletionResolution | ''>('')
+  const [demountReason, setDemountReason] = useState('')
+  const [demountRemovedSimDisposition, setDemountRemovedSimDisposition] = useState<
+    RemovedSimDisposition | ''
+  >('')
+  const [demountMeterDemountCategory, setDemountMeterDemountCategory] = useState<
+    MeterDemountCategory | ''
+  >('')
   const [installDrawerOpen, setInstallDrawerOpen] = useState(false);
   const [installMeter, setInstallMeter] = useState<MeterItem | null>(null);
   const [installOperatorId, setInstallOperatorId] = useState<string>('');
@@ -137,14 +155,25 @@ export default function MetersListPage() {
   });
 
   const createDemountMutation = useMutation({
-    mutationFn: (payload: { meterId: string; assignedToId: string; notes?: string }) =>
-      demountTasksApi.create(payload),
+    mutationFn: (payload: {
+      meterId: string
+      assignedToId: string
+      notes?: string
+      requestedResolution: DemountCompletionResolution
+      requestedReason: string
+      requestedRemovedSimDisposition: RemovedSimDisposition
+      requestedMeterDemountCategory?: MeterDemountCategory
+    }) => demountTasksApi.create(payload),
     onSuccess: () => {
       messageApi.success('Zadatak demontaže je kreiran.');
       setDemountDrawerOpen(false);
       setDemountMeter(null);
       setDemountOperatorId('');
       setDemountNotes('');
+      setDemountResolution('')
+      setDemountReason('')
+      setDemountRemovedSimDisposition('')
+      setDemountMeterDemountCategory('')
     },
     onError: (err: unknown) => {
       messageApi.error(
@@ -963,6 +992,10 @@ export default function MetersListPage() {
           setDemountMeter(null)
           setDemountOperatorId('')
           setDemountNotes('')
+          setDemountResolution('')
+          setDemountReason('')
+          setDemountRemovedSimDisposition('')
+          setDemountMeterDemountCategory('')
         }}
         destroyOnClose
         footer={
@@ -982,10 +1015,29 @@ export default function MetersListPage() {
               loading={createDemountMutation.isPending}
               onClick={() => {
                 if (!demountMeter || !demountOperatorId) return
+                if (!demountResolution) return
+                if (demountReason.trim().length < 3) return
+                if (!demountRemovedSimDisposition) return
+                if (
+                  (demountResolution === 'FULL_DEMOUNT' ||
+                    demountResolution === 'REMOVE_SIM_ONLY') &&
+                  !demountMeterDemountCategory
+                )
+                  return
                 createDemountMutation.mutate({
                   meterId: demountMeter.id,
                   assignedToId: demountOperatorId,
                   notes: demountNotes || undefined,
+                  requestedResolution: demountResolution,
+                  requestedReason: demountReason.trim(),
+                  requestedRemovedSimDisposition: demountRemovedSimDisposition,
+                  ...(demountResolution === 'FULL_DEMOUNT' ||
+                  demountResolution === 'REMOVE_SIM_ONLY'
+                    ? {
+                        requestedMeterDemountCategory:
+                          demountMeterDemountCategory as MeterDemountCategory,
+                      }
+                    : {}),
                 })
               }}
             >
@@ -1026,6 +1078,72 @@ export default function MetersListPage() {
                 value={demountNotes}
                 onChange={(e) => setDemountNotes(e.target.value)}
                 placeholder="Opcionalno"
+              />
+            </Form.Item>
+
+            <Form.Item label="Rezolucija" required>
+              <Select
+                placeholder="Odaberite rezoluciju"
+                value={demountResolution || undefined}
+                onChange={(v) => {
+                  setDemountResolution(v)
+                  if (v === 'REPLACE_SIM') setDemountMeterDemountCategory('')
+                }}
+                options={(
+                  ['FULL_DEMOUNT', 'REPLACE_SIM', 'REMOVE_SIM_ONLY'] as DemountCompletionResolution[]
+                ).map((v) => ({
+                  label: getDemountResolutionLabel(v),
+                  value: v,
+                }))}
+              />
+            </Form.Item>
+
+            <Form.Item label="Ishod uklonjene SIM" required>
+              <Select
+                placeholder="Odaberite ishod uklonjene SIM"
+                value={demountRemovedSimDisposition || undefined}
+                onChange={setDemountRemovedSimDisposition}
+                options={(['MARK_DEFECTIVE', 'RETURN_TO_STOCK'] as RemovedSimDisposition[]).map(
+                  (v) => ({
+                    label: getRemovedSimDispositionLabel(v),
+                    value: v,
+                  }),
+                )}
+              />
+            </Form.Item>
+
+            {demountResolution === 'FULL_DEMOUNT' || demountResolution === 'REMOVE_SIM_ONLY' ? (
+              <Form.Item label="Kategorija (brojilo ostaje bez SIM-a)" required>
+                <Select
+                  placeholder="Odaberite kategoriju"
+                  value={demountMeterDemountCategory || undefined}
+                  onChange={setDemountMeterDemountCategory}
+                  options={(
+                    [
+                      'METER_FAULTY',
+                      'TEMPORARY_REMOVAL',
+                      'MAINTENANCE',
+                      'OTHER',
+                    ] as MeterDemountCategory[]
+                  ).map((v) => ({
+                    label: getMeterDemountCategoryLabel(v),
+                    value: v,
+                  }))}
+                />
+              </Form.Item>
+            ) : null}
+
+            <Form.Item
+              label="Obrazloženje"
+              required
+              validateStatus={demountReason.trim().length >= 3 ? undefined : 'error'}
+              help={demountReason.trim().length >= 3 ? undefined : 'Unesite najmanje 3 znaka.'}
+            >
+              <Input.TextArea
+                rows={3}
+                value={demountReason}
+                onChange={(e) => setDemountReason(e.target.value)}
+                placeholder="Kratko obrazloženje odluke inicijatora"
               />
             </Form.Item>
           </Space>

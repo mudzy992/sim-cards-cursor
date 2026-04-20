@@ -28,6 +28,10 @@ export type DemountTaskItem = {
   createdById: string;
   status: DemountTaskStatus;
   taskType?: DemountTaskType;
+  requestedResolution?: DemountCompletionResolution | null
+  requestedReason?: string | null
+  requestedRemovedSimDisposition?: RemovedSimDisposition | null
+  requestedMeterDemountCategory?: MeterDemountCategory | null
   completionResolution?: DemountCompletionResolution | null;
   completionReason?: string | null;
   removedSimDisposition?: RemovedSimDisposition | null;

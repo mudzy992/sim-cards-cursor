@@ -79,6 +79,7 @@ export default function DemountScreen() {
   const [wizard, setWizard] = useState<{
     task: DemountTaskItem;
     step: 1 | 2;
+    isLocked: boolean;
     resolution?: DemountCompletionResolution;
     reason: string;
     newSimCardId?: string;
@@ -177,15 +178,17 @@ export default function DemountScreen() {
   };
 
   const handleOpenWizard = (task: DemountTaskItem) => {
+    const isLocked = Boolean(task.requestedResolution)
     setWizard({
       task,
-      step: 1,
-      reason: '',
-      removedSimDisposition: undefined,
-      meterDemountCategory: undefined,
+      step: isLocked ? 2 : 1,
+      isLocked,
+      resolution: task.requestedResolution ?? undefined,
+      reason: task.requestedReason ?? '',
+      removedSimDisposition: task.requestedRemovedSimDisposition ?? undefined,
+      meterDemountCategory: task.requestedMeterDemountCategory ?? undefined,
       newSimCardId: undefined,
       newSimIccid: undefined,
-      resolution: undefined,
     });
   };
 
@@ -491,54 +494,75 @@ export default function DemountScreen() {
                   </View>
                 ) : (
                   <View style={{ gap: 12 }}>
-                    <Pressable onPress={() => setWizard((w) => (w ? { ...w, step: 1 } : w))}>
-                      <Text style={{ color: colors.primary, fontWeight: '600' }}>← Nazad</Text>
-                    </Pressable>
-                    <Text style={{ fontWeight: '600' }}>Ishod uklonjene SIM</Text>
-                    {(Object.keys(removedSimLabels) as RemovedSimDisposition[]).map((key) => (
-                      <Pressable
-                        key={key}
-                        onPress={() =>
-                          setWizard((w) => (w ? { ...w, removedSimDisposition: key } : w))
-                        }
-                        style={({ pressed }) => ({
-                          borderWidth: 1,
-                          borderColor: wizard.removedSimDisposition === key ? colors.primary : colors.border,
-                          backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-                          padding: 12,
-                          borderRadius: 12,
-                        })}
-                      >
-                        <Text style={{ fontWeight: '600', fontSize: 13 }}>{removedSimLabels[key]}</Text>
+                    {!wizard.isLocked ? (
+                      <Pressable onPress={() => setWizard((w) => (w ? { ...w, step: 1 } : w))}>
+                        <Text style={{ color: colors.primary, fontWeight: '600' }}>← Nazad</Text>
                       </Pressable>
-                    ))}
+                    ) : null}
+
+                    <Text style={{ fontWeight: '600' }}>Rezolucija (inicijator)</Text>
+                    <Text style={{ color: colors.textMuted }}>
+                      {wizard.resolution ? resolutionLabels[wizard.resolution] : '—'}
+                    </Text>
+
+                    <Text style={{ fontWeight: '600' }}>Ishod uklonjene SIM (inicijator)</Text>
+                    {wizard.isLocked ? (
+                      <Text style={{ color: colors.textMuted }}>
+                        {wizard.removedSimDisposition ? removedSimLabels[wizard.removedSimDisposition] : '—'}
+                      </Text>
+                    ) : (
+                      (Object.keys(removedSimLabels) as RemovedSimDisposition[]).map((key) => (
+                        <Pressable
+                          key={key}
+                          onPress={() =>
+                            setWizard((w) => (w ? { ...w, removedSimDisposition: key } : w))
+                          }
+                          style={({ pressed }) => ({
+                            borderWidth: 1,
+                            borderColor: wizard.removedSimDisposition === key ? colors.primary : colors.border,
+                            backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
+                            padding: 12,
+                            borderRadius: 12,
+                          })}
+                        >
+                          <Text style={{ fontWeight: '600', fontSize: 13 }}>{removedSimLabels[key]}</Text>
+                        </Pressable>
+                      ))
+                    )}
                     {wizard.resolution &&
                     (wizard.resolution === 'FULL_DEMOUNT' ||
                       wizard.resolution === 'REMOVE_SIM_ONLY') ? (
                       <View style={{ gap: 10 }}>
                         <Text style={{ fontWeight: '600' }}>Brojilo ostaje bez SIM-a — kategorija</Text>
-                        {(Object.keys(meterDemountLabels) as MeterDemountCategory[]).map((key) => (
-                          <Pressable
-                            key={key}
-                            onPress={() =>
-                              setWizard((w) => (w ? { ...w, meterDemountCategory: key } : w))
-                            }
-                            style={({ pressed }) => ({
-                              borderWidth: 1,
-                              borderColor: wizard.meterDemountCategory === key ? colors.primary : colors.border,
-                              backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-                              padding: 12,
-                              borderRadius: 12,
-                            })}
-                          >
-                            <Text style={{ fontWeight: '600', fontSize: 13 }}>{meterDemountLabels[key]}</Text>
-                          </Pressable>
-                        ))}
+                        {wizard.isLocked ? (
+                          <Text style={{ color: colors.textMuted }}>
+                            {wizard.meterDemountCategory ? meterDemountLabels[wizard.meterDemountCategory] : '—'}
+                          </Text>
+                        ) : (
+                          (Object.keys(meterDemountLabels) as MeterDemountCategory[]).map((key) => (
+                            <Pressable
+                              key={key}
+                              onPress={() =>
+                                setWizard((w) => (w ? { ...w, meterDemountCategory: key } : w))
+                              }
+                              style={({ pressed }) => ({
+                                borderWidth: 1,
+                                borderColor: wizard.meterDemountCategory === key ? colors.primary : colors.border,
+                                backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
+                                padding: 12,
+                                borderRadius: 12,
+                              })}
+                            >
+                              <Text style={{ fontWeight: '600', fontSize: 13 }}>{meterDemountLabels[key]}</Text>
+                            </Pressable>
+                          ))
+                        )}
                       </View>
                     ) : null}
                     <Text style={{ fontWeight: '600' }}>Obrazloženje</Text>
                     <TextInput
                       value={wizard.reason}
+                      editable={!wizard.isLocked}
                       onChangeText={(text) => setWizard((w) => (w ? { ...w, reason: text } : w))}
                       placeholder="Opišite razlog demontaže / zamjene"
                       multiline

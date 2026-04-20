@@ -1,30 +1,54 @@
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/auth.store';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAppUpdateGate } from '@/hooks/useAppUpdateGate';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { OfflineBanner } from '@/components/common/OfflineBanner'
 import { colors } from '@/theme/colors';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Button,
   Text,
   View,
 } from 'react-native';
 import { useConnectivity } from '@/hooks/useConnectivity'
+import { useGlobalBlockingStore } from '@/store/global-blocking.store'
+import { normalizeDeepLink } from '../../src/utils/deeplink'
 
 const PrivateLayout = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const router = useRouter()
   const { isOnline } = useConnectivity()
   const [offlineBannerHeight, setOfflineBannerHeight] = useState(0)
+  const blocking = useGlobalBlockingStore((s) => ({
+    isBlocked: s.isBlocked,
+    title: s.title,
+    subtitle: s.subtitle,
+    consumeQueuedDeepLink: s.consumeQueuedDeepLink,
+  }))
 
   usePushNotifications();
   useOfflineSync();
   const { state: updateState, actions } = useAppUpdateGate();
   const shownOptionalRef = useRef(false);
+
+  useEffect(() => {
+    if (!blocking.isBlocked) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true)
+    return () => sub.remove()
+  }, [blocking.isBlocked])
+
+  useEffect(() => {
+    if (blocking.isBlocked) return
+    const queued = blocking.consumeQueuedDeepLink()
+    if (!queued) return
+    const normalized = normalizeDeepLink(queued)
+    router.push((normalized ?? '/notifications') as never)
+  }, [blocking.isBlocked, blocking.consumeQueuedDeepLink, router])
 
   useEffect(() => {
     if (updateState.kind !== 'update_available') return;
@@ -95,24 +119,30 @@ const PrivateLayout = () => {
     );
   }
 
+  const stackScreenOptions = useMemo(
+    () => ({
+      headerStyle: {
+        backgroundColor: colors.surface,
+      },
+      headerTintColor: colors.text,
+      headerTitleStyle: {
+        color: colors.text,
+        fontSize: 16,
+      },
+      headerTitleAlign: 'center' as const,
+      headerLargeTitle: false,
+      statusBarStyle: 'dark' as const,
+      gestureEnabled: !blocking.isBlocked,
+    }),
+    [blocking.isBlocked],
+  )
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <OfflineBanner onHeight={setOfflineBannerHeight} />
       <View style={{ flex: 1, paddingTop: isOnline ? 0 : 24 }}>
         <Stack
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: colors.surface,
-            },
-            headerTintColor: colors.text,
-            headerTitleStyle: {
-              color: colors.text,
-              fontSize: 16,
-            },
-            headerTitleAlign: 'center',
-            headerLargeTitle: false,
-            statusBarStyle: 'dark',
-          }}
+          screenOptions={stackScreenOptions}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="record-details" options={{ title: 'Detalji zapisnika' }} />
@@ -124,6 +154,60 @@ const PrivateLayout = () => {
           <Stack.Screen name="notifications" options={{ title: 'Notifikacije' }} />
         </Stack>
       </View>
+
+      {blocking.isBlocked ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 360,
+              backgroundColor: colors.surface,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: 16,
+              alignItems: 'center',
+            }}
+          >
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text
+              style={{
+                marginTop: 12,
+                fontSize: 16,
+                fontWeight: '800',
+                color: colors.text,
+                textAlign: 'center',
+              }}
+            >
+              {blocking.title ?? 'Obrada u toku'}
+            </Text>
+            {blocking.subtitle ? (
+              <Text
+                style={{
+                  marginTop: 6,
+                  fontSize: 13,
+                  color: colors.textMuted,
+                  textAlign: 'center',
+                }}
+              >
+                {blocking.subtitle}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 };

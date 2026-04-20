@@ -10,6 +10,14 @@ export type DemountCompletionResolution =
   | 'REPLACE_SIM'
   | 'REMOVE_SIM_ONLY';
 
+export type RemovedSimDisposition = 'MARK_DEFECTIVE' | 'RETURN_TO_STOCK'
+
+export type MeterDemountCategory =
+  | 'METER_FAULTY'
+  | 'TEMPORARY_REMOVAL'
+  | 'MAINTENANCE'
+  | 'OTHER'
+
 export type DemountTaskItem = {
   id: string;
   meterId: string;
@@ -17,6 +25,10 @@ export type DemountTaskItem = {
   createdById: string;
   status: DemountTaskStatus;
   taskType?: DemountTaskType;
+  requestedResolution?: DemountCompletionResolution | null
+  requestedReason?: string | null
+  requestedRemovedSimDisposition?: RemovedSimDisposition | null
+  requestedMeterDemountCategory?: MeterDemountCategory | null
   completionResolution?: DemountCompletionResolution | null;
   completionReason?: string | null;
   notes?: string | null;
@@ -49,6 +61,10 @@ export const demountTasksApi = {
     assignedToId: string;
     notes?: string;
     taskType?: DemountTaskType;
+    requestedResolution: DemountCompletionResolution
+    requestedReason: string
+    requestedRemovedSimDisposition: RemovedSimDisposition
+    requestedMeterDemountCategory?: MeterDemountCategory
   }): Promise<DemountTaskItem> => {
     const response = await axiosInstance.post<ApiEnvelope<DemountTaskItem>>(
       '/demount-tasks',

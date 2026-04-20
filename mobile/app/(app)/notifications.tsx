@@ -11,6 +11,7 @@ import { Stack, useRouter } from 'expo-router';
 import { notificationsApi } from '@/api/notifications.api';
 import type { Notification } from '@/api/notifications.api';
 import { colors } from '@/theme/colors';
+import { normalizeDeepLink } from '@/utils/deeplink'
 
 function NotificationItem({
   item,
@@ -84,9 +85,8 @@ export default function NotificationsScreen() {
     if (!item.isRead) {
       markAsReadMutation.mutate(item.id);
     }
-    if (item.link) {
-      router.push(item.link as never);
-    }
+    const normalized = normalizeDeepLink(item.link) ?? '/notifications'
+    router.push(normalized as never)
   };
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
