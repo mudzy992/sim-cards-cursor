@@ -5,10 +5,20 @@ export type RecordStatus =
   | 'SEP_ACTIVATED'
   | 'LEGACY_COMPLETED';
 
+export type InstallationRecordKind = 'NEW_CONNECTION' | 'METER_REPLACEMENT';
+
 export type InstallationRecordItem = {
   id: string;
   recordNumber: string;
+  kind?: InstallationRecordKind;
+  demountedMeterSnapshot?: Record<string, unknown> | null;
   meterId: string;
+  simCard?: {
+    id: string;
+    iccid: string;
+    ipAddress: string;
+    status: string;
+  } | null;
   installationAddress?: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -39,6 +49,8 @@ export type InstallationRecordItem = {
     measuringPoint?: string | null;
     latitude?: number | null;
     longitude?: number | null;
+    year?: number | null;
+    calibrationYear?: number | null;
     dynamicFieldValues?: Record<string, unknown> | null;
     meterTypeDefinition?: { name: string } | null;
     simCard?: {

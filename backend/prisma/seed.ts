@@ -41,43 +41,6 @@ type SeedSetting = {
 };
 
 const DEFAULT_APP_SETTINGS: SeedSetting[] = [
-  // Notifications
-  {
-    key: 'notifications.enabled',
-    value: 'true',
-    description:
-      'Globalni master toggle za notifikacije (web + mobile). Ako je isključeno, server ne bi trebao slati niti emitovati notifikacije.',
-  },
-  {
-    key: 'notifications.websocket.enabled',
-    value: 'true',
-    description:
-      'Kontroliše da li je WebSocket (Socket.IO) kanal za real-time notifikacije aktivan. Ako je isključeno, klijent treba preći na polling.',
-  },
-  {
-    key: 'notifications.pollingIntervalSeconds',
-    value: '30',
-    description:
-      'Fallback interval (u sekundama) za REST polling notifikacija kada WebSocket nije dostupan ili je isključen.',
-  },
-  {
-    key: 'notifications.showBadgeCount',
-    value: 'true',
-    description:
-      'Da li prikazivati badge broj nepročitanih notifikacija u UI-u (npr. zvono).',
-  },
-  {
-    key: 'notifications.mobile.enabled',
-    value: 'true',
-    description:
-      'Da li je notifikacijski sistem aktivan za mobilnu aplikaciju (generisanje i slanje mobile notifikacija).',
-  },
-  {
-    key: 'notifications.mobile.pushEnabled',
-    value: 'true',
-    description:
-      'Da li su push notifikacije dozvoljene za mobilnu aplikaciju (Expo/FCM/APNs). Ako je isključeno, klijent ne treba slati push tokene.',
-  },
   {
     key: 'notifications.push.enabled',
     value: 'true',
@@ -165,62 +128,6 @@ const DEFAULT_APP_SETTINGS: SeedSetting[] = [
     description:
       'Opcionalni Reply-To email. Ako je prazno, ne postavlja se.',
   },
-  {
-    key: 'email.fromName',
-    value: 'SIM Tracker',
-    description:
-      'Naziv pošiljaoca (display name) koji se prikazuje u email klijentima.',
-  },
-  {
-    key: 'email.fromAddress',
-    value: 'no-reply@example.com',
-    description:
-      'Email adresa pošiljaoca. Mora biti usklađena sa SMTP konfiguracijom i SPF/DKIM pravilima domene.',
-  },
-  {
-    key: 'email.replyTo',
-    value: '',
-    description:
-      'Opcionalni Reply-To. Ako je prazno, koristi se fromAddress ili default mailer konfiguracija.',
-  },
-  {
-    key: 'email.sendOnApprove',
-    value: 'false',
-    description:
-      'Ako je uključeno, sistem automatski šalje email obavijest kada zapisnik bude odobren.',
-  },
-  {
-    key: 'email.sendOnActivateSep',
-    value: 'false',
-    description:
-      'Ako je uključeno, sistem automatski šalje email obavijest kada zapisnik pređe u status aktivacije u SEP.',
-  },
-
-  // Installation records
-  {
-    key: 'installationRecords.autoSubmitForApproval',
-    value: 'false',
-    description:
-      'Ako je uključeno, novi zapisnik se automatski šalje na odobrenje odmah nakon kreiranja.',
-  },
-  {
-    key: 'installationRecords.allowSelfApproval',
-    value: 'true',
-    description:
-      'Da li korisnik koji je kreirao zapisnik smije odobriti isti zapisnik ako je u approval grupi. Preporuka: true za manja okruženja, false za strožije kontrole.',
-  },
-  {
-    key: 'installationRecords.maxPhotosPerRecord',
-    value: '5',
-    description:
-      'Maksimalan broj fotografija koje se mogu attachovati na jedan zapisnik.',
-  },
-  {
-    key: 'installationRecords.requirePhotoForApproval',
-    value: 'false',
-    description:
-      'Ako je uključeno, zapisnik ne može biti odobren bez minimalno jedne fotografije.',
-  },
 
   // Uploads
   {
@@ -247,54 +154,6 @@ const DEFAULT_APP_SETTINGS: SeedSetting[] = [
       'application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     description:
       'Lista dozvoljenih MIME tipova za dokumente, odvojeno zarezom.',
-  },
-
-  // Security / rate limiting
-  {
-    key: 'security.rateLimit.enabled',
-    value: 'true',
-    description:
-      'Uključuje globalni rate limiting (throttling). Preporučeno: true u produkciji.',
-  },
-  {
-    key: 'security.rateLimit.windowSeconds',
-    value: '60',
-    description:
-      'Trajanje rate limit prozora u sekundama (npr. 60s).',
-  },
-  {
-    key: 'security.rateLimit.maxRequests',
-    value: '100',
-    description:
-      'Maksimalan broj zahtjeva po prozoru (windowSeconds) po klijentu.',
-  },
-
-  // Dashboard
-  {
-    key: 'dashboard.defaultTimeRange',
-    value: '7_DAYS',
-    description:
-      'Podrazumijevani vremenski opseg za dashboard (npr. TODAY, 7_DAYS, 30_DAYS).',
-  },
-  {
-    key: 'dashboard.showDemountTasksWidget',
-    value: 'true',
-    description:
-      'Ako je uključeno, prikazuje se widget za demontažne zadatke na dashboardu.',
-  },
-
-  // Tours
-  {
-    key: 'tour.web.enabled',
-    value: 'true',
-    description:
-      'Uključuje onboarding tour u web aplikaciji.',
-  },
-  {
-    key: 'tour.mobile.enabled',
-    value: 'true',
-    description:
-      'Uključuje mini-tour / onboarding u mobilnoj aplikaciji.',
   },
 
   // Mobile

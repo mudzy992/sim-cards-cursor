@@ -427,7 +427,7 @@ export default function ShipmentsListPage() {
                         setAssignTarget(row);
                         setSelectedUserId(row.assignedTo?.id ?? null);
                       }}
-                      disabled={!(row.status === 'AVAILABLE' || row.status === 'ASSIGNED')}
+                      disabled={row.status !== 'AVAILABLE'}
                     >
                       Dodijeli
                     </Button>

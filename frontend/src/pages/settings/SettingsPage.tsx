@@ -3,30 +3,33 @@ import {
   Button,
   Card,
   Collapse,
-  Drawer,
   Form,
   Input,
+  InputNumber,
+  Modal,
   Select,
   Space,
   Switch,
   Table,
   Typography,
   message,
-  Divider,
 } from 'antd';
 import { settingsApi } from '@/api/settings.api';
 import { useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
+import {
+  APP_SETTINGS_MANIFEST,
+  MANIFEST_GROUP_ORDER,
+  MANIFEST_KEYS,
+  type AppSettingManifestEntry,
+  type AppSettingValueType,
+} from '@/config/app-settings.manifest';
 
 type SettingRow = {
   key: string;
   value: string;
   description?: string;
 };
-
-function getSettingValue(settings: SettingRow[], key: string): string | undefined {
-  return settings.find((s) => s.key === key)?.value;
-}
 
 function SettingsNotificationsSection() {
   const queryClient = useQueryClient();
@@ -87,7 +90,7 @@ function SettingsNotificationsSection() {
           />
         </Space>
 
-        <Divider className="!my-0" />
+        <div className="border-t border-neutral-200 dark:border-neutral-700" />
 
         <Space align="start" className="w-full justify-between">
           <div className="space-y-1 max-w-xl">
@@ -107,7 +110,7 @@ function SettingsNotificationsSection() {
           />
         </Space>
 
-        <Divider className="!my-0" />
+        <div className="border-t border-neutral-200 dark:border-neutral-700" />
 
         <Space align="start" className="w-full justify-between">
           <div className="space-y-1 max-w-xl">
@@ -131,20 +134,46 @@ function SettingsNotificationsSection() {
   );
 }
 
-type SettingsGroup = {
-  id: string;
+function guessLegacyValueType(row: SettingRow): AppSettingValueType {
+  const v = row.value;
+  if (v === 'true' || v === 'false') return 'boolean';
+  if (/^\d+(\.\d+)?$/.test(String(v).trim())) return 'number';
+  return 'string';
+}
+
+type ManifestGroupCardProps = {
+  groupId: string;
   title: string;
   description?: string;
-  keys: string[];
+  entries: AppSettingManifestEntry[];
+  settingsByKey: Map<string, SettingRow>;
+  pendingKey: string | null;
+  onBooleanChange: (row: SettingRow, entry: AppSettingManifestEntry, next: boolean) => void;
+  onOpenEdit: (row: SettingRow, entry: AppSettingManifestEntry) => void;
 };
 
-function SettingsKeyGroupCard(props: {
-  title: string;
-  description?: string;
-  rows: SettingRow[];
-  onEdit: (row: SettingRow) => void;
-}) {
-  const { title, description, rows, onEdit } = props;
+function ManifestGroupCard(props: ManifestGroupCardProps) {
+  const {
+    title,
+    description,
+    entries,
+    settingsByKey,
+    pendingKey,
+    onBooleanChange,
+    onOpenEdit,
+  } = props;
+
+  const rows = entries
+    .map((entry) => {
+      const row = settingsByKey.get(entry.key);
+      return row ? { entry, row } : null;
+    })
+    .filter(Boolean) as { entry: AppSettingManifestEntry; row: SettingRow }[];
+
+  if (!rows.length) {
+    return null;
+  }
+
   return (
     <Card title={title} className="mb-4">
       <Space direction="vertical" size="middle" className="w-full">
@@ -153,49 +182,63 @@ function SettingsKeyGroupCard(props: {
             {description}
           </Typography.Paragraph>
         ) : null}
-        <Table<SettingRow>
+        <Table
           dataSource={rows}
-          rowKey="key"
+          rowKey={(r) => r.entry.key}
           pagination={false}
           size="small"
           columns={[
             {
               title: 'Postavka',
-              dataIndex: 'description',
-              render: (_: string, record: SettingRow) => (
+              render: (_, r) => (
                 <div>
-                  <Typography.Text strong>
-                    {record.description || record.key}
-                  </Typography.Text>
+                  <Typography.Text strong>{r.entry.label}</Typography.Text>
+                  <Typography.Paragraph type="secondary" className="!mb-0 text-sm max-w-2xl">
+                    {r.entry.description}
+                  </Typography.Paragraph>
                   <Typography.Text type="secondary" className="block text-xs font-mono">
-                    {record.key}
+                    {r.entry.key}
                   </Typography.Text>
                 </div>
               ),
             },
             {
               title: 'Vrijednost',
-              dataIndex: 'value',
-              width: 180,
-              render: (v: SettingRow['value']) => {
-                if (v === 'true' || v === 'false') {
+              width: 200,
+              align: 'right',
+              render: (_, r) => {
+                if (r.entry.valueType === 'boolean') {
                   return (
-                    <Typography.Text className="font-mono text-sm">
-                      {v === 'true' ? 'Uključeno' : 'Isključeno'}
-                    </Typography.Text>
+                    <Switch
+                      checkedChildren="Da"
+                      unCheckedChildren="Ne"
+                      checked={r.row.value === 'true'}
+                      loading={pendingKey === r.entry.key}
+                      onChange={(checked) => onBooleanChange(r.row, r.entry, checked)}
+                    />
                   );
                 }
-                return <Typography.Text className="font-mono text-sm">{v}</Typography.Text>;
+                const display =
+                  r.entry.valueType === 'enum' && r.entry.enumOptions
+                    ? r.entry.enumOptions.find((o) => o.value === r.row.value)?.label ?? r.row.value
+                    : r.entry.valueType === 'secret'
+                      ? r.row.value
+                        ? '••••••••'
+                        : '—'
+                      : r.row.value;
+                return <Typography.Text className="font-mono text-sm">{display}</Typography.Text>;
               },
             },
             {
-              title: 'Akcije',
+              title: '',
               width: 100,
-              render: (_: unknown, record: SettingRow) => (
-                <Button size="small" onClick={() => onEdit(record)}>
-                  Uredi
-                </Button>
-              ),
+              align: 'right',
+              render: (_, r) =>
+                r.entry.valueType === 'boolean' ? null : (
+                  <Button size="small" type="link" onClick={() => onOpenEdit(r.row, r.entry)}>
+                    Uredi
+                  </Button>
+                ),
             },
           ]}
         />
@@ -205,12 +248,17 @@ function SettingsKeyGroupCard(props: {
 }
 
 export default function SettingsPage() {
-  const [form] = Form.useForm();
+  const [manifestForm] = Form.useForm();
+  const [legacyForm] = Form.useForm();
   const queryClient = useQueryClient();
   const [messageApi, contextHolder] = message.useMessage();
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalEntry, setModalEntry] = useState<AppSettingManifestEntry | null>(null);
+  const [modalRow, setModalRow] = useState<SettingRow | null>(null);
+  const [legacyModalOpen, setLegacyModalOpen] = useState(false);
+  const [legacyRow, setLegacyRow] = useState<SettingRow | null>(null);
   const [search, setSearch] = useState('');
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   useAuthStore((s) => s.user);
 
   const { data: settings = [], isLoading } = useQuery<SettingRow[]>({
@@ -218,20 +266,23 @@ export default function SettingsPage() {
     queryFn: () => settingsApi.list(),
   });
 
+  const settingsByKey = useMemo(() => new Map(settings.map((s) => [s.key, s] as const)), [settings]);
+
   const updateMutation = useMutation({
-    mutationFn: ({
-      key,
-      data,
-    }: {
-      key: string;
-      data: { value: string; description?: string };
-    }) => settingsApi.update(key, data),
+    mutationFn: (args: { key: string; data: { value: string; description?: string } }) =>
+      settingsApi.update(args.key, args.data),
+    onMutate: ({ key }) => setPendingKey(key),
     onSuccess: () => {
       messageApi.success('Postavka je ažurirana.');
-      setEditingKey(null);
-      setDrawerOpen(false);
-      form.resetFields();
       void queryClient.invalidateQueries({ queryKey: ['settings'] });
+      void queryClient.invalidateQueries({ queryKey: ['settings', 'features'] });
+      setModalOpen(false);
+      setLegacyModalOpen(false);
+      setModalEntry(null);
+      setModalRow(null);
+      setLegacyRow(null);
+      manifestForm.resetFields();
+      legacyForm.resetFields();
     },
     onError: (e: unknown) => {
       messageApi.error(
@@ -239,50 +290,12 @@ export default function SettingsPage() {
           ?.message ?? 'Greška',
       );
     },
+    onSettled: () => setPendingKey(null),
   });
-
-  const handleEdit = (record: { key: string; value: string; description?: string }) => {
-    setEditingKey(record.key);
-    form.setFieldsValue({
-      value:
-        record.value === 'true'
-          ? true
-          : record.value === 'false'
-          ? false
-          : record.value,
-      description: record.description,
-    });
-    setDrawerOpen(true);
-  };
-
-  const handleSubmit = (values: { value: string | boolean; description?: string }) => {
-    if (editingKey) {
-      const current = settings.find((s) => s.key === editingKey);
-      const isBooleanValue =
-        current && (current.value === 'true' || current.value === 'false');
-
-      const normalizedValue = isBooleanValue
-        ? (values.value ? 'true' : 'false')
-        : String(values.value ?? '');
-
-      updateMutation.mutate({
-        key: editingKey,
-        data: {
-          value: normalizedValue,
-          description: values.description,
-        },
-      });
-    }
-  };
 
   const excludedFromSettingsPage = useMemo(() => {
     const prefixes = ['smtp.', 'email.templates.'];
-    const exact = new Set<string>([
-      'email.enabled',
-      'email.fromName',
-      'email.fromAddress',
-      'email.replyTo',
-    ]);
+    const exact = new Set<string>(['email.enabled']);
 
     return (key: string) => {
       if (exact.has(key)) return true;
@@ -290,80 +303,148 @@ export default function SettingsPage() {
     };
   }, []);
 
-  const groups = useMemo<SettingsGroup[]>(
-    () => [
-      {
-        id: 'mobile',
-        title: 'Mobile',
-        description: 'Postavke koje utiču na ponašanje mobilne aplikacije.',
-        keys: [
-          'mobile.offlineQueue.enabled',
-          'mobile.offlineQueue.maxItems',
-          'mobile.requireGpsForRecord',
-          'mobile.push.testMode',
-          'mobile.push.defaultChannel',
-          'mobile.push.enabled',
-        ],
-      },
-      {
-        id: 'uploads',
-        title: 'Upload',
-        description: 'Limiti i allowed MIME tipovi za fotografije i dokumente.',
-        keys: [
-          'uploads.maxPhotoSizeMb',
-          'uploads.allowedPhotoMimeTypes',
-          'uploads.maxDocumentSizeMb',
-          'uploads.allowedDocumentMimeTypes',
-        ],
-      },
-      {
-        id: 'security',
-        title: 'Security / rate limit',
-        description: 'Globalni throttling. Preporuka: uključen u produkciji.',
-        keys: [
-          'security.rateLimit.enabled',
-          'security.rateLimit.windowSeconds',
-          'security.rateLimit.maxRequests',
-        ],
-      },
-      {
-        id: 'dashboard',
-        title: 'Dashboard',
-        keys: ['dashboard.defaultTimeRange', 'dashboard.showDemountTasksWidget'],
-      },
-      {
-        id: 'tour',
-        title: 'Onboarding / tour',
-        keys: ['tour.web.enabled', 'tour.mobile.enabled'],
-      },
-      {
-        id: 'installationRecords',
-        title: 'Zapisnici',
-        keys: [
-          'installationRecords.autoSubmitForApproval',
-          'installationRecords.allowSelfApproval',
-          'installationRecords.maxPhotosPerRecord',
-          'installationRecords.requirePhotoForApproval',
-        ],
-      },
-    ],
-    [],
-  );
+  const manifestGroups = useMemo(() => {
+    const byGroup = new Map<string, AppSettingManifestEntry[]>();
+    APP_SETTINGS_MANIFEST.forEach((e) => {
+      if (!byGroup.has(e.groupId)) {
+        byGroup.set(e.groupId, []);
+      }
+      byGroup.get(e.groupId)!.push(e);
+    });
+    return MANIFEST_GROUP_ORDER.map((groupId) => {
+      const entries = byGroup.get(groupId) ?? [];
+      const first = entries[0];
+      return {
+        groupId,
+        title: first?.groupTitle ?? groupId,
+        description: first?.groupDescription,
+        entries,
+      };
+    });
+  }, []);
 
-  const groupedRows = useMemo(() => {
-    const rowsByKey = new Map(settings.map((s) => [s.key, s] as const));
-    const result = groups.map((g) => ({
-      ...g,
-      rows: g.keys.map((k) => rowsByKey.get(k)).filter(Boolean) as SettingRow[],
-      missing: g.keys.filter((k) => !rowsByKey.has(k)),
-    }));
-    return result;
-  }, [groups, settings]);
+  const handleBooleanChange = (row: SettingRow, entry: AppSettingManifestEntry, next: boolean) => {
+    const apply = () => {
+      updateMutation.mutate({
+        key: row.key,
+        data: { value: next ? 'true' : 'false', description: row.description },
+      });
+    };
+    if (entry.confirmDangerousChange && !next) {
+      Modal.confirm({
+        title: entry.confirmDangerousChange.title,
+        content: entry.confirmDangerousChange.content,
+        okText: 'Isključi',
+        okButtonProps: { danger: true },
+        cancelText: 'Odustani',
+        onOk: apply,
+      });
+      return;
+    }
+    apply();
+  };
+
+  const openManifestModal = (row: SettingRow, entry: AppSettingManifestEntry) => {
+    setModalEntry(entry);
+    setModalRow(row);
+    const vt = entry.valueType;
+    if (vt === 'number') {
+      manifestForm.setFieldsValue({
+        value: Number(row.value) || 0,
+        description: row.description,
+      });
+    } else if (vt === 'enum') {
+      manifestForm.setFieldsValue({
+        value: row.value,
+        description: row.description,
+      });
+    } else if (vt === 'secret') {
+      manifestForm.setFieldsValue({
+        value: row.value,
+        description: row.description,
+      });
+    } else {
+      manifestForm.setFieldsValue({
+        value: row.value,
+        description: row.description,
+      });
+    }
+    setModalOpen(true);
+  };
+
+  const handleModalSubmit = () => {
+    void manifestForm.validateFields().then((values) => {
+      const key = modalEntry?.key ?? modalRow?.key;
+      if (!key || !modalEntry) return;
+      let out = '';
+      if (modalEntry.valueType === 'number') {
+        out = String(values.value ?? '');
+      } else if (modalEntry.valueType === 'enum') {
+        out = String(values.value ?? '');
+      } else if (modalEntry.valueType === 'secret') {
+        out = String(values.value ?? '');
+      } else {
+        out = String(values.value ?? '');
+      }
+      updateMutation.mutate({
+        key,
+        data: {
+          value: out,
+          description: values.description ?? modalRow?.description,
+        },
+      });
+    });
+  };
+
+  const openLegacyModal = (row: SettingRow) => {
+    setLegacyRow(row);
+    const t = guessLegacyValueType(row);
+    if (t === 'boolean') {
+      legacyForm.setFieldsValue({
+        value: row.value === 'true',
+        description: row.description,
+      });
+    } else if (t === 'number') {
+      legacyForm.setFieldsValue({
+        value: Number(row.value),
+        description: row.description,
+      });
+    } else {
+      legacyForm.setFieldsValue({
+        value: row.value,
+        description: row.description,
+      });
+    }
+    setLegacyModalOpen(true);
+  };
+
+  const handleLegacySubmit = () => {
+    void legacyForm.validateFields().then((values) => {
+      if (!legacyRow) return;
+      const t = guessLegacyValueType(legacyRow);
+      let out = '';
+      if (t === 'boolean') {
+        out = values.value ? 'true' : 'false';
+      } else if (t === 'number') {
+        out = String(values.value ?? '');
+      } else {
+        out = String(values.value ?? '');
+      }
+      updateMutation.mutate({
+        key: legacyRow.key,
+        data: {
+          value: out,
+          description: values.description ?? legacyRow.description,
+        },
+      });
+    });
+  };
 
   const advancedRows = useMemo(() => {
     const normalized = search.trim().toLowerCase();
     return settings
       .filter((s) => !excludedFromSettingsPage(s.key))
+      .filter((s) => !MANIFEST_KEYS.has(s.key))
       .filter((s) => {
         if (!normalized) return true;
         return (
@@ -373,6 +454,63 @@ export default function SettingsPage() {
       })
       .sort((a, b) => a.key.localeCompare(b.key));
   }, [excludedFromSettingsPage, search, settings]);
+
+  const renderModalFormFields = (entry: AppSettingManifestEntry) => {
+    if (entry.valueType === 'number') {
+      return (
+        <Form.Item
+          name="value"
+          label={entry.label}
+          rules={[{ required: true, type: 'number', min: 0 }]}
+        >
+          <InputNumber className="w-full max-w-md" min={0} />
+        </Form.Item>
+      );
+    }
+    if (entry.valueType === 'enum' && entry.enumOptions) {
+      return (
+        <Form.Item name="value" label={entry.label} rules={[{ required: true }]}>
+          <Select options={entry.enumOptions} />
+        </Form.Item>
+      );
+    }
+    if (entry.valueType === 'secret') {
+      return (
+        <Form.Item name="value" label={entry.label} rules={[{ required: true }]}>
+          <Input.Password autoComplete="new-password" />
+        </Form.Item>
+      );
+    }
+    return (
+      <Form.Item name="value" label={entry.label} rules={[{ required: true }]}>
+        <Input.TextArea rows={4} />
+      </Form.Item>
+    );
+  };
+
+  const renderLegacyModalFields = () => {
+    if (!legacyRow) return null;
+    const t = guessLegacyValueType(legacyRow);
+    if (t === 'boolean') {
+      return (
+        <Form.Item name="value" label="Vrijednost" valuePropName="checked">
+          <Switch checkedChildren="Uključeno" unCheckedChildren="Isključeno" />
+        </Form.Item>
+      );
+    }
+    if (t === 'number') {
+      return (
+        <Form.Item name="value" label="Vrijednost" rules={[{ required: true, type: 'number' }]}>
+          <InputNumber className="w-full max-w-md" />
+        </Form.Item>
+      );
+    }
+    return (
+      <Form.Item name="value" label="Vrijednost" rules={[{ required: true }]}>
+        <Input.TextArea rows={4} />
+      </Form.Item>
+    );
+  };
 
   return (
     <div
@@ -391,7 +529,7 @@ export default function SettingsPage() {
       <Card title="Email / SMTP" className="mb-4">
         <Space align="start" className="w-full justify-between" wrap>
           <Typography.Paragraph type="secondary" className="!mb-0 max-w-2xl">
-            Email (SMTP) postavke i template-i su prebačeni na posebnu stranicu radi lakšeg podešavanja.
+            Email (SMTP) postavke i template-i su na posebnoj stranici radi lakšeg podešavanja.
           </Typography.Paragraph>
           <Button type="primary" href="/settings/email">
             Otvori Email postavke
@@ -399,26 +537,28 @@ export default function SettingsPage() {
         </Space>
       </Card>
 
-      {groupedRows.map((g) =>
-        g.rows.length ? (
-          <SettingsKeyGroupCard
-            key={g.id}
-            title={g.title}
-            description={g.description}
-            rows={g.rows}
-            onEdit={handleEdit}
-          />
-        ) : null,
-      )}
+      {manifestGroups.map((g) => (
+        <ManifestGroupCard
+          key={g.groupId}
+          groupId={g.groupId}
+          title={g.title}
+          description={g.description}
+          entries={g.entries}
+          settingsByKey={settingsByKey}
+          pendingKey={pendingKey}
+          onBooleanChange={handleBooleanChange}
+          onOpenEdit={openManifestModal}
+        />
+      ))}
 
-      <Card title="Napredno (sve ostale postavke)" className="mb-4">
+      <Card title="Ostalo (ključevi izvan manifesta)" className="mb-4">
         <Space direction="vertical" className="w-full" size="middle">
           <Typography.Paragraph type="secondary" className="!mb-0 max-w-3xl">
-            Ovdje su postavke koje nisu dio glavnih grupa. SMTP i email template-i su uklonjeni sa
-            ove stranice jer se uređuju na posebnoj stranici.
+            Prikaz su korisnički i sistemski ključevi koji nisu u manifestu (npr.{' '}
+            <code className="text-xs">user:tour-state:*</code>, budući ključevi). Uredi otvara modal.
           </Typography.Paragraph>
           <Input
-            placeholder="Pretraga po ključu ili opisu..."
+            placeholder="Pretraga po ključu ili opisu…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             allowClear
@@ -426,19 +566,19 @@ export default function SettingsPage() {
           <Collapse
             items={[
               {
-                key: 'advanced',
-                label: `Prikaži listu (${advancedRows.length})`,
+                key: 'legacy',
+                label: `Lista (${advancedRows.length})`,
                 children: (
                   <Table<SettingRow>
                     dataSource={advancedRows}
                     rowKey="key"
                     loading={isLoading}
-                    pagination={{ pageSize: 20, showSizeChanger: true }}
+                    pagination={{ pageSize: 15, showSizeChanger: true }}
+                    locale={{ emptyText: 'Nema ključeva izvan manifesta' }}
                     columns={[
                       {
                         title: 'Postavka',
-                        dataIndex: 'description',
-                        render: (_: string, record: SettingRow) => (
+                        render: (_: unknown, record: SettingRow) => (
                           <div>
                             <Typography.Text strong>
                               {record.description || record.key}
@@ -454,26 +594,30 @@ export default function SettingsPage() {
                       },
                       {
                         title: 'Vrijednost',
-                        dataIndex: 'value',
                         width: 220,
-                        render: (v: SettingRow['value']) => {
-                          if (v === 'true' || v === 'false') {
+                        render: (_: unknown, record: SettingRow) => {
+                          if (record.value === 'true' || record.value === 'false') {
                             return (
-                              <Typography.Text className="font-mono text-sm">
-                                {v === 'true' ? 'Uključeno' : 'Isključeno'}
+                              <Typography.Text className="text-sm">
+                                {record.value === 'true' ? 'Uključeno' : 'Isključeno'}
                               </Typography.Text>
                             );
                           }
                           return (
-                            <Typography.Text className="font-mono text-sm">{v}</Typography.Text>
+                            <Typography.Text className="font-mono text-sm break-all">
+                              {record.key.includes('pass') || record.key.includes('secret')
+                                ? '••••••••'
+                                : record.value}
+                            </Typography.Text>
                           );
                         },
                       },
                       {
-                        title: 'Akcije',
+                        title: '',
                         width: 100,
+                        align: 'right',
                         render: (_: unknown, record: SettingRow) => (
-                          <Button size="small" onClick={() => handleEdit(record)}>
+                          <Button size="small" type="link" onClick={() => openLegacyModal(record)}>
                             Uredi
                           </Button>
                         ),
@@ -487,112 +631,54 @@ export default function SettingsPage() {
         </Space>
       </Card>
 
-      <Drawer
-        title={`Uredi postavku: ${editingKey}`}
-        open={drawerOpen}
-        width={520}
-        onClose={() => {
-          setDrawerOpen(false)
-          setEditingKey(null)
-          form.resetFields()
+      <Modal
+        title={modalEntry ? `Uredi: ${modalEntry.label}` : 'Uredi postavku'}
+        open={modalOpen}
+        onCancel={() => {
+          setModalOpen(false);
+          setModalEntry(null);
+          setModalRow(null);
+          manifestForm.resetFields();
         }}
+        okText="Sačuvaj"
+        confirmLoading={updateMutation.isPending}
+        onOk={() => handleModalSubmit()}
         destroyOnClose
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          {(() => {
-            const current = settings.find((s) => s.key === editingKey);
-            return current?.description ? (
-              <Typography.Paragraph type="secondary">
-                {current.description}
+        <Form form={manifestForm} layout="vertical" className="mt-2">
+          {modalEntry ? (
+            <>
+              <Typography.Paragraph type="secondary" className="!mb-4">
+                {modalEntry.description}
               </Typography.Paragraph>
-            ) : null;
-          })()}
-          {(() => {
-            const current = settings.find((s) => s.key === editingKey);
-            const key = current?.key ?? '';
-            const rawValue = current?.value ?? '';
-            const isBoolean = rawValue === 'true' || rawValue === 'false';
-
-            if (isBoolean) {
-              return (
-                <Form.Item
-                  name="value"
-                  label="Vrijednost"
-                  valuePropName="checked"
-                  rules={[{ required: true }]}
-                >
-                  <Switch checkedChildren="Uključeno" unCheckedChildren="Isključeno" />
-                </Form.Item>
-              );
-            }
-
-            if (key === 'dashboard.defaultTimeRange') {
-              return (
-                <Form.Item
-                  name="value"
-                  label="Podrazumijevani vremenski opseg"
-                  rules={[{ required: true }]}
-                >
-                  <Select
-                    options={[
-                      { value: 'TODAY', label: 'Danas' },
-                      { value: '7_DAYS', label: 'Posljednjih 7 dana' },
-                      { value: '30_DAYS', label: 'Posljednjih 30 dana' },
-                    ]}
-                  />
-                </Form.Item>
-              );
-            }
-
-            if (key === 'mobile.push.defaultChannel') {
-              return (
-                <Form.Item
-                  name="value"
-                  label="Podrazumijevani push kanal"
-                  rules={[{ required: true }]}
-                >
-                  <Select
-                    options={[
-                      { value: 'approval', label: 'Approval' },
-                      { value: 'records', label: 'Records' },
-                      { value: 'system', label: 'System' },
-                    ]}
-                  />
-                </Form.Item>
-              );
-            }
-
-            return (
-              <Form.Item
-                name="value"
-                label="Vrijednost"
-                rules={[{ required: true }]}
-              >
-                <Input.TextArea rows={3} />
-              </Form.Item>
-            );
-          })()}
-          <Form.Item>
-            <Space>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={updateMutation.isPending}
-              >
-                Sačuvaj
-              </Button>
-              <Button
-                onClick={() => {
-                  setDrawerOpen(false);
-                  setEditingKey(null);
-                }}
-              >
-                Odustani
-              </Button>
-            </Space>
-          </Form.Item>
+              {renderModalFormFields(modalEntry)}
+            </>
+          ) : null}
         </Form>
-      </Drawer>
+      </Modal>
+
+      <Modal
+        title={legacyRow ? `Uredi: ${legacyRow.key}` : 'Uredi'}
+        open={legacyModalOpen}
+        onCancel={() => {
+          setLegacyModalOpen(false);
+          setLegacyRow(null);
+          legacyForm.resetFields();
+        }}
+        okText="Sačuvaj"
+        confirmLoading={updateMutation.isPending}
+        onOk={() => handleLegacySubmit()}
+        destroyOnClose
+      >
+        <Form form={legacyForm} layout="vertical" className="mt-2">
+          {legacyRow?.description ? (
+            <Typography.Paragraph type="secondary" className="!mb-4">
+              {legacyRow.description}
+            </Typography.Paragraph>
+          ) : null}
+          {renderLegacyModalFields()}
+        </Form>
+      </Modal>
     </div>
   );
 }

@@ -30,6 +30,14 @@ export type MeterTypeFieldItem = {
 };
 
 export const meterTypeDefinitionsApi = {
+  get: async (id: string): Promise<MeterTypeDefinitionItem> => {
+    const response = await axiosInstance.get<{ data: MeterTypeDefinitionItem }>(
+      `/meter-type-definitions/${id}`,
+    )
+    const data = response.data?.data ?? (response.data as unknown as MeterTypeDefinitionItem)
+    return data
+  },
+
   list: async (): Promise<MeterTypeDefinitionItem[]> => {
     const user = useAuthStore.getState().user
     try {

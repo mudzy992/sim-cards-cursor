@@ -1,18 +1,27 @@
 import axios from 'axios'
-import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '@/store/auth.store';
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  RefreshControl,
+  Text,
+  View,
+} from 'react-native'
+import { useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
+import { useAuthStore } from '@/store/auth.store'
 import { simCardsApi } from '@/api/sim-cards.api'
 import { installationRecordsApi } from '@/api/installation-records.api'
-import { notificationsApi } from '@/api/notifications.api';
-import { useMiniTour } from '@/hooks/useMiniTour';
+import { notificationsApi } from '@/api/notifications.api'
+import { useMiniTour } from '@/hooks/useMiniTour'
 import { useConnectivity } from '@/hooks/useConnectivity'
 import { offlineCache } from '@/offline/offline-cache'
 import { listOutbox } from '@/offline/outbox'
 import { syncMeterTypesOfflineCache } from '@/offline/meter-types-sync'
-import { colors } from '@/theme/colors';
+import { useGlobalBlockingStore } from '@/store/global-blocking.store'
+import { colors } from '@/theme/colors'
 import { Card } from '@/components/common/Card'
 import { Screen } from '@/components/common/Screen'
 import { ScreenHeader } from '@/components/common/ScreenHeader'
@@ -53,6 +62,9 @@ export default function HomeScreen() {
   const user = useAuthStore((state) => state.user);
   const miniTour = useMiniTour();
   const { isOnline } = useConnectivity()
+  const setBlocked = useGlobalBlockingStore((s) => s.setBlocked)
+  const queryClient = useQueryClient()
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const { data: operatorStats, isLoading } = useQuery({
     queryKey: ['operator-offline-stats', user?.id, isOnline],
@@ -153,7 +165,32 @@ export default function HomeScreen() {
         }
       />
 
-      <Screen scroll contentStyle={{ paddingTop: 14, gap: 16 }}>
+      <Screen
+        scroll
+        contentStyle={{ paddingTop: 14, gap: 16 }}
+        scrollProps={{
+          refreshControl: (
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => {
+                if (!user) return
+                void (async () => {
+                  setIsRefreshing(true)
+                  try {
+                    await Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ['operator-offline-stats', user.id, isOnline] }),
+                      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] }),
+                    ])
+                  } finally {
+                    setIsRefreshing(false)
+                  }
+                })()
+              }}
+              colors={[colors.primary]}
+            />
+          ),
+        }}
+      >
 
       {isLoading ? (
         <View style={{ padding: 32, alignItems: 'center' }}>
@@ -201,7 +238,20 @@ export default function HomeScreen() {
               onPress={() => {
                 if (!user) return
                 void (async () => {
-                  await syncMeterTypesOfflineCache(user)
+                  setBlocked({
+                    title: 'Sync tipova brojila',
+                    subtitle: 'Molimo sačekajte, preuzimamo definicije…',
+                  })
+                  try {
+                    await syncMeterTypesOfflineCache(user)
+                  } catch {
+                    Alert.alert(
+                      'Sync nije uspio',
+                      'Provjerite internet konekciju i pokušajte ponovo.',
+                    )
+                  } finally {
+                    setBlocked(null)
+                  }
                 })()
               }}
               style={({ pressed }) => ({

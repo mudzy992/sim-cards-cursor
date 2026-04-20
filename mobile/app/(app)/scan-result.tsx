@@ -257,19 +257,38 @@ export default function ScanResultScreen() {
       ) : null}
 
       {showCreateRecordCta ? (
-        <Pressable
-          onPress={() =>
-            result && router.push({ pathname: '/create-record', params: { simCardId: result.id } })
-          }
-          style={({ pressed }) => ({
-            backgroundColor: pressed ? colors.primaryPressed : colors.primary,
-            padding: 12,
-            borderRadius: 10,
-            alignItems: 'center',
-          })}
-        >
-          <Text style={{ color: '#fff', fontWeight: '600' }}>Kreiraj zapisnik ugradnje</Text>
-        </Pressable>
+        <View style={{ gap: 10 }}>
+          <Pressable
+            onPress={() =>
+              result && router.push({ pathname: '/create-record', params: { simCardId: result.id } })
+            }
+            style={({ pressed }) => ({
+              backgroundColor: pressed ? colors.primaryPressed : colors.primary,
+              padding: 12,
+              borderRadius: 10,
+              alignItems: 'center',
+            })}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Novi priključak – zapisnik ugradnje</Text>
+          </Pressable>
+          <Pressable
+            onPress={() =>
+              result &&
+              router.push({
+                pathname: '/create-record-replacement',
+                params: { simCardId: result.id },
+              })
+            }
+            style={({ pressed }) => ({
+              backgroundColor: pressed ? '#475569' : '#64748b',
+              padding: 12,
+              borderRadius: 10,
+              alignItems: 'center',
+            })}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Zamjena brojila – zapisnik</Text>
+          </Pressable>
+        </View>
       ) : null}
       {isAssignedToAnother ? (
         <Text style={{ color: '#b45309' }}>Kartica je već zadužena kod drugog operatora.</Text>

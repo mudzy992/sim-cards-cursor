@@ -22,6 +22,8 @@ import {
   type DemountCompletionResolution,
   type DemountTaskItem,
   type DemountTaskStatus,
+  type MeterDemountCategory,
+  type RemovedSimDisposition,
 } from '@/api/demount-tasks.api';
 import { simCardsApi } from '@/api/sim-cards.api';
 import { useAuthStore } from '@/store/auth.store'
@@ -29,6 +31,7 @@ import { listOutbox } from '@/offline/outbox'
 import { colors } from '@/theme/colors';
 import { ScreenHeader } from '@/components/common/ScreenHeader'
 import { Card } from '@/components/common/Card'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const statusLabels: Record<DemountTaskStatus, string> = {
   PENDING: 'Čeka',
@@ -38,10 +41,10 @@ const statusLabels: Record<DemountTaskStatus, string> = {
 };
 
 const statusActions: Record<DemountTaskStatus, DemountTaskStatus[]> = {
-  PENDING: ['IN_PROGRESS', 'CANCELLED'],
-  IN_PROGRESS: ['CANCELLED'],
+  PENDING: ['IN_PROGRESS'],
+  IN_PROGRESS: ['PENDING'],
   COMPLETED: [],
-  CANCELLED: ['PENDING'],
+  CANCELLED: [],
 };
 
 const resolutionLabels: Record<DemountCompletionResolution, string> = {
@@ -50,9 +53,22 @@ const resolutionLabels: Record<DemountCompletionResolution, string> = {
   REMOVE_SIM_ONLY: 'Demontaža SIM-a bez zamjene (NO_SIM)',
 };
 
+const removedSimLabels: Record<RemovedSimDisposition, string> = {
+  MARK_DEFECTIVE: 'Uklonjena SIM je neispravna (označi kao neispravnu)',
+  RETURN_TO_STOCK: 'Uklonjena SIM je ispravna (vrati u zalihe za drugo brojilo)',
+};
+
+const meterDemountLabels: Record<MeterDemountCategory, string> = {
+  METER_FAULTY: 'Brojilo neispravno',
+  TEMPORARY_REMOVAL: 'Privremena demontaža SIM-a',
+  MAINTENANCE: 'Servis / održavanje',
+  OTHER: 'Ostalo',
+};
+
 export default function DemountScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user)
+  const insets = useSafeAreaInsets()
   const search = useLocalSearchParams<{ pickedIccid?: string; wizardTaskId?: string }>();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -63,10 +79,14 @@ export default function DemountScreen() {
   const [wizard, setWizard] = useState<{
     task: DemountTaskItem;
     step: 1 | 2;
+    isLocked: boolean;
     resolution?: DemountCompletionResolution;
     reason: string;
     newSimCardId?: string;
     newSimIccid?: string;
+    newSimIpAddress?: string;
+    removedSimDisposition?: RemovedSimDisposition;
+    meterDemountCategory?: MeterDemountCategory;
   } | null>(null);
   const [wizardSubmitting, setWizardSubmitting] = useState(false);
 
@@ -125,6 +145,7 @@ export default function DemountScreen() {
             ...w,
             newSimCardId: card.id,
             newSimIccid: card.iccid,
+            newSimIpAddress: card.ipAddress,
           };
         });
       } catch {
@@ -159,10 +180,18 @@ export default function DemountScreen() {
   };
 
   const handleOpenWizard = (task: DemountTaskItem) => {
+    const isLocked = Boolean(task.requestedResolution)
     setWizard({
       task,
-      step: 1,
-      reason: '',
+      step: isLocked ? 2 : 1,
+      isLocked,
+      resolution: task.requestedResolution ?? undefined,
+      reason: task.requestedReason ?? '',
+      removedSimDisposition: task.requestedRemovedSimDisposition ?? undefined,
+      meterDemountCategory: task.requestedMeterDemountCategory ?? undefined,
+      newSimCardId: undefined,
+      newSimIccid: undefined,
+      newSimIpAddress: undefined,
     });
   };
 
@@ -180,11 +209,26 @@ export default function DemountScreen() {
       Alert.alert('Nova SIM', 'Skenirajte ili učitajte novu SIM karticu.');
       return;
     }
+    if (!wizard.removedSimDisposition) {
+      Alert.alert('SIM', 'Odaberite šta se dešava sa uklonjenom SIM karticom.');
+      return;
+    }
+    if (
+      (wizard.resolution === 'FULL_DEMOUNT' || wizard.resolution === 'REMOVE_SIM_ONLY') &&
+      !wizard.meterDemountCategory
+    ) {
+      Alert.alert('Brojilo', 'Odaberite kategoriju demontaže brojila (bez SIM-a).');
+      return;
+    }
     setWizardSubmitting(true);
     try {
       await demountTasksApi.complete(wizard.task.id, {
         resolution: wizard.resolution,
         reason,
+        removedSimDisposition: wizard.removedSimDisposition,
+        ...(wizard.resolution === 'FULL_DEMOUNT' || wizard.resolution === 'REMOVE_SIM_ONLY'
+          ? { meterDemountCategory: wizard.meterDemountCategory! }
+          : {}),
         ...(wizard.resolution === 'REPLACE_SIM' && wizard.newSimCardId
           ? { newSimCardId: wizard.newSimCardId }
           : {}),
@@ -347,7 +391,9 @@ export default function DemountScreen() {
                     {updatingId === item.id ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
-                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Otkaži</Text>
+                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
+                        Vrati inicijatoru
+                      </Text>
                     )}
                   </Pressable>
                 ))}
@@ -376,7 +422,7 @@ export default function DemountScreen() {
                           ? 'Započni'
                           : status === 'CANCELLED'
                             ? 'Otkaži'
-                            : 'Vrati na čekanje'}
+                            : 'Vrati inicijatoru'}
                       </Text>
                     )}
                   </Pressable>
@@ -406,6 +452,7 @@ export default function DemountScreen() {
                 borderTopRightRadius: 18,
                 maxHeight: '88%',
                 padding: 16,
+                paddingBottom: 16 + insets.bottom,
                 gap: 12,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -424,7 +471,7 @@ export default function DemountScreen() {
               {wizard ? (
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
+                  contentContainerStyle={{ gap: 12, paddingBottom: 20 + insets.bottom }}
                 >
                 <Text style={{ color: colors.textMuted }}>
                   Brojilo: {wizard.task.meter?.serialNumber ?? wizard.task.meterId}
@@ -452,12 +499,75 @@ export default function DemountScreen() {
                   </View>
                 ) : (
                   <View style={{ gap: 12 }}>
-                    <Pressable onPress={() => setWizard((w) => (w ? { ...w, step: 1 } : w))}>
-                      <Text style={{ color: colors.primary, fontWeight: '600' }}>← Nazad</Text>
-                    </Pressable>
+                    {!wizard.isLocked ? (
+                      <Pressable onPress={() => setWizard((w) => (w ? { ...w, step: 1 } : w))}>
+                        <Text style={{ color: colors.primary, fontWeight: '600' }}>← Nazad</Text>
+                      </Pressable>
+                    ) : null}
+
+                    <Text style={{ fontWeight: '600' }}>Rezolucija (inicijator)</Text>
+                    <Text style={{ color: colors.textMuted }}>
+                      {wizard.resolution ? resolutionLabels[wizard.resolution] : '—'}
+                    </Text>
+
+                    <Text style={{ fontWeight: '600' }}>Ishod uklonjene SIM (inicijator)</Text>
+                    {wizard.isLocked ? (
+                      <Text style={{ color: colors.textMuted }}>
+                        {wizard.removedSimDisposition ? removedSimLabels[wizard.removedSimDisposition] : '—'}
+                      </Text>
+                    ) : (
+                      (Object.keys(removedSimLabels) as RemovedSimDisposition[]).map((key) => (
+                        <Pressable
+                          key={key}
+                          onPress={() =>
+                            setWizard((w) => (w ? { ...w, removedSimDisposition: key } : w))
+                          }
+                          style={({ pressed }) => ({
+                            borderWidth: 1,
+                            borderColor: wizard.removedSimDisposition === key ? colors.primary : colors.border,
+                            backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
+                            padding: 12,
+                            borderRadius: 12,
+                          })}
+                        >
+                          <Text style={{ fontWeight: '600', fontSize: 13 }}>{removedSimLabels[key]}</Text>
+                        </Pressable>
+                      ))
+                    )}
+                    {wizard.resolution &&
+                    (wizard.resolution === 'FULL_DEMOUNT' ||
+                      wizard.resolution === 'REMOVE_SIM_ONLY') ? (
+                      <View style={{ gap: 10 }}>
+                        <Text style={{ fontWeight: '600' }}>Brojilo ostaje bez SIM-a — kategorija</Text>
+                        {wizard.isLocked ? (
+                          <Text style={{ color: colors.textMuted }}>
+                            {wizard.meterDemountCategory ? meterDemountLabels[wizard.meterDemountCategory] : '—'}
+                          </Text>
+                        ) : (
+                          (Object.keys(meterDemountLabels) as MeterDemountCategory[]).map((key) => (
+                            <Pressable
+                              key={key}
+                              onPress={() =>
+                                setWizard((w) => (w ? { ...w, meterDemountCategory: key } : w))
+                              }
+                              style={({ pressed }) => ({
+                                borderWidth: 1,
+                                borderColor: wizard.meterDemountCategory === key ? colors.primary : colors.border,
+                                backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
+                                padding: 12,
+                                borderRadius: 12,
+                              })}
+                            >
+                              <Text style={{ fontWeight: '600', fontSize: 13 }}>{meterDemountLabels[key]}</Text>
+                            </Pressable>
+                          ))
+                        )}
+                      </View>
+                    ) : null}
                     <Text style={{ fontWeight: '600' }}>Obrazloženje</Text>
                     <TextInput
                       value={wizard.reason}
+                      editable={!wizard.isLocked}
                       onChangeText={(text) => setWizard((w) => (w ? { ...w, reason: text } : w))}
                       placeholder="Opišite razlog demontaže / zamjene"
                       multiline
@@ -477,7 +587,7 @@ export default function DemountScreen() {
                         <Text style={{ fontWeight: '600' }}>Nova SIM</Text>
                         {wizard.newSimIccid ? (
                           <Text style={{ color: '#166534' }}>
-                            Odabrano: {wizard.newSimIccid}
+                            Odabrano: {wizard.newSimIccid} • IP: {wizard.newSimIpAddress?.trim() || '–'}
                           </Text>
                         ) : (
                           <Text style={{ color: colors.textMuted }}>

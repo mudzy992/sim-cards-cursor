@@ -36,6 +36,7 @@ export default function CreateRecordScreen() {
   const [meterTypeId, setMeterTypeId] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
   const [year, setYear] = useState('');
+  const [calibrationYear, setCalibrationYear] = useState('');
   const [installationAddress, setInstallationAddress] = useState('');
   const [city, setCity] = useState('');
   const [municipality, setMunicipality] = useState('');
@@ -79,7 +80,11 @@ export default function CreateRecordScreen() {
 
     const lat = latitude ? parseFloat(latitude) : undefined;
     const lon = longitude ? parseFloat(longitude) : undefined;
-    const yearNum = year ? parseInt(year, 10) : undefined;
+    const yearNum = year ? parseInt(year, 10) : NaN;
+    const calibrationNum = calibrationYear ? parseInt(calibrationYear, 10) : NaN;
+    if (!Number.isFinite(yearNum) || !Number.isFinite(calibrationNum)) {
+      throw new Error('Godina proizvodnje i godina baždarenja su obavezne.');
+    }
 
     const meterFields = Array.isArray(meterTypeFieldsQuery.data)
       ? meterTypeFieldsQuery.data
@@ -105,7 +110,8 @@ export default function CreateRecordScreen() {
       clientRequestId,
       meterTypeDefinitionId: meterTypeId,
       serialNumber: serialNumber.trim(),
-      year: Number.isFinite(yearNum) ? yearNum : undefined,
+      year: yearNum,
+      calibrationYear: calibrationNum,
       installationAddress: installationAddress.trim() || undefined,
       installationDate: installationDate || undefined,
       city: city.trim() || undefined,
@@ -401,11 +407,29 @@ export default function CreateRecordScreen() {
       ) : null}
 
       <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Godina proizvodnje</Text>
+        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Godina proizvodnje *</Text>
         <TextInput
           value={year}
           onChangeText={setYear}
           placeholder="npr. 2024"
+          keyboardType="number-pad"
+          style={{
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 12,
+            padding: 12,
+            fontSize: 16,
+            backgroundColor: colors.surface,
+          }}
+        />
+      </View>
+
+      <View>
+        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Godina baždarenja *</Text>
+        <TextInput
+          value={calibrationYear}
+          onChangeText={setCalibrationYear}
+          placeholder="npr. 2025"
           keyboardType="number-pad"
           style={{
             borderWidth: 1,

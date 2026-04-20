@@ -1,0 +1,25 @@
+DELETE FROM `app_settings`
+WHERE `key` IN (
+  'notifications.enabled',
+  'notifications.websocket.enabled',
+  'notifications.pollingIntervalSeconds',
+  'notifications.showBadgeCount',
+  'notifications.mobile.enabled',
+  'notifications.mobile.pushEnabled',
+  'email.fromName',
+  'email.fromAddress',
+  'email.replyTo',
+  'email.sendOnApprove',
+  'email.sendOnActivateSep',
+  'installationRecords.autoSubmitForApproval',
+  'installationRecords.allowSelfApproval',
+  'installationRecords.maxPhotosPerRecord',
+  'installationRecords.requirePhotoForApproval',
+  'security.rateLimit.enabled',
+  'security.rateLimit.windowSeconds',
+  'security.rateLimit.maxRequests',
+  'dashboard.defaultTimeRange',
+  'dashboard.showDemountTasksWidget',
+  'tour.web.enabled',
+  'tour.mobile.enabled'
+);

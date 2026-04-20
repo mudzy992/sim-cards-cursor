@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsInt, IsUUID, IsDateString, IsEnum } from 'class-validator';
-import { MeterSimCardState } from '@prisma/client';
+import { MeterSimCardState, MeterStatus } from '@prisma/client';
 
 export class CreateMeterDto {
   @ApiProperty()
@@ -18,10 +18,20 @@ export class CreateMeterDto {
   @IsNotEmpty()
   meterTypeDefinitionId!: string;
 
+  @ApiPropertyOptional({ enum: MeterStatus, description: 'Status brojila (upotrebljivost)' })
+  @IsEnum(MeterStatus)
+  @IsOptional()
+  status?: MeterStatus;
+
   @ApiPropertyOptional({ description: 'Godina proizvodnje – operator definiše pri ugradnji' })
   @IsInt()
   @IsOptional()
   year?: number;
+
+  @ApiPropertyOptional({ description: 'Godina baždarenja' })
+  @IsInt()
+  @IsOptional()
+  calibrationYear?: number;
 
   @ApiPropertyOptional()
   @IsString()

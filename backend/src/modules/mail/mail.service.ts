@@ -6,17 +6,7 @@ import type { Transporter } from 'nodemailer';
 import * as path from 'path';
 import * as fs from 'fs';
 import Handlebars from 'handlebars';
-
-export interface SendApprovalRequestOptions {
-  to: string | string[];
-  recordNumber: string;
-  recordId: string;
-  meterSerialNumber: string;
-  ipAddress: string;
-  installationAddress: string;
-  municipality: string;
-  installedByName: string;
-}
+import { SETTINGS_KEYS } from '../settings/settings-keys';
 
 export interface SendRecordEmailOptions {
   to: string | string[];
@@ -31,10 +21,7 @@ export interface SendRecordEmailOptions {
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private readonly templateCache = new Map<string, Handlebars.TemplateDelegate>();
-  private readonly allowedTemplateNames = [
-    'installation-record-approval-request',
-    'installation-record-notification',
-  ] as const;
+  private readonly allowedTemplateNames = ['installation-record-notification'] as const;
 
   constructor(
     private readonly config: ConfigService,
@@ -71,7 +58,7 @@ export class MailService {
     replyTo?: string;
   } | null> {
     const emailNotificationsEnabled = await this.getBooleanSetting(
-      'notifications.email.enabled',
+      SETTINGS_KEYS.notificationsEmailEnabled,
       true,
     );
     if (!emailNotificationsEnabled) {
@@ -81,13 +68,13 @@ export class MailService {
       return null;
     }
 
-    const emailEnabled = await this.getBooleanSetting('email.enabled', true);
+    const emailEnabled = await this.getBooleanSetting(SETTINGS_KEYS.emailEnabled, true);
     if (!emailEnabled) {
       this.logger.warn('Email sending disabled by app setting: email.enabled=false');
       return null;
     }
 
-    const provider = (await this.getSetting('smtp.provider'))?.trim().toLowerCase() ?? 'custom';
+    const provider = (await this.getSetting(SETTINGS_KEYS.smtpProvider))?.trim().toLowerCase() ?? 'custom';
     if (provider === 'disabled') {
       this.logger.warn('Email sending disabled by app setting: smtp.provider=disabled');
       return null;
@@ -100,18 +87,18 @@ export class MailService {
           ? { host: 'smtp.office365.com', port: 587, secure: false, requireTLS: true }
           : { host: 'localhost', port: 587, secure: false, requireTLS: false };
 
-    const host = (await this.getSetting('smtp.host'))?.trim() || defaults.host;
-    const port = await this.getNumberSetting('smtp.port', defaults.port);
-    const secure = await this.getBooleanSetting('smtp.secure', defaults.secure);
-    const requireTLS = await this.getBooleanSetting('smtp.requireTLS', defaults.requireTLS);
-    const user = (await this.getSetting('smtp.user'))?.trim() || undefined;
-    const pass = (await this.getSetting('smtp.pass')) ?? undefined;
+    const host = (await this.getSetting(SETTINGS_KEYS.smtpHost))?.trim() || defaults.host;
+    const port = await this.getNumberSetting(SETTINGS_KEYS.smtpPort, defaults.port);
+    const secure = await this.getBooleanSetting(SETTINGS_KEYS.smtpSecure, defaults.secure);
+    const requireTLS = await this.getBooleanSetting(SETTINGS_KEYS.smtpRequireTLS, defaults.requireTLS);
+    const user = (await this.getSetting(SETTINGS_KEYS.smtpUser))?.trim() || undefined;
+    const pass = (await this.getSetting(SETTINGS_KEYS.smtpPass)) ?? undefined;
 
-    const fromName = (await this.getSetting('smtp.fromName'))?.trim() || 'SIM Tracker';
+    const fromName = (await this.getSetting(SETTINGS_KEYS.smtpFromName))?.trim() || 'SIM Tracker';
     const fromAddress =
-      (await this.getSetting('smtp.fromAddress'))?.trim() ||
+      (await this.getSetting(SETTINGS_KEYS.smtpFromAddress))?.trim() ||
       (user && host.includes('gmail.com') ? user : 'noreply@simtracker.local');
-    const replyTo = (await this.getSetting('smtp.replyTo'))?.trim() || undefined;
+    const replyTo = (await this.getSetting(SETTINGS_KEYS.smtpReplyTo))?.trim() || undefined;
 
     // Gmail zahtijeva da From adresa odgovara SMTP_USER; inače vraća 555 Syntax error
     const effectiveFrom =
@@ -176,29 +163,6 @@ export class MailService {
     const compiled = Handlebars.compile(source, { strict: true });
     this.templateCache.set(cacheKey, compiled);
     return compiled(context);
-  }
-
-  async sendApprovalRequest(options: SendApprovalRequestOptions): Promise<void> {
-    const { to, recordNumber, recordId, meterSerialNumber, ipAddress, installationAddress, municipality, installedByName } =
-      options;
-    const recipients = Array.isArray(to) ? to : [to];
-    const appUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173');
-    await this.sendMail({
-      to: recipients,
-      subject: `Zapisnik ${recordNumber} – čeka odobrenje`,
-      template: 'installation-record-approval-request',
-      context: {
-        recordNumber,
-        recordId,
-        meterSerialNumber,
-        ipAddress,
-        installationAddress: installationAddress || '–',
-        municipality: municipality || '–',
-        installedByName,
-        appUrl,
-      },
-    });
-    this.logger.log(`Approval request for ${recordNumber} sent to ${recipients.join(', ')}`);
   }
 
   async sendRecordWithPdf(options: SendRecordEmailOptions): Promise<void> {

@@ -4,18 +4,12 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { UpdateSettingDto } from './dto/update-setting.dto';
 import { UserTourStateDto } from './dto/update-my-settings.dto';
+import { SETTINGS_KEYS } from './settings-keys';
 
 type SettingChangeContext = {
   userId?: string;
   ipAddress?: string;
 };
-
-const SETTINGS_KEYS = {
-  mobilePushCompat: 'mobile.push.enabled',
-  notificationsPushEnabled: 'notifications.push.enabled',
-  notificationsEmailEnabled: 'notifications.email.enabled',
-  notificationsInAppEnabled: 'notifications.inApp.enabled',
-} as const;
 
 export type UserTourState = {
   web?: {
@@ -73,6 +67,26 @@ export class SettingsService {
     return defaultValue;
   }
 
+  async getOptionalValue(key: string): Promise<string | null> {
+    const setting = await this.prisma.appSetting.findUnique({
+      where: { key },
+      select: { value: true },
+    });
+    if (setting?.value == null) {
+      return null;
+    }
+    return String(setting.value);
+  }
+
+  async getNumber(key: string, defaultValue: number): Promise<number> {
+    const raw = await this.getOptionalValue(key);
+    if (raw == null) {
+      return defaultValue;
+    }
+    const n = Number(String(raw).trim());
+    return Number.isFinite(n) ? n : defaultValue;
+  }
+
   async isMobilePushEnabled(): Promise<boolean> {
     const notificationsPushEnabled = await this.getBoolean(
       SETTINGS_KEYS.notificationsPushEnabled,
@@ -99,15 +113,15 @@ export class SettingsService {
   }> {
     const mobilePushEnabled = await this.isMobilePushEnabled();
     const pushCampaignsEnabled = await this.isPushCampaignsEnabled();
-    const emailEnabled = await this.getBoolean('email.enabled', true);
+    const emailEnabled = await this.getBoolean(SETTINGS_KEYS.emailEnabled, true);
     const smtpProvider = await this.prisma.appSetting
-      .findUnique({ where: { key: 'smtp.provider' }, select: { value: true } })
+      .findUnique({ where: { key: SETTINGS_KEYS.smtpProvider }, select: { value: true } })
       .then((r) => r?.value ?? null);
     const smtpUser = await this.prisma.appSetting
-      .findUnique({ where: { key: 'smtp.user' }, select: { value: true } })
+      .findUnique({ where: { key: SETTINGS_KEYS.smtpUser }, select: { value: true } })
       .then((r) => r?.value ?? null);
     const smtpPass = await this.prisma.appSetting
-      .findUnique({ where: { key: 'smtp.pass' }, select: { value: true } })
+      .findUnique({ where: { key: SETTINGS_KEYS.smtpPass }, select: { value: true } })
       .then((r) => r?.value ?? null);
 
     const provider = (smtpProvider ?? 'custom').trim().toLowerCase();
@@ -117,8 +131,8 @@ export class SettingsService {
         : Boolean(smtpUser?.trim()) && Boolean(smtpPass?.trim());
 
     const requiredKeys = [
-      'email.enabled',
-      'smtp.provider',
+      SETTINGS_KEYS.emailEnabled,
+      SETTINGS_KEYS.smtpProvider,
       SETTINGS_KEYS.mobilePushCompat,
       SETTINGS_KEYS.notificationsPushEnabled,
       SETTINGS_KEYS.notificationsEmailEnabled,
@@ -129,10 +143,10 @@ export class SettingsService {
       select: { key: true },
     });
     const existingSet = new Set(existing.map((e) => e.key));
-    const missingKeys = requiredKeys.filter((k) => !existingSet.has(k));
+    let missingKeys: string[] = requiredKeys.filter((k) => !existingSet.has(k));
 
     if (emailEnabled && provider !== 'disabled' && (!smtpUser?.trim() || !smtpPass?.trim())) {
-      missingKeys.push('smtp.user', 'smtp.pass');
+      missingKeys.push(SETTINGS_KEYS.smtpUser, SETTINGS_KEYS.smtpPass);
     }
 
     return {

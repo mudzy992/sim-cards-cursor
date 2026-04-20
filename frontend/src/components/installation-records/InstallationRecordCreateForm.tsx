@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Button, Card, Form, Input, InputNumber, Radio, Select, Switch, message } from 'antd';
+import { Button, Card, Divider, Form, Input, InputNumber, Radio, Select, Switch, message } from 'antd';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { metersApi } from '@/api/meters.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import { simCardsApi } from '@/api/sim-cards.api';
 import { branchesApi } from '@/api/branches.api';
 import { useAuthStore } from '@/store/auth.store';
-import type { InstallationRecordItem } from '@/types/installation-record.types';
+import type {
+  InstallationRecordItem,
+  InstallationRecordKind,
+} from '@/types/installation-record.types';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 
 type CreateMode = 'existing' | 'new';
@@ -57,13 +60,31 @@ export default function InstallationRecordCreateForm({
 
   const selectedMeterTypeDefinitionId = Form.useWatch('meterTypeDefinitionId', form) as
     | string
-    | undefined
+    | undefined;
+
+  const installRecordKind = (Form.useWatch('installRecordKind', form) ??
+    'NEW_CONNECTION') as InstallationRecordKind;
+
+  const demountedMeterTypeDefinitionId = Form.useWatch(
+    ['demountedMeter', 'meterTypeDefinitionId'],
+    form,
+  ) as string | undefined;
 
   const meterTypeFieldsQuery = useQuery({
     queryKey: ['meter-type-definitions', 'fields', selectedMeterTypeDefinitionId],
     queryFn: () => meterTypeDefinitionsApi.listFields(selectedMeterTypeDefinitionId!),
     enabled: Boolean(userId) && createMode === 'new' && Boolean(selectedMeterTypeDefinitionId),
-  })
+  });
+
+  const demountedMeterTypeFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', 'fields-demounted', demountedMeterTypeDefinitionId],
+    queryFn: () => meterTypeDefinitionsApi.listFields(demountedMeterTypeDefinitionId!),
+    enabled:
+      Boolean(userId) &&
+      createMode === 'new' &&
+      installRecordKind === 'METER_REPLACEMENT' &&
+      Boolean(demountedMeterTypeDefinitionId),
+  });
 
   const branchesQuery = useQuery({
     queryKey: ['branches', 'list', userDistributionId],
@@ -135,12 +156,42 @@ export default function InstallationRecordCreateForm({
       const municipality =
         (values.municipality as string) || selectedBranch?.name || userBranch?.name;
 
+      const kind = (values.installRecordKind as InstallationRecordKind) ?? 'NEW_CONNECTION';
+      const dm = values.demountedMeter as
+        | {
+            meterTypeDefinitionId?: string;
+            serialNumber?: string;
+            year?: number;
+            calibrationYear?: number;
+            dynamicFieldValues?: Record<string, unknown>;
+            notes?: string;
+            hadIntegratedSim?: boolean;
+            noSimNote?: string;
+          }
+        | undefined;
+      const demountedMeter =
+        kind === 'METER_REPLACEMENT' && dm?.meterTypeDefinitionId
+          ? {
+              meterTypeDefinitionId: dm.meterTypeDefinitionId,
+              serialNumber: (dm.serialNumber ?? '').trim(),
+              year: Number(dm.year),
+              calibrationYear: Number(dm.calibrationYear),
+              ...(dm.dynamicFieldValues && Object.keys(dm.dynamicFieldValues).length > 0
+                ? { dynamicFieldValues: dm.dynamicFieldValues }
+                : {}),
+              ...(dm.notes?.trim() ? { notes: dm.notes.trim() } : {}),
+              ...(dm.hadIntegratedSim !== undefined ? { hadIntegratedSim: dm.hadIntegratedSim } : {}),
+              ...(dm.noSimNote?.trim() ? { noSimNote: dm.noSimNote.trim() } : {}),
+            }
+          : undefined;
       createMutation.mutate({
         simCardId: values.simCardId as string,
         installedById: userId,
+        ...(kind === 'METER_REPLACEMENT' ? { kind, demountedMeter } : {}),
         meterTypeDefinitionId: values.meterTypeDefinitionId as string,
         serialNumber: (values.serialNumber as string)?.trim() ?? '',
-        year: values.year != null ? Number(values.year) : undefined,
+        year: Number(values.year),
+        calibrationYear: Number(values.calibrationYear),
         installationAddress: values.installationAddress as string | undefined,
         installationDate: values.installationDate as string | undefined,
         city: values.city as string | undefined,
@@ -189,6 +240,7 @@ export default function InstallationRecordCreateForm({
         onFinish={handleFinish}
         initialValues={{
           installationDate: new Date().toISOString().slice(0, 10),
+          installRecordKind: 'NEW_CONNECTION',
         }}
       >
         <Form.Item label="Način kreiranja">
@@ -196,7 +248,13 @@ export default function InstallationRecordCreateForm({
             value={createMode}
             onChange={(e) => {
               setCreateMode(e.target.value);
-              form.resetFields(['meterId', 'meterTypeDefinitionId', 'serialNumber']);
+              form.resetFields([
+                'meterId',
+                'meterTypeDefinitionId',
+                'serialNumber',
+                'installRecordKind',
+                'demountedMeter',
+              ]);
             }}
           >
             <Radio value="new">Novo brojilo na terenu (tip + serijski broj + lokacija)</Radio>
@@ -222,6 +280,99 @@ export default function InstallationRecordCreateForm({
           </Form.Item>
         ) : (
           <>
+            <Form.Item name="installRecordKind" label="Vrsta zapisnika">
+              <Radio.Group>
+                <Radio value="NEW_CONNECTION">Novi priključak</Radio>
+                <Radio value="METER_REPLACEMENT">Zamjena brojila</Radio>
+              </Radio.Group>
+            </Form.Item>
+
+            {installRecordKind === 'METER_REPLACEMENT' && (
+              <>
+                <Divider orientation="left">Demontirano brojilo</Divider>
+                <Form.Item
+                  name={['demountedMeter', 'meterTypeDefinitionId']}
+                  label="Tip demontiranog brojila"
+                  rules={[{ required: true, message: 'Odaberite tip demontiranog brojila.' }]}
+                >
+                  <Select
+                    placeholder="Odaberi tip"
+                    options={meterTypeOptions}
+                    loading={meterTypesQuery.isLoading}
+                    showSearch
+                    filterOption={(input, opt) =>
+                      (opt?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                    }
+                  />
+                </Form.Item>
+                <Form.Item
+                  name={['demountedMeter', 'serialNumber']}
+                  label="Serijski broj demontiranog"
+                  rules={[{ required: true, message: 'Unesite serijski broj demontiranog brojila.' }]}
+                >
+                  <Input placeholder="Serijski broj" />
+                </Form.Item>
+                {demountedMeterTypeDefinitionId && (
+                  <div className="rounded-md border border-slate-200 p-3 mb-3">
+                    <div className="font-medium mb-2">Dodatna polja (demontirano)</div>
+                    {(demountedMeterTypeFieldsQuery.data ?? [])
+                      .slice()
+                      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                      .map((field) => (
+                        <Form.Item
+                          key={field.id}
+                          name={['demountedMeter', 'dynamicFieldValues', field.name]}
+                          label={field.label}
+                          rules={
+                            field.isRequired && isFieldEditable(field)
+                              ? [{ required: true, message: `Unesite: ${field.label}` }]
+                              : []
+                          }
+                          initialValue={field.defaultValue ?? undefined}
+                          valuePropName={field.fieldType === 'BOOLEAN' ? 'checked' : 'value'}
+                        >
+                          {renderFieldInput(field)}
+                        </Form.Item>
+                      ))}
+                    {demountedMeterTypeFieldsQuery.isLoading && (
+                      <div className="text-sm text-slate-500">Učitavanje polja…</div>
+                    )}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <Form.Item
+                    name={['demountedMeter', 'year']}
+                    label="Godina proizvodnje (demontirano)"
+                    rules={[{ required: true, message: 'Obavezno.' }]}
+                  >
+                    <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
+                  </Form.Item>
+                  <Form.Item
+                    name={['demountedMeter', 'calibrationYear']}
+                    label="Godina baždarenja (demontirano)"
+                    rules={[{ required: true, message: 'Obavezno.' }]}
+                  >
+                    <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
+                  </Form.Item>
+                </div>
+                <Form.Item name={['demountedMeter', 'notes']} label="Napomena (demontirano brojilo)">
+                  <Input.TextArea rows={2} placeholder="Opcionalno" />
+                </Form.Item>
+                <Form.Item
+                  name={['demountedMeter', 'hadIntegratedSim']}
+                  label="Staro brojilo ima ugrađenu SIM karticu"
+                  valuePropName="checked"
+                  initialValue={false}
+                >
+                  <Switch />
+                </Form.Item>
+                <Form.Item name={['demountedMeter', 'noSimNote']} label="Napomena (SIM na starom brojilu)">
+                  <Input placeholder="Opcionalno" />
+                </Form.Item>
+                <Divider orientation="left">Novo brojilo</Divider>
+              </>
+            )}
+
             <Form.Item
               name="meterTypeDefinitionId"
               label="Tip brojila"
@@ -244,14 +395,22 @@ export default function InstallationRecordCreateForm({
             >
               <Input placeholder="Serijski broj s brojila" />
             </Form.Item>
-            <Form.Item name="year" label="Godina proizvodnje">
-              <InputNumber
-                min={1900}
-                max={2100}
-                placeholder="Opcionalno"
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
+            <div className="grid grid-cols-2 gap-4">
+              <Form.Item
+                name="year"
+                label="Godina proizvodnje"
+                rules={[{ required: true, message: 'Obavezno.' }]}
+              >
+                <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item
+                name="calibrationYear"
+                label="Godina baždarenja"
+                rules={[{ required: true, message: 'Obavezno.' }]}
+              >
+                <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
+              </Form.Item>
+            </div>
             <Form.Item name="installationAddress" label="Adresa instalacije">
               <Input placeholder="Ulica, broj, mjesto" />
             </Form.Item>

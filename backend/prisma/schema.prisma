@@ -34,6 +34,13 @@ enum MeterSimCardState {
   NO_SIM
 }
 
+enum MeterStatus {
+  ACTIVE
+  DEFECTIVE
+  IN_CALIBRATION
+  INACTIVE
+}
+
 enum MeterType {
   SINGLE_PHASE
   THREE_PHASE
@@ -45,6 +52,11 @@ enum RecordStatus {
   SEND_FAILED
   SEP_ACTIVATED
   LEGACY_COMPLETED
+}
+
+enum InstallationRecordKind {
+  NEW_CONNECTION
+  METER_REPLACEMENT
 }
 
 enum ShipmentStatus {
@@ -80,34 +92,34 @@ enum MobileAppPlatform {
 }
 
 model Distribution {
-  id             String          @id @default(uuid())
-  name           String
-  code           String          @unique
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  branches       Branch[]
-  users          User[]          @relation("UserDistribution")
-  shipments      Shipment[]
+  branches            Branch[]
+  users               User[]         @relation("UserDistribution")
+  shipments           Shipment[]
   pushCampaignsScoped PushCampaign[]
 
   @@map("distributions")
 }
 
 model Branch {
-  id             String               @id @default(uuid())
-  distributionId String               @map("distribution_id")
-  distribution   Distribution         @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  id             String       @id @default(uuid())
+  distributionId String       @map("distribution_id")
+  distribution   Distribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
   name           String
   code           String
-  createdAt      DateTime             @default(now()) @map("created_at")
-  updatedAt      DateTime             @updatedAt @map("updated_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  users              User[]                @relation("UserBranch")
-  meters             Meter[]
+  users               User[]                 @relation("UserBranch")
+  meters              Meter[]
   pushCampaignsScoped PushCampaign[]
-  emailRecipients    BranchEmailRecipient[]
-  branchModerators   BranchModerator[]
+  emailRecipients     BranchEmailRecipient[]
+  branchModerators    BranchModerator[]
 
   @@unique([distributionId, code])
   @@index([distributionId])
@@ -115,40 +127,40 @@ model Branch {
 }
 
 model User {
-  id                String               @id @default(uuid())
-  email             String               @unique
-  username          String?              @unique
-  password          String
-  firstName         String               @map("first_name")
-  lastName          String               @map("last_name")
-  phone             String?
-  role              UserRole             @default(USER)
-  status            UserStatus           @default(ACTIVE)
-  avatar            String?
-  refreshToken      String?              @map("refresh_token") @db.Text
-  distributionId    String?              @map("distribution_id")
-  distribution      Distribution?        @relation("UserDistribution", fields: [distributionId], references: [id], onDelete: SetNull)
-  branchId          String?              @map("branch_id")
-  branch            Branch?              @relation("UserBranch", fields: [branchId], references: [id], onDelete: SetNull)
-  createdAt         DateTime             @default(now()) @map("created_at")
-  updatedAt         DateTime             @updatedAt @map("updated_at")
-  lastLoginAt       DateTime?            @map("last_login_at")
+  id             String        @id @default(uuid())
+  email          String        @unique
+  username       String?       @unique
+  password       String
+  firstName      String        @map("first_name")
+  lastName       String        @map("last_name")
+  phone          String?
+  role           UserRole      @default(USER)
+  status         UserStatus    @default(ACTIVE)
+  avatar         String?
+  refreshToken   String?       @map("refresh_token") @db.Text
+  distributionId String?       @map("distribution_id")
+  distribution   Distribution? @relation("UserDistribution", fields: [distributionId], references: [id], onDelete: SetNull)
+  branchId       String?       @map("branch_id")
+  branch         Branch?       @relation("UserBranch", fields: [branchId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  lastLoginAt    DateTime?     @map("last_login_at")
 
-  assignedSimCards  SimCard[]            @relation("AssignedTo")
-  installedRecords  InstallationRecord[] @relation("InstalledBy")
-  approvedRecords   InstallationRecord[] @relation("ApprovedBy")
-  importedShipments Shipment[]           @relation("ImportedBy")
-  notifications     Notification[]
-  activityLogs      ActivityLog[]
-  demountTasksAssigned DemountTask[]     @relation("DemountTasksAssigned")
-  demountTasksCreated  DemountTask[]     @relation("DemountTasksCreated")
-  installTasksAssigned InstallTask[]    @relation("InstallTasksAssigned")
-  installTasksCreated  InstallTask[]    @relation("InstallTasksCreated")
-  pushTokens        PushToken[]
-  pushCampaignsCreated PushCampaign[]    @relation("PushCampaignCreatedBy")
-  mobileReleasesCreated MobileAppRelease[] @relation("MobileAppReleaseCreatedBy")
-  pushDeliveries    PushDelivery[]
-  branchModeratorRoles BranchModerator[]
+  assignedSimCards      SimCard[]            @relation("AssignedTo")
+  installedRecords      InstallationRecord[] @relation("InstalledBy")
+  approvedRecords       InstallationRecord[] @relation("ApprovedBy")
+  importedShipments     Shipment[]           @relation("ImportedBy")
+  notifications         Notification[]
+  activityLogs          ActivityLog[]
+  demountTasksAssigned  DemountTask[]        @relation("DemountTasksAssigned")
+  demountTasksCreated   DemountTask[]        @relation("DemountTasksCreated")
+  installTasksAssigned  InstallTask[]        @relation("InstallTasksAssigned")
+  installTasksCreated   InstallTask[]        @relation("InstallTasksCreated")
+  pushTokens            PushToken[]
+  pushCampaignsCreated  PushCampaign[]       @relation("PushCampaignCreatedBy")
+  mobileReleasesCreated MobileAppRelease[]   @relation("MobileAppReleaseCreatedBy")
+  pushDeliveries        PushDelivery[]
+  branchModeratorRoles  BranchModerator[]
 
   @@map("users")
 }
@@ -174,22 +186,23 @@ model Shipment {
 }
 
 model SimCard {
-  id             String         @id @default(uuid())
-  iccid          String         @unique
-  ipAddress      String         @map("ip_address")
-  publicIpAddress String?       @map("public_ip_address")
-  status         SimCardStatus  @default(AVAILABLE)
-  phoneNumber    String?        @map("phone_number")
-  apn            String?
-  shipmentId     String         @map("shipment_id")
-  shipment       Shipment       @relation(fields: [shipmentId], references: [id])
-  assignedToId   String?        @map("assigned_to_id")
-  assignedTo     User?          @relation("AssignedTo", fields: [assignedToId], references: [id])
-  assignedAt     DateTime?      @map("assigned_at")
-  meter          Meter?         // kroz brojilo – kartica je fizički u brojilu
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-  events         SimEvent[]
+  id                  String               @id @default(uuid())
+  iccid               String               @unique
+  ipAddress           String               @map("ip_address")
+  publicIpAddress     String?              @map("public_ip_address")
+  status              SimCardStatus        @default(AVAILABLE)
+  phoneNumber         String?              @map("phone_number")
+  apn                 String?
+  shipmentId          String               @map("shipment_id")
+  shipment            Shipment             @relation(fields: [shipmentId], references: [id])
+  assignedToId        String?              @map("assigned_to_id")
+  assignedTo          User?                @relation("AssignedTo", fields: [assignedToId], references: [id])
+  assignedAt          DateTime?            @map("assigned_at")
+  meter               Meter? // kroz brojilo – kartica je fizički u brojilu
+  installationRecords InstallationRecord[]
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  events              SimEvent[]
 
   @@index([iccid])
   @@index([ipAddress])
@@ -198,79 +211,91 @@ model SimCard {
 }
 
 model Meter {
-  id                        String                @id @default(uuid())
-  serialNumber              String                @unique @map("serial_number")
-  branchId                  String?               @map("branch_id")
-  branch                    Branch?               @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  meterTypeDefinitionId     String                @map("meter_type_definition_id")
-  meterTypeDefinition       MeterTypeDefinition   @relation(fields: [meterTypeDefinitionId], references: [id], onDelete: Restrict)
-  simCardId                 String?              @unique @map("sim_card_id")
-  simCard                   SimCard?             @relation(fields: [simCardId], references: [id], onDelete: SetNull)
-  simCardState              MeterSimCardState     @default(NO_SIM) @map("sim_card_state")
-  noSimReason               String?               @map("no_sim_reason") @db.Text
-  year                      Int?
-  notes                     String?              @db.Text
-  installationAddress       String?               @map("installation_address") @db.Text
-  installationDate          DateTime?             @map("installation_date")
-  city                      String?
-  municipality              String?
-  measuringPoint            String?               @map("measuring_point")
-  latitude                  Decimal?              @db.Decimal(10, 8)
-  longitude                 Decimal?              @db.Decimal(11, 8)
-  dynamicFieldValues        Json?                 @map("dynamic_field_values")
-  createdAt                 DateTime              @default(now()) @map("created_at")
-  updatedAt                 DateTime              @updatedAt @map("updated_at")
-  installationRecords       InstallationRecord[]
-  demountTasks              DemountTask[]
-  installTasks              InstallTask[]
+  id                      String                @id @default(uuid())
+  serialNumber            String                @unique @map("serial_number")
+  branchId                String?               @map("branch_id")
+  branch                  Branch?               @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  meterTypeDefinitionId   String                @map("meter_type_definition_id")
+  meterTypeDefinition     MeterTypeDefinition   @relation(fields: [meterTypeDefinitionId], references: [id], onDelete: Restrict)
+  status                  MeterStatus           @default(ACTIVE)
+  simCardId               String?               @unique @map("sim_card_id")
+  simCard                 SimCard?              @relation(fields: [simCardId], references: [id], onDelete: SetNull)
+  simCardState            MeterSimCardState     @default(NO_SIM) @map("sim_card_state")
+  noSimReason             String?               @map("no_sim_reason") @db.Text
+  lastSimDemountCategory  MeterDemountCategory? @map("last_sim_demount_category")
+  isDemountedFromLocation Boolean               @default(false) @map("is_demounted_from_location")
+  hasOpenInstallTask      Boolean               @default(false) @map("has_open_install_task")
+  hasOpenDemountTask      Boolean               @default(false) @map("has_open_demount_task")
+  year                    Int?
+  calibrationYear         Int?                  @map("calibration_year")
+  notes                   String?               @db.Text
+  installationAddress     String?               @map("installation_address") @db.Text
+  installationDate        DateTime?             @map("installation_date")
+  city                    String?
+  municipality            String?
+  measuringPoint          String?               @map("measuring_point")
+  latitude                Decimal?              @db.Decimal(10, 8)
+  longitude               Decimal?              @db.Decimal(11, 8)
+  dynamicFieldValues      Json?                 @map("dynamic_field_values")
+  createdAt               DateTime              @default(now()) @map("created_at")
+  updatedAt               DateTime              @updatedAt @map("updated_at")
+  installationRecords     InstallationRecord[]
+  demountTasks            DemountTask[]
+  installTasks            InstallTask[]
 
   @@index([serialNumber])
   @@index([meterTypeDefinitionId])
   @@index([simCardId])
+  @@index([status])
   @@map("meters")
 }
 
 model MeterTypeDefinition {
-  id                    String               @id @default(uuid())
-  name                  String
-  manufacturer          String?
-  model                 String?
-  type                  MeterType            @default(SINGLE_PHASE)
-  maxCurrent            String?              @map("max_current")
-  notes                 String?              @db.Text
-  createdAt             DateTime             @default(now()) @map("created_at")
-  updatedAt             DateTime             @updatedAt @map("updated_at")
-  meters                Meter[]
-  fields                MeterTypeField[]
+  id           String           @id @default(uuid())
+  name         String
+  manufacturer String?
+  model        String?
+  type         MeterType        @default(SINGLE_PHASE)
+  maxCurrent   String?          @map("max_current")
+  notes        String?          @db.Text
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  meters       Meter[]
+  fields       MeterTypeField[]
 
   @@map("meter_type_definitions")
 }
 
 model InstallationRecord {
-  id                        String                @id @default(uuid())
-  recordNumber              String                @unique @map("record_number")
-  clientRequestId           String?               @unique @map("client_request_id")
-  meterId                   String                @map("meter_id")
-  meter                     Meter                 @relation(fields: [meterId], references: [id])
-  installedById             String                @map("installed_by_id")
-  installedBy               User                  @relation("InstalledBy", fields: [installedById], references: [id])
-  status                    RecordStatus          @default(DRAFT)
-  approvedById              String?               @map("approved_by_id")
-  approvedBy                User?                 @relation("ApprovedBy", fields: [approvedById], references: [id])
-  approvedAt                DateTime?             @map("approved_at")
-  rejectionReason          String?               @map("rejection_reason") @db.Text
-  sentToEmail              String?               @map("sent_to_email")
-  sentAt                   DateTime?             @map("sent_at")
-  pdfPath                  String?               @map("pdf_path")
-  notes                    String?               @db.Text
-  photos                   Json?
-  createdAt                DateTime              @default(now()) @map("created_at")
-  updatedAt                DateTime              @updatedAt @map("updated_at")
-  installTask              InstallTask?          @relation("InstallTaskInstallationRecord")
+  id                     String                 @id @default(uuid())
+  recordNumber           String                 @unique @map("record_number")
+  clientRequestId        String?                @unique @map("client_request_id")
+  kind                   InstallationRecordKind @default(NEW_CONNECTION) @map("kind")
+  demountedMeterSnapshot Json?                  @map("demounted_meter_snapshot")
+  meterId                String                 @map("meter_id")
+  meter                  Meter                  @relation(fields: [meterId], references: [id])
+  simCardId              String?                @map("sim_card_id")
+  simCard                SimCard?               @relation(fields: [simCardId], references: [id], onDelete: SetNull)
+  installedById          String                 @map("installed_by_id")
+  installedBy            User                   @relation("InstalledBy", fields: [installedById], references: [id])
+  status                 RecordStatus           @default(DRAFT)
+  approvedById           String?                @map("approved_by_id")
+  approvedBy             User?                  @relation("ApprovedBy", fields: [approvedById], references: [id])
+  approvedAt             DateTime?              @map("approved_at")
+  rejectionReason        String?                @map("rejection_reason") @db.Text
+  sentToEmail            String?                @map("sent_to_email")
+  sentAt                 DateTime?              @map("sent_at")
+  pdfPath                String?                @map("pdf_path")
+  notes                  String?                @db.Text
+  photos                 Json?
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+  installTask            InstallTask?           @relation("InstallTaskInstallationRecord")
 
   @@index([recordNumber])
   @@index([status])
   @@index([meterId])
+  @@index([simCardId])
   @@map("installation_records")
 }
 
@@ -307,46 +332,46 @@ model ActivityLog {
 }
 
 model PushToken {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token       String
-  platform    String?
-  deviceId    String?  @map("device_id")
-  isValid     Boolean  @default(true) @map("is_valid")
-  lastUsedAt  DateTime? @map("last_used_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  deliveries  PushDelivery[]
+  id         String         @id @default(uuid())
+  userId     String         @map("user_id")
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String
+  platform   String?
+  deviceId   String?        @map("device_id")
+  isValid    Boolean        @default(true) @map("is_valid")
+  lastUsedAt DateTime?      @map("last_used_at")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+  deliveries PushDelivery[]
 
-  @@index([userId])
   @@unique([token])
+  @@index([userId])
   @@map("push_tokens")
 }
 
 model PushCampaign {
-  id                  String                   @id @default(uuid())
-  createdById         String                   @map("created_by_id")
-  createdBy           User                     @relation("PushCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  id          String @id @default(uuid())
+  createdById String @map("created_by_id")
+  createdBy   User   @relation("PushCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
 
-  scopeDistributionId String?                  @map("scope_distribution_id")
-  scopeDistribution   Distribution?            @relation(fields: [scopeDistributionId], references: [id], onDelete: SetNull)
-  scopeBranchId       String?                  @map("scope_branch_id")
-  scopeBranch         Branch?                  @relation(fields: [scopeBranchId], references: [id], onDelete: SetNull)
+  scopeDistributionId String?       @map("scope_distribution_id")
+  scopeDistribution   Distribution? @relation(fields: [scopeDistributionId], references: [id], onDelete: SetNull)
+  scopeBranchId       String?       @map("scope_branch_id")
+  scopeBranch         Branch?       @relation(fields: [scopeBranchId], references: [id], onDelete: SetNull)
 
-  title               String
-  message             String                   @db.Text
-  deepLink            String?                  @map("deep_link")
-  audienceType        PushCampaignAudienceType @map("audience_type")
-  filters             Json?
-  targetUserId        String?                  @map("target_user_id")
-  status              PushCampaignStatus       @default(DRAFT)
+  title        String
+  message      String                   @db.Text
+  deepLink     String?                  @map("deep_link")
+  audienceType PushCampaignAudienceType @map("audience_type")
+  filters      Json?
+  targetUserId String?                  @map("target_user_id")
+  status       PushCampaignStatus       @default(DRAFT)
 
-  createdAt           DateTime                 @default(now()) @map("created_at")
-  updatedAt           DateTime                 @updatedAt @map("updated_at")
-  sentAt              DateTime?                @map("sent_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  sentAt    DateTime? @map("sent_at")
 
-  deliveries          PushDelivery[]
+  deliveries PushDelivery[]
 
   @@index([createdById])
   @@index([scopeDistributionId])
@@ -356,13 +381,13 @@ model PushCampaign {
 }
 
 model PushDelivery {
-  id               String             @id @default(uuid())
-  campaignId       String             @map("campaign_id")
-  campaign         PushCampaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  userId           String             @map("user_id")
-  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pushTokenId      String             @map("push_token_id")
-  pushToken        PushToken          @relation(fields: [pushTokenId], references: [id], onDelete: Cascade)
+  id          String       @id @default(uuid())
+  campaignId  String       @map("campaign_id")
+  campaign    PushCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId      String       @map("user_id")
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushTokenId String       @map("push_token_id")
+  pushToken   PushToken    @relation(fields: [pushTokenId], references: [id], onDelete: Cascade)
 
   expoTicketId     String?            @map("expo_ticket_id")
   status           PushDeliveryStatus @default(QUEUED)
@@ -371,34 +396,34 @@ model PushDelivery {
   receiptCheckedAt DateTime?          @map("receipt_checked_at")
   deliveredAt      DateTime?          @map("delivered_at")
 
-  createdAt        DateTime           @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
+  @@unique([campaignId, pushTokenId])
   @@index([campaignId])
   @@index([userId])
   @@index([pushTokenId])
   @@index([status, createdAt])
-  @@unique([campaignId, pushTokenId])
   @@map("push_deliveries")
 }
 
 model MobileAppRelease {
-  id               String            @id @default(uuid())
-  platform         MobileAppPlatform @default(ANDROID)
-  versionName      String            @map("version_name")
-  versionCode      Int               @map("version_code")
-  apkPath          String            @map("apk_path") @db.Text
-  apkFileName      String            @map("apk_file_name")
-  apkSha256        String            @map("apk_sha256")
-  releaseNotes     String?           @map("release_notes") @db.Text
+  id           String            @id @default(uuid())
+  platform     MobileAppPlatform @default(ANDROID)
+  versionName  String            @map("version_name")
+  versionCode  Int               @map("version_code")
+  apkPath      String            @map("apk_path") @db.Text
+  apkFileName  String            @map("apk_file_name")
+  apkSha256    String            @map("apk_sha256")
+  releaseNotes String?           @map("release_notes") @db.Text
 
-  publishedAt      DateTime          @default(now()) @map("published_at")
-  mandatoryAfterAt DateTime          @map("mandatory_after_at")
+  publishedAt      DateTime @default(now()) @map("published_at")
+  mandatoryAfterAt DateTime @map("mandatory_after_at")
 
-  createdById      String            @map("created_by_id")
-  createdBy        User              @relation("MobileAppReleaseCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById String @map("created_by_id")
+  createdBy   User   @relation("MobileAppReleaseCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
 
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([platform, versionCode])
   @@index([platform, publishedAt])
@@ -441,6 +466,18 @@ enum DemountCompletionResolution {
   REMOVE_SIM_ONLY
 }
 
+enum RemovedSimDisposition {
+  MARK_DEFECTIVE
+  RETURN_TO_STOCK
+}
+
+enum MeterDemountCategory {
+  METER_FAULTY
+  TEMPORARY_REMOVAL
+  MAINTENANCE
+  OTHER
+}
+
 enum InstallTaskStatus {
   PENDING
   IN_PROGRESS
@@ -449,21 +486,27 @@ enum InstallTaskStatus {
 }
 
 model DemountTask {
-  id                     String                       @id @default(uuid())
-  meterId                String                       @map("meter_id")
-  meter                  Meter                        @relation(fields: [meterId], references: [id], onDelete: Cascade)
-  assignedToId           String                       @map("assigned_to_id")
-  assignedTo             User                         @relation("DemountTasksAssigned", fields: [assignedToId], references: [id])
-  createdById            String                       @map("created_by_id")
-  createdBy              User                         @relation("DemountTasksCreated", fields: [createdById], references: [id])
-  status                 DemountTaskStatus            @default(PENDING)
-  taskType               DemountTaskType              @default(DEMOUNT_SIM) @map("task_type")
-  completionResolution   DemountCompletionResolution? @map("completion_resolution")
-  completionReason       String?                      @map("completion_reason") @db.Text
-  notes                  String?                      @db.Text
-  completedAt            DateTime?                    @map("completed_at")
-  createdAt              DateTime                     @default(now()) @map("created_at")
-  updatedAt              DateTime                     @updatedAt @map("updated_at")
+  id                             String                       @id @default(uuid())
+  meterId                        String                       @map("meter_id")
+  meter                          Meter                        @relation(fields: [meterId], references: [id], onDelete: Cascade)
+  assignedToId                   String?                      @map("assigned_to_id")
+  assignedTo                     User?                        @relation("DemountTasksAssigned", fields: [assignedToId], references: [id])
+  createdById                    String                       @map("created_by_id")
+  createdBy                      User                         @relation("DemountTasksCreated", fields: [createdById], references: [id])
+  status                         DemountTaskStatus            @default(PENDING)
+  taskType                       DemountTaskType              @default(DEMOUNT_SIM) @map("task_type")
+  requestedResolution            DemountCompletionResolution? @map("requested_resolution")
+  requestedReason                String?                      @map("requested_reason") @db.Text
+  requestedRemovedSimDisposition RemovedSimDisposition?       @map("requested_removed_sim_disposition")
+  requestedMeterDemountCategory  MeterDemountCategory?        @map("requested_meter_demount_category")
+  completionResolution           DemountCompletionResolution? @map("completion_resolution")
+  completionReason               String?                      @map("completion_reason") @db.Text
+  removedSimDisposition          RemovedSimDisposition?       @map("removed_sim_disposition")
+  meterDemountCategory           MeterDemountCategory?        @map("meter_demount_category")
+  notes                          String?                      @db.Text
+  completedAt                    DateTime?                    @map("completed_at")
+  createdAt                      DateTime                     @default(now()) @map("created_at")
+  updatedAt                      DateTime                     @updatedAt @map("updated_at")
 
   @@index([assignedToId])
   @@index([status])
@@ -471,20 +514,20 @@ model DemountTask {
 }
 
 model InstallTask {
-  id                       String            @id @default(uuid())
-  meterId                  String            @map("meter_id")
-  meter                    Meter             @relation(fields: [meterId], references: [id], onDelete: Cascade)
-  assignedToId             String            @map("assigned_to_id")
-  assignedTo               User              @relation("InstallTasksAssigned", fields: [assignedToId], references: [id])
-  createdById              String            @map("created_by_id")
-  createdBy                User              @relation("InstallTasksCreated", fields: [createdById], references: [id])
-  status                   InstallTaskStatus @default(PENDING)
-  notes                    String?           @db.Text
-  installationRecordId     String?           @unique @map("installation_record_id")
-  installationRecord       InstallationRecord? @relation("InstallTaskInstallationRecord", fields: [installationRecordId], references: [id], onDelete: SetNull)
-  completedAt              DateTime?         @map("completed_at")
-  createdAt                DateTime          @default(now()) @map("created_at")
-  updatedAt                DateTime          @updatedAt @map("updated_at")
+  id                   String              @id @default(uuid())
+  meterId              String              @map("meter_id")
+  meter                Meter               @relation(fields: [meterId], references: [id], onDelete: Cascade)
+  assignedToId         String?             @map("assigned_to_id")
+  assignedTo           User?               @relation("InstallTasksAssigned", fields: [assignedToId], references: [id])
+  createdById          String              @map("created_by_id")
+  createdBy            User                @relation("InstallTasksCreated", fields: [createdById], references: [id])
+  status               InstallTaskStatus   @default(PENDING)
+  notes                String?             @db.Text
+  installationRecordId String?             @unique @map("installation_record_id")
+  installationRecord   InstallationRecord? @relation("InstallTaskInstallationRecord", fields: [installationRecordId], references: [id], onDelete: SetNull)
+  completedAt          DateTime?           @map("completed_at")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
 
   @@index([assignedToId])
   @@index([status])

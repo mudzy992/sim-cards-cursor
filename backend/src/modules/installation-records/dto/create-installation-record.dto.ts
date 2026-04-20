@@ -9,7 +9,11 @@ import {
   IsNumber,
   IsInt,
   IsArray,
+  IsEnum,
+  ValidateNested,
 } from 'class-validator';
+import { InstallationRecordKind } from '@prisma/client';
+import { DemountedMeterSectionDto } from './demounted-meter-section.dto';
 
 export class CreateInstallationRecordDto {
   @ApiPropertyOptional({
@@ -17,7 +21,24 @@ export class CreateInstallationRecordDto {
   })
   @IsString()
   @IsOptional()
-  clientRequestId?: string
+  clientRequestId?: string;
+
+  @ApiPropertyOptional({
+    enum: InstallationRecordKind,
+    default: InstallationRecordKind.NEW_CONNECTION,
+  })
+  @IsEnum(InstallationRecordKind)
+  @IsOptional()
+  kind?: InstallationRecordKind;
+
+  @ApiPropertyOptional({
+    type: DemountedMeterSectionDto,
+    description: 'Obavezno kada je kind = METER_REPLACEMENT',
+  })
+  @ValidateNested()
+  @Type(() => DemountedMeterSectionDto)
+  @IsOptional()
+  demountedMeter?: DemountedMeterSectionDto;
 
   @ApiProperty()
   @IsUUID()
@@ -52,6 +73,12 @@ export class CreateInstallationRecordDto {
   @IsInt()
   @IsOptional()
   year?: number;
+
+  @ApiPropertyOptional({ description: 'Godina baždarenja – operator definiše pri ugradnji' })
+  @Type(() => Number)
+  @IsInt()
+  @IsOptional()
+  calibrationYear?: number;
 
   @ApiPropertyOptional()
   @IsString()

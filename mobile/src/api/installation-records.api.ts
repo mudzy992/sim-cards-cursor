@@ -11,9 +11,13 @@ export type RecordStatus =
   | 'SEP_ACTIVATED'
   | 'LEGACY_COMPLETED';
 
+export type InstallationRecordKind = 'NEW_CONNECTION' | 'METER_REPLACEMENT';
+
 export type InstallationRecordItem = {
   id: string;
   recordNumber: string;
+  kind?: InstallationRecordKind;
+  demountedMeterSnapshot?: Record<string, unknown> | null;
   simCardId?: string;
   meterId?: string;
   installationAddress?: string | null;
@@ -67,20 +71,34 @@ export type InstallationRecordsListResponse = {
   totalPages: number;
 };
 
+export type DemountedMeterPayload = {
+  meterTypeDefinitionId: string;
+  serialNumber: string;
+  year: number;
+  calibrationYear: number;
+  dynamicFieldValues?: Record<string, unknown>;
+  notes?: string;
+  hadIntegratedSim?: boolean;
+  noSimNote?: string;
+};
+
 export type CreateInstallationRecordPayload =
   | {
       simCardId: string;
       meterId: string;
       installedById: string;
       notes?: string;
-      clientRequestId?: string
+      clientRequestId?: string;
     }
   | {
       simCardId: string;
       installedById: string;
+      kind?: InstallationRecordKind;
+      demountedMeter?: DemountedMeterPayload;
       meterTypeDefinitionId: string;
       serialNumber: string;
-      year?: number;
+      year: number;
+      calibrationYear: number;
       installationAddress?: string;
       installationDate?: string;
       city?: string;
@@ -92,7 +110,7 @@ export type CreateInstallationRecordPayload =
       dynamicFieldValues?: Record<string, unknown>;
       notes?: string;
       photos?: string[];
-      clientRequestId?: string
+      clientRequestId?: string;
     };
 
 function requireUser() {

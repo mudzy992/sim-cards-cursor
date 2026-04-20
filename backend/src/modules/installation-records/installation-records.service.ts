@@ -12,9 +12,11 @@ import {
   MeterSimCardState,
   Prisma,
   InstallationRecord,
+  InstallationRecordKind,
   RecordStatus,
   SimCardStatus,
 } from '@prisma/client';
+import { assertMeterYearsRequired } from 'src/common/utils/meter-years.util';
 import { InstallationRecordFilterDto } from './dto/installation-record-filter.dto';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { RecordNumberGenerator } from 'src/common/utils/record-number.generator';
@@ -56,10 +58,49 @@ export class InstallationRecordsService {
     if (createInstallationRecordDto.clientRequestId) {
       const existing = await this.prisma.installationRecord.findUnique({
         where: { clientRequestId: createInstallationRecordDto.clientRequestId },
-      })
+      });
       if (existing) {
-        return existing
+        return existing;
       }
+    }
+
+    const kind =
+      createInstallationRecordDto.kind ?? InstallationRecordKind.NEW_CONNECTION;
+    if (kind === InstallationRecordKind.NEW_CONNECTION && createInstallationRecordDto.demountedMeter) {
+      throw new BadRequestException(
+        'Polje demountedMeter nije dozvoljeno za zapisnik novog priključka.',
+      );
+    }
+    if (kind === InstallationRecordKind.METER_REPLACEMENT && !createInstallationRecordDto.demountedMeter) {
+      throw new BadRequestException('Za zamjenu brojila obavezno je polje demountedMeter.');
+    }
+
+    let demountedMeterSnapshot: Prisma.InputJsonValue | undefined;
+    if (kind === InstallationRecordKind.METER_REPLACEMENT && createInstallationRecordDto.demountedMeter) {
+      const dm = createInstallationRecordDto.demountedMeter;
+      assertMeterYearsRequired(dm.year, dm.calibrationYear, 'demontirano brojilo');
+      const demountedType = await this.prisma.meterTypeDefinition.findUnique({
+        where: { id: dm.meterTypeDefinitionId },
+      });
+      if (!demountedType) {
+        throw new BadRequestException('Tip demontiranog brojila nije pronađen.');
+      }
+      const validatedDemountedDynamic = await this.meterTypeFieldsService.validateDynamicValues(
+        dm.meterTypeDefinitionId,
+        dm.dynamicFieldValues ?? null,
+      );
+      demountedMeterSnapshot = {
+        meterTypeDefinitionId: dm.meterTypeDefinitionId,
+        serialNumber: dm.serialNumber.trim(),
+        year: dm.year,
+        calibrationYear: dm.calibrationYear,
+        ...(Object.keys(validatedDemountedDynamic).length > 0 && {
+          dynamicFieldValues: validatedDemountedDynamic,
+        }),
+        ...(dm.notes != null && dm.notes !== '' ? { notes: dm.notes } : {}),
+        ...(dm.hadIntegratedSim !== undefined ? { hadIntegratedSim: dm.hadIntegratedSim } : {}),
+        ...(dm.noSimNote != null && dm.noSimNote !== '' ? { noSimNote: dm.noSimNote } : {}),
+      } as Prisma.InputJsonValue;
     }
 
     let meterId: string;
@@ -82,6 +123,11 @@ export class InstallationRecordsService {
       if (!typeDef) {
         throw new BadRequestException('Tip brojila nije pronađen.');
       }
+      assertMeterYearsRequired(
+        createInstallationRecordDto.year,
+        createInstallationRecordDto.calibrationYear,
+        'novo brojilo',
+      );
       const existing = await this.prisma.meter.findUnique({
         where: { serialNumber: createInstallationRecordDto.serialNumber.trim() },
       });
@@ -104,6 +150,7 @@ export class InstallationRecordsService {
           meterTypeDefinitionId: createInstallationRecordDto.meterTypeDefinitionId,
           branchId,
           year: createInstallationRecordDto.year ?? undefined,
+          calibrationYear: createInstallationRecordDto.calibrationYear ?? undefined,
           installationAddress: createInstallationRecordDto.installationAddress ?? undefined,
           installationDate: createInstallationRecordDto.installationDate
             ? new Date(createInstallationRecordDto.installationDate)
@@ -130,11 +177,21 @@ export class InstallationRecordsService {
     if (!simCard) {
       throw new BadRequestException('SIM kartica nije pronađena.');
     }
+    const canUseSim =
+      simCard.status === SimCardStatus.AVAILABLE ||
+      (simCard.status === SimCardStatus.ASSIGNED &&
+        simCard.assignedToId === createInstallationRecordDto.installedById);
+    if (!canUseSim) {
+      throw new BadRequestException('SIM kartica nije dostupna za ugradnju.');
+    }
 
     const meter = await this.prisma.meter.findUnique({
       where: { id: meterId },
-      select: { simCardId: true },
+      select: { simCardId: true, status: true },
     });
+    if (meter?.status && meter.status !== 'ACTIVE') {
+      throw new BadRequestException('Brojilo nije aktivno; ugradnja SIM-a nije dozvoljena.');
+    }
     await this.prisma.$transaction(async (tx) => {
       await tx.meter.update({
         where: { id: meterId },
@@ -161,7 +218,12 @@ export class InstallationRecordsService {
       data: {
         recordNumber,
         clientRequestId: createInstallationRecordDto.clientRequestId ?? undefined,
+        kind,
+        ...(demountedMeterSnapshot !== undefined
+          ? { demountedMeterSnapshot }
+          : {}),
         meterId,
+        simCardId,
         installedById: createInstallationRecordDto.installedById,
         notes: createInstallationRecordDto.notes,
         photos: createInstallationRecordDto.photos
@@ -299,6 +361,7 @@ export class InstallationRecordsService {
         ...(scopeClause ? { AND: [scopeClause] } : {}),
       },
       include: {
+        simCard: { include: { assignedTo: true } },
         meter: {
           include: {
             meterTypeDefinition: true,
@@ -499,10 +562,13 @@ export class InstallationRecordsService {
   }
 
   private async serializeRecordForPdf(record: InstallationRecord & {
+    kind?: InstallationRecordKind;
+    demountedMeterSnapshot?: Prisma.JsonValue | null;
     photos?: string[] | null;
     meter?: {
       serialNumber: string;
       year?: number | null;
+      calibrationYear?: number | null;
       notes?: string | null;
       installationAddress?: string | null;
       installationDate?: Date | null;
@@ -516,20 +582,20 @@ export class InstallationRecordsService {
       meterTypeDefinition?: { name: string; manufacturer?: string | null; model?: string | null; type: string; maxCurrent?: string | null } | null;
       simCard?: { iccid: string; ipAddress: string; publicIpAddress?: string | null; phoneNumber?: string | null; apn?: string | null; assignedTo?: { firstName: string; lastName: string } | null } | null;
     } | null;
+    simCard?: { iccid: string; ipAddress: string; publicIpAddress?: string | null; phoneNumber?: string | null; apn?: string | null; assignedTo?: { firstName: string; lastName: string } | null } | null;
     installedBy?: { firstName: string; lastName: string } | null;
     approvedBy?: { firstName: string; lastName: string } | null;
   }): Promise<Record<string, unknown>> {
     const formatDate = (d: Date | string | null | undefined) =>
       d ? new Date(d).toLocaleDateString('bs-BA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
     const typeLabel = (t: string) => (t === 'SINGLE_PHASE' ? 'Jednofazno' : t === 'THREE_PHASE' ? 'Trofazno' : t);
-    const simCard = record.meter?.simCard;
+    const simCard = record.simCard ?? record.meter?.simCard;
     const simCardPlain = simCard
       ? {
           iccid: simCard.iccid,
           ipAddress: simCard.ipAddress,
           publicIpAddress: simCard.publicIpAddress ?? '',
           phoneNumber: simCard.phoneNumber ?? '',
-          apn: simCard.apn ?? '',
           assignedTo: simCard.assignedTo
             ? `${simCard.assignedTo.firstName} ${simCard.assignedTo.lastName}`
             : '',
@@ -540,14 +606,13 @@ export class InstallationRecordsService {
       ? {
           serialNumber: record.meter.serialNumber,
           year: record.meter.year ?? '',
+          calibrationYear: record.meter.calibrationYear ?? '',
           notes: record.meter.notes ?? '',
           installationAddress: record.meter.installationAddress ?? '',
           installationDate: formatDate(record.meter.installationDate),
           city: record.meter.city ?? '',
           municipality: record.meter.municipality ?? '',
           measuringPoint: record.meter.measuringPoint ?? '',
-          latitude: record.meter.latitude != null ? String(record.meter.latitude) : undefined,
-          longitude: record.meter.longitude != null ? String(record.meter.longitude) : undefined,
           typeName: typeDef?.name ?? '',
           typeManufacturer: typeDef?.manufacturer ?? '',
           typeModel: typeDef?.model ?? '',
@@ -592,6 +657,47 @@ export class InstallationRecordsService {
       }
     }
 
+    const isMeterReplacement = record.kind === InstallationRecordKind.METER_REPLACEMENT;
+    let demountedMeterPlain: Record<string, unknown> | null = null;
+    const demountedDynamicFields: { label: string; value: string }[] = [];
+    if (isMeterReplacement && record.demountedMeterSnapshot != null) {
+      const snap = record.demountedMeterSnapshot as Record<string, unknown>;
+      const demDefId =
+        typeof snap.meterTypeDefinitionId === 'string' ? snap.meterTypeDefinitionId : '';
+      const demTypeDef = demDefId
+        ? await this.prisma.meterTypeDefinition.findUnique({ where: { id: demDefId } })
+        : null;
+      demountedMeterPlain = {
+        serialNumber: typeof snap.serialNumber === 'string' ? snap.serialNumber : '',
+        year: snap.year != null ? String(snap.year) : '',
+        calibrationYear: snap.calibrationYear != null ? String(snap.calibrationYear) : '',
+        notes: typeof snap.notes === 'string' ? snap.notes : '',
+        typeName: demTypeDef?.name ?? '',
+        typeManufacturer: demTypeDef?.manufacturer ?? '',
+        typeModel: demTypeDef?.model ?? '',
+        typePhase: demTypeDef ? typeLabel(demTypeDef.type) : '',
+        typeMaxCurrent: demTypeDef?.maxCurrent ?? '',
+        hadIntegratedSimText:
+          snap.hadIntegratedSim === true ? 'Da' : snap.hadIntegratedSim === false ? 'Ne' : '–',
+        noSimNote: typeof snap.noSimNote === 'string' ? snap.noSimNote : '',
+      };
+      const demDyn = snap.dynamicFieldValues as Record<string, unknown> | undefined;
+      if (demDyn && demDefId) {
+        const fieldDefs = await this.meterTypeFieldsService.findAllByDefinition(demDefId);
+        for (const fd of fieldDefs) {
+          const raw = demDyn[fd.name];
+          if (raw === undefined || raw === null || raw === '') continue;
+          let display = String(raw);
+          if (fd.fieldType === 'BOOLEAN') {
+            display = raw === true || raw === 'true' ? 'Da' : 'Ne';
+          } else if (fd.fieldType === 'DATE') {
+            display = formatDate(raw as string);
+          }
+          demountedDynamicFields.push({ label: fd.label, value: display });
+        }
+      }
+    }
+
     return {
       recordNumber: record.recordNumber,
       installationAddress: (record.meter?.installationAddress ?? '') as string,
@@ -612,16 +718,21 @@ export class InstallationRecordsService {
       photoDataUrls,
       hasDynamicFields: dynamicFields.length > 0,
       dynamicFields,
+      isMeterReplacement,
+      demountedMeter: demountedMeterPlain,
+      hasDemountedDynamicFields: demountedDynamicFields.length > 0,
+      demountedDynamicFields,
     };
   }
 
   async generatePdf(id: string, scope?: ScopeContext | null): Promise<Buffer> {
     const installationRecord = await this.findOne(id, scope) as Parameters<InstallationRecordsService['serializeRecordForPdf']>[0];
     const pdfData = await this.serializeRecordForPdf(installationRecord);
-    const buffer = await this.pdfGenerator.generatePdf(
-      'installation-record',
-      pdfData,
-    );
+    const templateName =
+      installationRecord.kind === InstallationRecordKind.METER_REPLACEMENT
+        ? 'installation-record-meter-replacement'
+        : 'installation-record';
+    const buffer = await this.pdfGenerator.generatePdf(templateName, pdfData);
     const sanitizedFileName = `${installationRecord.recordNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
     const relativePath = path.join('generated', 'pdf', sanitizedFileName);
     const absolutePath = path.join(this.pdfStorageDir, sanitizedFileName);
@@ -684,7 +795,10 @@ export class InstallationRecordsService {
     }
 
     const pdfFileName = `${record.recordNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
-    const subject = `Zapisnik o ugradnji ${record.recordNumber} - SIM Tracker`;
+    const subject =
+      record.kind === InstallationRecordKind.METER_REPLACEMENT
+        ? `Zapisnik o zamjeni brojila ${record.recordNumber} - SIM Tracker`
+        : `Zapisnik o ugradnji ${record.recordNumber} - SIM Tracker`;
 
     try {
       await this.mailService.sendRecordWithPdf({
@@ -747,6 +861,7 @@ export class InstallationRecordsService {
       select: {
         id: true,
         recordNumber: true,
+        simCardId: true,
         meter: {
           select: {
             simCardId: true,
@@ -754,12 +869,16 @@ export class InstallationRecordsService {
         },
       },
     });
-    if (!record?.meter?.simCardId) {
+    if (!record) {
+      return;
+    }
+    const simCardId = record?.simCardId ?? record?.meter?.simCardId ?? null;
+    if (!simCardId) {
       return;
     }
     await this.prisma.simEvent.create({
       data: {
-        simCardId: record.meter.simCardId,
+        simCardId,
         type,
         recordId: record.id,
         userId,

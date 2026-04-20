@@ -1,5 +1,6 @@
 export type MeterType = 'SINGLE_PHASE' | 'THREE_PHASE';
 export type MeterSimCardState = 'INSTALLED' | 'NO_SIM';
+export type MeterStatus = 'ACTIVE' | 'DEFECTIVE' | 'IN_CALIBRATION' | 'INACTIVE';
 
 export type MeterTypeDefinitionRef = {
   id: string;
@@ -16,10 +17,26 @@ export type MeterItem = {
   meterTypeDefinitionId: string;
   branchId?: string | null;
   meterTypeDefinition?: MeterTypeDefinitionRef | null;
+  status?: MeterStatus;
   simCard?: { id: string; iccid: string; status: string; ipAddress?: string } | null;
   simCardState?: MeterSimCardState;
   noSimReason?: string | null;
+  lastSimDemountCategory?: string | null;
+  installTasks?: Array<{
+    id: string;
+    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    createdAt: string;
+    assignedTo?: { id: string; firstName: string; lastName: string } | null;
+  }>;
+  demountTasks?: Array<{
+    id: string
+    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+    createdAt: string
+    requestedResolution?: string | null
+    assignedTo?: { id: string; firstName: string; lastName: string } | null
+  }>
   year?: number | null;
+  calibrationYear?: number | null;
   notes?: string | null;
   installationAddress?: string | null;
   installationDate?: string | null;
@@ -38,6 +55,7 @@ export type MetersListParams = {
   limit?: number;
   meterTypeDefinitionId?: string;
   serialNumber?: string;
+  simCardState?: MeterSimCardState;
 };
 
 export type MetersResponse = {
@@ -51,7 +69,9 @@ export type MetersResponse = {
 export type CreateMeterInput = {
   serialNumber: string;
   meterTypeDefinitionId: string;
+  status?: MeterStatus;
   year?: number;
+  calibrationYear?: number;
   notes?: string;
   installationAddress?: string;
   installationDate?: string;

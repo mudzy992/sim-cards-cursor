@@ -9,7 +9,7 @@ export type InstallTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCE
 export type InstallTaskItem = {
   id: string
   meterId: string
-  assignedToId: string
+  assignedToId: string | null
   createdById: string
   status: InstallTaskStatus
   notes?: string | null
@@ -17,11 +17,24 @@ export type InstallTaskItem = {
   completedAt?: string | null
   createdAt: string
   updatedAt: string
+  createdBy?: { id: string; firstName: string; lastName: string } | null
   meter?: {
     id: string
     serialNumber: string
+    status?: string
     simCardState?: string
-    meterTypeDefinition?: { name: string } | null
+    meterTypeDefinitionId?: string
+    meterTypeDefinition?: { id: string; name: string } | null
+    isDemountedFromLocation?: boolean
+    dynamicFieldValues?: Record<string, unknown> | null
+    installationAddress?: string | null
+    installationDate?: string | null
+    city?: string | null
+    municipality?: string | null
+    measuringPoint?: string | null
+    latitude?: number | null
+    longitude?: number | null
+    calibrationYear?: number | null
   }
   installationRecord?: { id: string; recordNumber: string; status: string } | null
 }
@@ -29,6 +42,15 @@ export type InstallTaskItem = {
 export type CompleteInstallTaskPayload = {
   simCardId: string
   recordNotes?: string
+  calibrationYear?: number
+  installationAddress?: string
+  installationDate?: string
+  city?: string
+  municipality?: string
+  measuringPoint?: string
+  latitude?: number
+  longitude?: number
+  dynamicFieldValues?: Record<string, unknown>
 }
 
 export const installTasksApi = {
@@ -67,7 +89,11 @@ export const installTasksApi = {
           meta: { taskId: id },
         })
         const cached = (await offlineCache.installTasksMy.get(user))?.data ?? []
-        const patched = cached.map((t) => (t.id === id ? { ...t, status } : t))
+        const current = cached.find((t) => t.id === id)
+        const patched =
+          current?.status === 'IN_PROGRESS' && status === 'PENDING'
+            ? cached.filter((t) => t.id !== id)
+            : cached.map((t) => (t.id === id ? { ...t, status } : t))
         await offlineCache.installTasksMy.set(user, patched)
         return patched.find((t) => t.id === id) ?? ({ id } as InstallTaskItem)
       }

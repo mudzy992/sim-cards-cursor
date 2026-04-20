@@ -1,0 +1,19 @@
+## App postavke (`AppSetting`)
+
+- Model: `backend/prisma/schema.prisma` → `AppSetting`. Konstante ključeva: `backend/src/modules/settings/settings-keys.ts` (proširiti kad backend čita novi ključ).
+
+### Dodavanje ili promjena funkcionalnosti koja koristi konfiguraciju iz baze
+
+- Dodaj ili ažuriraj red u `app_settings`: Prisma migracija ako treba čišćenje/stari podaci, i/ili `backend/prisma/seed.ts` za default vrijednosti na novoj instalaciji.
+- Implementiraj čitanje u odgovarajućem Nest servisu (ne ostavljati ključ samo u seedu ili admin UI-u bez runtime logike).
+- Za admin web: kad postoji manifest, dodaj stavku u `frontend/src/config/app-settings.manifest.ts` (grupa, `label`, `description`, `valueType`, `enumOptions` po potrebi).
+
+### Uklanjanje ili velika promjena funkcionalnosti
+
+- U istom PR-u ukloni ili migriraj povezane `AppSetting` ključeve (migracija `DELETE` + ažuriran `seed.ts`).
+- Ukloni mrtve reference u backendu, frontend manifestu i API tipovima.
+
+### Posebno
+
+- Per-user tour stanje: ključevi `user:tour-state:*` — ne brisati dok postoji minitour / `PATCH /settings/me` za tour.
+- Javni endpointi bez auth: `GET /settings/mobile-push`, `GET /settings/notifications` — pazi na kompatibilnost odgovora (`ApiEnvelope` na klijentima).

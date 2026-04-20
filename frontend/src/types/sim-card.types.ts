@@ -3,8 +3,22 @@ export type SimCardStatus =
   | 'ASSIGNED'
   | 'INSTALLED'
   | 'DEFECTIVE'
+  | 'DEMOUNTED'
   | 'RETURNED'
   | 'DEACTIVATED';
+
+export type SimEventItem = {
+  id: string;
+  type: string;
+  createdAt: string;
+  metadata: unknown;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+};
 
 export type SimCardListParams = {
   page?: number;

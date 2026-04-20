@@ -6,19 +6,22 @@ import {
   Image,
   Space,
   Tag,
+  Timeline,
   Typography,
   message,
 } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { activityLogApi } from '@/api/activity-log.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
+import { simCardsApi } from '@/api/sim-cards.api'
 import { useAuthStore } from '@/store/auth.store';
 import type { InstallationRecordItem } from '@/types/installation-record.types';
 import { RecordPhotoImage } from '@/components/installation-records/RecordPhotoImage';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types';
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
+import { getActivityLogActionLabel, getSimCardStatusLabel } from '@/utils/labels.utils'
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Nacrt',
@@ -55,6 +58,26 @@ export default function InstallationRecordDetailPage() {
         (recordQuery.data as InstallationRecordItem).meter!.meterTypeDefinitionId!,
       ),
     enabled: Boolean(recordQuery.data?.meter?.meterTypeDefinitionId),
+  })
+
+  const demountedDefId =
+    recordQuery.data?.kind === 'METER_REPLACEMENT' &&
+    recordQuery.data?.demountedMeterSnapshot &&
+    typeof (recordQuery.data.demountedMeterSnapshot as Record<string, unknown>).meterTypeDefinitionId ===
+      'string'
+      ? String((recordQuery.data.demountedMeterSnapshot as Record<string, unknown>).meterTypeDefinitionId)
+      : undefined
+
+  const demountedTypeQuery = useQuery({
+    queryKey: ['meter-type-definitions', demountedDefId],
+    queryFn: () => meterTypeDefinitionsApi.get(demountedDefId!),
+    enabled: Boolean(demountedDefId),
+  })
+
+  const demountedFieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', 'fields', demountedDefId],
+    queryFn: () => meterTypeDefinitionsApi.listFields(demountedDefId!),
+    enabled: Boolean(demountedDefId),
   })
 
   const permissionsQuery = useQuery({
@@ -138,6 +161,12 @@ export default function InstallationRecordDetailPage() {
   }
 
   const record = recordQuery.data;
+  const currentSimQuery = useQuery({
+    queryKey: ['sim-cards', 'details', record?.simCard?.id],
+    queryFn: () => simCardsApi.getById(record!.simCard!.id),
+    enabled: Boolean(record?.simCard?.id),
+  })
+
   const canMarkSepActivated = !!permissionsQuery.data?.canMarkSepActivated;
   const canRetrySend = !!permissionsQuery.data?.canRetrySend;
   const canDownloadPdf = true;
@@ -213,6 +242,11 @@ export default function InstallationRecordDetailPage() {
       <Card title="Podaci zapisnika">
         <Descriptions column={1} bordered size="small">
           <Descriptions.Item label="Broj zapisnika">{record.recordNumber}</Descriptions.Item>
+          {record.kind && (
+            <Descriptions.Item label="Vrsta">
+              {record.kind === 'METER_REPLACEMENT' ? 'Zamjena brojila' : 'Novi priključak'}
+            </Descriptions.Item>
+          )}
           <Descriptions.Item label="Status">
             <Tag color={statusColor[record.status]}>{statusLabel[record.status]}</Tag>
           </Descriptions.Item>
@@ -237,6 +271,62 @@ export default function InstallationRecordDetailPage() {
         </Descriptions>
       </Card>
 
+      {record.kind === 'METER_REPLACEMENT' && record.demountedMeterSnapshot && (
+        <Card title="Demontirano brojilo (prije zamjene)">
+          <Descriptions column={1} bordered size="small">
+            {(() => {
+              const snap = record.demountedMeterSnapshot as Record<string, unknown>
+              const serial = typeof snap.serialNumber === 'string' ? snap.serialNumber : '–'
+              const year = snap.year != null ? String(snap.year) : '–'
+              const calYear = snap.calibrationYear != null ? String(snap.calibrationYear) : '–'
+              const hadSim = snap.hadIntegratedSim
+              const noSimNote = typeof snap.noSimNote === 'string' ? snap.noSimNote : null
+              return (
+                <>
+                  <Descriptions.Item label="Serijski broj">{serial}</Descriptions.Item>
+                  <Descriptions.Item label="Tip brojila">
+                    {demountedTypeQuery.data?.name ?? '–'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Proizvođač">
+                    {demountedTypeQuery.data?.manufacturer ?? '–'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Model">{demountedTypeQuery.data?.model ?? '–'}</Descriptions.Item>
+                  <Descriptions.Item label="Godina proizvodnje">{year}</Descriptions.Item>
+                  <Descriptions.Item label="Godina baždarenja">{calYear}</Descriptions.Item>
+                  <Descriptions.Item label="Ugrađena SIM u starom brojilu">
+                    {hadSim === true ? 'Da' : hadSim === false ? 'Ne' : '–'}
+                  </Descriptions.Item>
+                  {noSimNote ? (
+                    <Descriptions.Item label="Napomena (SIM / staro brojilo)">{noSimNote}</Descriptions.Item>
+                  ) : null}
+                </>
+              )
+            })()}
+            {(demountedFieldsQuery.data ?? [])
+              .slice()
+              .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+              .map((field) => {
+                const snap = record.demountedMeterSnapshot as Record<string, unknown>
+                const dyn = (snap.dynamicFieldValues as Record<string, unknown> | undefined) ?? {}
+                const display = formatDynamicFieldValue(field, dyn[field.name])
+                if (!display) return null
+                return (
+                  <Descriptions.Item key={field.id} label={field.label}>
+                    {display}
+                  </Descriptions.Item>
+                )
+              })}
+            {(() => {
+              const snap = record.demountedMeterSnapshot as Record<string, unknown>
+              const notes = typeof snap.notes === 'string' ? snap.notes : null
+              return notes ? (
+                <Descriptions.Item label="Napomena (brojilo)">{notes}</Descriptions.Item>
+              ) : null
+            })()}
+          </Descriptions>
+        </Card>
+      )}
+
       <Card title="Podaci o brojilu">
         <Descriptions column={1} bordered size="small">
           <Descriptions.Item label="Serijski broj">{record.meter?.serialNumber ?? '–'}</Descriptions.Item>
@@ -257,29 +347,6 @@ export default function InstallationRecordDetailPage() {
           <Descriptions.Item label="Mjerno mjesto">
             {record.meter?.measuringPoint ?? '–'}
           </Descriptions.Item>
-          {(record.meter?.latitude != null || record.meter?.longitude != null) && (
-            <>
-              <Descriptions.Item label="GPS širina">
-                {record.meter?.latitude != null ? String(record.meter.latitude) : '–'}
-              </Descriptions.Item>
-              <Descriptions.Item label="GPS dužina">
-                {record.meter?.longitude != null ? String(record.meter.longitude) : '–'}
-              </Descriptions.Item>
-            </>
-          )}
-          <Descriptions.Item label="Status SIM-a">
-            {record.meter?.simCard ? 'Ugrađena' : 'Bez kartice'}
-          </Descriptions.Item>
-          {record.meter?.simCard && (
-            <>
-              <Descriptions.Item label="ICCID">
-                {record.meter.simCard.iccid ?? '–'}
-              </Descriptions.Item>
-              <Descriptions.Item label="IP adresa">
-                {record.meter.simCard.ipAddress ?? '–'}
-              </Descriptions.Item>
-            </>
-          )}
           {(record.meter?.dynamicFieldValues &&
             Object.keys(record.meter.dynamicFieldValues).length > 0 &&
             (meterTypeFieldsQuery.data ?? []).some((f) => {
@@ -301,6 +368,42 @@ export default function InstallationRecordDetailPage() {
                     </Descriptions.Item>
                   )
                 })}
+            </>
+          )}
+          {(record.meter?.latitude != null || record.meter?.longitude != null) && (
+            <>
+              <Descriptions.Item label="GPS širina">
+                {record.meter?.latitude != null ? String(record.meter.latitude) : '–'}
+              </Descriptions.Item>
+              <Descriptions.Item label="GPS dužina">
+                {record.meter?.longitude != null ? String(record.meter.longitude) : '–'}
+              </Descriptions.Item>
+            </>
+          )}
+          <Descriptions.Item label="Status SIM-a">
+            {record.simCard ? 'Ugrađena (iz zapisnika)' : record.meter?.simCard ? 'Ugrađena (trenutno na brojilu)' : 'Bez kartice'}
+          </Descriptions.Item>
+          {(record.simCard ?? record.meter?.simCard) && (
+            <>
+              <Descriptions.Item label="ICCID">
+                <Space wrap size={10}>
+                  {record.simCard?.id ? (
+                    <Link to={`/sim-cards/${record.simCard.id}`}>
+                      {record.simCard.iccid ?? '–'}
+                    </Link>
+                  ) : (
+                    <span>{(record.simCard ?? record.meter?.simCard)?.iccid ?? '–'}</span>
+                  )}
+                  {record.simCard?.id && currentSimQuery.data ? (
+                    <Tag color="blue">
+                      Trenutno: {getSimCardStatusLabel(currentSimQuery.data.status)}
+                    </Tag>
+                  ) : null}
+                </Space>
+              </Descriptions.Item>
+              <Descriptions.Item label="IP adresa">
+                {(record.simCard ?? record.meter?.simCard)?.ipAddress ?? '–'}
+              </Descriptions.Item>
             </>
           )}
         </Descriptions>
@@ -371,23 +474,27 @@ export default function InstallationRecordDetailPage() {
           </Typography.Text>
         )}
         {timelineQuery.data && timelineQuery.data.items.length > 0 && (
-          <ul className="space-y-2 mt-2">
-            {timelineQuery.data.items.map((item) => (
-              <li key={item.id} className="text-sm border-b pb-2 last:border-b-0">
-                <div className="flex justify-between gap-2">
-                  <span className="font-semibold">{item.action}</span>
-                  <span className="text-xs text-gray-500">
-                    {new Date(item.createdAt).toLocaleString()}
-                  </span>
+          <Timeline
+            className="mt-2"
+            items={timelineQuery.data.items.map((item) => ({
+              key: item.id,
+              children: (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-start justify-between gap-4">
+                    <Typography.Text strong>{getActivityLogActionLabel(item.action)}</Typography.Text>
+                    <Typography.Text type="secondary" className="text-xs whitespace-nowrap">
+                      {new Date(item.createdAt).toLocaleString('bs-BA')}
+                    </Typography.Text>
+                  </div>
+                  <Typography.Text type="secondary" className="text-xs">
+                    {item.user
+                      ? `${item.user.firstName} ${item.user.lastName} (${item.user.role})`
+                      : 'Sistem'}
+                  </Typography.Text>
                 </div>
-                <div className="text-xs text-gray-600 mt-1">
-                  {item.user
-                    ? `${item.user.firstName} ${item.user.lastName} (${item.user.role})`
-                    : 'Sistem'}
-                </div>
-              </li>
-            ))}
-          </ul>
+              ),
+            }))}
+          />
         )}
       </Card>
 

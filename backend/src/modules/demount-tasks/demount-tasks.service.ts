@@ -10,17 +10,24 @@ import { CompleteDemountTaskDto } from './dto/complete-demount-task.dto';
 import {
   DemountTaskStatus,
   DemountCompletionResolution,
+  MeterDemountCategory,
   MeterSimCardState,
+  MeterStatus,
+  RemovedSimDisposition,
   SimCardStatus,
   Prisma,
+  UserRole,
 } from '@prisma/client';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import type { User } from '@prisma/client';
 
 @Injectable()
 export class DemountTasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityLogService: ActivityLogService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(
@@ -35,13 +42,29 @@ export class DemountTasksService {
         id: dto.meterId,
         ...(scopeClause ? { AND: [scopeClause] } : {}),
       },
-      include: { simCard: true },
+      select: {
+        id: true,
+        branchId: true,
+        simCardId: true,
+        simCardState: true,
+        status: true,
+        hasOpenDemountTask: true,
+      },
     });
     if (!meter) {
       throw new BadRequestException('Brojilo nije pronađeno.');
     }
+    if (meter.hasOpenDemountTask) {
+      throw new BadRequestException('Za ovo brojilo već postoji aktivan nalog za demontažu.')
+    }
     if (!meter.simCardId) {
       throw new BadRequestException('Brojilo nema ugradjenu SIM karticu.');
+    }
+    if (meter.simCardState !== MeterSimCardState.INSTALLED) {
+      throw new BadRequestException('Zadatak demontaže se može kreirati samo za brojilo sa ugrađenom SIM karticom.')
+    }
+    if (meter.status !== MeterStatus.ACTIVE) {
+      throw new BadRequestException('Zadatak demontaže se ne može kreirati za brojilo koje nije aktivno.')
     }
     const assignedTo = await this.prisma.user.findUnique({
       where: { id: dto.assignedToId },
@@ -57,20 +80,40 @@ export class DemountTasksService {
       }
     }
 
-    const task = await this.prisma.demountTask.create({
-      data: {
-        meterId: dto.meterId,
-        assignedToId: dto.assignedToId,
-        createdById,
-        notes: dto.notes,
-        taskType: dto.taskType ?? undefined,
-      },
-      include: {
-        meter: { include: { simCard: true, meterTypeDefinition: true } },
-        assignedTo: true,
-        createdBy: true,
-      },
-    });
+    const task = await this.prisma.$transaction(async (tx) => {
+      const lockResult = await tx.meter.updateMany({
+        where: {
+          id: dto.meterId,
+          hasOpenDemountTask: false,
+          simCardState: MeterSimCardState.INSTALLED,
+          simCardId: { not: null },
+          status: MeterStatus.ACTIVE,
+        },
+        data: { hasOpenDemountTask: true },
+      })
+      if (lockResult.count !== 1) {
+        throw new BadRequestException('Za ovo brojilo već postoji aktivan nalog za demontažu.')
+      }
+      return tx.demountTask.create({
+        data: {
+          meterId: dto.meterId,
+          assignedToId: dto.assignedToId,
+          createdById,
+          notes: dto.notes,
+          taskType: dto.taskType ?? undefined,
+          requestedResolution: dto.requestedResolution,
+          requestedReason: dto.requestedReason,
+          requestedRemovedSimDisposition: dto.requestedRemovedSimDisposition as RemovedSimDisposition,
+          requestedMeterDemountCategory:
+            (dto.requestedMeterDemountCategory ?? null) as MeterDemountCategory | null,
+        },
+        include: {
+          meter: { include: { simCard: true, meterTypeDefinition: true } },
+          assignedTo: true,
+          createdBy: true,
+        },
+      })
+    })
 
     await this.activityLogService.log({
       userId: createdById,
@@ -79,6 +122,14 @@ export class DemountTasksService {
       entityId: task.id,
       details: { meterId: dto.meterId, assignedToId: dto.assignedToId, taskType: task.taskType },
       ipAddress,
+    });
+
+    await this.notificationsService.create({
+      userId: dto.assignedToId,
+      title: 'Novi zadatak demontaže',
+      message: `Dodijeljen vam je zadatak demontaže za brojilo ${task.meter?.serialNumber ?? dto.meterId}.`,
+      type: 'DEMOUNT_TASK_ASSIGNED',
+      link: `/demount`,
     });
 
     return task;
@@ -112,8 +163,12 @@ export class DemountTasksService {
         'Završetak zadatka ide preko POST /demount-tasks/:id/complete sa rezolucijom i obrazloženjem.',
       );
     }
+    if (status === DemountTaskStatus.CANCELLED) {
+      throw new BadRequestException('Operator ne može otkazati nalog. Otkazivanje radi inicijator naloga.');
+    }
     const task = await this.prisma.demountTask.findUnique({
       where: { id },
+      include: { meter: { select: { id: true, serialNumber: true } } },
     });
     if (!task) {
       throw new NotFoundException('Zadatak demontaže nije pronađen.');
@@ -121,11 +176,27 @@ export class DemountTasksService {
     if (task.assignedToId !== userId) {
       throw new BadRequestException('Samo operator kojem je zadatak dodijeljen može ažurirati status.');
     }
+    if (task.status === DemountTaskStatus.COMPLETED) {
+      throw new BadRequestException('Nalog je već završen.');
+    }
+    if (task.status === DemountTaskStatus.CANCELLED) {
+      throw new BadRequestException('Nalog je otkazan i ne može se mijenjati.');
+    }
+    const allowed =
+      (task.status === DemountTaskStatus.PENDING && status === DemountTaskStatus.IN_PROGRESS) ||
+      (task.status === DemountTaskStatus.IN_PROGRESS && status === DemountTaskStatus.PENDING);
+    if (!allowed) {
+      throw new BadRequestException('Dozvoljeno je samo: započni nalog ili vrati nalog inicijatoru.');
+    }
+
+    const isReturnToInitiator =
+      task.status === DemountTaskStatus.IN_PROGRESS && status === DemountTaskStatus.PENDING
 
     const updated = await this.prisma.demountTask.update({
       where: { id },
       data: {
         status,
+        ...(isReturnToInitiator ? { assignedToId: null } : {}),
       },
       include: {
         meter: { include: { simCard: true, meterTypeDefinition: true } },
@@ -139,10 +210,139 @@ export class DemountTasksService {
       action: 'UPDATE',
       entity: 'demount_task',
       entityId: id,
-      details: { status },
+      details: { status, ...(isReturnToInitiator ? { returnedToInitiator: true } : {}) },
       ipAddress,
     });
 
+    await this.notificationsService.create({
+      userId: task.createdById,
+      title: 'Status zadatka demontaže ažuriran',
+      message: `Zadatak demontaže za brojilo ${task.meter?.serialNumber ?? task.meterId} je promijenjen na ${status}.`,
+      type: 'DEMOUNT_TASK_STATUS_UPDATED',
+      link: `/meters/${task.meterId}`,
+    });
+
+    return updated;
+  }
+
+  async cancel(id: string, actor: User, ipAddress?: string) {
+    const task = await this.prisma.demountTask.findUnique({
+      where: { id },
+      include: { meter: { select: { id: true, serialNumber: true } } },
+    });
+    if (!task) throw new NotFoundException('Zadatak demontaže nije pronađen.');
+    const canCancel =
+      actor.role === UserRole.SYSTEM_ADMIN ||
+      actor.role === UserRole.DIST_ADMIN ||
+      task.createdById === actor.id;
+    if (!canCancel) {
+      throw new BadRequestException('Samo inicijator naloga može otkazati nalog.');
+    }
+    if (task.status === DemountTaskStatus.COMPLETED) {
+      throw new BadRequestException('Nalog je već završen i ne može se otkazati.');
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const upd = await tx.demountTask.update({
+        where: { id },
+        data: { status: DemountTaskStatus.CANCELLED },
+        include: {
+          meter: { include: { simCard: true, meterTypeDefinition: true } },
+          assignedTo: true,
+          createdBy: true,
+        },
+      })
+      await tx.meter.update({
+        where: { id: upd.meterId },
+        data: { hasOpenDemountTask: false },
+      })
+      return upd
+    })
+    await this.activityLogService.log({
+      userId: actor.id,
+      action: 'UPDATE',
+      entity: 'demount_task',
+      entityId: id,
+      details: { status: DemountTaskStatus.CANCELLED },
+      ipAddress,
+    });
+    if (updated.assignedToId) {
+      await this.notificationsService.create({
+        userId: updated.assignedToId,
+        title: 'Nalog demontaže otkazan',
+        message: `Nalog demontaže za brojilo ${updated.meter?.serialNumber ?? updated.meterId} je otkazan.`,
+        type: 'DEMOUNT_TASK_CANCELLED',
+        link: `/meters/${updated.meterId}`,
+      });
+    }
+    return updated;
+  }
+
+  async reassign(
+    id: string,
+    assignedToId: string,
+    actor: User,
+    scope: ScopeContext | null,
+    ipAddress?: string,
+  ) {
+    const task = await this.prisma.demountTask.findUnique({
+      where: { id },
+      include: { meter: { select: { id: true, serialNumber: true, branchId: true } } },
+    });
+    if (!task) throw new NotFoundException('Zadatak demontaže nije pronađen.');
+    const canReassign =
+      actor.role === UserRole.SYSTEM_ADMIN ||
+      actor.role === UserRole.DIST_ADMIN ||
+      task.createdById === actor.id;
+    if (!canReassign) {
+      throw new BadRequestException('Samo inicijator naloga može pre-dodijeliti nalog.');
+    }
+    if (task.status === DemountTaskStatus.COMPLETED) {
+      throw new BadRequestException('Nalog je već završen i ne može se pre-dodijeliti.');
+    }
+    if (task.status === DemountTaskStatus.CANCELLED) {
+      throw new BadRequestException('Nalog je otkazan i ne može se pre-dodijeliti.');
+    }
+    const assignedTo = await this.prisma.user.findUnique({
+      where: { id: assignedToId },
+      include: { branch: { select: { distributionId: true } } },
+    });
+    if (!assignedTo) throw new BadRequestException('Operator nije pronađen.');
+    if (assignedTo.role !== UserRole.USER) {
+      throw new BadRequestException('Nalog se može dodijeliti samo operatoru.');
+    }
+    if (scope?.role === UserRole.DIST_ADMIN && scope.distributionId) {
+      const opDistributionId = assignedTo.distributionId ?? assignedTo.branch?.distributionId;
+      if (opDistributionId !== scope.distributionId) {
+        throw new BadRequestException('Možete dodijeliti nalog samo operatorima iz svoje distribucije.');
+      }
+    }
+    const updated = await this.prisma.demountTask.update({
+      where: { id },
+      data: {
+        assignedToId,
+        status: DemountTaskStatus.PENDING,
+      },
+      include: {
+        meter: { include: { simCard: true, meterTypeDefinition: true } },
+        assignedTo: true,
+        createdBy: true,
+      },
+    });
+    await this.activityLogService.log({
+      userId: actor.id,
+      action: 'UPDATE',
+      entity: 'demount_task',
+      entityId: id,
+      details: { assignedToId, status: DemountTaskStatus.PENDING },
+      ipAddress,
+    });
+    await this.notificationsService.create({
+      userId: assignedToId,
+      title: 'Novi zadatak demontaže',
+      message: `Dodijeljen vam je zadatak demontaže za brojilo ${updated.meter?.serialNumber ?? updated.meterId}.`,
+      type: 'DEMOUNT_TASK_ASSIGNED',
+      link: `/meters/${updated.meterId}`,
+    });
     return updated;
   }
 
@@ -190,8 +390,35 @@ export class DemountTasksService {
     if (!oldSimId) {
       throw new BadRequestException('Brojilo više nema SIM karticu; zadatak se ne može završiti ovim tokom.');
     }
+
+    const effectiveResolution = task.requestedResolution ?? dto.resolution
+    const effectiveReason = task.requestedReason ?? dto.reason
+    const effectiveRemovedSimDisposition =
+      (task.requestedRemovedSimDisposition ?? dto.removedSimDisposition) as RemovedSimDisposition
+    const effectiveMeterDemountCategory = (task.requestedMeterDemountCategory ??
+      (dto.meterDemountCategory ?? null)) as MeterDemountCategory | null
+
+    if (task.requestedResolution && dto.resolution !== task.requestedResolution) {
+      throw new BadRequestException('Rezolucija je zaključana od strane inicijatora naloga.')
+    }
+    if (task.requestedReason && dto.reason !== task.requestedReason) {
+      throw new BadRequestException('Obrazloženje je zaključano od strane inicijatora naloga.')
+    }
+    if (task.requestedRemovedSimDisposition && dto.removedSimDisposition !== task.requestedRemovedSimDisposition) {
+      throw new BadRequestException('Ishod uklonjene SIM je zaključan od strane inicijatora naloga.')
+    }
+    if (
+      task.requestedMeterDemountCategory &&
+      (dto.meterDemountCategory ?? null) !== task.requestedMeterDemountCategory
+    ) {
+      throw new BadRequestException('Kategorija demontaže je zaključana od strane inicijatora naloga.')
+    }
+
     const meterDistributionId = meter.branch?.distributionId ?? null;
-    if (dto.resolution === DemountCompletionResolution.REPLACE_SIM) {
+    const oldSimRemoval = this.buildOldSimRemovalUpdate(
+      effectiveRemovedSimDisposition as RemovedSimDisposition,
+    );
+    if (effectiveResolution === DemountCompletionResolution.REPLACE_SIM) {
       if (!dto.newSimCardId) {
         throw new BadRequestException('Za zamjenu SIM-a navedite novu SIM karticu (newSimCardId).');
       }
@@ -206,15 +433,12 @@ export class DemountTasksService {
             simCardId: dto.newSimCardId,
             simCardState: MeterSimCardState.INSTALLED,
             noSimReason: null,
+            hasOpenDemountTask: false,
           },
         });
         await tx.simCard.update({
           where: { id: oldSimId },
-          data: {
-            status: SimCardStatus.DEMOUNTED,
-            assignedToId: null,
-            assignedAt: null,
-          },
+          data: oldSimRemoval,
         });
         await tx.simCard.update({
           where: { id: dto.newSimCardId },
@@ -225,8 +449,10 @@ export class DemountTasksService {
           data: {
             status: DemountTaskStatus.COMPLETED,
             completedAt: new Date(),
-            completionResolution: dto.resolution,
-            completionReason: dto.reason,
+            completionResolution: effectiveResolution,
+            completionReason: effectiveReason,
+            removedSimDisposition: effectiveRemovedSimDisposition,
+            meterDemountCategory: effectiveMeterDemountCategory,
           },
         });
       });
@@ -238,9 +464,10 @@ export class DemountTasksService {
           userId,
           branchId: branchId ?? null,
           metadata: {
-            resolution: dto.resolution,
+            resolution: effectiveResolution,
             demountTaskId: task.id,
             replacedBySimCardId: dto.newSimCardId,
+            removedSimDisposition: effectiveRemovedSimDisposition,
           } as Prisma.InputJsonValue,
         },
       });
@@ -251,7 +478,7 @@ export class DemountTasksService {
           userId,
           branchId: branchId ?? null,
           metadata: {
-            resolution: dto.resolution,
+            resolution: effectiveResolution,
             demountTaskId: task.id,
             replacedSimCardId: oldSimId,
             meterId: meter.id,
@@ -259,30 +486,52 @@ export class DemountTasksService {
         },
       });
     } else {
+      if (!effectiveMeterDemountCategory) {
+        throw new BadRequestException(
+          'Za ovu rezoluciju navedite kategoriju demontaže brojila (bez SIM-a).',
+        );
+      }
+      const demountedFromLocation =
+        effectiveResolution === DemountCompletionResolution.FULL_DEMOUNT ||
+        (effectiveResolution === DemountCompletionResolution.REMOVE_SIM_ONLY &&
+          effectiveMeterDemountCategory !== MeterDemountCategory.TEMPORARY_REMOVAL);
+
+      const nextMeterStatus =
+        effectiveResolution === DemountCompletionResolution.FULL_DEMOUNT
+          ? effectiveMeterDemountCategory === MeterDemountCategory.MAINTENANCE
+            ? MeterStatus.IN_CALIBRATION
+            : MeterStatus.INACTIVE
+          : effectiveMeterDemountCategory === MeterDemountCategory.METER_FAULTY
+            ? MeterStatus.DEFECTIVE
+            : effectiveMeterDemountCategory === MeterDemountCategory.MAINTENANCE
+              ? MeterStatus.IN_CALIBRATION
+              : MeterStatus.ACTIVE
       await this.prisma.$transaction(async (tx) => {
         await tx.meter.update({
           where: { id: meter.id },
           data: {
             simCardId: null,
             simCardState: MeterSimCardState.NO_SIM,
-            noSimReason: dto.reason,
+            noSimReason: effectiveReason,
+            lastSimDemountCategory: effectiveMeterDemountCategory,
+            isDemountedFromLocation: demountedFromLocation,
+            hasOpenDemountTask: false,
+            status: nextMeterStatus,
           },
         });
         await tx.simCard.update({
           where: { id: oldSimId },
-          data: {
-            status: SimCardStatus.DEMOUNTED,
-            assignedToId: null,
-            assignedAt: null,
-          },
+          data: oldSimRemoval,
         });
         await tx.demountTask.update({
           where: { id: task.id },
           data: {
             status: DemountTaskStatus.COMPLETED,
             completedAt: new Date(),
-            completionResolution: dto.resolution,
-            completionReason: dto.reason,
+            completionResolution: effectiveResolution,
+            completionReason: effectiveReason,
+            removedSimDisposition: effectiveRemovedSimDisposition,
+            meterDemountCategory: effectiveMeterDemountCategory,
           },
         });
       });
@@ -294,9 +543,12 @@ export class DemountTasksService {
           userId,
           branchId: branchId ?? null,
           metadata: {
-            resolution: dto.resolution,
+            resolution: effectiveResolution,
             demountTaskId: task.id,
             meterId: meter.id,
+            removedSimDisposition: effectiveRemovedSimDisposition,
+            meterDemountCategory: effectiveMeterDemountCategory,
+            demountedFromLocation,
           } as Prisma.InputJsonValue,
         },
       });
@@ -309,12 +561,12 @@ export class DemountTasksService {
       entityId: id,
       details: {
         status: DemountTaskStatus.COMPLETED,
-        completionResolution: dto.resolution,
+        completionResolution: effectiveResolution,
       },
       ipAddress,
     });
 
-    return this.prisma.demountTask.findUniqueOrThrow({
+    const out = await this.prisma.demountTask.findUniqueOrThrow({
       where: { id },
       include: {
         meter: { include: { simCard: true, meterTypeDefinition: true } },
@@ -322,6 +574,33 @@ export class DemountTasksService {
         createdBy: true,
       },
     });
+
+    await this.notificationsService.create({
+      userId: out.createdById,
+      title: 'Završen zadatak demontaže',
+      message: `Zadatak demontaže za brojilo ${out.meter?.serialNumber ?? out.meterId} je završen.`,
+      type: 'DEMOUNT_TASK_COMPLETED',
+      link: `/meters/${out.meterId}`,
+    });
+
+    return out;
+  }
+
+  private buildOldSimRemovalUpdate(
+    disposition: RemovedSimDisposition,
+  ): { status: SimCardStatus; assignedToId: null; assignedAt: null } {
+    if (disposition === RemovedSimDisposition.MARK_DEFECTIVE) {
+      return {
+        status: SimCardStatus.DEFECTIVE,
+        assignedToId: null,
+        assignedAt: null,
+      };
+    }
+    return {
+      status: SimCardStatus.AVAILABLE,
+      assignedToId: null,
+      assignedAt: null,
+    };
   }
 
   private async assertSimUsableForReplace(
