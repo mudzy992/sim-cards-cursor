@@ -177,11 +177,21 @@ export class InstallationRecordsService {
     if (!simCard) {
       throw new BadRequestException('SIM kartica nije pronađena.');
     }
+    const canUseSim =
+      simCard.status === SimCardStatus.AVAILABLE ||
+      (simCard.status === SimCardStatus.ASSIGNED &&
+        simCard.assignedToId === createInstallationRecordDto.installedById);
+    if (!canUseSim) {
+      throw new BadRequestException('SIM kartica nije dostupna za ugradnju.');
+    }
 
     const meter = await this.prisma.meter.findUnique({
       where: { id: meterId },
-      select: { simCardId: true },
+      select: { simCardId: true, status: true },
     });
+    if (meter?.status && meter.status !== 'ACTIVE') {
+      throw new BadRequestException('Brojilo nije aktivno; ugradnja SIM-a nije dozvoljena.');
+    }
     await this.prisma.$transaction(async (tx) => {
       await tx.meter.update({
         where: { id: meterId },
@@ -213,6 +223,7 @@ export class InstallationRecordsService {
           ? { demountedMeterSnapshot }
           : {}),
         meterId,
+        simCardId,
         installedById: createInstallationRecordDto.installedById,
         notes: createInstallationRecordDto.notes,
         photos: createInstallationRecordDto.photos
@@ -350,6 +361,7 @@ export class InstallationRecordsService {
         ...(scopeClause ? { AND: [scopeClause] } : {}),
       },
       include: {
+        simCard: { include: { assignedTo: true } },
         meter: {
           include: {
             meterTypeDefinition: true,
@@ -570,13 +582,14 @@ export class InstallationRecordsService {
       meterTypeDefinition?: { name: string; manufacturer?: string | null; model?: string | null; type: string; maxCurrent?: string | null } | null;
       simCard?: { iccid: string; ipAddress: string; publicIpAddress?: string | null; phoneNumber?: string | null; apn?: string | null; assignedTo?: { firstName: string; lastName: string } | null } | null;
     } | null;
+    simCard?: { iccid: string; ipAddress: string; publicIpAddress?: string | null; phoneNumber?: string | null; apn?: string | null; assignedTo?: { firstName: string; lastName: string } | null } | null;
     installedBy?: { firstName: string; lastName: string } | null;
     approvedBy?: { firstName: string; lastName: string } | null;
   }): Promise<Record<string, unknown>> {
     const formatDate = (d: Date | string | null | undefined) =>
       d ? new Date(d).toLocaleDateString('bs-BA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
     const typeLabel = (t: string) => (t === 'SINGLE_PHASE' ? 'Jednofazno' : t === 'THREE_PHASE' ? 'Trofazno' : t);
-    const simCard = record.meter?.simCard;
+    const simCard = record.simCard ?? record.meter?.simCard;
     const simCardPlain = simCard
       ? {
           iccid: simCard.iccid,
@@ -848,6 +861,7 @@ export class InstallationRecordsService {
       select: {
         id: true,
         recordNumber: true,
+        simCardId: true,
         meter: {
           select: {
             simCardId: true,
@@ -855,12 +869,16 @@ export class InstallationRecordsService {
         },
       },
     });
-    if (!record?.meter?.simCardId) {
+    if (!record) {
+      return;
+    }
+    const simCardId = record?.simCardId ?? record?.meter?.simCardId ?? null;
+    if (!simCardId) {
       return;
     }
     await this.prisma.simEvent.create({
       data: {
-        simCardId: record.meter.simCardId,
+        simCardId,
         type,
         recordId: record.id,
         userId,

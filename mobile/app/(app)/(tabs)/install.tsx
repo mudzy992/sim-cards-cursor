@@ -19,11 +19,13 @@ import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { installTasksApi, type InstallTaskItem, type InstallTaskStatus } from '@/api/install-tasks.api'
 import { simCardsApi } from '@/api/sim-cards.api'
+import { meterTypeDefinitionsApi, type MeterTypeFieldItem } from '@/api/meter-type-definitions.api'
 import { useAuthStore } from '@/store/auth.store'
 import { listOutbox } from '@/offline/outbox'
 import { colors } from '@/theme/colors'
 import { ScreenHeader } from '@/components/common/ScreenHeader'
 import { Card } from '@/components/common/Card'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const statusLabels: Record<InstallTaskStatus, string> = {
   PENDING: 'Čeka',
@@ -33,15 +35,16 @@ const statusLabels: Record<InstallTaskStatus, string> = {
 }
 
 const statusActions: Record<InstallTaskStatus, InstallTaskStatus[]> = {
-  PENDING: ['IN_PROGRESS', 'CANCELLED'],
-  IN_PROGRESS: ['CANCELLED'],
+  PENDING: ['IN_PROGRESS'],
+  IN_PROGRESS: ['PENDING'],
   COMPLETED: [],
-  CANCELLED: ['PENDING'],
+  CANCELLED: [],
 }
 
 export default function InstallScreen() {
   const router = useRouter()
   const user = useAuthStore((s) => s.user)
+  const insets = useSafeAreaInsets()
   const search = useLocalSearchParams<{ pickedIccid?: string; wizardTaskId?: string }>()
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -49,11 +52,21 @@ export default function InstallScreen() {
   const [items, setItems] = useState<InstallTaskItem[]>([])
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set())
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [wizardFields, setWizardFields] = useState<MeterTypeFieldItem[]>([])
   const [wizard, setWizard] = useState<{
     task: InstallTaskItem
     pickedSimCardId?: string
     pickedSimIccid?: string
     recordNotes: string
+    calibrationYear: string
+    installationAddress: string
+    installationDate: string
+    city: string
+    municipality: string
+    measuringPoint: string
+    latitude: string
+    longitude: string
+    dynamicFieldValues: Record<string, unknown>
   } | null>(null)
   const [wizardSubmitting, setWizardSubmitting] = useState(false)
 
@@ -150,14 +163,63 @@ export default function InstallScreen() {
   }
 
   const handleOpenWizard = (task: InstallTaskItem) => {
-    setWizard({ task, recordNotes: '' })
+    const meter = task.meter
+    const today = new Date().toISOString().slice(0, 10)
+    setWizardFields([])
+    setWizard({
+      task,
+      recordNotes: '',
+      calibrationYear: meter?.calibrationYear != null ? String(meter.calibrationYear) : '',
+      installationAddress: meter?.installationAddress ?? '',
+      installationDate: meter?.installationDate
+        ? String(meter.installationDate).slice(0, 10)
+        : today,
+      city: meter?.city ?? '',
+      municipality: meter?.municipality ?? '',
+      measuringPoint: meter?.measuringPoint ?? '',
+      latitude: meter?.latitude != null ? String(meter.latitude) : '',
+      longitude: meter?.longitude != null ? String(meter.longitude) : '',
+      dynamicFieldValues:
+        meter?.dynamicFieldValues && typeof meter.dynamicFieldValues === 'object'
+          ? (meter.dynamicFieldValues as Record<string, unknown>)
+          : {},
+    })
   }
+
+  useEffect(() => {
+    if (!wizard?.task?.meter?.meterTypeDefinitionId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const fields = await meterTypeDefinitionsApi.listFields(wizard.task.meter!.meterTypeDefinitionId!)
+        if (!cancelled) setWizardFields(fields)
+      } catch {
+        if (!cancelled) setWizardFields([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [wizard?.task?.meter?.meterTypeDefinitionId])
 
   const handleScanSim = () => {
     if (!wizard) return
     router.push({
       pathname: '/(app)/(tabs)/scan',
       params: { afterScan: 'install', installTaskId: wizard.task.id },
+    })
+  }
+
+  const handleDynamicFieldChange = (fieldName: string, value: unknown) => {
+    setWizard((w) => {
+      if (!w) return w
+      return {
+        ...w,
+        dynamicFieldValues: {
+          ...w.dynamicFieldValues,
+          [fieldName]: value,
+        },
+      }
     })
   }
 
@@ -168,9 +230,30 @@ export default function InstallScreen() {
     }
     setWizardSubmitting(true)
     try {
+      const meter = wizard.task.meter
+      const demountedFromLocation = meter?.isDemountedFromLocation === true
+      const calibrationYear =
+        wizard.calibrationYear.trim() ? Number.parseInt(wizard.calibrationYear.trim(), 10) : undefined
+      const latitude = wizard.latitude.trim() ? Number.parseFloat(wizard.latitude.trim()) : undefined
+      const longitude = wizard.longitude.trim() ? Number.parseFloat(wizard.longitude.trim()) : undefined
       await installTasksApi.complete(wizard.task.id, {
         simCardId: wizard.pickedSimCardId,
         recordNotes: wizard.recordNotes.trim() ? wizard.recordNotes.trim() : undefined,
+        ...(calibrationYear !== undefined ? { calibrationYear } : {}),
+        ...(demountedFromLocation
+          ? {
+              installationAddress: wizard.installationAddress.trim() ? wizard.installationAddress.trim() : undefined,
+              installationDate: wizard.installationDate.trim() ? wizard.installationDate.trim() : undefined,
+              city: wizard.city.trim() ? wizard.city.trim() : undefined,
+              municipality: wizard.municipality.trim() ? wizard.municipality.trim() : undefined,
+              measuringPoint: wizard.measuringPoint.trim() ? wizard.measuringPoint.trim() : undefined,
+              ...(latitude !== undefined ? { latitude } : {}),
+              ...(longitude !== undefined ? { longitude } : {}),
+            }
+          : {}),
+        ...(Object.keys(wizard.dynamicFieldValues ?? {}).length > 0
+          ? { dynamicFieldValues: wizard.dynamicFieldValues }
+          : {}),
       })
       setWizard(null)
       void load(true)
@@ -274,6 +357,13 @@ export default function InstallScreen() {
                 </Text>
               </View>
             </View>
+
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 4 }}>
+              Poslano: {new Date(item.createdAt).toLocaleString('bs-BA')}
+              {item.createdBy
+                ? ` • Poslao: ${item.createdBy.firstName} ${item.createdBy.lastName}`
+                : ''}
+            </Text>
 
             {item.notes ? (
               <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 4 }}>
@@ -382,6 +472,7 @@ export default function InstallScreen() {
                 borderTopRightRadius: 18,
                 maxHeight: '88%',
                 padding: 16,
+                paddingBottom: 16 + insets.bottom,
                 gap: 12,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -396,11 +487,179 @@ export default function InstallScreen() {
               {wizard ? (
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
+                  contentContainerStyle={{ gap: 12, paddingBottom: 20 + insets.bottom }}
                 >
                 <Text style={{ color: colors.textMuted }}>
                   Brojilo: {wizard.task.meter?.serialNumber ?? wizard.task.meterId}
                 </Text>
+                {wizard.task.meter?.isDemountedFromLocation ? (
+                  <View style={{ gap: 10 }}>
+                    <Text style={{ fontWeight: '600' }}>Svježi podaci (brojilo demontirano sa lokacije)</Text>
+                    <View style={{ gap: 6 }}>
+                      <Text style={{ fontWeight: '600' }}>Adresa</Text>
+                      <TextInput
+                        value={wizard.installationAddress}
+                        onChangeText={(text) => setWizard((w) => (w ? { ...w, installationAddress: text } : w))}
+                        placeholder="Ulica i broj"
+                        style={{
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          borderRadius: 12,
+                          padding: 12,
+                          backgroundColor: colors.surface,
+                        }}
+                      />
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <Text style={{ fontWeight: '600' }}>Grad</Text>
+                        <TextInput
+                          value={wizard.city}
+                          onChangeText={(text) => setWizard((w) => (w ? { ...w, city: text } : w))}
+                          placeholder="Grad"
+                          style={{
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 12,
+                            padding: 12,
+                            backgroundColor: colors.surface,
+                          }}
+                        />
+                      </View>
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <Text style={{ fontWeight: '600' }}>Općina</Text>
+                        <TextInput
+                          value={wizard.municipality}
+                          onChangeText={(text) => setWizard((w) => (w ? { ...w, municipality: text } : w))}
+                          placeholder="Općina"
+                          style={{
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 12,
+                            padding: 12,
+                            backgroundColor: colors.surface,
+                          }}
+                        />
+                      </View>
+                    </View>
+                    <View style={{ gap: 6 }}>
+                      <Text style={{ fontWeight: '600' }}>Mjerno mjesto</Text>
+                      <TextInput
+                        value={wizard.measuringPoint}
+                        onChangeText={(text) => setWizard((w) => (w ? { ...w, measuringPoint: text } : w))}
+                        placeholder="Mjerno mjesto"
+                        style={{
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          borderRadius: 12,
+                          padding: 12,
+                          backgroundColor: colors.surface,
+                        }}
+                      />
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <Text style={{ fontWeight: '600' }}>Datum instalacije</Text>
+                        <TextInput
+                          value={wizard.installationDate}
+                          onChangeText={(text) => setWizard((w) => (w ? { ...w, installationDate: text } : w))}
+                          placeholder="YYYY-MM-DD"
+                          style={{
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 12,
+                            padding: 12,
+                            backgroundColor: colors.surface,
+                          }}
+                        />
+                      </View>
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <Text style={{ fontWeight: '600' }}>Godina baždarenja</Text>
+                        <TextInput
+                          value={wizard.calibrationYear}
+                          onChangeText={(text) => setWizard((w) => (w ? { ...w, calibrationYear: text } : w))}
+                          placeholder="npr. 2026"
+                          keyboardType="number-pad"
+                          style={{
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 12,
+                            padding: 12,
+                            backgroundColor: colors.surface,
+                          }}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontWeight: '600' }}>Godina baždarenja (po potrebi)</Text>
+                    <TextInput
+                      value={wizard.calibrationYear}
+                      onChangeText={(text) => setWizard((w) => (w ? { ...w, calibrationYear: text } : w))}
+                      placeholder="npr. 2026"
+                      keyboardType="number-pad"
+                      style={{
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        borderRadius: 12,
+                        padding: 12,
+                        backgroundColor: colors.surface,
+                      }}
+                    />
+                  </View>
+                )}
+                {wizardFields.length ? (
+                  <View style={{ gap: 10 }}>
+                    <Text style={{ fontWeight: '600' }}>Dodatna polja (po tipu brojila)</Text>
+                    {wizardFields
+                      .filter((f) => f.isOperatorFillable)
+                      .map((field) => {
+                        const rawValue = wizard.dynamicFieldValues[field.name]
+                        const valueText =
+                          rawValue === undefined || rawValue === null ? '' : String(rawValue)
+                        if (field.fieldType === 'BOOLEAN') {
+                          const isOn = rawValue === true || rawValue === 'true' || rawValue === 1 || rawValue === '1'
+                          return (
+                            <Pressable
+                              key={field.id}
+                              onPress={() => handleDynamicFieldChange(field.name, !isOn)}
+                              style={({ pressed }) => ({
+                                borderWidth: 1,
+                                borderColor: isOn ? colors.primary : colors.border,
+                                backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
+                                padding: 12,
+                                borderRadius: 12,
+                              })}
+                            >
+                              <Text style={{ fontWeight: '700' }}>{field.label}</Text>
+                              <Text style={{ color: colors.textMuted, marginTop: 2 }}>
+                                {isOn ? 'Da' : 'Ne'}
+                              </Text>
+                            </Pressable>
+                          )
+                        }
+                        return (
+                          <View key={field.id} style={{ gap: 6 }}>
+                            <Text style={{ fontWeight: '700' }}>{field.label}</Text>
+                            <TextInput
+                              value={valueText}
+                              onChangeText={(text) => handleDynamicFieldChange(field.name, text)}
+                              placeholder={field.isRequired ? 'Obavezno' : 'Opcionalno'}
+                              keyboardType={field.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'}
+                              style={{
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                borderRadius: 12,
+                                padding: 12,
+                                backgroundColor: colors.surface,
+                              }}
+                            />
+                          </View>
+                        )
+                      })}
+                  </View>
+                ) : null}
                 <View style={{ gap: 8 }}>
                   <Text style={{ fontWeight: '600' }}>SIM kartica</Text>
                   {wizard.pickedSimIccid ? (

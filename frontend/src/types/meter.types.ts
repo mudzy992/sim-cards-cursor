@@ -1,5 +1,6 @@
 export type MeterType = 'SINGLE_PHASE' | 'THREE_PHASE';
 export type MeterSimCardState = 'INSTALLED' | 'NO_SIM';
+export type MeterStatus = 'ACTIVE' | 'DEFECTIVE' | 'IN_CALIBRATION';
 
 export type MeterTypeDefinitionRef = {
   id: string;
@@ -16,10 +17,17 @@ export type MeterItem = {
   meterTypeDefinitionId: string;
   branchId?: string | null;
   meterTypeDefinition?: MeterTypeDefinitionRef | null;
+  status?: MeterStatus;
   simCard?: { id: string; iccid: string; status: string; ipAddress?: string } | null;
   simCardState?: MeterSimCardState;
   noSimReason?: string | null;
   lastSimDemountCategory?: string | null;
+  installTasks?: Array<{
+    id: string;
+    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    createdAt: string;
+    assignedTo?: { id: string; firstName: string; lastName: string } | null;
+  }>;
   year?: number | null;
   calibrationYear?: number | null;
   notes?: string | null;
@@ -54,6 +62,7 @@ export type MetersResponse = {
 export type CreateMeterInput = {
   serialNumber: string;
   meterTypeDefinitionId: string;
+  status?: MeterStatus;
   year?: number;
   calibrationYear?: number;
   notes?: string;

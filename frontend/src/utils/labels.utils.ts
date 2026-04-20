@@ -41,3 +41,46 @@ export const getSimEventTypeLabel = (type: string): string => {
   return type
 }
 
+export const getDemountResolutionLabel = (resolution: string): string => {
+  const map: Record<string, string> = {
+    FULL_DEMOUNT: 'Potpuna demontaža',
+    REPLACE_SIM: 'Zamjena SIM-a',
+    REMOVE_SIM_ONLY: 'Demontaža SIM-a (bez zamjene)',
+  }
+  return map[resolution] ?? resolution
+}
+
+export const getMeterDemountCategoryLabel = (cat: string): string => {
+  const map: Record<string, string> = {
+    METER_FAULTY: 'Brojilo neispravno',
+    TEMPORARY_REMOVAL: 'Privremeno demontirano',
+    MAINTENANCE: 'Servis / održavanje',
+    OTHER: 'Ostalo',
+  }
+  return map[cat] ?? cat
+}
+
+export const getRemovedSimDispositionLabel = (d: string): string => {
+  const map: Record<string, string> = {
+    MARK_DEFECTIVE: 'Uklonjena SIM neispravna',
+    RETURN_TO_STOCK: 'Uklonjena SIM vraćena u zalihe',
+  }
+  return map[d] ?? d
+}
+
+export const getActivityLogActionLabel = (action: string): string => {
+  const map: Record<string, string> = {
+    CREATE: 'Kreirano',
+    UPDATE: 'Ažurirano',
+    DELETE: 'Obrisano',
+    SEND: 'Poslano',
+    SEND_FAILED: 'Neuspješno slanje',
+    MARK_SEP_ACTIVATED: 'SEP aktiviran',
+    STATUS_CHANGE: 'Promjena statusa',
+    CLAIM: 'Zaduživanje',
+    ASSIGN: 'Dodjela',
+    UNASSIGN: 'Oduzimanje dodjele',
+  }
+  return map[action] ?? action
+}
+

@@ -12,6 +12,7 @@ import ShipmentsListPage from '@/pages/shipments/ShipmentsListPage';
 import SimCardDetailsPage from '@/pages/sim-cards/SimCardDetailsPage';
 import UsersListPage from '@/pages/users/UsersListPage';
 import MetersListPage from '@/pages/meters/MetersListPage';
+import MeterDetailPage from '@/pages/meters/MeterDetailPage'
 import InstallationRecordsListPage from '@/pages/installation-records/InstallationRecordsListPage';
 import InstallationRecordCreatePage from '@/pages/installation-records/InstallationRecordCreatePage';
 import InstallationRecordDetailPage from '@/pages/installation-records/InstallationRecordDetailPage';
@@ -86,6 +87,14 @@ export const router = createBrowserRouter([
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
                 <MetersListPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: '/meters/:id',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+                <MeterDetailPage />
               </RoleGuard>
             ),
           },

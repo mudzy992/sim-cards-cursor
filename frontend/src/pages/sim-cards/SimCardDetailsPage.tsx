@@ -1,8 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Button, Card, Descriptions, Space, Tag, Timeline, Typography } from 'antd';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { simCardsApi } from '@/api/sim-cards.api';
-import { getSimCardStatusLabel, getSimEventTypeLabel } from '@/utils/labels.utils';
+import {
+  getDemountResolutionLabel,
+  getMeterDemountCategoryLabel,
+  getRemovedSimDispositionLabel,
+  getSimCardStatusLabel,
+  getSimEventTypeLabel,
+} from '@/utils/labels.utils';
 
 const statusColor: Record<string, string> = {
   AVAILABLE: 'green',
@@ -31,6 +37,73 @@ export default function SimCardDetailsPage() {
   });
 
   const simCard = simCardQuery.data;
+
+  const renderMetadata = (metadata: unknown) => {
+    if (!metadata || typeof metadata !== 'object') return null
+    const m = metadata as Record<string, unknown>
+    const meterId = typeof m.meterId === 'string' ? m.meterId : null
+    const recordId = typeof m.recordId === 'string' ? m.recordId : null
+    const demountTaskId = typeof m.demountTaskId === 'string' ? m.demountTaskId : null
+    const resolution = typeof m.resolution === 'string' ? m.resolution : null
+    const meterDemountCategory =
+      typeof m.meterDemountCategory === 'string' ? m.meterDemountCategory : null
+    const removedSimDisposition =
+      typeof m.removedSimDisposition === 'string' ? m.removedSimDisposition : null
+
+    const tags: Array<{ key: string; color?: string; label: string }> = []
+    if (resolution)
+      tags.push({
+        key: 'resolution',
+        color: 'blue',
+        label: getDemountResolutionLabel(resolution),
+      })
+    if (removedSimDisposition)
+      tags.push({
+        key: 'removedSimDisposition',
+        color: 'geekblue',
+        label: getRemovedSimDispositionLabel(removedSimDisposition),
+      })
+    if (meterDemountCategory)
+      tags.push({
+        key: 'meterDemountCategory',
+        color: 'gold',
+        label: getMeterDemountCategoryLabel(meterDemountCategory),
+      })
+
+    const hasAny = Boolean(meterId) || Boolean(recordId) || Boolean(demountTaskId) || tags.length > 0
+    if (!hasAny) return null
+
+    return (
+      <div className="mt-2 flex flex-col gap-2">
+        {tags.length > 0 ? (
+          <Space size={[6, 6]} wrap>
+            {tags.map((t) => (
+              <Tag key={t.key} color={t.color}>
+                {t.label}
+              </Tag>
+            ))}
+          </Space>
+        ) : null}
+        <Space size={[10, 8]} wrap>
+          {meterId ? (
+            <Typography.Text type="secondary" className="text-xs">
+              Brojilo: <Link to={`/meters/${meterId}`}>Otvori</Link>
+            </Typography.Text>
+          ) : null}
+          {recordId ? (
+            <Typography.Text type="secondary" className="text-xs">
+              Zapisnik: <Link to={`/installation-records/${recordId}`}>{recordId.slice(0, 8)}…</Link>
+            </Typography.Text>
+          ) : null}
+          {demountTaskId ? (
+            <Typography.Text type="secondary" className="text-xs">
+              Task: <Typography.Text code copyable={{ text: demountTaskId }}>{demountTaskId.slice(0, 8)}…</Typography.Text>
+            </Typography.Text>
+          ) : null}
+        </Space>
+      </div>
+    )
+  }
 
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -94,14 +167,11 @@ export default function SimCardDetailsPage() {
                       ? ` · ${ev.user.firstName} ${ev.user.lastName}`
                       : ''}
                   </div>
-                  {ev.metadata != null && typeof ev.metadata === 'object' ? (
-                    <Typography.Paragraph
-                      className="!mb-0 mt-1 text-xs font-mono text-slate-600"
-                      copyable={{ text: JSON.stringify(ev.metadata) }}
-                    >
-                      {JSON.stringify(ev.metadata)}
-                    </Typography.Paragraph>
-                  ) : null}
+                  {renderMetadata(ev.metadata) ?? (
+                    <Typography.Text type="secondary" className="text-xs">
+                      Nema dodatnih detalja.
+                    </Typography.Text>
+                  )}
                 </div>
               ),
             }))}

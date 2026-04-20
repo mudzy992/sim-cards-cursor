@@ -3,6 +3,8 @@ import { io } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { getApiBaseUrls } from '@/api/axios.instance';
+import { notification as antdNotification } from 'antd'
+import type { Notification } from '@/api/notifications.api'
 
 const getSocketUrls = (): string[] => {
   const baseUrls = getApiBaseUrls();
@@ -27,9 +29,17 @@ export function useNotificationSocket() {
       transports: ['websocket', 'polling'],
     });
 
-    const onNotification = () => {
+    const onNotification = (payload?: Notification) => {
       void queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
       void queryClient.invalidateQueries({ queryKey: ['notifications-list'] });
+      if (payload?.title && payload?.message) {
+        antdNotification.open({
+          message: payload.title,
+          description: payload.message,
+          placement: 'topRight',
+          duration: 4,
+        })
+      }
     };
 
     socket.on('notification', onNotification);

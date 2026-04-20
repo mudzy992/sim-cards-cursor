@@ -6,19 +6,22 @@ import {
   Image,
   Space,
   Tag,
+  Timeline,
   Typography,
   message,
 } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { activityLogApi } from '@/api/activity-log.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
+import { simCardsApi } from '@/api/sim-cards.api'
 import { useAuthStore } from '@/store/auth.store';
 import type { InstallationRecordItem } from '@/types/installation-record.types';
 import { RecordPhotoImage } from '@/components/installation-records/RecordPhotoImage';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types';
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
+import { getActivityLogActionLabel, getSimCardStatusLabel } from '@/utils/labels.utils'
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Nacrt',
@@ -158,6 +161,12 @@ export default function InstallationRecordDetailPage() {
   }
 
   const record = recordQuery.data;
+  const currentSimQuery = useQuery({
+    queryKey: ['sim-cards', 'details', record?.simCard?.id],
+    queryFn: () => simCardsApi.getById(record!.simCard!.id),
+    enabled: Boolean(record?.simCard?.id),
+  })
+
   const canMarkSepActivated = !!permissionsQuery.data?.canMarkSepActivated;
   const canRetrySend = !!permissionsQuery.data?.canRetrySend;
   const canDownloadPdf = true;
@@ -372,15 +381,28 @@ export default function InstallationRecordDetailPage() {
             </>
           )}
           <Descriptions.Item label="Status SIM-a">
-            {record.meter?.simCard ? 'Ugrađena' : 'Bez kartice'}
+            {record.simCard ? 'Ugrađena (iz zapisnika)' : record.meter?.simCard ? 'Ugrađena (trenutno na brojilu)' : 'Bez kartice'}
           </Descriptions.Item>
-          {record.meter?.simCard && (
+          {(record.simCard ?? record.meter?.simCard) && (
             <>
               <Descriptions.Item label="ICCID">
-                {record.meter.simCard.iccid ?? '–'}
+                <Space wrap size={10}>
+                  {record.simCard?.id ? (
+                    <Link to={`/sim-cards/${record.simCard.id}`}>
+                      {record.simCard.iccid ?? '–'}
+                    </Link>
+                  ) : (
+                    <span>{(record.simCard ?? record.meter?.simCard)?.iccid ?? '–'}</span>
+                  )}
+                  {record.simCard?.id && currentSimQuery.data ? (
+                    <Tag color="blue">
+                      Trenutno: {getSimCardStatusLabel(currentSimQuery.data.status)}
+                    </Tag>
+                  ) : null}
+                </Space>
               </Descriptions.Item>
               <Descriptions.Item label="IP adresa">
-                {record.meter.simCard.ipAddress ?? '–'}
+                {(record.simCard ?? record.meter?.simCard)?.ipAddress ?? '–'}
               </Descriptions.Item>
             </>
           )}
@@ -452,23 +474,27 @@ export default function InstallationRecordDetailPage() {
           </Typography.Text>
         )}
         {timelineQuery.data && timelineQuery.data.items.length > 0 && (
-          <ul className="space-y-2 mt-2">
-            {timelineQuery.data.items.map((item) => (
-              <li key={item.id} className="text-sm border-b pb-2 last:border-b-0">
-                <div className="flex justify-between gap-2">
-                  <span className="font-semibold">{item.action}</span>
-                  <span className="text-xs text-gray-500">
-                    {new Date(item.createdAt).toLocaleString()}
-                  </span>
+          <Timeline
+            className="mt-2"
+            items={timelineQuery.data.items.map((item) => ({
+              key: item.id,
+              children: (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-start justify-between gap-4">
+                    <Typography.Text strong>{getActivityLogActionLabel(item.action)}</Typography.Text>
+                    <Typography.Text type="secondary" className="text-xs whitespace-nowrap">
+                      {new Date(item.createdAt).toLocaleString('bs-BA')}
+                    </Typography.Text>
+                  </div>
+                  <Typography.Text type="secondary" className="text-xs">
+                    {item.user
+                      ? `${item.user.firstName} ${item.user.lastName} (${item.user.role})`
+                      : 'Sistem'}
+                  </Typography.Text>
                 </div>
-                <div className="text-xs text-gray-600 mt-1">
-                  {item.user
-                    ? `${item.user.firstName} ${item.user.lastName} (${item.user.role})`
-                    : 'Sistem'}
-                </div>
-              </li>
-            ))}
-          </ul>
+              ),
+            }))}
+          />
         )}
       </Card>
 

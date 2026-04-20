@@ -78,6 +78,7 @@ export default function MetersListPage() {
   const [meterDrawerOpen, setMeterDrawerOpen] = useState(false);
   const [editingMeter, setEditingMeter] = useState<MeterItem | null>(null);
   const [detailMeter, setDetailMeter] = useState<MeterItem | null>(null);
+  const [isQuickDetail, setIsQuickDetail] = useState(false)
   const [demountDrawerOpen, setDemountDrawerOpen] = useState(false);
   const [demountMeter, setDemountMeter] = useState<MeterItem | null>(null);
   const [demountOperatorId, setDemountOperatorId] = useState<string>('');
@@ -262,6 +263,7 @@ export default function MetersListPage() {
 
   function openMeterDetail(record: MeterItem) {
     setDetailMeter(record);
+    setIsQuickDetail(true)
   }
 
   function openTypeCreate() {
@@ -512,11 +514,12 @@ export default function MetersListPage() {
                       width: 120,
                       render: (_, record) => (
                         <Space onClick={(e) => e.stopPropagation()}>
-                          <Button type="link" size="small" onClick={() => openMeterDetail(record)}>
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => navigate(`/meters/${record.id}`)}
+                          >
                             Detalji
-                          </Button>
-                          <Button type="link" size="small" onClick={() => openMeterEdit(record)}>
-                            Uredi
                           </Button>
                         </Space>
                       ),
@@ -632,39 +635,10 @@ export default function MetersListPage() {
         placement="right"
         width={480}
         open={Boolean(detailMeter)}
-        onClose={() => setDetailMeter(null)}
-        extra={
-          detailMeter ? (
-            <Space>
-              {(detailMeter as MeterItem & { simCard?: { id: string } }).simCard &&
-                (userRole === 'SYSTEM_ADMIN' || userRole === 'DIST_ADMIN') && (
-                  <Button
-                    size="small"
-                    onClick={() => {
-                      setDemountMeter(detailMeter);
-                      setDemountDrawerOpen(true);
-                    }}
-                  >
-                    Demontiraj SIM
-                  </Button>
-                )}
-              {canCreateInstallTaskForMeter(detailMeter) && (
-                <Button
-                  size="small"
-                  onClick={() => {
-                    setInstallMeter(detailMeter)
-                    setInstallDrawerOpen(true)
-                  }}
-                >
-                  Pošalji ugradnju SIM
-                </Button>
-              )}
-              <Button type="primary" size="small" onClick={() => openMeterEdit(detailMeter)}>
-                Uredi
-              </Button>
-            </Space>
-          ) : null
-        }
+        onClose={() => {
+          setDetailMeter(null)
+          setIsQuickDetail(false)
+        }}
       >
         {detailMeter && (
           <>
@@ -762,40 +736,6 @@ export default function MetersListPage() {
                 </>
               )}
             </Descriptions>
-            {(detailMeter as MeterItem).latitude != null &&
-              (detailMeter as MeterItem).longitude != null && (
-                <div className="mb-4">
-                  <Typography.Title level={5}>Lokacija na mapi</Typography.Title>
-                  <iframe
-                    title="Lokacija brojila"
-                    src={buildOsmEmbedUrl({
-                      latitude: Number((detailMeter as MeterItem).latitude),
-                      longitude: Number((detailMeter as MeterItem).longitude),
-                      radiusMeters: 50,
-                    })}
-                    width="100%"
-                    height="240"
-                    style={{ border: 0, borderRadius: 8 }}
-                    loading="lazy"
-                  />
-                </div>
-              )}
-            <Typography.Title level={5}>Zapisnici za ovo brojilo</Typography.Title>
-            {recordsByMeterQuery.isLoading ? (
-              <Typography.Text type="secondary">Učitavanje…</Typography.Text>
-            ) : recordsForMeter.length === 0 ? (
-              <Typography.Text type="secondary">Nema zapisnika.</Typography.Text>
-            ) : (
-              <ul className="list-disc pl-4 space-y-1">
-                {recordsForMeter.map((r) => (
-                  <li key={r.id}>
-                    <Link to={`/installation-records/${r.id}`}>{r.recordNumber}</Link>
-                    {' – '}
-                    {r.meter?.simCard?.iccid ?? '–'} ({r.status})
-                  </li>
-                ))}
-              </ul>
-            )}
           </>
         )}
       </Drawer>

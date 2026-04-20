@@ -13,6 +13,12 @@ export type InstallationRecordItem = {
   kind?: InstallationRecordKind;
   demountedMeterSnapshot?: Record<string, unknown> | null;
   meterId: string;
+  simCard?: {
+    id: string;
+    iccid: string;
+    ipAddress: string;
+    status: string;
+  } | null;
   installationAddress?: string | null;
   latitude?: number | null;
   longitude?: number | null;

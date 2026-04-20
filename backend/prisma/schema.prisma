@@ -34,6 +34,12 @@ enum MeterSimCardState {
   NO_SIM
 }
 
+enum MeterStatus {
+  ACTIVE
+  DEFECTIVE
+  IN_CALIBRATION
+}
+
 enum MeterType {
   SINGLE_PHASE
   THREE_PHASE
@@ -192,6 +198,7 @@ model SimCard {
   assignedTo     User?          @relation("AssignedTo", fields: [assignedToId], references: [id])
   assignedAt     DateTime?      @map("assigned_at")
   meter          Meter?         // kroz brojilo – kartica je fizički u brojilu
+  installationRecords InstallationRecord[]
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
   events         SimEvent[]
@@ -209,11 +216,14 @@ model Meter {
   branch                    Branch?               @relation(fields: [branchId], references: [id], onDelete: SetNull)
   meterTypeDefinitionId     String                @map("meter_type_definition_id")
   meterTypeDefinition       MeterTypeDefinition   @relation(fields: [meterTypeDefinitionId], references: [id], onDelete: Restrict)
+  status                    MeterStatus           @default(ACTIVE)
   simCardId                 String?              @unique @map("sim_card_id")
   simCard                   SimCard?             @relation(fields: [simCardId], references: [id], onDelete: SetNull)
   simCardState              MeterSimCardState     @default(NO_SIM) @map("sim_card_state")
   noSimReason               String?               @map("no_sim_reason") @db.Text
   lastSimDemountCategory    MeterDemountCategory? @map("last_sim_demount_category")
+  isDemountedFromLocation   Boolean               @default(false) @map("is_demounted_from_location")
+  hasOpenInstallTask        Boolean               @default(false) @map("has_open_install_task")
   year                      Int?
   calibrationYear           Int?                 @map("calibration_year")
   notes                     String?              @db.Text
@@ -234,6 +244,7 @@ model Meter {
   @@index([serialNumber])
   @@index([meterTypeDefinitionId])
   @@index([simCardId])
+  @@index([status])
   @@map("meters")
 }
 
@@ -261,6 +272,8 @@ model InstallationRecord {
   demountedMeterSnapshot    Json?                 @map("demounted_meter_snapshot")
   meterId                   String                @map("meter_id")
   meter                     Meter                 @relation(fields: [meterId], references: [id])
+  simCardId                 String?               @map("sim_card_id")
+  simCard                   SimCard?              @relation(fields: [simCardId], references: [id], onDelete: SetNull)
   installedById             String                @map("installed_by_id")
   installedBy               User                  @relation("InstalledBy", fields: [installedById], references: [id])
   status                    RecordStatus          @default(DRAFT)
@@ -280,6 +293,7 @@ model InstallationRecord {
   @@index([recordNumber])
   @@index([status])
   @@index([meterId])
+  @@index([simCardId])
   @@map("installation_records")
 }
 

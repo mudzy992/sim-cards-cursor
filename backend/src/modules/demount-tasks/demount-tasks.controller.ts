@@ -56,7 +56,7 @@ export class DemountTasksController {
 
   @Patch(':id/status')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
-  @ApiOperation({ summary: 'Ažuriraj status (PENDING, IN_PROGRESS, CANCELLED) — ne koristiti COMPLETED' })
+  @ApiOperation({ summary: 'Operator: započni / vrati na čekanje (PENDING, IN_PROGRESS)' })
   updateStatus(
     @Param('id') id: string,
     @Body() body: { status: DemountTaskStatus },
@@ -72,6 +72,36 @@ export class DemountTasksController {
       user.id,
       ipAddress,
     );
+  }
+
+  @Post(':id/cancel')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Inicijator: otkaži nalog (CANCELLED)' })
+  cancel(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    return this.demountTasksService.cancel(id, user, ipAddress);
+  }
+
+  @Post(':id/reassign')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Inicijator: dodijeli nalog drugom operatoru' })
+  reassign(
+    @Param('id') id: string,
+    @Body() body: { assignedToId: string },
+    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null; branchModeratorBranchIds?: string[] },
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    const scope = toScopeContext({ ...user, role: user.role as UserRole });
+    return this.demountTasksService.reassign(id, body.assignedToId, user, scope, ipAddress);
   }
 
   @Post(':id/complete')

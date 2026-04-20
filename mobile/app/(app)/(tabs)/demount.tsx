@@ -31,6 +31,7 @@ import { listOutbox } from '@/offline/outbox'
 import { colors } from '@/theme/colors';
 import { ScreenHeader } from '@/components/common/ScreenHeader'
 import { Card } from '@/components/common/Card'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const statusLabels: Record<DemountTaskStatus, string> = {
   PENDING: 'Čeka',
@@ -40,10 +41,10 @@ const statusLabels: Record<DemountTaskStatus, string> = {
 };
 
 const statusActions: Record<DemountTaskStatus, DemountTaskStatus[]> = {
-  PENDING: ['IN_PROGRESS', 'CANCELLED'],
-  IN_PROGRESS: ['CANCELLED'],
+  PENDING: ['IN_PROGRESS'],
+  IN_PROGRESS: ['PENDING'],
   COMPLETED: [],
-  CANCELLED: ['PENDING'],
+  CANCELLED: [],
 };
 
 const resolutionLabels: Record<DemountCompletionResolution, string> = {
@@ -67,6 +68,7 @@ const meterDemountLabels: Record<MeterDemountCategory, string> = {
 export default function DemountScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user)
+  const insets = useSafeAreaInsets()
   const search = useLocalSearchParams<{ pickedIccid?: string; wizardTaskId?: string }>();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -442,6 +444,7 @@ export default function DemountScreen() {
                 borderTopRightRadius: 18,
                 maxHeight: '88%',
                 padding: 16,
+                paddingBottom: 16 + insets.bottom,
                 gap: 12,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -460,7 +463,7 @@ export default function DemountScreen() {
               {wizard ? (
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
+                  contentContainerStyle={{ gap: 12, paddingBottom: 20 + insets.bottom }}
                 >
                 <Text style={{ color: colors.textMuted }}>
                   Brojilo: {wizard.task.meter?.serialNumber ?? wizard.task.meterId}

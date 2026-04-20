@@ -3,7 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
 import { CreateMeterDto } from './dto/create-meter.dto';
 import { UpdateMeterDto } from './dto/update-meter.dto';
-import { Meter, MeterSimCardState, Prisma } from '@prisma/client';
+import { Meter, MeterSimCardState, MeterStatus, Prisma } from '@prisma/client';
 import { MeterFilterDto } from './dto/meter-filter.dto';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
@@ -29,6 +29,7 @@ export class MetersService {
       serialNumber: createMeterDto.serialNumber,
       meterTypeDefinitionId: createMeterDto.meterTypeDefinitionId,
     };
+    if (createMeterDto.status) data.status = createMeterDto.status
     if (createMeterDto.year != null) data.year = createMeterDto.year;
     if (createMeterDto.calibrationYear != null) data.calibrationYear = createMeterDto.calibrationYear;
     if (createMeterDto.notes != null) data.notes = createMeterDto.notes;
@@ -124,6 +125,14 @@ export class MetersService {
       include: {
         meterTypeDefinition: true,
         simCard: { include: { assignedTo: true } },
+        installTasks: {
+          where: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            assignedTo: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
       },
     });
 
@@ -163,6 +172,10 @@ export class MetersService {
     const simCardId = updateMeterDto.simCardId;
     const simCardState = updateMeterDto.simCardState;
     if (simCardId) {
+      const existing = await this.prisma.meter.findUnique({ where: { id }, select: { status: true } })
+      if (existing?.status && existing.status !== MeterStatus.ACTIVE) {
+        throw new BadRequestException('Nije dozvoljeno ugraditi SIM na brojilo koje nije aktivno.')
+      }
       data.simCardState = MeterSimCardState.INSTALLED;
       data.noSimReason = null;
     }
