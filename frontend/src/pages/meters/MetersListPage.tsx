@@ -538,6 +538,24 @@ export default function MetersListPage() {
                       },
                     },
                     {
+                      title: 'Demontaža',
+                      key: 'demountTask',
+                      width: 220,
+                      render: (_: unknown, row: MeterItem) => {
+                        const t = row.demountTasks?.[0]
+                        if (!t) return '—'
+                        const date = new Date(t.createdAt).toLocaleString('bs-BA')
+                        const op = t.assignedTo
+                          ? `${t.assignedTo.firstName} ${t.assignedTo.lastName}`
+                          : '—'
+                        return (
+                          <Tag color="gold">
+                            Nalog: {date} • {op}
+                          </Tag>
+                        )
+                      },
+                    },
+                    {
                       title: 'Akcije',
                       key: 'actions',
                       width: 120,

@@ -1,6 +1,6 @@
 export type MeterType = 'SINGLE_PHASE' | 'THREE_PHASE';
 export type MeterSimCardState = 'INSTALLED' | 'NO_SIM';
-export type MeterStatus = 'ACTIVE' | 'DEFECTIVE' | 'IN_CALIBRATION';
+export type MeterStatus = 'ACTIVE' | 'DEFECTIVE' | 'IN_CALIBRATION' | 'INACTIVE';
 
 export type MeterTypeDefinitionRef = {
   id: string;

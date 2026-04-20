@@ -489,6 +489,17 @@ export class DemountTasksService {
         effectiveResolution === DemountCompletionResolution.FULL_DEMOUNT ||
         (effectiveResolution === DemountCompletionResolution.REMOVE_SIM_ONLY &&
           effectiveMeterDemountCategory !== MeterDemountCategory.TEMPORARY_REMOVAL);
+
+      const nextMeterStatus =
+        effectiveResolution === DemountCompletionResolution.FULL_DEMOUNT
+          ? effectiveMeterDemountCategory === MeterDemountCategory.MAINTENANCE
+            ? MeterStatus.IN_CALIBRATION
+            : MeterStatus.INACTIVE
+          : effectiveMeterDemountCategory === MeterDemountCategory.METER_FAULTY
+            ? MeterStatus.DEFECTIVE
+            : effectiveMeterDemountCategory === MeterDemountCategory.MAINTENANCE
+              ? MeterStatus.IN_CALIBRATION
+              : MeterStatus.ACTIVE
       await this.prisma.$transaction(async (tx) => {
         await tx.meter.update({
           where: { id: meter.id },
@@ -499,12 +510,7 @@ export class DemountTasksService {
             lastSimDemountCategory: effectiveMeterDemountCategory,
             isDemountedFromLocation: demountedFromLocation,
             hasOpenDemountTask: false,
-            status:
-              effectiveMeterDemountCategory === MeterDemountCategory.METER_FAULTY
-                ? MeterStatus.DEFECTIVE
-                : effectiveMeterDemountCategory === MeterDemountCategory.MAINTENANCE
-                  ? MeterStatus.IN_CALIBRATION
-                  : MeterStatus.ACTIVE,
+            status: nextMeterStatus,
           },
         });
         await tx.simCard.update({

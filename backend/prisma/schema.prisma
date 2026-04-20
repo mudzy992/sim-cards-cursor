@@ -38,6 +38,7 @@ enum MeterStatus {
   ACTIVE
   DEFECTIVE
   IN_CALIBRATION
+  INACTIVE
 }
 
 enum MeterType {

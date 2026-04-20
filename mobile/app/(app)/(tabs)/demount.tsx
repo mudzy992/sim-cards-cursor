@@ -388,7 +388,9 @@ export default function DemountScreen() {
                     {updatingId === item.id ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
-                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Otkaži</Text>
+                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
+                        Vrati inicijatoru
+                      </Text>
                     )}
                   </Pressable>
                 ))}
@@ -417,7 +419,7 @@ export default function DemountScreen() {
                           ? 'Započni'
                           : status === 'CANCELLED'
                             ? 'Otkaži'
-                            : 'Vrati na čekanje'}
+                            : 'Vrati inicijatoru'}
                       </Text>
                     )}
                   </Pressable>

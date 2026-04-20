@@ -42,6 +42,7 @@ const renderType = (t: MeterType) =>
 const meterStatusLabel = (s: MeterStatus) => {
   if (s === 'ACTIVE') return 'Aktivno'
   if (s === 'DEFECTIVE') return 'Neispravno'
+  if (s === 'INACTIVE') return 'Neaktivno'
   return 'Na baždarenju / servis'
 }
 
@@ -689,6 +690,7 @@ export default function MeterDetailPage() {
                 { label: 'Aktivno', value: 'ACTIVE' },
                 { label: 'Neispravno', value: 'DEFECTIVE' },
                 { label: 'Na baždarenju / servis', value: 'IN_CALIBRATION' },
+                { label: 'Neaktivno', value: 'INACTIVE' },
               ]}
             />
           </Form.Item>

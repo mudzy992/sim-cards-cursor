@@ -101,6 +101,14 @@ export class MetersService {
         include: {
           meterTypeDefinition: true,
           simCard: true,
+          demountTasks: {
+            where: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: {
+              assignedTo: { select: { id: true, firstName: true, lastName: true } },
+            },
+          },
         },
       }),
       this.prisma.meter.count({ where: whereClause }),
