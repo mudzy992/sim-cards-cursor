@@ -57,6 +57,7 @@ export default function InstallScreen() {
     task: InstallTaskItem
     pickedSimCardId?: string
     pickedSimIccid?: string
+    pickedSimIpAddress?: string
     recordNotes: string
     calibrationYear: string
     installationAddress: string
@@ -126,6 +127,7 @@ export default function InstallScreen() {
             ...w,
             pickedSimCardId: claimed.id,
             pickedSimIccid: claimed.iccid,
+            pickedSimIpAddress: claimed.ipAddress,
           }
         })
       } catch {
@@ -169,6 +171,9 @@ export default function InstallScreen() {
     setWizard({
       task,
       recordNotes: '',
+      pickedSimCardId: undefined,
+      pickedSimIccid: undefined,
+      pickedSimIpAddress: undefined,
       calibrationYear: meter?.calibrationYear != null ? String(meter.calibrationYear) : '',
       installationAddress: meter?.installationAddress ?? '',
       installationDate: meter?.installationDate
@@ -663,7 +668,9 @@ export default function InstallScreen() {
                 <View style={{ gap: 8 }}>
                   <Text style={{ fontWeight: '600' }}>SIM kartica</Text>
                   {wizard.pickedSimIccid ? (
-                    <Text style={{ color: '#166534' }}>Odabrano: {wizard.pickedSimIccid}</Text>
+                    <Text style={{ color: '#166534' }}>
+                      Odabrano: {wizard.pickedSimIccid} • IP: {wizard.pickedSimIpAddress?.trim() || '–'}
+                    </Text>
                   ) : (
                     <Text style={{ color: colors.textMuted }}>
                       Skenirajte karticu koja će biti ugrađena.

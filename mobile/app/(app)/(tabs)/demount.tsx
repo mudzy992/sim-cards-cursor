@@ -84,6 +84,7 @@ export default function DemountScreen() {
     reason: string;
     newSimCardId?: string;
     newSimIccid?: string;
+    newSimIpAddress?: string;
     removedSimDisposition?: RemovedSimDisposition;
     meterDemountCategory?: MeterDemountCategory;
   } | null>(null);
@@ -144,6 +145,7 @@ export default function DemountScreen() {
             ...w,
             newSimCardId: card.id,
             newSimIccid: card.iccid,
+            newSimIpAddress: card.ipAddress,
           };
         });
       } catch {
@@ -189,6 +191,7 @@ export default function DemountScreen() {
       meterDemountCategory: task.requestedMeterDemountCategory ?? undefined,
       newSimCardId: undefined,
       newSimIccid: undefined,
+      newSimIpAddress: undefined,
     });
   };
 
@@ -584,7 +587,7 @@ export default function DemountScreen() {
                         <Text style={{ fontWeight: '600' }}>Nova SIM</Text>
                         {wizard.newSimIccid ? (
                           <Text style={{ color: '#166534' }}>
-                            Odabrano: {wizard.newSimIccid}
+                            Odabrano: {wizard.newSimIccid} • IP: {wizard.newSimIpAddress?.trim() || '–'}
                           </Text>
                         ) : (
                           <Text style={{ color: colors.textMuted }}>
