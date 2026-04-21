@@ -178,7 +178,11 @@ describe('InstallationRecordsService', () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ simCardId: null });
       prismaMock.meter.create.mockResolvedValue({ id: 'meter-new' });
-      prismaMock.simCard.findUnique.mockResolvedValue({ id: 'sim-1' });
+      prismaMock.simCard.findUnique.mockResolvedValue({
+        id: 'sim-1',
+        status: 'AVAILABLE',
+        assignedToId: null,
+      });
       prismaMock.installationRecord.create.mockResolvedValue({
         id: 'rec-x',
         recordNumber: 'REC-001',
