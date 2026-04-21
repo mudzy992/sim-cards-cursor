@@ -127,6 +127,7 @@ export default function AppReleasesPage() {
         dataSource={releases}
         pagination={false}
         size="middle"
+        scroll={{ x: 'max-content' }}
       />
 
       <div className="mt-8 max-w-xl">

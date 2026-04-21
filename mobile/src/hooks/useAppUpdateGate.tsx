@@ -20,7 +20,19 @@ type GateState =
       isMandatory: boolean;
       deferUntil: number | null;
     }
-  | { kind: 'downloading'; latest: AndroidLatestRelease; progress?: number }
+  | {
+      kind: 'downloading';
+      latest: AndroidLatestRelease;
+      progress?: number;
+      totalBytesWritten?: number;
+      totalBytesExpectedToWrite?: number;
+    }
+  | {
+      kind: 'downloaded';
+      latest: AndroidLatestRelease;
+      apkUri: string;
+      contentUri: string;
+    }
   | { kind: 'error'; message: string };
 
 function getAndroidVersionCode(): number {
@@ -111,7 +123,7 @@ export function useAppUpdateGate() {
   }, [isAuthenticated, accessToken, currentVersionCode]);
 
   const actions = useMemo(() => {
-    const downloadAndInstall = async (latest: AndroidLatestRelease) => {
+    const download = async (latest: AndroidLatestRelease) => {
       try {
         setState({ kind: 'downloading', latest, progress: 0 });
 
@@ -133,10 +145,27 @@ export function useAppUpdateGate() {
             },
           },
           (p) => {
-            const progress = p.totalBytesExpectedToWrite
-              ? p.totalBytesWritten / p.totalBytesExpectedToWrite
-              : undefined;
-            setState({ kind: 'downloading', latest, progress });
+            const expected = Number(p.totalBytesExpectedToWrite);
+            const written = Number(p.totalBytesWritten);
+
+            const canComputePct =
+              Number.isFinite(expected) && Number.isFinite(written) && expected > 0;
+
+            const raw = canComputePct ? written / expected : undefined;
+            const progress =
+              raw == null
+                ? undefined
+                : Number.isFinite(raw)
+                  ? Math.max(0, Math.min(1, raw))
+                  : undefined;
+
+            setState({
+              kind: 'downloading',
+              latest,
+              progress,
+              totalBytesWritten: Number.isFinite(written) ? written : undefined,
+              totalBytesExpectedToWrite: Number.isFinite(expected) ? expected : undefined,
+            });
           },
         );
 
@@ -146,15 +175,19 @@ export function useAppUpdateGate() {
         }
 
         const contentUri = await FileSystem.getContentUriAsync(result.uri);
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: contentUri,
-          flags: 1,
-          type: 'application/vnd.android.package-archive',
-        });
+        setState({ kind: 'downloaded', latest, apkUri: result.uri, contentUri });
       } catch (e: any) {
         Alert.alert('Nadogradnja nije uspjela', e?.message ?? 'Greška pri nadogradnji');
         setState({ kind: 'error', message: e?.message ?? 'Download/install failed' });
       }
+    };
+
+    const install = async (downloaded: { contentUri: string }) => {
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: downloaded.contentUri,
+        flags: 1,
+        type: 'application/vnd.android.package-archive',
+      });
     };
 
     const postpone = async (latest: AndroidLatestRelease) => {
@@ -165,7 +198,7 @@ export function useAppUpdateGate() {
       setState({ kind: 'no_update' });
     };
 
-    return { downloadAndInstall, postpone };
+    return { download, install, postpone };
   }, []);
 
   return { state, actions };

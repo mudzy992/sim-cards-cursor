@@ -6,6 +6,7 @@ backend/dist/
 frontend/dist/
 mobile/.expo/
 mobile/.expo-shared/
+*.tar
 
 # VM deploy branch specific – ne track-ati ove direktorije/fajlove
 # Ne stavljati ceo mobile/ ovdje: EAS Build pakuje prema .gitignore i onda nema package.json u arhivi
