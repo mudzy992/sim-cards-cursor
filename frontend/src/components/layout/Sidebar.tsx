@@ -19,7 +19,9 @@ const { Sider } = Layout;
 
 export function Sidebar() {
   const location = useLocation();
-  const role = useAuthStore((state) => state.user?.role);
+  const user = useAuthStore((state) => state.user);
+  const role = user?.role;
+  const isModerator = role === 'USER' && (user?.branchModeratorBranchIds?.length ?? 0) > 0;
 
   const featuresQuery = useAppFeatures();
   const pushCampaignsEnabled = featuresQuery.data?.pushCampaignsEnabled ?? true;
@@ -75,6 +77,15 @@ export function Sidebar() {
             key: '/activity-log',
             icon: <UnorderedListOutlined />,
             label: <Link to="/activity-log">Dnevnik aktivnosti</Link>,
+          },
+        ]
+      : []),
+    ...(isModerator
+      ? [
+          {
+            key: '/meters',
+            icon: <ThunderboltOutlined />,
+            label: <Link to="/meters">Brojila</Link>,
           },
         ]
       : []),

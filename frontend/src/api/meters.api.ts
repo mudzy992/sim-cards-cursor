@@ -6,6 +6,8 @@ import type {
   MetersResponse,
   CreateMeterInput,
   UpdateMeterInput,
+  MeterDeleteSummary,
+  DeleteMeterWithConfirmInput,
 } from '@/types/meter.types';
 
 export const metersApi = {
@@ -42,6 +44,23 @@ export const metersApi = {
 
   remove: async (id: string): Promise<void> => {
     await axiosInstance.delete(`/meters/${id}`);
+  },
+
+  getDeleteSummary: async (id: string): Promise<MeterDeleteSummary> => {
+    const response = await axiosInstance.get<ApiEnvelope<MeterDeleteSummary>>(
+      `/meters/${id}/delete-summary`,
+    );
+    return response.data.data;
+  },
+
+  deleteWithConfirm: async (
+    id: string,
+    payload: DeleteMeterWithConfirmInput,
+  ): Promise<{ deleted: boolean; deletedRecordsCount: number }> => {
+    const response = await axiosInstance.post<
+      ApiEnvelope<{ deleted: boolean; deletedRecordsCount: number }>
+    >(`/meters/${id}/delete`, payload);
+    return response.data.data;
   },
 
   getAvailable: async (): Promise<MeterItem[]> => {

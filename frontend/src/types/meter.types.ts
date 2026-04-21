@@ -85,3 +85,45 @@ export type CreateMeterInput = {
 };
 
 export type UpdateMeterInput = Partial<CreateMeterInput>;
+
+export type MeterDeleteSimAction = 'DELETE_SIM' | 'RETURN_SIM_TO_AVAILABLE' | 'LEAVE_AS_IS';
+export type MeterDeleteRecordsAction = 'DELETE_ALL' | 'ABORT_IF_EXISTS';
+
+export type MeterDeleteSummary = {
+  meter: {
+    id: string;
+    serialNumber: string;
+    branchId: string | null;
+    meterTypeDefinitionId: string;
+    hasOpenInstallTask: boolean;
+    hasOpenDemountTask: boolean;
+    simCardId: string | null;
+  };
+  simCard: null | {
+    id: string;
+    iccid: string;
+    status: string;
+    assignedToId: string | null;
+  };
+  installationRecords: {
+    count: number;
+    items: Array<{
+      id: string;
+      recordNumber: string;
+      status: string;
+      createdAt: string | Date;
+      pdfPath: string | null;
+      photos: string[];
+    }>;
+  };
+  tasks: {
+    installTasksCount: number;
+    demountTasksCount: number;
+  };
+};
+
+export type DeleteMeterWithConfirmInput = {
+  password: string;
+  simAction: MeterDeleteSimAction;
+  recordsAction: MeterDeleteRecordsAction;
+};

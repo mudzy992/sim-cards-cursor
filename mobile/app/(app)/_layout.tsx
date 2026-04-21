@@ -69,7 +69,7 @@ const PrivateLayout = () => {
       },
       {
         text: 'Nadogradi',
-        onPress: () => void actions.downloadAndInstall(updateState.latest),
+        onPress: () => void actions.download(updateState.latest),
       },
     ]);
   }, [updateState]);
@@ -97,7 +97,7 @@ const PrivateLayout = () => {
           ) : null}
           <Button
             title="Preuzmi i instaliraj"
-            onPress={() => void actions.downloadAndInstall(updateState.latest)}
+            onPress={() => void actions.download(updateState.latest)}
           />
         </View>
       </SafeAreaView>
@@ -114,6 +114,26 @@ const PrivateLayout = () => {
           <Text style={{ marginTop: 12, color: '#334155' }}>
             Preuzimanje nadogradnje{pct != null ? ` (${pct}%)` : '...'}
           </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (updateState.kind === 'downloaded') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+        <View style={{ flex: 1, padding: 20, justifyContent: 'center' }}>
+          <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 10 }}>
+            Nadogradnja je preuzeta
+          </Text>
+          <Text style={{ color: '#334155', marginBottom: 16 }}>
+            Verzija {updateState.latest.versionName} (kod {updateState.latest.versionCode}) je
+            spremna za instalaciju.
+          </Text>
+          <Button
+            title="Instaliraj"
+            onPress={() => void actions.install({ contentUri: updateState.contentUri })}
+          />
         </View>
       </SafeAreaView>
     );

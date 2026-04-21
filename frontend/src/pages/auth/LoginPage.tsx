@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { LoginInput } from '@/types/auth.types';
 import { useQuery } from '@tanstack/react-query';
 import { appReleasesApi } from '@/api/app-releases.api';
+import { API_BASE_URL } from '@/api/axios.instance';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -90,7 +91,7 @@ export default function LoginPage() {
             </Typography.Text>
             <div>
               <a
-                href={latestReleaseQuery.data.downloadUrl}
+                href={`${API_BASE_URL}${latestReleaseQuery.data.downloadUrl}`}
                 target="_blank"
                 rel="noreferrer"
                 className="text-emerald-700"

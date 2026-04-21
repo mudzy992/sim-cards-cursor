@@ -19,6 +19,7 @@ import { UpdateMeterDto } from './dto/update-meter.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Meter, UserRole } from '@prisma/client';
 import { MeterFilterDto } from './dto/meter-filter.dto';
+import { DeleteMeterDto } from './dto/delete-meter.dto';
 import { ApiPaginated } from 'src/common/decorators/api-paginated.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -26,6 +27,7 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { User } from '@prisma/client';
 import { InstallationRecordsService } from '../installation-records/installation-records.service';
+import { toScopeContext } from 'src/common/utils/scope-filter.util';
 
 @ApiTags('Meters')
 @Controller('meters')
@@ -66,11 +68,20 @@ export class MetersController {
   }
 
   @Get()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiPaginated()
   @ApiOperation({ summary: 'Get all meters' })
-  findAll(@Query() filter: MeterFilterDto, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
-    const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
+  findAll(
+    @Query() filter: MeterFilterDto,
+    @CurrentUser()
+    user?: {
+      role: string;
+      distributionId?: string | null;
+      branchId?: string | null;
+      branchModeratorBranchIds?: string[];
+    },
+  ) {
+    const scope = toScopeContext(user ? { ...user, role: user.role as UserRole } : null);
     return this.metersService.findAll(filter, scope);
   }
 
@@ -78,18 +89,35 @@ export class MetersController {
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Get all available meters' })
   @ApiResponse({ status: 200, description: 'Return all available meters.'})
-  findAvailable(@CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }): Promise<Meter[]> {
-    const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
+  findAvailable(
+    @CurrentUser()
+    user?: {
+      role: string;
+      distributionId?: string | null;
+      branchId?: string | null;
+      branchModeratorBranchIds?: string[];
+    },
+  ): Promise<Meter[]> {
+    const scope = toScopeContext(user ? { ...user, role: user.role as UserRole } : null);
     return this.metersService.findAvailable(scope);
   }
 
   @Get(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Get a meter by ID' })
   @ApiResponse({ status: 200, description: 'Return the meter.' })
   @ApiResponse({ status: 404, description: 'Meter not found.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }): Promise<Meter> {
-    const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser()
+    user?: {
+      role: string;
+      distributionId?: string | null;
+      branchId?: string | null;
+      branchModeratorBranchIds?: string[];
+    },
+  ): Promise<Meter> {
+    const scope = toScopeContext(user ? { ...user, role: user.role as UserRole } : null);
     return this.metersService.findOne(id, scope);
   }
 
@@ -105,6 +133,28 @@ export class MetersController {
   ): Promise<Meter> {
     const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
     return this.metersService.update(id, updateMeterDto, scope);
+  }
+
+  @Get(':id/delete-summary')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Get meter delete summary (SYSTEM_ADMIN)' })
+  getDeleteSummary(@Param('id', ParseUUIDPipe) id: string) {
+    return this.metersService.getDeleteSummary(id);
+  }
+
+  @Post(':id/delete')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Delete meter with confirmation (SYSTEM_ADMIN)' })
+  deleteWithConfirm(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DeleteMeterDto,
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    return this.metersService.deleteWithConfirm(id, dto, { userId, ipAddress });
   }
 
   @Delete(':id')

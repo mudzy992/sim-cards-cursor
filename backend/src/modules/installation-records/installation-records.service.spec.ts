@@ -8,6 +8,7 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { MailService } from '../mail/mail.service';
 import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
 import { InstallationRecordsService } from './installation-records.service';
+import { ConfigService } from '@nestjs/config';
 
 const mockRecord = {
   id: 'rec-1',
@@ -72,6 +73,7 @@ describe('InstallationRecordsService', () => {
         { provide: ActivityLogService, useValue: { log: jest.fn() } },
         { provide: MailService, useValue: { sendRecordWithPdf: jest.fn().mockResolvedValue(undefined) } },
         { provide: MeterTypeFieldsService, useValue: { validateDynamicValues: jest.fn().mockResolvedValue({}), findAllByDefinition: jest.fn().mockResolvedValue([]) } },
+        { provide: ConfigService, useValue: { get: jest.fn((_k: string, def: string) => def) } },
       ],
     }).compile();
 
@@ -176,7 +178,11 @@ describe('InstallationRecordsService', () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ simCardId: null });
       prismaMock.meter.create.mockResolvedValue({ id: 'meter-new' });
-      prismaMock.simCard.findUnique.mockResolvedValue({ id: 'sim-1' });
+      prismaMock.simCard.findUnique.mockResolvedValue({
+        id: 'sim-1',
+        status: 'AVAILABLE',
+        assignedToId: null,
+      });
       prismaMock.installationRecord.create.mockResolvedValue({
         id: 'rec-x',
         recordNumber: 'REC-001',

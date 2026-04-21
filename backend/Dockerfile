@@ -1,31 +1,40 @@
-# --- STAGE 1: Build ---
+# =========================
+# STAGE 1: BUILD
+# =========================
 FROM node:20 AS build
 
 WORKDIR /usr/app
 
-# Kopiramo samo datoteke potrebne za instalaciju dependencija
+# Kopiramo dependency manifest
 COPY package*.json ./
 COPY prisma ./prisma
 
-# Instaliramo sve (uključujući devDependencies za build)
+# Instalacija (reproducibilno)
 RUN npm ci
 
-# Generiramo Prisma Client (ovdje će povući ispravan engine za Debian)
+# Prisma client (Linux build context)
 RUN npx prisma generate
 
-# Kopiramo ostatak koda i buildamo aplikaciju
+# ostatak aplikacije
 COPY . .
+
+# build aplikacije (NestJS / TS)
 RUN npm run build
 
-# --- STAGE 2: Runtime ---
+
+
+# =========================
+# STAGE 2: RUNTIME
+# =========================
 FROM node:20 AS runtime
 
 WORKDIR /usr/app
 
-# Sistemske dependencije potrebne za Chrome/Puppeteer
+# OS dependencies (Chrome + Puppeteer + fonts)
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     fonts-liberation \
+    chromium \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -54,26 +63,41 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libxss1 \
     libxtst6 \
-    wget \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Kopiramo samo ono što je nužno za rad aplikacije
-COPY --from=build /usr/app/package*.json ./
-COPY --from=build /usr/app/node_modules ./node_modules
+
+# =========================
+# Dependencies (RUNTIME SAFE)
+# =========================
+
+COPY package*.json ./
+
+# samo production deps (IMPORTANT)
+RUN npm ci --omit=dev
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# =========================
+# App artifacts
+# =========================
+
 COPY --from=build /usr/app/dist ./dist
 COPY --from=build /usr/app/prisma ./prisma
+COPY --from=build /usr/app/src/templates ./templates
 COPY --from=build /usr/app/tsconfig.json ./tsconfig.json
 COPY --from=build /usr/app/tsconfig.build.json ./tsconfig.build.json
-COPY --from=build /usr/app/src/templates ./templates
 
-# Instaliramo Chrome za Puppeteer (managed browser)
-RUN npx puppeteer browsers install chrome
 
-# Volumen za upload datoteka
+# =========================
+# Runtime config
+# =========================
+
+# (ako koristiš Puppeteer)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 VOLUME ["/usr/app/uploads"]
 
 EXPOSE 3003
 
-# Pokretanje aplikacije
 CMD ["node", "dist/src/main.js"]

@@ -73,6 +73,26 @@ export class DemountTasksService {
     if (!assignedTo) {
       throw new BadRequestException('Operator nije pronađen.');
     }
+    if (assignedTo.role !== UserRole.USER) {
+      throw new BadRequestException('Zadatak se može dodijeliti samo operatoru.')
+    }
+    if (scope?.role === UserRole.USER) {
+      const isModerator = await this.prisma.branchModerator.findUnique({
+        where: {
+          userId_branchId: {
+            userId: createdById,
+            branchId: meter.branchId ?? '',
+          },
+        },
+        select: { id: true },
+      })
+      if (!isModerator) {
+        throw new BadRequestException('Samo moderator podružnice može kreirati ovaj zadatak.')
+      }
+      if (!meter.branchId || assignedTo.branchId !== meter.branchId) {
+        throw new BadRequestException('Možete dodijeliti zadatak samo operatoru iz iste podružnice kao brojilo.')
+      }
+    }
     if (scope?.role === 'DIST_ADMIN' && scope.distributionId) {
       const opDistributionId = assignedTo.distributionId ?? assignedTo.branch?.distributionId;
       if (opDistributionId !== scope.distributionId) {
