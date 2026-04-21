@@ -648,7 +648,11 @@ export default function CreateRecordScreen() {
                   setLocalPhotoUris((p) => [...p, result.assets[0].uri])
                   return
                 }
-                const path = await installationRecordsApi.uploadPhoto(result.assets[0].uri);
+                const yearNum = year ? parseInt(year, 10) : undefined
+                const path = await installationRecordsApi.uploadPhoto(result.assets[0].uri, {
+                  serialNumber: serialNumber.trim(),
+                  year: Number.isFinite(yearNum as number) ? yearNum : undefined,
+                });
                 setPhotoPaths((p) => [...p, path]);
               } catch (err) {
                 if (axios.isAxiosError(err) && !err.response) {

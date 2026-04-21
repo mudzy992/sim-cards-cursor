@@ -87,6 +87,13 @@ export class InstallTasksService {
     if (assignedTo.role !== UserRole.USER) {
       throw new BadRequestException('Zadatak se može dodijeliti samo operatoru.')
     }
+    if (scope?.role === UserRole.USER) {
+      if (!meter.branchId || assignedTo.branchId !== meter.branchId) {
+        throw new BadRequestException(
+          'Možete dodijeliti zadatak samo operatoru iz iste podružnice kao brojilo.',
+        )
+      }
+    }
     if (scope?.role === UserRole.DIST_ADMIN && scope.distributionId) {
       const opDistributionId = assignedTo.distributionId ?? assignedTo.branch?.distributionId
       if (opDistributionId !== scope.distributionId) {

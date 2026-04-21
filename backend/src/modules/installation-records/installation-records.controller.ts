@@ -77,9 +77,16 @@ export class InstallationRecordsController {
   )
   @ApiOperation({ summary: 'Upload photo for installation record (returns path for photos array)' })
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
-  async uploadPhoto(@UploadedFile() file: Express.Multer.File): Promise<{ path: string }> {
-    const path = await this.photoUploadService.save(file);
-    return { path };
+  async uploadPhoto(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('serialNumber') serialNumber: string,
+    @Body('year') year?: string,
+  ): Promise<{ path: string }> {
+    const p = await this.photoUploadService.save(file, {
+      serialNumber,
+      year: year ? parseInt(year, 10) : undefined,
+    });
+    return { path: p };
   }
 
   @Get()

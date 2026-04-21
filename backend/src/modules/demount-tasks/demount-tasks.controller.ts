@@ -29,7 +29,7 @@ export class DemountTasksController {
   constructor(private readonly demountTasksService: DemountTasksService) {}
 
   @Post()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Kreiraj zadatak demontaže – bira operatora' })
   create(
     @Body() dto: CreateDemountTaskDto,

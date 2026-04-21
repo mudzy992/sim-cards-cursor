@@ -151,9 +151,16 @@ function toErrorMessage(error: unknown): string {
 async function sendOne(item: OutboxItem): Promise<void> {
   if (item.kind === 'INSTALLATION_RECORD_CREATE' && item.meta?.localPhotoUris?.length) {
     const body = item.request.body as any
+    const serialNumber = typeof body?.serialNumber === 'string' ? body.serialNumber.trim() : ''
+    if (!serialNumber) {
+      throw new Error('Nedostaje serialNumber za upload fotografija (offline queue).')
+    }
     const uploaded: string[] = []
     for (const uri of item.meta.localPhotoUris) {
-      const path = await installationRecordsUploadApi.uploadPhoto(uri)
+      const path = await installationRecordsUploadApi.uploadPhoto(uri, {
+        serialNumber,
+        year: body?.year,
+      })
       uploaded.push(path)
     }
     item.request.body = {

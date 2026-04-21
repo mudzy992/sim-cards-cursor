@@ -29,6 +29,7 @@ import {
 import { installTasksApi } from '@/api/install-tasks.api'
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
+import { useAuthStore } from '@/store/auth.store'
 import {
   getDemountResolutionLabel,
   getMeterDemountCategoryLabel,
@@ -36,6 +37,7 @@ import {
 } from '@/utils/labels.utils'
 import type { MeterStatus, MeterType, UpdateMeterInput } from '@/types/meter.types'
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
+import type { UserRole } from '@/types/auth.types'
 
 const renderType = (t: MeterType) =>
   t === 'SINGLE_PHASE' ? 'Jednofazno' : t === 'THREE_PHASE' ? 'Trofazno' : t
@@ -67,6 +69,8 @@ export default function MeterDetailPage() {
   const queryClient = useQueryClient()
   const [messageApi, messageContextHolder] = message.useMessage()
   const { id } = useParams<{ id: string }>()
+  const user = useAuthStore((s) => s.user)
+  const userRole = (user?.role ?? null) as UserRole | null
 
   const [installDrawerOpen, setInstallDrawerOpen] = useState(false)
   const [demountDrawerOpen, setDemountDrawerOpen] = useState(false)
@@ -97,6 +101,18 @@ export default function MeterDetailPage() {
   const meter = meterQuery.data
   const openInstallTask = meter?.installTasks?.[0]
   const openDemountTask = meter?.demountTasks?.[0]
+  const moderatedBranchIds = user?.branchModeratorBranchIds ?? []
+  const isAdmin = userRole === 'SYSTEM_ADMIN' || userRole === 'DIST_ADMIN'
+  const isModeratorForMeter = Boolean(meter?.branchId) && moderatedBranchIds.includes(meter!.branchId!)
+  const canCreateTasksForMeter = isAdmin || isModeratorForMeter
+  const canCreateInstallTask =
+    canCreateTasksForMeter &&
+    Boolean(meter) &&
+    (meter!.simCardState === 'NO_SIM' || !meter!.simCard) &&
+    !openInstallTask
+  const canCreateDemountTask =
+    canCreateTasksForMeter && Boolean(meter) && Boolean(meter!.simCard) && !openDemountTask
+  const isActiveMeter = !meter?.status || meter.status === 'ACTIVE'
   const openInstallLabel = openInstallTask
     ? {
         date: new Date(openInstallTask.createdAt).toLocaleString('bs-BA'),
@@ -158,6 +174,20 @@ export default function MeterDetailPage() {
     queryFn: () => usersApi.list({ page: 1, limit: 100, role: 'USER' }),
     enabled: installDrawerOpen || demountDrawerOpen || reassignDrawerOpen,
   })
+
+  const operatorOptions =
+    operatorsQuery.data?.items
+      ?.filter((u) => u.role === 'USER')
+      .filter((u) => {
+        if (!meter?.branchId) return true
+        // Moderator can assign only to operators in same branch as meter; admins keep full list.
+        if (userRole === 'USER') return u.branchId === meter.branchId
+        return true
+      })
+      .map((u) => ({
+        label: `${u.firstName} ${u.lastName} (${u.email})`,
+        value: u.id,
+      })) ?? []
 
   const updateMeterMutation = useMutation({
     mutationFn: ({ payload }: { payload: UpdateMeterInput }) => metersApi.update(id!, payload),
@@ -399,11 +429,27 @@ export default function MeterDetailPage() {
                 </Space>
               ) : null}
               {meter.simCard && !openDemountLabel ? (
-                <Button disabled={meter.status && meter.status !== 'ACTIVE'} onClick={() => setDemountDrawerOpen(true)}>
+                <Button
+                  disabled={!isActiveMeter || !canCreateDemountTask}
+                  title={
+                    !canCreateDemountTask
+                      ? 'Nemate pravo kreirati demontažu za ovo brojilo.'
+                      : !isActiveMeter
+                        ? 'Brojilo mora biti aktivno.'
+                        : undefined
+                  }
+                  onClick={() => {
+                    if (!canCreateDemountTask) {
+                      messageApi.error('Nemate pravo kreirati demontažu za ovo brojilo.')
+                      return
+                    }
+                    setDemountDrawerOpen(true)
+                  }}
+                >
                   Demontaža
                 </Button>
               ) : null}
-              {meter.simCardState === 'NO_SIM' ? (
+              {meter.simCardState === 'NO_SIM' || !meter.simCard ? (
                 openInstallTask ? (
                   <Tag color={openInstallTask.status === 'IN_PROGRESS' ? 'gold' : 'blue'}>
                     Kreiran nalog za ugradnju: {openInstallLabel?.date} • {openInstallLabel?.operator} (
@@ -411,8 +457,21 @@ export default function MeterDetailPage() {
                   </Tag>
                 ) : (
                   <Button
-                    disabled={meter.status && meter.status !== 'ACTIVE'}
-                    onClick={() => setInstallDrawerOpen(true)}
+                    disabled={!isActiveMeter || !canCreateInstallTask}
+                    title={
+                      !canCreateInstallTask
+                        ? 'Nemate pravo kreirati ugradnju za ovo brojilo.'
+                        : !isActiveMeter
+                          ? 'Brojilo mora biti aktivno.'
+                          : undefined
+                    }
+                    onClick={() => {
+                      if (!canCreateInstallTask) {
+                        messageApi.error('Nemate pravo kreirati ugradnju za ovo brojilo.')
+                        return
+                      }
+                      setInstallDrawerOpen(true)
+                    }}
                   >
                     Pošalji na ugradnju
                   </Button>
@@ -653,6 +712,10 @@ export default function MeterDetailPage() {
               loading={createInstallMutation.isPending}
               onClick={() => {
                 if (!id || !installOperatorId) return
+                if (!canCreateInstallTask) {
+                  messageApi.error('Nemate pravo kreirati ugradnju za ovo brojilo.')
+                  return
+                }
                 createInstallMutation.mutate({
                   meterId: id,
                   assignedToId: installOperatorId,
@@ -671,14 +734,7 @@ export default function MeterDetailPage() {
               placeholder="Odaberite operatora"
               value={installOperatorId || undefined}
               onChange={setInstallOperatorId}
-              options={
-                operatorsQuery.data?.items
-                  ?.filter((u) => u.role === 'USER')
-                  .map((u) => ({
-                    label: `${u.firstName} ${u.lastName} (${u.email})`,
-                    value: u.id,
-                  })) ?? []
-              }
+              options={operatorOptions}
               loading={operatorsQuery.isLoading}
               showSearch
               filterOption={(input, opt) =>
@@ -719,6 +775,10 @@ export default function MeterDetailPage() {
               loading={createDemountMutation.isPending}
               onClick={() => {
                 if (!id || !demountOperatorId) return
+                if (!canCreateDemountTask) {
+                  messageApi.error('Nemate pravo kreirati demontažu za ovo brojilo.')
+                  return
+                }
                 if (!demountResolution) return
                 if (demountReason.trim().length < 3) return
                 if (!demountRemovedSimDisposition) return
@@ -756,14 +816,7 @@ export default function MeterDetailPage() {
               placeholder="Odaberite operatora"
               value={demountOperatorId || undefined}
               onChange={setDemountOperatorId}
-              options={
-                operatorsQuery.data?.items
-                  ?.filter((u) => u.role === 'USER')
-                  .map((u) => ({
-                    label: `${u.firstName} ${u.lastName} `,
-                    value: u.id,
-                  })) ?? []
-              }
+              options={operatorOptions.map((o) => ({ ...o, label: String(o.label).replace(/\s*\(.*\)\s*$/, '') }))}
               loading={operatorsQuery.isLoading}
               showSearch
               filterOption={(input, opt) =>

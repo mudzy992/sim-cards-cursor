@@ -11,6 +11,7 @@ import {
   assertMeterYearsPairIfPartial,
   assertMeterYearsRequired,
 } from 'src/common/utils/meter-years.util';
+import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class MetersService {
@@ -86,7 +87,7 @@ export class MetersService {
     if (simCardState) {
       where.simCardState = simCardState;
     }
-    const scopeClause = scopeWhere(scope, { branchIdField: 'branchId' });
+    const scopeClause = this.getMetersReadScopeClause(scope);
     if (scopeClause) {
       where.AND = where.AND ? [...(Array.isArray(where.AND) ? where.AND : [where.AND]), scopeClause] : [scopeClause];
     }
@@ -124,7 +125,7 @@ export class MetersService {
   }
 
   async findOne(id: string, scope?: ScopeContext | null) {
-    const scopeClause = scopeWhere(scope, { branchIdField: 'branchId' });
+    const scopeClause = this.getMetersReadScopeClause(scope);
     const meter = await this.prisma.meter.findFirst({
       where: {
         id,
@@ -245,12 +246,26 @@ export class MetersService {
 
   /** Sva brojila – pri kreiranju zapisnika bira se brojilo i SIM (zapisnik = pridruživanje SIM brojilu). */
   async findAvailable(scope?: ScopeContext | null) {
-    const scopeClause = scopeWhere(scope, { branchIdField: 'branchId' });
+    const scopeClause = this.getMetersReadScopeClause(scope);
     return this.prisma.meter.findMany({
       where: scopeClause ? { AND: [scopeClause] } : undefined,
       orderBy: [{ meterTypeDefinition: { name: 'asc' } }, { serialNumber: 'asc' }],
       include: { meterTypeDefinition: true },
     });
+  }
+
+  private getMetersReadScopeClause(scope?: ScopeContext | null) {
+    if (
+      scope?.role === UserRole.USER &&
+      (scope.branchModeratorBranchIds?.length ?? 0) > 0
+    ) {
+      if (scope.distributionId) {
+        return { branch: { distributionId: scope.distributionId } };
+      }
+      // Fallback (shouldn't happen in normal data): behave like normal USER scope.
+      return scopeWhere(scope, { branchIdField: 'branchId' });
+    }
+    return scopeWhere(scope, { branchIdField: 'branchId' });
   }
 }
 

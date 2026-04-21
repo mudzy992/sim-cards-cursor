@@ -26,6 +26,7 @@ import BranchModeratorsPage from '@/pages/branch-moderators/BranchModeratorsPage
 import BranchEmailRecipientsPage from '@/pages/branch-email-recipients/BranchEmailRecipientsPage'
 import MeterTypeFieldsPage from '@/pages/meter-type-fields/MeterTypeFieldsPage'
 import MeterTypeUpsertPage from '@/pages/meter-types/MeterTypeUpsertPage'
+import { MetersAccessGuard } from '@/components/common/MetersAccessGuard'
 
 export const router = createBrowserRouter([
   {
@@ -85,17 +86,17 @@ export const router = createBrowserRouter([
           {
             path: '/meters',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+              <MetersAccessGuard>
                 <MetersListPage />
-              </RoleGuard>
+              </MetersAccessGuard>
             ),
           },
           {
             path: '/meters/:id',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+              <MetersAccessGuard>
                 <MeterDetailPage />
-              </RoleGuard>
+              </MetersAccessGuard>
             ),
           },
           {

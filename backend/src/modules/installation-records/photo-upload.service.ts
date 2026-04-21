@@ -8,17 +8,20 @@ import { SETTINGS_KEYS } from '../settings/settings-keys';
 
 @Injectable()
 export class PhotoUploadService {
-  private readonly uploadDir: string;
+  private readonly uploadsRoot: string;
 
   constructor(
     private readonly config: ConfigService,
     private readonly settings: SettingsService,
   ) {
-    const root = this.config.get<string>('UPLOAD_ROOT_PATH', path.join(process.cwd(), 'uploads'));
-    this.uploadDir = path.join(root, 'installation-records');
-    if (!fs.existsSync(this.uploadDir)) {
-      fs.mkdirSync(this.uploadDir, { recursive: true });
-    }
+    this.uploadsRoot = this.config.get<string>(
+      'UPLOAD_ROOT_PATH',
+      path.join(process.cwd(), 'uploads'),
+    );
+  }
+
+  private sanitizePathSegment(value: string): string {
+    return value.replace(/[^a-zA-Z0-9-_]/g, '_');
   }
 
   private normalizeMime(m: string): string {
@@ -43,10 +46,24 @@ export class PhotoUploadService {
     return { maxBytes: mb * 1024 * 1024, allowedMimes };
   }
 
-  async save(file: Express.Multer.File): Promise<string> {
+  async save(
+    file: Express.Multer.File,
+    opts: { serialNumber: string; year?: number | string | null },
+  ): Promise<string> {
     if (!file) {
       throw new BadRequestException('Fajl nije pronađen.');
     }
+    const serialNumber = (opts.serialNumber ?? '').trim();
+    if (!serialNumber) {
+      throw new BadRequestException('Nedostaje serijski broj brojila (serialNumber).');
+    }
+    const yearValue = opts.year ?? new Date().getFullYear();
+    const year = String(
+      typeof yearValue === 'number'
+        ? yearValue
+        : parseInt(String(yearValue), 10) || new Date().getFullYear(),
+    );
+
     const buffer = file.buffer ?? (file.path ? fs.readFileSync(file.path) : null);
     if (!buffer) {
       throw new BadRequestException('Sadržaj fajla nije dostupan.');
@@ -69,9 +86,20 @@ export class PhotoUploadService {
     const mimetype = normalizedMime || 'image/jpeg';
     const ext = mimetype === 'image/png' ? '.png' : '.jpg';
     const sanitizedName = `${randomUUID()}${ext}`;
-    const relativePath = `installation-records/${sanitizedName}`;
-    const fullPath = path.join(this.uploadDir, sanitizedName);
+    const serial = this.sanitizePathSegment(serialNumber);
+    const relativePath = path.posix.join(
+      'installation-records',
+      year,
+      serial,
+      'photos',
+      sanitizedName,
+    );
+    const dir = path.join(this.uploadsRoot, 'installation-records', year, serial, 'photos');
+    const fullPath = path.join(dir, sanitizedName);
 
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(fullPath, buffer);
 
     return relativePath;

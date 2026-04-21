@@ -24,6 +24,7 @@ import { PdfGeneratorService } from 'src/common/utils/pdf-generator.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { MailService } from '../mail/mail.service';
 import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
+import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -36,11 +37,7 @@ export type InstallationRecordContext = {
 
 @Injectable()
 export class InstallationRecordsService {
-  private readonly pdfStorageDir = path.join(
-    process.cwd(),
-    'generated',
-    'pdf',
-  );
+  private readonly uploadsRoot: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -49,7 +46,39 @@ export class InstallationRecordsService {
     private readonly activityLogService: ActivityLogService,
     private readonly mailService: MailService,
     private readonly meterTypeFieldsService: MeterTypeFieldsService,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    this.uploadsRoot = this.config.get<string>(
+      'UPLOAD_ROOT_PATH',
+      path.join(process.cwd(), 'uploads'),
+    );
+  }
+
+  private resolveUploadsPath(relativePath: string): string {
+    const parts = relativePath.split(/[\\/]+/).filter(Boolean);
+    return path.join(this.uploadsRoot, ...parts);
+  }
+
+  private sanitizePathSegment(value: string): string {
+    return value.replace(/[^a-zA-Z0-9-_]/g, '_');
+  }
+
+  private getRecordYear(record: { createdAt?: Date | string | null }): string {
+    const d = record.createdAt ? new Date(record.createdAt) : new Date();
+    return String(d.getFullYear());
+  }
+
+  private getRecordBaseDir(record: {
+    createdAt?: Date | string | null;
+    meter?: { serialNumber?: string | null } | null;
+  }): { year: string; serial: string; baseRelativeDir: string; baseAbsoluteDir: string } {
+    const year = this.getRecordYear(record);
+    const serialRaw = record.meter?.serialNumber?.trim() || 'unknown-meter';
+    const serial = this.sanitizePathSegment(serialRaw);
+    const baseRelativeDir = path.posix.join('installation-records', year, serial);
+    const baseAbsoluteDir = this.resolveUploadsPath(baseRelativeDir);
+    return { year, serial, baseRelativeDir, baseAbsoluteDir };
+  }
 
   async create(
     createInstallationRecordDto: CreateInstallationRecordDto,
@@ -565,6 +594,7 @@ export class InstallationRecordsService {
     kind?: InstallationRecordKind;
     demountedMeterSnapshot?: Prisma.JsonValue | null;
     photos?: string[] | null;
+    createdAt?: Date;
     meter?: {
       serialNumber: string;
       year?: number | null;
@@ -621,8 +651,7 @@ export class InstallationRecordsService {
         }
       : null;
     const photos = (record.photos as string[] | undefined) ?? [];
-    const uploadsRoot =
-      (this as any).config?.get?.('UPLOAD_ROOT_PATH') ?? path.join(process.cwd(), 'uploads');
+    const uploadsRoot = this.uploadsRoot;
     const photoDataUrls: string[] = [];
     for (const p of photos) {
       if (typeof p !== 'string' || !p.startsWith('installation-records/')) continue;
@@ -733,10 +762,12 @@ export class InstallationRecordsService {
         ? 'installation-record-meter-replacement'
         : 'installation-record';
     const buffer = await this.pdfGenerator.generatePdf(templateName, pdfData);
-    const sanitizedFileName = `${installationRecord.recordNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
-    const relativePath = path.join('generated', 'pdf', sanitizedFileName);
-    const absolutePath = path.join(this.pdfStorageDir, sanitizedFileName);
-    fs.mkdirSync(this.pdfStorageDir, { recursive: true });
+    const { baseRelativeDir, baseAbsoluteDir } = this.getRecordBaseDir(installationRecord);
+    const sanitizedFileName = `${this.sanitizePathSegment(installationRecord.recordNumber)}.pdf`;
+    const relativePath = path.posix.join(baseRelativeDir, 'zapisnik', sanitizedFileName);
+    const absoluteDir = path.join(baseAbsoluteDir, 'zapisnik');
+    const absolutePath = path.join(absoluteDir, sanitizedFileName);
+    fs.mkdirSync(absoluteDir, { recursive: true });
     fs.writeFileSync(absolutePath, buffer);
     await this.prisma.installationRecord.update({
       where: { id },
@@ -768,7 +799,7 @@ export class InstallationRecordsService {
 
     let pdfBuffer: Buffer;
     if (record.pdfPath) {
-      const absolutePath = path.join(process.cwd(), record.pdfPath);
+      const absolutePath = this.resolveUploadsPath(record.pdfPath);
       if (fs.existsSync(absolutePath)) {
         pdfBuffer = fs.readFileSync(absolutePath);
       } else {
