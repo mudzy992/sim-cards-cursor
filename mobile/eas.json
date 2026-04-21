@@ -12,10 +12,7 @@
         "NODE_ENV": "development"
       },
       "android": {
-        "buildType": "apk",
-        "config": {
-          "abiFilters": ["arm64-v8a"]
-        }
+        "buildType": "apk"
       }
     },
     "preview": {
@@ -28,10 +25,7 @@
         "NODE_ENV": "production"
       },
       "android": {
-        "buildType": "apk",
-        "config": {
-          "abiFilters": ["arm64-v8a"]
-        }
+        "buildType": "apk"
       }
     }
   },
