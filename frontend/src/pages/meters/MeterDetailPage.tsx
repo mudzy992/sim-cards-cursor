@@ -177,9 +177,11 @@ export default function MeterDetailPage() {
       messageApi.success('Brojilo je obrisano.')
       setDeleteModalOpen(false)
       setDeletePassword('')
+      navigate('/meters')
+      await queryClient.invalidateQueries({ queryKey: ['meters', 'list'] })
+      await queryClient.refetchQueries({ queryKey: ['meters', 'list'] })
       await queryClient.invalidateQueries({ queryKey: ['meters'] })
       await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
-      navigate('/meters')
     },
     onError: (err: unknown) => {
       messageApi.error(
