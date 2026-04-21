@@ -28,9 +28,6 @@
       "package": "ba.epbih.simtracker",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "pan",
-      "config": {
-        "abiFilters": ["arm64-v8a"]
-      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundImage": "./assets/ic_launcher_background.png"
@@ -62,7 +59,8 @@
             "targetSdkVersion": 36,
             "buildToolsVersion": "36.0.0",
             "enableMinifyInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "abiFilters": ["arm64-v8a"]
             }
         }
       ],
