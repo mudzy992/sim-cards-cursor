@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import * as Application from 'expo-application';
-import * as FileSystem from 'expo-file-system/legacy';
+import {
+  createDownloadResumable,
+  documentDirectory,
+  getContentUriAsync,
+  getInfoAsync,
+  makeDirectoryAsync,
+} from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as SecureStore from 'expo-secure-store';
 import { appReleasesApi, type AndroidLatestRelease } from '@/api/app-releases.api';
@@ -127,8 +133,16 @@ export function useAppUpdateGate() {
       try {
         setState({ kind: 'downloading', latest, progress: 0 });
 
-        const updatesDir = `${FileSystem.documentDirectory ?? ''}updates/`;
-        await FileSystem.makeDirectoryAsync(updatesDir, { intermediates: true });
+        const baseDir = documentDirectory;
+        if (!baseDir) {
+          throw new Error('Storage directory not available');
+        }
+
+        const updatesDir = `${baseDir}updates/`;
+        const dirInfo = await getInfoAsync(updatesDir);
+        if (!dirInfo.exists) {
+          await makeDirectoryAsync(updatesDir, { intermediates: true });
+        }
         const target = `${updatesDir}sim-tracker-${latest.versionName}-${latest.versionCode}.apk`;
 
         const base = axiosInstance.defaults.baseURL ?? '';
@@ -136,7 +150,7 @@ export function useAppUpdateGate() {
           ? latest.downloadUrl
           : `${base}${latest.downloadUrl}`;
 
-        const download = FileSystem.createDownloadResumable(
+        const download = createDownloadResumable(
           absoluteUrl,
           target,
           {
@@ -174,7 +188,7 @@ export function useAppUpdateGate() {
           throw new Error('Download failed');
         }
 
-        const contentUri = await FileSystem.getContentUriAsync(result.uri);
+        const contentUri = await getContentUriAsync(result.uri);
         setState({ kind: 'downloaded', latest, apkUri: result.uri, contentUri });
       } catch (e: any) {
         Alert.alert('Nadogradnja nije uspjela', e?.message ?? 'Greška pri nadogradnji');
