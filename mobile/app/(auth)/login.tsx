@@ -16,10 +16,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { getApiErrorMessage } from '@/utils/error.utils';
 import { colors } from '@/theme/colors';
 import { LogoWatermark } from '@/components/LogoWatermark'
+import { useServerHealth } from '@/hooks/useServerHealth'
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
+  const { status: serverStatus, check: checkServer } = useServerHealth({ timeoutMs: 2500 });
 
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -67,6 +69,53 @@ export default function LoginScreen() {
         <Text style={{ color: 'rgba(255,255,255,0.75)', marginBottom: 20 }}>
           Prijava na mobilnu aplikaciju
         </Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <View
+            style={{
+              paddingVertical: 6,
+              paddingHorizontal: 10,
+              borderRadius: 999,
+              backgroundColor:
+                serverStatus === 'online'
+                  ? 'rgba(34,197,94,0.16)'
+                  : serverStatus === 'offline'
+                    ? 'rgba(239,68,68,0.16)'
+                    : 'rgba(255,255,255,0.10)',
+              borderWidth: 1,
+              borderColor:
+                serverStatus === 'online'
+                  ? 'rgba(34,197,94,0.40)'
+                  : serverStatus === 'offline'
+                    ? 'rgba(239,68,68,0.40)'
+                    : 'rgba(255,255,255,0.20)',
+            }}
+          >
+            <Text style={{ color: colors.onPrimary, fontWeight: '700' }}>
+              Server:{' '}
+              {serverStatus === 'online'
+                ? 'Online'
+                : serverStatus === 'offline'
+                  ? 'Offline'
+                  : 'Provjera...'}
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={() => void checkServer()}
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.85 : 1,
+              paddingVertical: 6,
+              paddingHorizontal: 10,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.20)',
+              backgroundColor: 'rgba(255,255,255,0.08)',
+            })}
+          >
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600' }}>Provjeri</Text>
+          </Pressable>
+        </View>
 
         <TextInput
           placeholder="Email"
@@ -126,9 +175,6 @@ export default function LoginScreen() {
         <View style={{ marginTop: 16 }}>
           <Text style={{ color: 'rgba(255,255,255,0.75)' }}>
             Prijava putem emaila ili korisničkog imena (ime.prezime)
-          </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.60)', marginTop: 4 }}>
-            API: {process.env.EXPO_PUBLIC_API_BASE_URL ?? 'nije postavljen'}
           </Text>
         </View>
       </KeyboardAvoidingView>

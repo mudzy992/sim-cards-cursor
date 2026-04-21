@@ -6,10 +6,12 @@ import { colors } from '@/theme/colors'
 import { ScreenHeader } from '@/components/common/ScreenHeader'
 import { Screen } from '@/components/common/Screen'
 import { Card } from '@/components/common/Card'
+import { useAppVersion } from '@/hooks/useAppVersion'
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { versionName, buildNumber } = useAppVersion();
 
   const handleLogout = async () => {
     await logout();
@@ -29,6 +31,13 @@ export default function ProfileScreen() {
           </Text>
           <Text style={{ color: colors.textMuted }}>{user?.email ?? '—'}</Text>
           <Text style={{ color: colors.textMuted }}>Role: {user?.role ?? '—'}</Text>
+        </Card>
+
+        <Card style={{ gap: 6 }}>
+          <Text style={{ color: colors.text, fontWeight: '800' }}>Verzija aplikacije</Text>
+          <Text style={{ color: colors.textMuted }}>
+            {versionName} (build {buildNumber})
+          </Text>
         </Card>
 
         <View style={{ gap: 10 }}>

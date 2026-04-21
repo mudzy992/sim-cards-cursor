@@ -106,6 +106,11 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
+  const publicBasePath = config.get<string>(
+    'SWAGGER_PUBLIC_BASE_PATH',
+    !isDev ? '/backend' : '',
+  );
+  document.servers = [{ url: `${publicBasePath}` }];
   SwaggerModule.setup('api/docs', app, document);
 
   await app.get(PrismaService).enableShutdownHooks(app);
