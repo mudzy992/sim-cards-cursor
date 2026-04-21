@@ -28,6 +28,9 @@
       "package": "ba.epbih.simtracker",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "pan",
+      "config": {
+        "abiFilters": ["arm64-v8a"]
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundImage": "./assets/ic_launcher_background.png"
