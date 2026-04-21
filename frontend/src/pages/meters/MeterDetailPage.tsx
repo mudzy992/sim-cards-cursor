@@ -7,7 +7,9 @@ import {
   Form,
   Input,
   InputNumber,
+  Modal,
   Popconfirm,
+  Radio,
   Select,
   Space,
   Switch,
@@ -36,6 +38,11 @@ import {
   getRemovedSimDispositionLabel,
 } from '@/utils/labels.utils'
 import type { MeterStatus, MeterType, UpdateMeterInput } from '@/types/meter.types'
+import type {
+  DeleteMeterWithConfirmInput,
+  MeterDeleteRecordsAction,
+  MeterDeleteSimAction,
+} from '@/types/meter.types'
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 import type { UserRole } from '@/types/auth.types'
 
@@ -71,6 +78,12 @@ export default function MeterDetailPage() {
   const { id } = useParams<{ id: string }>()
   const user = useAuthStore((s) => s.user)
   const userRole = (user?.role ?? null) as UserRole | null
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteSimAction, setDeleteSimAction] = useState<MeterDeleteSimAction>('LEAVE_AS_IS')
+  const [deleteRecordsAction, setDeleteRecordsAction] =
+    useState<MeterDeleteRecordsAction>('ABORT_IF_EXISTS')
 
   const [installDrawerOpen, setInstallDrawerOpen] = useState(false)
   const [demountDrawerOpen, setDemountDrawerOpen] = useState(false)
@@ -150,6 +163,61 @@ export default function MeterDetailPage() {
       }),
     enabled: Boolean(id),
   })
+
+  const deleteSummaryQuery = useQuery({
+    queryKey: ['meters', 'delete-summary', id],
+    queryFn: () => metersApi.getDeleteSummary(id!),
+    enabled: Boolean(id) && deleteModalOpen && userRole === 'SYSTEM_ADMIN',
+  })
+
+  const deleteWithConfirmMutation = useMutation({
+    mutationFn: (payload: DeleteMeterWithConfirmInput) =>
+      metersApi.deleteWithConfirm(id!, payload),
+    onSuccess: async () => {
+      messageApi.success('Brojilo je obrisano.')
+      setDeleteModalOpen(false)
+      setDeletePassword('')
+      await queryClient.invalidateQueries({ queryKey: ['meters'] })
+      await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
+      navigate('/meters')
+    },
+    onError: (err: unknown) => {
+      messageApi.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Brisanje brojila nije uspjelo.',
+      )
+    },
+  })
+
+  const handleDownloadRecordPdf = async (recordId: string, recordNumber?: string) => {
+    try {
+      const blob = await installationRecordsApi.getPdfBlob(recordId)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `zapisnik-${recordNumber ?? recordId}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      messageApi.success('PDF je preuzet.')
+    } catch {
+      messageApi.error('Preuzimanje PDF-a nije uspjelo.')
+    }
+  }
+
+  const handleDownloadPhoto = async (photoPath: string) => {
+    try {
+      const blob = await installationRecordsApi.getPhotoBlob(photoPath)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = photoPath.split('/').filter(Boolean).pop() ?? 'photo'
+      a.click()
+      URL.revokeObjectURL(url)
+      messageApi.success('Fotografija je preuzeta.')
+    } catch {
+      messageApi.error('Preuzimanje fotografije nije uspjelo.')
+    }
+  }
 
   const meterTypeFieldsQuery = useQuery({
     queryKey: ['meter-type-definitions', 'fields', meter?.meterTypeDefinitionId],
@@ -504,6 +572,19 @@ export default function MeterDetailPage() {
               <Button type="primary" onClick={handleOpenEdit}>
                 Uredi
               </Button>
+              {userRole === 'SYSTEM_ADMIN' ? (
+                <Button
+                  danger
+                  onClick={() => {
+                    setDeleteModalOpen(true)
+                    setDeletePassword('')
+                    setDeleteRecordsAction('ABORT_IF_EXISTS')
+                    setDeleteSimAction(meter.simCard ? 'RETURN_SIM_TO_AVAILABLE' : 'LEAVE_AS_IS')
+                  }}
+                >
+                  Obriši brojilo
+                </Button>
+              ) : null}
             </Space>
           ) : null
         }
@@ -993,6 +1074,182 @@ export default function MeterDetailPage() {
           ) : null}
         </Form>
       </Drawer>
+
+      <Modal
+        title="Brisanje brojila (SYSTEM_ADMIN)"
+        open={deleteModalOpen}
+        okText="Obriši"
+        cancelText="Odustani"
+        okButtonProps={{
+          danger: true,
+          loading: deleteWithConfirmMutation.isPending,
+          disabled: !deletePassword.trim() ||
+            (deleteSummaryQuery.data?.installationRecords?.count ?? 0) > 0 &&
+              deleteRecordsAction !== 'DELETE_ALL',
+        }}
+        onCancel={() => {
+          setDeleteModalOpen(false)
+          setDeletePassword('')
+        }}
+        onOk={() => {
+          if (!id) return
+          deleteWithConfirmMutation.mutate({
+            password: deletePassword,
+            simAction: deleteSimAction,
+            recordsAction: deleteRecordsAction,
+          })
+        }}
+        destroyOnClose
+      >
+        {deleteSummaryQuery.isLoading ? (
+          <Typography.Text type="secondary">Učitavanje veza…</Typography.Text>
+        ) : deleteSummaryQuery.data ? (
+          <div className="space-y-3">
+            <Typography.Text>
+              Brisanje će trajno ukloniti brojilo iz baze. Prije nastavka provjerite sve veze.
+            </Typography.Text>
+
+            <Card size="small" title="Veze">
+              <div className="space-y-2">
+                {deleteSummaryQuery.data.meter.hasOpenInstallTask ||
+                deleteSummaryQuery.data.meter.hasOpenDemountTask ? (
+                  <Typography.Text type="warning">
+                    Upozorenje: brojilo ima otvoren nalog (
+                    {deleteSummaryQuery.data.meter.hasOpenInstallTask ? 'ugradnja' : null}
+                    {deleteSummaryQuery.data.meter.hasOpenInstallTask &&
+                    deleteSummaryQuery.data.meter.hasOpenDemountTask
+                      ? ' + '
+                      : null}
+                    {deleteSummaryQuery.data.meter.hasOpenDemountTask ? 'demontaža' : null}
+                    ). Preporuka je prvo zatvoriti/otkazati naloge prije brisanja.
+                  </Typography.Text>
+                ) : null}
+
+                <div>
+                  <Typography.Text strong>SIM</Typography.Text>
+                  <div className="mt-1">
+                    {deleteSummaryQuery.data.simCard ? (
+                      <div className="space-y-2">
+                        <Typography.Text>
+                          Ugrađena SIM: {deleteSummaryQuery.data.simCard.iccid} •{' '}
+                          {deleteSummaryQuery.data.simCard.status}
+                        </Typography.Text>
+                        <Radio.Group
+                          value={deleteSimAction}
+                          onChange={(e) => setDeleteSimAction(e.target.value)}
+                        >
+                          <Space direction="vertical">
+                            <Radio value="RETURN_SIM_TO_AVAILABLE">Vrati SIM u dostupne (AVAILABLE)</Radio>
+                            <Radio value="DELETE_SIM">Obriši SIM iz baze</Radio>
+                            <Radio value="LEAVE_AS_IS">Ne diraj SIM (nije preporučeno)</Radio>
+                          </Space>
+                        </Radio.Group>
+                      </div>
+                    ) : (
+                      <Typography.Text type="secondary">Nema ugrađene SIM kartice.</Typography.Text>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Typography.Text strong>Zapisnici</Typography.Text>
+                  <div className="mt-1 space-y-2">
+                    <Typography.Text>
+                      Ukupno: {deleteSummaryQuery.data.installationRecords.count}
+                    </Typography.Text>
+                    {deleteSummaryQuery.data.installationRecords.items.length ? (
+                      <ul className="list-disc pl-4 space-y-1">
+                        {deleteSummaryQuery.data.installationRecords.items.map((r) => (
+                          <li key={r.id}>
+                            <Space wrap>
+                              <Link to={`/installation-records/${r.id}`}>{r.recordNumber}</Link>
+                              <Button size="small" onClick={() => handleDownloadRecordPdf(r.id, r.recordNumber)}>
+                                PDF
+                              </Button>
+                              {(r.photos ?? []).length > 0 ? (
+                                <Space size={4} wrap>
+                                  {(r.photos ?? []).slice(0, 5).map((p, idx) => (
+                                    <Button
+                                      key={`${r.id}-${idx}`}
+                                      size="small"
+                                      onClick={() => handleDownloadPhoto(String(p))}
+                                    >
+                                      Foto {idx + 1}
+                                    </Button>
+                                  ))}
+                                  {(r.photos ?? []).length > 5 ? (
+                                    <Typography.Text type="secondary">
+                                      +{(r.photos ?? []).length - 5} foto
+                                    </Typography.Text>
+                                  ) : null}
+                                </Space>
+                              ) : (
+                                <Typography.Text type="secondary">Nema foto</Typography.Text>
+                              )}
+                            </Space>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <Typography.Text type="secondary">Nema zapisnika.</Typography.Text>
+                    )}
+
+                    <Radio.Group
+                      value={deleteRecordsAction}
+                      onChange={(e) => setDeleteRecordsAction(e.target.value)}
+                    >
+                      <Space direction="vertical">
+                        <Radio value="ABORT_IF_EXISTS">
+                          Ne briši zapisnike (blokiraj brisanje ako postoje)
+                        </Radio>
+                        <Radio value="DELETE_ALL">Obriši sve zapisnike (DB + fajlovi)</Radio>
+                      </Space>
+                    </Radio.Group>
+
+                    {(deleteSummaryQuery.data.installationRecords.count ?? 0) > 0 &&
+                    deleteRecordsAction !== 'DELETE_ALL' ? (
+                      <Typography.Text type="warning">
+                        Da biste obrisali brojilo, morate odabrati “Obriši sve zapisnike” (prethodno ručno preuzmite PDF/foto).
+                      </Typography.Text>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div>
+                  <Typography.Text strong>Ostale veze</Typography.Text>
+                  <div className="mt-1">
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>
+                        Install taskovi: {deleteSummaryQuery.data.tasks.installTasksCount} (open:{' '}
+                        {deleteSummaryQuery.data.meter.hasOpenInstallTask ? 'da' : 'ne'})
+                      </li>
+                      <li>
+                        Demount taskovi: {deleteSummaryQuery.data.tasks.demountTasksCount} (open:{' '}
+                        {deleteSummaryQuery.data.meter.hasOpenDemountTask ? 'da' : 'ne'})
+                      </li>
+                      <li>Branch ID: {deleteSummaryQuery.data.meter.branchId ?? '–'}</li>
+                      <li>Tip brojila ID: {deleteSummaryQuery.data.meter.meterTypeDefinitionId}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card size="small" title="Potvrda lozinkom">
+              <Input.Password
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Unesite lozinku"
+              />
+              <Typography.Text type="secondary" className="block mt-2">
+                Potvrda lozinkom je obavezna za konačno brisanje.
+              </Typography.Text>
+            </Card>
+          </div>
+        ) : (
+          <Typography.Text type="danger">Nije moguće učitati podatke za brisanje.</Typography.Text>
+        )}
+      </Modal>
     </div>
   )
 }

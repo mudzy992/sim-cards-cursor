@@ -18,6 +18,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { VerifyPasswordDto } from './dto/verify-password.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -64,6 +65,14 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ) {
     return this.authService.changePassword(userId, dto);
+  }
+
+  @Post('verify-password')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Potvrda lozinke (reauth)' })
+  verifyPassword(@CurrentUser('id') userId: string, @Body() dto: VerifyPasswordDto) {
+    return this.authService.verifyPassword(userId, dto.password);
   }
 
   @Get('profile')

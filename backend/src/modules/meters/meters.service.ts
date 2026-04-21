@@ -12,13 +12,69 @@ import {
   assertMeterYearsRequired,
 } from 'src/common/utils/meter-years.util';
 import { UserRole } from '@prisma/client';
+import { DeleteMeterDto, MeterDeleteRecordsAction, MeterDeleteSimAction } from './dto/delete-meter.dto';
+import { AuthService } from '../auth/auth.service';
+import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
+import * as path from 'path';
+
+type MeterDeleteSummary = {
+  meter: {
+    id: string;
+    serialNumber: string;
+    branchId: string | null;
+    meterTypeDefinitionId: string;
+    hasOpenInstallTask: boolean;
+    hasOpenDemountTask: boolean;
+    simCardId: string | null;
+  };
+  simCard: null | {
+    id: string;
+    iccid: string;
+    status: string;
+    assignedToId: string | null;
+  };
+  installationRecords: {
+    count: number;
+    items: Array<{
+      id: string;
+      recordNumber: string;
+      status: string;
+      createdAt: Date;
+      pdfPath: string | null;
+      photos: string[];
+    }>;
+  };
+  tasks: {
+    installTasksCount: number;
+    demountTasksCount: number;
+  };
+};
+
+type DeleteContext = { userId: string; ipAddress?: string };
 
 @Injectable()
 export class MetersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly meterTypeFieldsService: MeterTypeFieldsService,
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
   ) {}
+
+  private uploadsRoot(): string {
+    return this.config.get<string>('UPLOAD_ROOT_PATH', path.join(process.cwd(), 'uploads'));
+  }
+
+  private safeRmDirRecursive(absolutePath: string): void {
+    const uploadsRoot = path.resolve(this.uploadsRoot());
+    const resolved = path.resolve(absolutePath);
+    if (!resolved.startsWith(uploadsRoot)) {
+      return;
+    }
+    if (!fs.existsSync(resolved)) return;
+    fs.rmSync(resolved, { recursive: true, force: true });
+  }
 
   async create(createMeterDto: CreateMeterDto): Promise<Meter> {
     assertMeterYearsRequired(
@@ -242,6 +298,186 @@ export class MetersService {
     throw new BadRequestException(
       'Brisanje brojila nije dozvoljeno. Ispravke se rade kroz izmjene uz logovanje i proceduru demontaže.',
     );
+  }
+
+  async getDeleteSummary(id: string): Promise<MeterDeleteSummary> {
+    const meter = await this.prisma.meter.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        serialNumber: true,
+        branchId: true,
+        meterTypeDefinitionId: true,
+        hasOpenInstallTask: true,
+        hasOpenDemountTask: true,
+        simCardId: true,
+        simCard: {
+          select: { id: true, iccid: true, status: true, assignedToId: true },
+        },
+      },
+    });
+    if (!meter) {
+      throw new NotFoundException(`Meter with ID ${id} not found`);
+    }
+
+    const [installTasksCount, demountTasksCount, records] = await this.prisma.$transaction([
+      this.prisma.installTask.count({ where: { meterId: id } }),
+      this.prisma.demountTask.count({ where: { meterId: id } }),
+      this.prisma.installationRecord.findMany({
+        where: { meterId: id },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          recordNumber: true,
+          status: true,
+          createdAt: true,
+          pdfPath: true,
+          photos: true,
+        },
+      }),
+    ]);
+
+    return {
+      meter: {
+        id: meter.id,
+        serialNumber: meter.serialNumber,
+        branchId: meter.branchId ?? null,
+        meterTypeDefinitionId: meter.meterTypeDefinitionId,
+        hasOpenInstallTask: meter.hasOpenInstallTask,
+        hasOpenDemountTask: meter.hasOpenDemountTask,
+        simCardId: meter.simCardId ?? null,
+      },
+      simCard: meter.simCard
+        ? {
+            id: meter.simCard.id,
+            iccid: meter.simCard.iccid,
+            status: meter.simCard.status,
+            assignedToId: meter.simCard.assignedToId ?? null,
+          }
+        : null,
+      installationRecords: {
+        count: records.length,
+        items: records.map((r) => ({
+          id: r.id,
+          recordNumber: r.recordNumber,
+          status: r.status,
+          createdAt: r.createdAt,
+          pdfPath: r.pdfPath ?? null,
+          photos: Array.isArray(r.photos)
+            ? (r.photos as unknown as string[])
+            : ((r.photos ?? []) as unknown as string[]),
+        })),
+      },
+      tasks: { installTasksCount, demountTasksCount },
+    };
+  }
+
+  async deleteWithConfirm(id: string, dto: DeleteMeterDto, ctx: DeleteContext) {
+    await this.authService.verifyPassword(ctx.userId, dto.password);
+
+    const meter = await this.prisma.meter.findUnique({
+      where: { id },
+      select: { id: true, serialNumber: true, simCardId: true },
+    });
+    if (!meter) {
+      throw new NotFoundException(`Meter with ID ${id} not found`);
+    }
+
+    const records = await this.prisma.installationRecord.findMany({
+      where: { meterId: id },
+      select: { id: true, createdAt: true, pdfPath: true, photos: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (records.length > 0 && dto.recordsAction === MeterDeleteRecordsAction.ABORT_IF_EXISTS) {
+      throw new BadRequestException('Brojilo ima zapisnike. Preuzmite zapisnike pa odaberite brisanje zapisnika.');
+    }
+
+    const baseDirsToCleanup = new Set<string>();
+    const collectBaseDir = (p: string) => {
+      const parts = p.split(/[\\/]+/).filter(Boolean);
+      // expected: installation-records/<year>/<serial>/...
+      if (parts.length < 3) return;
+      if (parts[0] !== 'installation-records') return;
+      baseDirsToCleanup.add(path.join(this.uploadsRoot(), parts[0], parts[1], parts[2]));
+    };
+    for (const r of records) {
+      if (r.pdfPath && typeof r.pdfPath === 'string') collectBaseDir(r.pdfPath);
+      if (Array.isArray(r.photos)) {
+        for (const p of r.photos) {
+          if (typeof p === 'string') collectBaseDir(p);
+        }
+      }
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // SIM handling (optional)
+      if (meter.simCardId) {
+        if (dto.simAction === MeterDeleteSimAction.RETURN_SIM_TO_AVAILABLE) {
+          await tx.meter.update({
+            where: { id },
+            data: {
+              simCardId: null,
+              simCardState: MeterSimCardState.NO_SIM,
+              noSimReason: 'Obrisano brojilo (admin cleanup)',
+            },
+          });
+          await tx.simCard.update({
+            where: { id: meter.simCardId },
+            data: {
+              status: 'AVAILABLE',
+              assignedToId: null,
+              assignedAt: null,
+            },
+          });
+        } else if (dto.simAction === MeterDeleteSimAction.DELETE_SIM) {
+          await tx.meter.update({
+            where: { id },
+            data: {
+              simCardId: null,
+              simCardState: MeterSimCardState.NO_SIM,
+              noSimReason: 'Obrisano brojilo (admin cleanup)',
+            },
+          });
+          await tx.simCard.delete({ where: { id: meter.simCardId } });
+        }
+      }
+
+      let deletedRecordsCount = 0;
+      if (dto.recordsAction === MeterDeleteRecordsAction.DELETE_ALL) {
+        const del = await tx.installationRecord.deleteMany({ where: { meterId: id } });
+        deletedRecordsCount = del.count;
+      }
+
+      // Meter delete (install/demount tasks cascade)
+      await tx.meter.delete({ where: { id } });
+
+      await tx.activityLog.create({
+        data: {
+          userId: ctx.userId,
+          action: 'DELETE',
+          entity: 'meter',
+          entityId: id,
+          details: {
+            serialNumber: meter.serialNumber,
+            simAction: dto.simAction,
+            recordsAction: dto.recordsAction,
+            deletedRecordsCount,
+          },
+          ipAddress: ctx.ipAddress,
+        },
+      });
+
+      return { deleted: true, deletedRecordsCount };
+    });
+
+    if (dto.recordsAction === MeterDeleteRecordsAction.DELETE_ALL) {
+      for (const dir of baseDirsToCleanup) {
+        this.safeRmDirRecursive(dir);
+      }
+    }
+
+    return result;
   }
 
   /** Sva brojila – pri kreiranju zapisnika bira se brojilo i SIM (zapisnik = pridruživanje SIM brojilu). */

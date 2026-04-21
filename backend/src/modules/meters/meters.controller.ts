@@ -19,6 +19,7 @@ import { UpdateMeterDto } from './dto/update-meter.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Meter, UserRole } from '@prisma/client';
 import { MeterFilterDto } from './dto/meter-filter.dto';
+import { DeleteMeterDto } from './dto/delete-meter.dto';
 import { ApiPaginated } from 'src/common/decorators/api-paginated.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -132,6 +133,28 @@ export class MetersController {
   ): Promise<Meter> {
     const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
     return this.metersService.update(id, updateMeterDto, scope);
+  }
+
+  @Get(':id/delete-summary')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Get meter delete summary (SYSTEM_ADMIN)' })
+  getDeleteSummary(@Param('id', ParseUUIDPipe) id: string) {
+    return this.metersService.getDeleteSummary(id);
+  }
+
+  @Post(':id/delete')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'Delete meter with confirmation (SYSTEM_ADMIN)' })
+  deleteWithConfirm(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DeleteMeterDto,
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    return this.metersService.deleteWithConfirm(id, dto, { userId, ipAddress });
   }
 
   @Delete(':id')

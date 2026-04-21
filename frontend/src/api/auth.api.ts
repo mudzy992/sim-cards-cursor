@@ -14,4 +14,11 @@ export const authApi = {
     const response = await axiosInstance.get<ApiEnvelope<LoginResponse['user']>>('/auth/profile');
     return response.data.data;
   },
+  verifyPassword: async (payload: { password: string }): Promise<{ verified: true }> => {
+    const response = await axiosInstance.post<ApiEnvelope<{ verified: true }>>(
+      '/auth/verify-password',
+      payload,
+    );
+    return response.data.data;
+  },
 };
