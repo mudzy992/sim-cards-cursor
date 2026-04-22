@@ -197,11 +197,50 @@ export function useAppUpdateGate() {
     };
 
     const install = async (downloaded: { contentUri: string }) => {
-      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-        data: downloaded.contentUri,
-        flags: 1,
-        type: 'application/vnd.android.package-archive',
-      });
+      try {
+        // FLAG_GRANT_READ_URI_PERMISSION (1) is required for content://
+        // FLAG_ACTIVITY_NEW_TASK (268435456) improves reliability across OS versions.
+        const flags = 1 | 268435456;
+
+        console.log('[Update] Launching installer for', downloaded.contentUri);
+        // Prefer INSTALL_PACKAGE (more explicit) then fall back to VIEW.
+        try {
+          await IntentLauncher.startActivityAsync('android.intent.action.INSTALL_PACKAGE', {
+            data: downloaded.contentUri,
+            flags,
+            type: 'application/vnd.android.package-archive',
+          });
+        } catch {
+          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+            data: downloaded.contentUri,
+            flags,
+            type: 'application/vnd.android.package-archive',
+          });
+        }
+      } catch (e: any) {
+        console.warn('[Update] Installer launch failed:', e?.message ?? e);
+        const message =
+          (e?.message as string | undefined) ??
+          'Ne mogu pokrenuti instalaciju. Provjerite da je dozvoljena instalacija iz nepoznatih izvora.';
+
+        Alert.alert('Instaliranje nije uspjelo', message, [
+          {
+            text: 'Otvori podešavanja',
+            onPress: () => {
+              const pkg =
+                (Application.applicationId as string | null | undefined) ??
+                (Application.applicationId as unknown as string | undefined);
+              if (!pkg) return;
+              // Opens “Install unknown apps” settings for this app.
+              void IntentLauncher.startActivityAsync(
+                'android.settings.MANAGE_UNKNOWN_APP_SOURCES',
+                { data: `package:${pkg}` },
+              );
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]);
+      }
     };
 
     const postpone = async (latest: AndroidLatestRelease) => {

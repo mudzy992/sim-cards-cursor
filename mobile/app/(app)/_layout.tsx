@@ -125,6 +125,14 @@ const PrivateLayout = () => {
   if (updateState.kind === 'downloading') {
     const pct =
       updateState.progress != null ? Math.round(updateState.progress * 100) : null;
+    const mbWritten =
+      updateState.totalBytesWritten != null
+        ? Math.max(0, updateState.totalBytesWritten) / (1024 * 1024)
+        : null;
+    const mbExpected =
+      updateState.totalBytesExpectedToWrite != null && updateState.totalBytesExpectedToWrite > 0
+        ? updateState.totalBytesExpectedToWrite / (1024 * 1024)
+        : null;
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
         <View style={{ flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' }}>
@@ -132,6 +140,15 @@ const PrivateLayout = () => {
           <Text style={{ marginTop: 12, color: '#334155' }}>
             Preuzimanje nadogradnje{pct != null ? ` (${pct}%)` : '...'}
           </Text>
+          <Text style={{ marginTop: 8, color: '#64748b', textAlign: 'center' }}>
+            Aplikacija radi normalno – nemojte zatvarati aplikaciju.
+          </Text>
+          {mbWritten != null ? (
+            <Text style={{ marginTop: 8, color: '#64748b', textAlign: 'center' }}>
+              Preuzeto: {mbWritten.toFixed(1)} MB
+              {mbExpected != null ? ` / ${mbExpected.toFixed(1)} MB` : ''}
+            </Text>
+          ) : null}
         </View>
       </SafeAreaView>
     );
@@ -152,6 +169,10 @@ const PrivateLayout = () => {
             title="Instaliraj"
             onPress={() => void actions.install({ contentUri: updateState.contentUri })}
           />
+          <Text style={{ marginTop: 10, color: '#64748b' }}>
+            Ako se instalacija ne pokrene, provjerite Android postavke za “Instaliraj nepoznate
+            aplikacije” za SIM Tracker.
+          </Text>
         </View>
       </SafeAreaView>
     );
