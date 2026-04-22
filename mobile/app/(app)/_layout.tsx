@@ -87,7 +87,7 @@ const PrivateLayout = () => {
       },
       {
         text: 'Nadogradi',
-        onPress: () => void actions.download(updateState.latest),
+        onPress: () => void actions.openInBrowser(updateState.latest),
       },
     ]);
   }, [updateState]);
@@ -115,68 +115,27 @@ const PrivateLayout = () => {
           ) : null}
           <Button
             title="Preuzmi i instaliraj"
-            onPress={() => void actions.download(updateState.latest)}
+            onPress={() => void actions.openInBrowser(updateState.latest)}
           />
         </View>
       </SafeAreaView>
     );
   }
 
-  if (updateState.kind === 'downloading') {
-    const pct =
-      updateState.progress != null ? Math.round(updateState.progress * 100) : null;
-    const mbWritten =
-      updateState.totalBytesWritten != null
-        ? Math.max(0, updateState.totalBytesWritten) / (1024 * 1024)
-        : null;
-    const mbExpected =
-      updateState.totalBytesExpectedToWrite != null && updateState.totalBytesExpectedToWrite > 0
-        ? updateState.totalBytesExpectedToWrite / (1024 * 1024)
-        : null;
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-        <View style={{ flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" />
-          <Text style={{ marginTop: 12, color: '#334155' }}>
-            Preuzimanje nadogradnje{pct != null ? ` (${pct}%)` : '...'}
-          </Text>
-          <Text style={{ marginTop: 8, color: '#64748b', textAlign: 'center' }}>
-            Aplikacija radi normalno – nemojte zatvarati aplikaciju.
-          </Text>
-          {mbWritten != null ? (
-            <Text style={{ marginTop: 8, color: '#64748b', textAlign: 'center' }}>
-              Preuzeto: {mbWritten.toFixed(1)} MB
-              {mbExpected != null ? ` / ${mbExpected.toFixed(1)} MB` : ''}
-            </Text>
-          ) : null}
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (updateState.kind === 'downloaded') {
+  if (updateState.kind === 'opening_browser') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
         <View style={{ flex: 1, padding: 20, justifyContent: 'center' }}>
           <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 10 }}>
-            Nadogradnja je preuzeta
+            Preuzimanje u browseru
           </Text>
           <Text style={{ color: '#334155', marginBottom: 16 }}>
-            Verzija {updateState.latest.versionName} (kod {updateState.latest.versionCode}) je
-            spremna za instalaciju.
+            Otvorili smo browser za download verzije {updateState.latest.versionName}. Nakon što se
+            download završi, Android će ponuditi instalaciju.
           </Text>
-          <Button
-            title="Instaliraj"
-            onPress={() => void actions.install({ contentUri: updateState.contentUri })}
-          />
-          <View style={{ height: 10 }} />
-          <Button
-            title="Omogući instalaciju (Unknown sources)"
-            onPress={() => actions.openUnknownSourcesSettings()}
-          />
+          <Button title="Otvori ponovo" onPress={() => void actions.openInBrowser(updateState.latest)} />
           <Text style={{ marginTop: 10, color: '#64748b' }}>
-            Ako se instalacija ne pokrene, provjerite Android postavke za “Instaliraj nepoznate
-            aplikacije” za SIM Tracker.
+            Ako se instalacija ne pojavi, otvorite Downloads u Chrome-u i tapnite na preuzeti .apk.
           </Text>
         </View>
       </SafeAreaView>

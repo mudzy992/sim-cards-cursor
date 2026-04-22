@@ -17,3 +17,12 @@
 
 - Per-user tour stanje: ključevi `user:tour-state:*` — ne brisati dok postoji minitour / `PATCH /settings/me` za tour.
 - Javni endpointi bez auth: `GET /settings/mobile-push`, `GET /settings/notifications` — pazi na kompatibilnost odgovora (`ApiEnvelope` na klijentima).
+
+### Čiščenje koda
+- Ukoliko se neka postojeća funkcionalnost mijenja ili se ukida upotpunosti
+stari deadcode se upotpunosti briše, tako da uvijek imamo čist i funkcionalan kod
+
+- Na frontendu se držati logiku, ukoliko je moguće neku funkcionalnost izvesti u helper odvojeni fajl, obavezno to raditi, a u izvorni fajl importovati tako da svi fajlovi i kodovi budu lakše čitljivi i organizovani, tj. da nisu pretrpani kodovima
+
+### Nova pravila
+- Svako novo pravilo koje uvedemo, zabilježiti u .cursorrules update
