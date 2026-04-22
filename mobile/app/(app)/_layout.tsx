@@ -36,6 +36,24 @@ const PrivateLayout = () => {
   const { state: updateState, actions } = useAppUpdateGate();
   const shownOptionalRef = useRef(false);
 
+  const stackScreenOptions = useMemo(
+    () => ({
+      headerStyle: {
+        backgroundColor: colors.surface,
+      },
+      headerTintColor: colors.text,
+      headerTitleStyle: {
+        color: colors.text,
+        fontSize: 16,
+      },
+      headerTitleAlign: 'center' as const,
+      headerLargeTitle: false,
+      statusBarStyle: 'dark' as const,
+      gestureEnabled: !blocking.isBlocked,
+    }),
+    [blocking.isBlocked],
+  )
+
   useEffect(() => {
     if (!blocking.isBlocked) return
     const sub = BackHandler.addEventListener('hardwareBackPress', () => true)
@@ -138,24 +156,6 @@ const PrivateLayout = () => {
       </SafeAreaView>
     );
   }
-
-  const stackScreenOptions = useMemo(
-    () => ({
-      headerStyle: {
-        backgroundColor: colors.surface,
-      },
-      headerTintColor: colors.text,
-      headerTitleStyle: {
-        color: colors.text,
-        fontSize: 16,
-      },
-      headerTitleAlign: 'center' as const,
-      headerLargeTitle: false,
-      statusBarStyle: 'dark' as const,
-      gestureEnabled: !blocking.isBlocked,
-    }),
-    [blocking.isBlocked],
-  )
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
