@@ -169,6 +169,11 @@ const PrivateLayout = () => {
             title="Instaliraj"
             onPress={() => void actions.install({ contentUri: updateState.contentUri })}
           />
+          <View style={{ height: 10 }} />
+          <Button
+            title="Omogući instalaciju (Unknown sources)"
+            onPress={() => actions.openUnknownSourcesSettings()}
+          />
           <Text style={{ marginTop: 10, color: '#64748b' }}>
             Ako se instalacija ne pokrene, provjerite Android postavke za “Instaliraj nepoznate
             aplikacije” za SIM Tracker.

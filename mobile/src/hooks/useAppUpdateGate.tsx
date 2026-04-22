@@ -15,6 +15,7 @@ import { axiosInstance } from '@/api/axios.instance';
 import { useAuthStore } from '@/store/auth.store';
 
 const DEFER_KEY = 'appUpdate.deferUntil';
+const INSTALL_ALREADY_STARTED_RE = /activity is already started/i;
 
 type GateState =
   | { kind: 'idle' }
@@ -129,6 +130,18 @@ export function useAppUpdateGate() {
   }, [isAuthenticated, accessToken, currentVersionCode]);
 
   const actions = useMemo(() => {
+    let installInFlight = false;
+
+    const openUnknownSourcesSettings = () => {
+      const pkg =
+        (Application.applicationId as string | null | undefined) ??
+        (Application.applicationId as unknown as string | undefined);
+      if (!pkg) return;
+      void IntentLauncher.startActivityAsync('android.settings.MANAGE_UNKNOWN_APP_SOURCES', {
+        data: `package:${pkg}`,
+      });
+    };
+
     const download = async (latest: AndroidLatestRelease) => {
       try {
         setState({ kind: 'downloading', latest, progress: 0 });
@@ -197,6 +210,8 @@ export function useAppUpdateGate() {
     };
 
     const install = async (downloaded: { contentUri: string }) => {
+      if (installInFlight) return;
+      installInFlight = true;
       try {
         // FLAG_GRANT_READ_URI_PERMISSION (1) is required for content://
         // FLAG_ACTIVITY_NEW_TASK (268435456) improves reliability across OS versions.
@@ -210,7 +225,12 @@ export function useAppUpdateGate() {
             flags,
             type: 'application/vnd.android.package-archive',
           });
-        } catch {
+        } catch (e: any) {
+          const msg = String(e?.message ?? e ?? '');
+          if (INSTALL_ALREADY_STARTED_RE.test(msg)) {
+            // Installer is already being shown; ignore subsequent taps/attempts.
+            return;
+          }
           await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
             data: downloaded.contentUri,
             flags,
@@ -218,6 +238,9 @@ export function useAppUpdateGate() {
           });
         }
       } catch (e: any) {
+        const msg = String(e?.message ?? e ?? '');
+        if (INSTALL_ALREADY_STARTED_RE.test(msg)) return;
+
         console.warn('[Update] Installer launch failed:', e?.message ?? e);
         const message =
           (e?.message as string | undefined) ??
@@ -227,19 +250,16 @@ export function useAppUpdateGate() {
           {
             text: 'Otvori podešavanja',
             onPress: () => {
-              const pkg =
-                (Application.applicationId as string | null | undefined) ??
-                (Application.applicationId as unknown as string | undefined);
-              if (!pkg) return;
-              // Opens “Install unknown apps” settings for this app.
-              void IntentLauncher.startActivityAsync(
-                'android.settings.MANAGE_UNKNOWN_APP_SOURCES',
-                { data: `package:${pkg}` },
-              );
+              openUnknownSourcesSettings();
             },
           },
           { text: 'OK', style: 'cancel' },
         ]);
+      } finally {
+        // Give the OS a moment to transition to the installer UI.
+        setTimeout(() => {
+          installInFlight = false;
+        }, 1500);
       }
     };
 
@@ -251,7 +271,7 @@ export function useAppUpdateGate() {
       setState({ kind: 'no_update' });
     };
 
-    return { download, install, postpone };
+    return { download, install, postpone, openUnknownSourcesSettings };
   }, []);
 
   return { state, actions };
