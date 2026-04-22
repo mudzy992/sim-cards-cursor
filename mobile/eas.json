@@ -21,7 +21,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://10.50.255.189/backend/api",
+        "EXPO_PUBLIC_API_BASE_URL": "https://simtracker.ba101.top/backend/api",
         "NODE_ENV": "production"
       },
       "android": {
