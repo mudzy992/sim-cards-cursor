@@ -36,6 +36,24 @@ const PrivateLayout = () => {
   const { state: updateState, actions } = useAppUpdateGate();
   const shownOptionalRef = useRef(false);
 
+  const stackScreenOptions = useMemo(
+    () => ({
+      headerStyle: {
+        backgroundColor: colors.surface,
+      },
+      headerTintColor: colors.text,
+      headerTitleStyle: {
+        color: colors.text,
+        fontSize: 16,
+      },
+      headerTitleAlign: 'center' as const,
+      headerLargeTitle: false,
+      statusBarStyle: 'dark' as const,
+      gestureEnabled: !blocking.isBlocked,
+    }),
+    [blocking.isBlocked],
+  )
+
   useEffect(() => {
     if (!blocking.isBlocked) return
     const sub = BackHandler.addEventListener('hardwareBackPress', () => true)
@@ -69,7 +87,7 @@ const PrivateLayout = () => {
       },
       {
         text: 'Nadogradi',
-        onPress: () => void actions.download(updateState.latest),
+        onPress: () => void actions.openInBrowser(updateState.latest),
       },
     ]);
   }, [updateState]);
@@ -97,65 +115,32 @@ const PrivateLayout = () => {
           ) : null}
           <Button
             title="Preuzmi i instaliraj"
-            onPress={() => void actions.download(updateState.latest)}
+            onPress={() => void actions.openInBrowser(updateState.latest)}
           />
         </View>
       </SafeAreaView>
     );
   }
 
-  if (updateState.kind === 'downloading') {
-    const pct =
-      updateState.progress != null ? Math.round(updateState.progress * 100) : null;
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-        <View style={{ flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" />
-          <Text style={{ marginTop: 12, color: '#334155' }}>
-            Preuzimanje nadogradnje{pct != null ? ` (${pct}%)` : '...'}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (updateState.kind === 'downloaded') {
+  if (updateState.kind === 'opening_browser') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
         <View style={{ flex: 1, padding: 20, justifyContent: 'center' }}>
           <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 10 }}>
-            Nadogradnja je preuzeta
+            Preuzimanje u browseru
           </Text>
           <Text style={{ color: '#334155', marginBottom: 16 }}>
-            Verzija {updateState.latest.versionName} (kod {updateState.latest.versionCode}) je
-            spremna za instalaciju.
+            Otvorili smo browser za download verzije {updateState.latest.versionName}. Nakon što se
+            download završi, Android će ponuditi instalaciju.
           </Text>
-          <Button
-            title="Instaliraj"
-            onPress={() => void actions.install({ contentUri: updateState.contentUri })}
-          />
+          <Button title="Otvori ponovo" onPress={() => void actions.openInBrowser(updateState.latest)} />
+          <Text style={{ marginTop: 10, color: '#64748b' }}>
+            Ako se instalacija ne pojavi, otvorite Downloads u Chrome-u i tapnite na preuzeti .apk.
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
-
-  const stackScreenOptions = useMemo(
-    () => ({
-      headerStyle: {
-        backgroundColor: colors.surface,
-      },
-      headerTintColor: colors.text,
-      headerTitleStyle: {
-        color: colors.text,
-        fontSize: 16,
-      },
-      headerTitleAlign: 'center' as const,
-      headerLargeTitle: false,
-      statusBarStyle: 'dark' as const,
-      gestureEnabled: !blocking.isBlocked,
-    }),
-    [blocking.isBlocked],
-  )
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

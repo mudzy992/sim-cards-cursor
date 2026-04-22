@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import * as Application from 'expo-application';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as IntentLauncher from 'expo-intent-launcher';
 import * as SecureStore from 'expo-secure-store';
 import { appReleasesApi, type AndroidLatestRelease } from '@/api/app-releases.api';
 import { axiosInstance } from '@/api/axios.instance';
@@ -20,19 +18,7 @@ type GateState =
       isMandatory: boolean;
       deferUntil: number | null;
     }
-  | {
-      kind: 'downloading';
-      latest: AndroidLatestRelease;
-      progress?: number;
-      totalBytesWritten?: number;
-      totalBytesExpectedToWrite?: number;
-    }
-  | {
-      kind: 'downloaded';
-      latest: AndroidLatestRelease;
-      apkUri: string;
-      contentUri: string;
-    }
+  | { kind: 'opening_browser'; latest: AndroidLatestRelease; url: string }
   | { kind: 'error'; message: string };
 
 function getAndroidVersionCode(): number {
@@ -123,71 +109,27 @@ export function useAppUpdateGate() {
   }, [isAuthenticated, accessToken, currentVersionCode]);
 
   const actions = useMemo(() => {
-    const download = async (latest: AndroidLatestRelease) => {
-      try {
-        setState({ kind: 'downloading', latest, progress: 0 });
-
-        const updatesDir = `${FileSystem.documentDirectory ?? ''}updates/`;
-        await FileSystem.makeDirectoryAsync(updatesDir, { intermediates: true });
-        const target = `${updatesDir}sim-tracker-${latest.versionName}-${latest.versionCode}.apk`;
-
-        const base = axiosInstance.defaults.baseURL ?? '';
-        const absoluteUrl = latest.downloadUrl.startsWith('http')
-          ? latest.downloadUrl
-          : `${base}${latest.downloadUrl}`;
-
-        const download = FileSystem.createDownloadResumable(
-          absoluteUrl,
-          target,
-          {
-            headers: {
-              Authorization: `Bearer ${useAuthStore.getState().accessToken}`,
-            },
-          },
-          (p) => {
-            const expected = Number(p.totalBytesExpectedToWrite);
-            const written = Number(p.totalBytesWritten);
-
-            const canComputePct =
-              Number.isFinite(expected) && Number.isFinite(written) && expected > 0;
-
-            const raw = canComputePct ? written / expected : undefined;
-            const progress =
-              raw == null
-                ? undefined
-                : Number.isFinite(raw)
-                  ? Math.max(0, Math.min(1, raw))
-                  : undefined;
-
-            setState({
-              kind: 'downloading',
-              latest,
-              progress,
-              totalBytesWritten: Number.isFinite(written) ? written : undefined,
-              totalBytesExpectedToWrite: Number.isFinite(expected) ? expected : undefined,
-            });
-          },
-        );
-
-        const result = await download.downloadAsync();
-        if (!result?.uri) {
-          throw new Error('Download failed');
-        }
-
-        const contentUri = await FileSystem.getContentUriAsync(result.uri);
-        setState({ kind: 'downloaded', latest, apkUri: result.uri, contentUri });
-      } catch (e: any) {
-        Alert.alert('Nadogradnja nije uspjela', e?.message ?? 'Greška pri nadogradnji');
-        setState({ kind: 'error', message: e?.message ?? 'Download/install failed' });
-      }
+    const buildAbsoluteDownloadUrl = (latest: AndroidLatestRelease) => {
+      const base = axiosInstance.defaults.baseURL ?? '';
+      return latest.downloadUrl.startsWith('http')
+        ? latest.downloadUrl
+        : `${base}${latest.downloadUrl}`;
     };
 
-    const install = async (downloaded: { contentUri: string }) => {
-      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-        data: downloaded.contentUri,
-        flags: 1,
-        type: 'application/vnd.android.package-archive',
-      });
+    const openInBrowser = async (latest: AndroidLatestRelease) => {
+      try {
+        const url = buildAbsoluteDownloadUrl(latest);
+        setState({ kind: 'opening_browser', latest, url });
+        const canOpen = await Linking.canOpenURL(url);
+        if (!canOpen) throw new Error('Ne mogu otvoriti link u browseru.');
+        await Linking.openURL(url);
+      } catch (e: any) {
+        Alert.alert(
+          'Nadogradnja nije uspjela',
+          e?.message ?? 'Ne mogu otvoriti download u browseru.',
+        );
+        setState({ kind: 'error', message: e?.message ?? 'Browser open failed' });
+      }
     };
 
     const postpone = async (latest: AndroidLatestRelease) => {
@@ -198,7 +140,7 @@ export function useAppUpdateGate() {
       setState({ kind: 'no_update' });
     };
 
-    return { download, install, postpone };
+    return { openInBrowser, postpone };
   }, []);
 
   return { state, actions };
