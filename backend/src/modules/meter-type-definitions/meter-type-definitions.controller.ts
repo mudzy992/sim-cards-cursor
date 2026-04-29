@@ -15,6 +15,7 @@ import { UserRole } from '@prisma/client';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { BranchModeratorGuard } from 'src/common/guards/branch-moderator.guard';
 import { MeterTypeDefinitionsService } from './meter-type-definitions.service';
 import { MeterTypeFieldsService } from './meter-type-fields.service';
 import { CreateMeterTypeDefinitionDto } from './dto/create-meter-type-definition.dto';
@@ -40,14 +41,16 @@ export class MeterTypeDefinitionsController {
   }
 
   @Get()
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @UseGuards(BranchModeratorGuard)
   @ApiOperation({ summary: 'Lista tipova brojila' })
   findAll() {
     return this.meterTypeDefinitionsService.findAll();
   }
 
   @Get(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @UseGuards(BranchModeratorGuard)
   @ApiOperation({ summary: 'Detalji tipa brojila' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.meterTypeDefinitionsService.findOne(id);
