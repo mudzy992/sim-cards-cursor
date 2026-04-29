@@ -18,6 +18,7 @@ import { ApiPaginated } from '../../common/decorators/api-paginated.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { BranchModeratorGuard } from '../../common/guards/branch-moderator.guard';
 import { AssignSimCardDto } from './dto/assign-sim-card.dto';
 import { CreateSimCardDto } from './dto/create-sim-card.dto';
 import { SimCardFilterDto } from './dto/sim-card-filter.dto';
@@ -37,6 +38,30 @@ export class SimCardsController {
   findAll(@Query() filter: SimCardFilterDto, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
     const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
     return this.simCardsService.findAll(filter, scope);
+  }
+
+  @Get('moderated-installed')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @UseGuards(BranchModeratorGuard)
+  @ApiPaginated('SIM kartice ugrađene u moderirane podružnice')
+  moderatedInstalled(
+    @Query() filter: SimCardFilterDto,
+    @CurrentUser() user?: {
+      role: string
+      distributionId?: string | null
+      branchId?: string | null
+      branchModeratorBranchIds?: string[]
+    },
+  ) {
+    const scope = user
+      ? {
+          role: user.role as UserRole,
+          distributionId: user.distributionId ?? null,
+          branchId: user.branchId ?? null,
+          branchModeratorBranchIds: user.branchModeratorBranchIds ?? [],
+        }
+      : null
+    return this.simCardsService.moderatedInstalled(filter, scope)
   }
 
   @Get('my-assigned')
@@ -76,7 +101,8 @@ export class SimCardsController {
   }
 
   @Get(':id/events')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @UseGuards(BranchModeratorGuard)
   @ApiOperation({ summary: 'Historija događaja (timeline) za SIM karticu' })
   listEvents(@Param('id') id: string, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
     const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
@@ -84,7 +110,8 @@ export class SimCardsController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @UseGuards(BranchModeratorGuard)
   @ApiOperation({ summary: 'Detalji SIM kartice' })
   findOne(@Param('id') id: string, @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null }) {
     const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;

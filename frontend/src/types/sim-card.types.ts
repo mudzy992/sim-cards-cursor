@@ -55,6 +55,27 @@ export type SimCardItem = {
   updatedAt: string;
 };
 
+export type ModeratedInstalledSimCardItem = SimCardItem & {
+  meter: {
+    id: string;
+    serialNumber: string;
+    branch: {
+      id: string;
+      name: string;
+      code: string;
+    } | null;
+  } | null;
+  installedAt: string | null;
+};
+
+export type ModeratedInstalledSimCardsResponse = {
+  items: ModeratedInstalledSimCardItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
 export type SimCardsResponse = {
   items: SimCardItem[];
   page: number;

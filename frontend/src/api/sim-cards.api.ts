@@ -4,6 +4,7 @@ import type {
   SimCardItem,
   SimCardListParams,
   SimCardsResponse,
+  ModeratedInstalledSimCardsResponse,
   SimEventItem,
 } from '@/types/sim-card.types';
 
@@ -12,6 +13,16 @@ export const simCardsApi = {
     const response = await axiosInstance.get<ApiEnvelope<SimCardsResponse>>('/sim-cards', {
       params,
     });
+    return response.data.data;
+  },
+
+  moderatedInstalled: async (
+    params?: SimCardListParams,
+  ): Promise<ModeratedInstalledSimCardsResponse> => {
+    const response = await axiosInstance.get<ApiEnvelope<ModeratedInstalledSimCardsResponse>>(
+      '/sim-cards/moderated-installed',
+      { params },
+    );
     return response.data.data;
   },
 

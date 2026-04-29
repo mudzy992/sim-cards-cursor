@@ -21,6 +21,68 @@ export class SimCardsService {
     private readonly activityLogService: ActivityLogService,
   ) {}
 
+  async moderatedInstalled(
+    filter: SimCardFilterDto,
+    scope?: ScopeContext | null,
+  ): Promise<
+    PaginatedResult<
+      Prisma.SimCardGetPayload<{
+        include: ReturnType<SimCardsService['moderatedInstalledInclude']>
+      }> & { installedAt: Date | null }
+    >
+  > {
+    const page = filter.page ?? 1
+    const limit = filter.limit ?? 20
+
+    const branchIds = this.getModeratedBranchIds(scope)
+
+    const where: Prisma.SimCardWhereInput = {
+      status: SimCardStatus.INSTALLED,
+      meter: {
+        is: {
+          ...(branchIds ? { branchId: { in: branchIds } } : {}),
+          ...(scope?.role === 'DIST_ADMIN' && scope.distributionId
+            ? { branch: { distributionId: scope.distributionId } }
+            : {}),
+        },
+      },
+      ...(filter.search
+        ? {
+            OR: [
+              { iccid: { contains: filter.search } },
+              { ipAddress: { contains: filter.search } },
+              { publicIpAddress: { contains: filter.search } },
+              { phoneNumber: { contains: filter.search } },
+            ],
+          }
+        : {}),
+    }
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.simCard.findMany({
+        where,
+        include: this.moderatedInstalledInclude(),
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.simCard.count({ where }),
+    ])
+
+    const withInstalledAt = items.map((i) => ({
+      ...i,
+      installedAt: i.installationRecords?.[0]?.createdAt ?? null,
+    }))
+
+    return {
+      items: withInstalledAt,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit) || 1,
+    }
+  }
+
   async create(dto: CreateSimCardDto, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
     await this.ensureShipmentExists(dto.shipmentId, scope);
 
@@ -493,6 +555,41 @@ export class SimCardsService {
         },
       },
     } as const;
+  }
+
+  private moderatedInstalledInclude() {
+    return {
+      ...this.simCardInclude(),
+      meter: {
+        select: {
+          id: true,
+          serialNumber: true,
+          branch: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+        },
+      },
+      installationRecords: {
+        select: {
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
+    } as const
+  }
+
+  private getModeratedBranchIds(scope?: ScopeContext | null): string[] | null {
+    if (!scope) return null
+    if (scope.role !== 'USER') return null
+    const moderated = scope.branchModeratorBranchIds ?? []
+    const combined = scope.branchId ? [scope.branchId, ...moderated] : moderated
+    const unique = [...new Set(combined)].filter((id) => Boolean(id))
+    return unique.length > 0 ? unique : null
   }
 
   private async createSimEvent(

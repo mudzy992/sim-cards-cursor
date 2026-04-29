@@ -9,6 +9,7 @@ import NotFoundPage from '@/pages/errors/NotFoundPage';
 import ShipmentCreatePage from '@/pages/shipments/ShipmentCreatePage';
 import ShipmentDetailsPage from '@/pages/shipments/ShipmentDetailsPage';
 import ShipmentsListPage from '@/pages/shipments/ShipmentsListPage';
+import SimCardsIndexPage from '@/pages/sim-cards/SimCardsIndexPage'
 import SimCardDetailsPage from '@/pages/sim-cards/SimCardDetailsPage';
 import UsersListPage from '@/pages/users/UsersListPage';
 import MetersListPage from '@/pages/meters/MetersListPage';
@@ -110,21 +111,21 @@ export const router = createBrowserRouter([
           {
             path: '/meter-types/:id',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+              <MetersAccessGuard>
                 <MeterTypeUpsertPage />
-              </RoleGuard>
+              </MetersAccessGuard>
             ),
           },
           {
             path: '/sim-cards',
-            element: <Navigate to="/shipments" replace />,
+            element: <SimCardsIndexPage />,
           },
           {
             path: '/sim-cards/:id',
             element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+              <MetersAccessGuard>
                 <SimCardDetailsPage />
-              </RoleGuard>
+              </MetersAccessGuard>
             ),
           },
           {

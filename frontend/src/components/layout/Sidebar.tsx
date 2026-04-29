@@ -2,6 +2,7 @@ import {
   UserOutlined,
   DashboardOutlined,
   InboxOutlined,
+  CreditCardOutlined,
   ThunderboltOutlined,
   FileTextOutlined,
   MailOutlined,
@@ -83,6 +84,11 @@ export function Sidebar() {
     ...(isModerator
       ? [
           {
+            key: '/sim-cards',
+            icon: <CreditCardOutlined />,
+            label: <Link to="/sim-cards">SIM kartice</Link>,
+          },
+          {
             key: '/meters',
             icon: <ThunderboltOutlined />,
             label: <Link to="/meters">Brojila</Link>,
@@ -122,15 +128,17 @@ export function Sidebar() {
   return (
     <Sider width={240} theme="light" breakpoint="lg" collapsedWidth={0}>
       <div className="px-4 py-4 text-lg font-semibold">SIM Tracker</div>
+      {(() => {
+        const isSimCards = location.pathname === '/sim-cards' || location.pathname.startsWith('/sim-cards/')
+        const selectedKey = isSimCards ? (isModerator ? '/sim-cards' : '/shipments') : location.pathname
+        return (
       <Menu
         mode="inline"
-        selectedKeys={[
-          location.pathname === '/sim-cards' || location.pathname.startsWith('/sim-cards/')
-            ? '/shipments'
-            : location.pathname,
-        ]}
+        selectedKeys={[selectedKey]}
         items={items}
       />
+        )
+      })()}
     </Sider>
   );
 }
