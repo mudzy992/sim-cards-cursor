@@ -6,7 +6,7 @@ import { Footer } from './Footer';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '@/store/auth.store';
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { useAppFeatures } from '@/hooks/useAppFeatures';
 
 const { Content } = Layout;
@@ -16,12 +16,13 @@ export function AppLayout() {
 
   const user = useAuthStore((s) => s.user);
   const featuresQuery = useAppFeatures();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
     <Layout className="min-h-screen bg-slate-50">
-      <Sidebar />
+      <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
       <Layout>
-        <Header />
+        <Header onMobileMenuClick={() => setMobileNavOpen(true)} />
         <Content className="px-6 py-5">
           <Breadcrumb />
           {user?.role === 'SYSTEM_ADMIN' && featuresQuery.data?.missingKeys?.length ? (

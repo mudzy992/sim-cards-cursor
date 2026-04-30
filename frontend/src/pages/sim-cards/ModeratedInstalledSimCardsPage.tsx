@@ -122,21 +122,24 @@ export default function ModeratedInstalledSimCardsPage() {
         </Typography.Text>
       )}
 
-      <Table<ModeratedInstalledSimCardItem>
-        rowKey="id"
-        loading={query.isLoading}
-        dataSource={rows}
-        pagination={{
-          current: query.data?.page,
-          pageSize: query.data?.limit,
-          total: query.data?.total,
-          showSizeChanger: true,
-          showTotal: (total) => `Ukupno: ${total}`,
-          onChange: (page, pageSize) =>
-            setFilters((prev) => ({ ...prev, page, limit: pageSize ?? 20 })),
-        }}
-        columns={columns}
-      />
+      <div className="-mx-4 overflow-x-auto px-4">
+        <Table<ModeratedInstalledSimCardItem>
+          rowKey="id"
+          loading={query.isLoading}
+          dataSource={rows}
+          pagination={{
+            current: query.data?.page,
+            pageSize: query.data?.limit,
+            total: query.data?.total,
+            showSizeChanger: true,
+            showTotal: (total) => `Ukupno: ${total}`,
+            onChange: (page, pageSize) =>
+              setFilters((prev) => ({ ...prev, page, limit: pageSize ?? 20 })),
+          }}
+          columns={columns}
+          scroll={{ x: 'max-content' }}
+        />
+      </div>
     </div>
   )
 }

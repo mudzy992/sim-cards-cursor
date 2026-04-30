@@ -3,6 +3,8 @@ import {
   Button,
   Card,
   Descriptions,
+  Dropdown,
+  Grid,
   Image,
   Space,
   Tag,
@@ -16,7 +18,6 @@ import { installationRecordsApi } from '@/api/installation-records.api';
 import { activityLogApi } from '@/api/activity-log.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import { simCardsApi } from '@/api/sim-cards.api'
-import { useAuthStore } from '@/store/auth.store';
 import type { InstallationRecordItem } from '@/types/installation-record.types';
 import { RecordPhotoImage } from '@/components/installation-records/RecordPhotoImage';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types';
@@ -44,6 +45,7 @@ export default function InstallationRecordDetailPage() {
   const navigate = useNavigate();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [pdfObjectUrl, setPdfObjectUrl] = useState<string | null>(null);
+  const screens = Grid.useBreakpoint()
 
   const recordQuery = useQuery({
     queryKey: ['installation-record', id],
@@ -170,6 +172,7 @@ export default function InstallationRecordDetailPage() {
   const canMarkSepActivated = !!permissionsQuery.data?.canMarkSepActivated;
   const canRetrySend = !!permissionsQuery.data?.canRetrySend;
   const canDownloadPdf = true;
+  const isMobile = !screens.sm
 
   if (!id) {
     navigate('/installation-records');
@@ -212,31 +215,53 @@ export default function InstallationRecordDetailPage() {
         <Typography.Title level={3} className="!mb-0">
           Zapisnik {record.recordNumber}
         </Typography.Title>
-        <Space>
-          <Button onClick={() => navigate('/installation-records')}>Natrag na listu</Button>
-          {canMarkSepActivated && (
-            <Button
-              type="primary"
-              onClick={() => markSepActivatedMutation.mutate()}
-              loading={markSepActivatedMutation.isPending}
-            >
-              Označi SEP aktiviran
-            </Button>
-          )}
-          {canRetrySend && (
-            <Button
-              onClick={() => retrySendMutation.mutate()}
-              loading={retrySendMutation.isPending}
-            >
-              Ponovo pošalji email
-            </Button>
-          )}
-          {canDownloadPdf && (
-            <Button onClick={handleDownloadPdf} loading={pdfQuery.isLoading}>
-              Preuzmi PDF
-            </Button>
-          )}
-        </Space>
+        {isMobile ? (
+          <Dropdown
+            trigger={['click']}
+            menu={{
+              items: [
+                { key: 'back', label: 'Natrag na listu' },
+                ...(canMarkSepActivated ? [{ key: 'sep', label: 'Označi SEP aktiviran' }] : []),
+                ...(canRetrySend ? [{ key: 'retry', label: 'Ponovo pošalji email' }] : []),
+                ...(canDownloadPdf ? [{ key: 'pdf', label: 'Preuzmi PDF' }] : []),
+              ],
+              onClick: ({ key }) => {
+                if (key === 'back') navigate('/installation-records')
+                if (key === 'sep') markSepActivatedMutation.mutate()
+                if (key === 'retry') retrySendMutation.mutate()
+                if (key === 'pdf') void handleDownloadPdf()
+              },
+            }}
+          >
+            <Button type="primary">Akcije</Button>
+          </Dropdown>
+        ) : (
+          <Space wrap>
+            <Button onClick={() => navigate('/installation-records')}>Natrag na listu</Button>
+            {canMarkSepActivated && (
+              <Button
+                type="primary"
+                onClick={() => markSepActivatedMutation.mutate()}
+                loading={markSepActivatedMutation.isPending}
+              >
+                Označi SEP aktiviran
+              </Button>
+            )}
+            {canRetrySend && (
+              <Button
+                onClick={() => retrySendMutation.mutate()}
+                loading={retrySendMutation.isPending}
+              >
+                Ponovo pošalji email
+              </Button>
+            )}
+            {canDownloadPdf && (
+              <Button onClick={handleDownloadPdf} loading={pdfQuery.isLoading}>
+                Preuzmi PDF
+              </Button>
+            )}
+          </Space>
+        )}
       </div>
 
       <Card title="Podaci zapisnika">

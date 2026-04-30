@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, Card, Descriptions, Space, Tag, Timeline, Typography } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { simCardsApi } from '@/api/sim-cards.api';
+import { useAuthStore } from '@/store/auth.store'
 import {
   getDemountResolutionLabel,
   getMeterDemountCategoryLabel,
@@ -23,6 +24,9 @@ const statusColor: Record<string, string> = {
 export default function SimCardDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const user = useAuthStore((s) => s.user)
+  const role = user?.role
+  const isModerator = role === 'USER' && (user?.branchModeratorBranchIds?.length ?? 0) > 0
 
   const simCardQuery = useQuery({
     queryKey: ['sim-cards', 'details', id],
@@ -108,7 +112,7 @@ export default function SimCardDetailsPage() {
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Space>
-        <Button onClick={() => navigate('/shipments')}>Nazad</Button>
+        <Button onClick={() => navigate(isModerator ? '/sim-cards' : '/shipments')}>Nazad</Button>
         <Typography.Title level={3} className="!mb-0">
           Detalji SIM kartice
         </Typography.Title>

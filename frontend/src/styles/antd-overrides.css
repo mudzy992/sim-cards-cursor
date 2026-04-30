@@ -1,3 +1,22 @@
 .ant-layout-header {
   line-height: normal;
 }
+
+/* Global mobile safety: tables/descriptions should not overflow cards */
+.ant-table-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.ant-table {
+  min-width: max-content;
+}
+
+.ant-card-body {
+  max-width: 100%;
+}
+
+.ant-descriptions-view {
+  max-width: 100%;
+  overflow-x: auto;
+}

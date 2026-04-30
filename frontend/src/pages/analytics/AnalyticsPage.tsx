@@ -93,14 +93,16 @@ export default function AnalyticsPage() {
         <Typography.Title level={3} className="!mb-0">
           Analitika
         </Typography.Title>
-        <Space>
-          <Typography.Text type="secondary">Vremenski raspon:</Typography.Text>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+          <Typography.Text type="secondary" className="text-xs sm:text-sm">
+            Vremenski raspon:
+          </Typography.Text>
           <Segmented
             options={rangeOptions}
             value={rangeParams.range ?? '30_DAYS'}
             onChange={(v) => setRangeRange(v as AnalyticsRange)}
           />
-        </Space>
+        </div>
       </div>
 
       <Row gutter={[16, 16]}>
@@ -243,31 +245,37 @@ export default function AnalyticsPage() {
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
           <Card title="SIM kartice po distribucijama" loading={simQuery.isLoading}>
-            <Table
-              dataSource={sim?.byDistribution ?? []}
-              rowKey="distributionId"
-              size="small"
-              pagination={false}
-              columns={[
-                { title: 'Distribucija', dataIndex: 'distributionName' },
-                { title: 'SIM kartice', dataIndex: 'total' },
-              ]}
-            />
+            <div className="-mx-4 overflow-x-auto px-4">
+              <Table
+                dataSource={sim?.byDistribution ?? []}
+                rowKey="distributionId"
+                size="small"
+                pagination={false}
+                scroll={{ x: 'max-content' }}
+                columns={[
+                  { title: 'Distribucija', dataIndex: 'distributionName' },
+                  { title: 'SIM kartice', dataIndex: 'total' },
+                ]}
+              />
+            </div>
           </Card>
         </Col>
         <Col xs={24} lg={12}>
           <Card title="SIM kartice po podružnicama (instalirane)" loading={simQuery.isLoading}>
-            <Table
-              dataSource={sim?.byBranch ?? []}
-              rowKey="branchId"
-              size="small"
-              pagination={false}
-              columns={[
-                { title: 'Distribucija', dataIndex: 'distributionName' },
-                { title: 'Podružnica', dataIndex: 'branchName' },
-                { title: 'Instalirano SIM', dataIndex: 'installedCount' },
-              ]}
-            />
+            <div className="-mx-4 overflow-x-auto px-4">
+              <Table
+                dataSource={sim?.byBranch ?? []}
+                rowKey="branchId"
+                size="small"
+                pagination={false}
+                scroll={{ x: 'max-content' }}
+                columns={[
+                  { title: 'Distribucija', dataIndex: 'distributionName' },
+                  { title: 'Podružnica', dataIndex: 'branchName' },
+                  { title: 'Instalirano SIM', dataIndex: 'installedCount' },
+                ]}
+              />
+            </div>
           </Card>
         </Col>
       </Row>
@@ -275,23 +283,25 @@ export default function AnalyticsPage() {
       <Row gutter={[16, 16]}>
         <Col xs={24}>
           <Card title="SIM kartice po operatorima" loading={simQuery.isLoading}>
-            <Table
-              dataSource={sim?.byOperator ?? []}
-              rowKey="userId"
-              size="small"
-              pagination={false}
-              columns={[
-                {
-                  title: 'Operator',
-                  render: (_: unknown, row) =>
-                    `${row.firstName} ${row.lastName}`,
-                },
-                { title: 'Distribucija', dataIndex: 'distributionName' },
-                { title: 'Podružnica', dataIndex: 'branchName' },
-                { title: 'Zaduženih SIM', dataIndex: 'totalAssigned' },
-                { title: 'Instaliranih SIM', dataIndex: 'totalInstalled' },
-              ]}
-            />
+            <div className="-mx-4 overflow-x-auto px-4">
+              <Table
+                dataSource={sim?.byOperator ?? []}
+                rowKey="userId"
+                size="small"
+                pagination={false}
+                scroll={{ x: 'max-content' }}
+                columns={[
+                  {
+                    title: 'Operator',
+                    render: (_: unknown, row) => `${row.firstName} ${row.lastName}`,
+                  },
+                  { title: 'Distribucija', dataIndex: 'distributionName' },
+                  { title: 'Podružnica', dataIndex: 'branchName' },
+                  { title: 'Zaduženih SIM', dataIndex: 'totalAssigned' },
+                  { title: 'Instaliranih SIM', dataIndex: 'totalInstalled' },
+                ]}
+              />
+            </div>
           </Card>
         </Col>
       </Row>
@@ -348,27 +358,29 @@ export default function AnalyticsPage() {
               </Button>
             }
           >
-            <Table
-              dataSource={users}
-              rowKey="userId"
-              size="small"
-              pagination={false}
-              columns={[
-                {
-                  title: 'Korisnik',
-                  render: (_: unknown, row) =>
-                    `${row.firstName} ${row.lastName}`,
-                },
-                { title: 'Email', dataIndex: 'email' },
-                {
-                  title: 'Rola',
-                  dataIndex: 'role',
-                  render: (r: string) => <Tag>{r}</Tag>,
-                },
-                { title: 'Kreirani zapisnici', dataIndex: 'created' },
-                { title: 'Odobreni zapisnici', dataIndex: 'approved' },
-              ]}
-            />
+            <div className="-mx-4 overflow-x-auto px-4">
+              <Table
+                dataSource={users}
+                rowKey="userId"
+                size="small"
+                pagination={false}
+                scroll={{ x: 'max-content' }}
+                columns={[
+                  {
+                    title: 'Korisnik',
+                    render: (_: unknown, row) => `${row.firstName} ${row.lastName}`,
+                  },
+                  { title: 'Email', dataIndex: 'email' },
+                  {
+                    title: 'Rola',
+                    dataIndex: 'role',
+                    render: (r: string) => <Tag>{r}</Tag>,
+                  },
+                  { title: 'Kreirani zapisnici', dataIndex: 'created' },
+                  { title: 'Odobreni zapisnici', dataIndex: 'approved' },
+                ]}
+              />
+            </div>
           </Card>
         </Col>
       </Row>

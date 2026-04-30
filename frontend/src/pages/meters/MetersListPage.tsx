@@ -472,126 +472,129 @@ export default function MetersListPage() {
                       ?.data?.message ?? 'Učitavanje liste nije uspjelo.'}
                   </Typography.Text>
                 )}
-                <Table<MeterItem>
-                  rowKey="id"
-                  loading={listQuery.isLoading}
-                  dataSource={meterRows}
-                  pagination={{
-                    current: listQuery.data?.page,
-                    pageSize: listQuery.data?.limit,
-                    total: listQuery.data?.total,
-                    showSizeChanger: true,
-                    showTotal: (total) => `Ukupno: ${total}`,
-                    onChange: (page, pageSize) =>
-                      setPagination((p) => ({ ...p, page, limit: pageSize ?? 20 })),
-                  }}
-                  onRow={(record) => ({
-                    onClick: () => openMeterDetail(record),
-                    style: { cursor: 'pointer' },
-                  })}
-                  columns={[
-                    {
-                      title: 'Serijski broj',
-                      dataIndex: 'serialNumber',
-                      key: 'serialNumber',
-                    },
-                    {
-                      title: 'Tip brojila',
-                      key: 'meterTypeDefinition',
-                      render: (_: unknown, row: MeterItem) =>
-                        row.meterTypeDefinition?.name ?? '–',
-                    },
-                    {
-                      title: 'Proizvođač',
-                      key: 'manufacturer',
-                      render: (_: unknown, row: MeterItem) =>
-                        row.meterTypeDefinition?.manufacturer ?? '–',
-                    },
-                    {
-                      title: 'Model',
-                      key: 'model',
-                      render: (_: unknown, row: MeterItem) =>
-                        row.meterTypeDefinition?.model ?? '–',
-                    },
-                    {
-                      title: 'God. proizv.',
-                      dataIndex: 'year',
-                      key: 'year',
-                      render: (val: number | null) => (val != null ? String(val) : '–'),
-                    },
-                    {
-                      title: 'God. baždarenja',
-                      dataIndex: 'calibrationYear',
-                      key: 'calibrationYear',
-                      render: (val: number | null) => (val != null ? String(val) : '–'),
-                    },
-                    {
-                      title: 'Status brojila',
-                      key: 'meterStatus',
-                      width: 160,
-                      render: (_: unknown, row: MeterItem) => {
-                        const status = row.status ?? 'ACTIVE'
-                        const color =
-                          status === 'ACTIVE'
-                            ? 'success'
-                            : status === 'DEFECTIVE'
-                              ? 'error'
-                              : status === 'IN_CALIBRATION'
-                                ? 'warning'
-                                : 'default'
-                        return <Tag color={color}>{getMeterStatusLabel(status)}</Tag>
+                <div className="-mx-4 overflow-x-auto px-4">
+                  <Table<MeterItem>
+                    rowKey="id"
+                    loading={listQuery.isLoading}
+                    dataSource={meterRows}
+                    pagination={{
+                      current: listQuery.data?.page,
+                      pageSize: listQuery.data?.limit,
+                      total: listQuery.data?.total,
+                      showSizeChanger: true,
+                      showTotal: (total) => `Ukupno: ${total}`,
+                      onChange: (page, pageSize) =>
+                        setPagination((p) => ({ ...p, page, limit: pageSize ?? 20 })),
+                    }}
+                    scroll={{ x: 'max-content' }}
+                    onRow={(record) => ({
+                      onClick: () => openMeterDetail(record),
+                      style: { cursor: 'pointer' },
+                    })}
+                    columns={[
+                      {
+                        title: 'Serijski broj',
+                        dataIndex: 'serialNumber',
+                        key: 'serialNumber',
                       },
-                    },
-                    {
-                      title: 'SIM',
-                      key: 'sim',
-                      width: 130,
-                      render: (_: unknown, row: MeterItem) => {
-                        const noSim = row.simCardState === 'NO_SIM' || !row.simCard;
-                        return (
-                          <Tag color={noSim ? 'warning' : 'success'}>
-                            {noSim ? 'Bez SIM' : 'SIM ugrađena'}
-                          </Tag>
-                        );
+                      {
+                        title: 'Tip brojila',
+                        key: 'meterTypeDefinition',
+                        render: (_: unknown, row: MeterItem) =>
+                          row.meterTypeDefinition?.name ?? '–',
                       },
-                    },
-                    {
-                      title: 'Demontaža',
-                      key: 'demountTask',
-                      width: 220,
-                      render: (_: unknown, row: MeterItem) => {
-                        const t = row.demountTasks?.[0]
-                        if (!t) return '—'
-                        const date = new Date(t.createdAt).toLocaleString('bs-BA')
-                        const op = t.assignedTo
-                          ? `${t.assignedTo.firstName} ${t.assignedTo.lastName}`
-                          : '—'
-                        return (
-                          <Tag color="gold">
-                            Nalog: {date} • {op}
-                          </Tag>
-                        )
+                      {
+                        title: 'Proizvođač',
+                        key: 'manufacturer',
+                        render: (_: unknown, row: MeterItem) =>
+                          row.meterTypeDefinition?.manufacturer ?? '–',
                       },
-                    },
-                    {
-                      title: 'Akcije',
-                      key: 'actions',
-                      width: 120,
-                      render: (_, record) => (
-                        <Space onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            type="link"
-                            size="small"
-                            onClick={() => navigate(`/meters/${record.id}`)}
-                          >
-                            Detalji
-                          </Button>
-                        </Space>
-                      ),
-                    },
-                  ]}
-                  data-tour-id="meters-table"
-                />
+                      {
+                        title: 'Model',
+                        key: 'model',
+                        render: (_: unknown, row: MeterItem) =>
+                          row.meterTypeDefinition?.model ?? '–',
+                      },
+                      {
+                        title: 'God. proizv.',
+                        dataIndex: 'year',
+                        key: 'year',
+                        render: (val: number | null) => (val != null ? String(val) : '–'),
+                      },
+                      {
+                        title: 'God. baždarenja',
+                        dataIndex: 'calibrationYear',
+                        key: 'calibrationYear',
+                        render: (val: number | null) => (val != null ? String(val) : '–'),
+                      },
+                      {
+                        title: 'Status brojila',
+                        key: 'meterStatus',
+                        width: 160,
+                        render: (_: unknown, row: MeterItem) => {
+                          const status = row.status ?? 'ACTIVE'
+                          const color =
+                            status === 'ACTIVE'
+                              ? 'success'
+                              : status === 'DEFECTIVE'
+                                ? 'error'
+                                : status === 'IN_CALIBRATION'
+                                  ? 'warning'
+                                  : 'default'
+                          return <Tag color={color}>{getMeterStatusLabel(status)}</Tag>
+                        },
+                      },
+                      {
+                        title: 'SIM',
+                        key: 'sim',
+                        width: 130,
+                        render: (_: unknown, row: MeterItem) => {
+                          const noSim = row.simCardState === 'NO_SIM' || !row.simCard;
+                          return (
+                            <Tag color={noSim ? 'warning' : 'success'}>
+                              {noSim ? 'Bez SIM' : 'SIM ugrađena'}
+                            </Tag>
+                          );
+                        },
+                      },
+                      {
+                        title: 'Demontaža',
+                        key: 'demountTask',
+                        width: 220,
+                        render: (_: unknown, row: MeterItem) => {
+                          const t = row.demountTasks?.[0]
+                          if (!t) return '—'
+                          const date = new Date(t.createdAt).toLocaleString('bs-BA')
+                          const op = t.assignedTo
+                            ? `${t.assignedTo.firstName} ${t.assignedTo.lastName}`
+                            : '—'
+                          return (
+                            <Tag color="gold">
+                              Nalog: {date} • {op}
+                            </Tag>
+                          )
+                        },
+                      },
+                      {
+                        title: 'Akcije',
+                        key: 'actions',
+                        width: 120,
+                        render: (_, record) => (
+                          <Space onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              type="link"
+                              size="small"
+                              onClick={() => navigate(`/meters/${record.id}`)}
+                            >
+                              Detalji
+                            </Button>
+                          </Space>
+                        ),
+                      },
+                    ]}
+                    data-tour-id="meters-table"
+                  />
+                </div>
               </div>
             ),
           },
@@ -619,76 +622,79 @@ export default function MetersListPage() {
                     </Button>
                   )}
                 </div>
-                <Table<MeterTypeDefinitionItem>
-                  rowKey="id"
-                  loading={typesListQuery.isLoading}
-                  dataSource={typeRows}
-                  pagination={false}
-                  columns={[
-                    { title: 'Naziv', dataIndex: 'name', key: 'name' },
-                    {
-                      title: 'Proizvođač',
-                      dataIndex: 'manufacturer',
-                      key: 'manufacturer',
-                      render: (v: string | null) => v ?? '–',
-                    },
-                    {
-                      title: 'Model',
-                      dataIndex: 'model',
-                      key: 'model',
-                      render: (v: string | null) => v ?? '–',
-                    },
-                    {
-                      title: 'Tip',
-                      dataIndex: 'type',
-                      key: 'type',
-                      render: (t: MeterType) => renderType(t),
-                    },
-                    {
-                      title: 'Max struja',
-                      dataIndex: 'maxCurrent',
-                      key: 'maxCurrent',
-                      render: (v: string | null) => v ?? '–',
-                    },
-                    {
-                      title: 'Akcije',
-                      key: 'actions',
-                      width: 160,
-                      render: (_, record) => (
-                        <Space>
-                          {userRole === 'SYSTEM_ADMIN' ? (
-                            <>
-                              <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
-                                Uredi
-                              </Button>
-                              <Popconfirm
-                                title="Obrisati tip brojila?"
-                                onConfirm={() => deleteTypeMutation.mutate(record.id)}
-                                okText="Da"
-                                cancelText="Ne"
-                                okButtonProps={{ danger: true }}
-                              >
-                                <Button
-                                  type="link"
-                                  size="small"
-                                  danger
-                                  disabled={deleteTypeMutation.isPending}
-                                >
-                                  Obriši
+                <div className="-mx-4 overflow-x-auto px-4">
+                  <Table<MeterTypeDefinitionItem>
+                    rowKey="id"
+                    loading={typesListQuery.isLoading}
+                    dataSource={typeRows}
+                    pagination={false}
+                    scroll={{ x: 'max-content' }}
+                    columns={[
+                      { title: 'Naziv', dataIndex: 'name', key: 'name' },
+                      {
+                        title: 'Proizvođač',
+                        dataIndex: 'manufacturer',
+                        key: 'manufacturer',
+                        render: (v: string | null) => v ?? '–',
+                      },
+                      {
+                        title: 'Model',
+                        dataIndex: 'model',
+                        key: 'model',
+                        render: (v: string | null) => v ?? '–',
+                      },
+                      {
+                        title: 'Tip',
+                        dataIndex: 'type',
+                        key: 'type',
+                        render: (t: MeterType) => renderType(t),
+                      },
+                      {
+                        title: 'Max struja',
+                        dataIndex: 'maxCurrent',
+                        key: 'maxCurrent',
+                        render: (v: string | null) => v ?? '–',
+                      },
+                      {
+                        title: 'Akcije',
+                        key: 'actions',
+                        width: 160,
+                        render: (_, record) => (
+                          <Space>
+                            {userRole === 'SYSTEM_ADMIN' ? (
+                              <>
+                                <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
+                                  Uredi
                                 </Button>
-                              </Popconfirm>
-                            </>
-                          ) : (
-                            <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
-                              Detalji
-                            </Button>
-                          )}
-                        </Space>
-                      ),
-                    },
-                  ]}
-                  data-tour-id="meters-types-table"
-                />
+                                <Popconfirm
+                                  title="Obrisati tip brojila?"
+                                  onConfirm={() => deleteTypeMutation.mutate(record.id)}
+                                  okText="Da"
+                                  cancelText="Ne"
+                                  okButtonProps={{ danger: true }}
+                                >
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    danger
+                                    disabled={deleteTypeMutation.isPending}
+                                  >
+                                    Obriši
+                                  </Button>
+                                </Popconfirm>
+                              </>
+                            ) : (
+                              <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
+                                Detalji
+                              </Button>
+                            )}
+                          </Space>
+                        ),
+                      },
+                    ]}
+                    data-tour-id="meters-types-table"
+                  />
+                </div>
               </div>
             ),
           },

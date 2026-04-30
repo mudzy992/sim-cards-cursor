@@ -11,15 +11,21 @@ import {
   SettingOutlined,
   AreaChartOutlined,
 } from '@ant-design/icons';
-import { Layout, Menu } from 'antd';
+import { Drawer, Grid, Layout, Menu } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { useAppFeatures } from '@/hooks/useAppFeatures';
 
 const { Sider } = Layout;
 
-export function Sidebar() {
+type SidebarProps = {
+  mobileOpen: boolean
+  onMobileClose: () => void
+}
+
+export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
+  const screens = Grid.useBreakpoint()
   const user = useAuthStore((state) => state.user);
   const role = user?.role;
   const isModerator = role === 'USER' && (user?.branchModeratorBranchIds?.length ?? 0) > 0;
@@ -125,20 +131,42 @@ export function Sidebar() {
       : []),
   ];
 
+  const isMobile = !screens.lg
+
+  const isSimCards = location.pathname === '/sim-cards' || location.pathname.startsWith('/sim-cards/')
+  const selectedKey = isSimCards ? (isModerator ? '/sim-cards' : '/shipments') : location.pathname
+
+  const menuNode = (
+    <Menu
+      mode="inline"
+      selectedKeys={[selectedKey]}
+      items={items}
+      onClick={() => {
+        if (!isMobile) return
+        onMobileClose()
+      }}
+    />
+  )
+
+  if (isMobile) {
+    return (
+      <Drawer
+        open={mobileOpen}
+        onClose={onMobileClose}
+        placement="left"
+        width={260}
+        bodyStyle={{ padding: 0 }}
+        title={<div className="px-2 py-1 text-base font-semibold">SIM Tracker</div>}
+      >
+        {menuNode}
+      </Drawer>
+    )
+  }
+
   return (
     <Sider width={240} theme="light" breakpoint="lg" collapsedWidth={0}>
       <div className="px-4 py-4 text-lg font-semibold">SIM Tracker</div>
-      {(() => {
-        const isSimCards = location.pathname === '/sim-cards' || location.pathname.startsWith('/sim-cards/')
-        const selectedKey = isSimCards ? (isModerator ? '/sim-cards' : '/shipments') : location.pathname
-        return (
-      <Menu
-        mode="inline"
-        selectedKeys={[selectedKey]}
-        items={items}
-      />
-        )
-      })()}
+      {menuNode}
     </Sider>
   );
 }
