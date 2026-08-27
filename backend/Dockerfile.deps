@@ -1,0 +1,46 @@
+# =====================================================================
+# DEPS IMAGE za VM (offline build) — backend
+# =====================================================================
+# Builda se SAMO kada se mijenjaju zavisnosti (package*.json) ili
+# sistemski paketi (apt paketi ispod) — NE kod svake izmjene koda.
+#
+# Builda se OBAVEZNO na mašini koja ima internet (npm registry + apt
+# repozitorijum), zatim se rezultujući image prenosi na VM jednom preko
+# `docker save | gzip` + `docker load` (vidi scripts/vm-deps-build.sh i
+# scripts/vm-deps-load.sh).
+#
+# Sadrži: node runtime, sistemske pakete za Puppeteer/Chromium (PDF
+# generisanje), i kompletan `npm ci` rezultat (uključujući devDependencies
+# — namjerno, da isti sloj mogu koristiti i build i runtime stage u
+# backend/Dockerfile.vm bez ijednog dodatnog `npm install` poziva, čime
+# je svaki svakodnevni build na VM-u garantovano offline).
+#
+# Tag konvencija: simtracker-backend-deps:<YYYYMMDD-HHMM ili git short sha>
+# =====================================================================
+FROM node:24-slim AS deps
+
+# openssl - potreban Prisma engine-u
+# chromium + fonts-freefont-ttf - Puppeteer (PDF generisanje izvještaja)
+# ca-certificates - TLS konekcije iz Node-a (npr. ka Postgres-u sa sslmode)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    chromium \
+    fonts-freefont-ttf \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Puppeteer ne treba da skida sopstveni Chromium (koristi sistemski, gore
+# instaliran) — ovo se poštuje i u build i u runtime stage jer oba
+# nasljeđuju ovaj isti deps image.
+ENV PUPPETEER_SKIP_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+WORKDIR /usr/app
+
+COPY package*.json ./
+RUN npm ci
+
+# Namjerno NEMA `COPY prisma` ni `npx prisma generate` ovdje — Prisma
+# klijent se generiše u backend/Dockerfile.vm (build stage), da svaka
+# izmjena u schema.prisma (koja je "kod", ne "zavisnost") bude pokrivena
+# bez potrebe da se ovaj deps image ponovo builda.

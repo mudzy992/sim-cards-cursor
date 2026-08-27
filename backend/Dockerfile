@@ -1,7 +1,11 @@
 # STAGE 1: BUILD
-FROM node:20-slim AS build
+FROM node:24-slim AS build
 # Prisma treba openssl u slim verziji
 RUN apt-get update && apt-get install -y openssl
+# Build stage ne pokreće Puppeteer (samo tsc kompajliranje) — preskoči
+# preuzimanje Chromium-a ovdje da se izbjegne nepotreban download/rizik
+# od flaky CDN-a; sistemski Chromium se instalira samo u runtime stage.
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 WORKDIR /usr/app
 COPY package*.json ./
 COPY prisma ./prisma
@@ -11,7 +15,7 @@ COPY . .
 RUN npm run build
 
 # STAGE 2: RUNTIME
-FROM node:20-slim AS runtime
+FROM node:24-slim AS runtime
 # Instalacija samo najnužnijeg za Chromium
 RUN apt-get update && apt-get install -y \
     chromium \

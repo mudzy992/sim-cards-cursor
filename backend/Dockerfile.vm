@@ -1,0 +1,33 @@
+# =====================================================================
+# APP IMAGE za VM (offline build) — backend
+# =====================================================================
+# Svakodnevni build kada se mijenja SAMO kod (nema novih zavisnosti).
+# Builda se DIREKTNO NA VM-u, bez interneta — pod uslovom da je
+# `simtracker-backend-deps:<tag>` (backend/Dockerfile.deps) već učitan
+# lokalno na VM (docker load), i da je taj tag proslijeđen kao DEPS_IMAGE
+# build-arg (vidi scripts/vm-backend-build.sh i docker-compose.vm.app.yml).
+#
+# Ne radi nikakav `npm ci`/`npm install` — sve zavisnosti (uključujući
+# devDependencies, namjerno) već postoje u deps image-u.
+# =====================================================================
+ARG DEPS_IMAGE=simtracker-backend-deps:latest
+
+FROM ${DEPS_IMAGE} AS build
+WORKDIR /usr/app
+COPY prisma ./prisma
+RUN npx prisma generate
+COPY . .
+RUN chmod -R +x node_modules/.bin
+RUN npm run build
+
+FROM ${DEPS_IMAGE} AS runtime
+WORKDIR /usr/app
+
+COPY --from=build /usr/app/dist ./dist
+COPY --from=build /usr/app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /usr/app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=build /usr/app/prisma ./prisma
+COPY --from=build /usr/app/src/templates ./templates
+
+EXPOSE 3003
+CMD ["node", "dist/src/main.js"]

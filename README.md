@@ -1,7 +1,7 @@
 # SIM Tracker Monorepo (Phase 1)
 
 ## Projects
-- `backend/` - NestJS + Prisma + MySQL (auth, RBAC, users)
+- `backend/` - NestJS + Prisma + PostgreSQL (auth, RBAC, users)
 - `frontend/` - Vite + React + Antd (login, protected routes, users page)
 - `mobile/` - Expo Router app (login flow, tab navigation, secure session)
 - `execution-playbook/` - source-of-truth planning docs
@@ -40,8 +40,14 @@ npm run start
 - Frontend: `http://localhost:5173`
 
 ## Notes
-- Backend expects MySQL connection via `DATABASE_URL`.
+- Backend expects PostgreSQL connection via `DATABASE_URL` (MySQL config kept
+  as backup/rollback reference — see `docs/MIGRATION_MYSQL_TO_POSTGRES.md`).
 - Seed script creates admin user using env variables in `backend/.env`.
+
+## Deployment
+- Public/host: `docker-compose.yml` (has internet, normal build).
+- VM (closed network, no internet): `docker-compose.vm.*.yml`, offline
+  build via deps images — see `VM_DEPLOYMENT.md` and `scripts/deploy.sh`.
 
 ## Notification settings (verification)
 

@@ -1,43 +1,54 @@
+## VM baza — PostgreSQL (isključivo, MySQL varijanta je arhivirana u
+## docker-compose.vm.db.mysql.backup.yml, vidi napomenu tamo).
+##
+## Isti Postgres image/verzija kao i public infrastruktura (sql.ba101.top)
+## — jedina razlika je gdje kontejner radi i koji hostname/kredencijali se
+## koriste (ovdje: lokalni kontejner "postgres" na "sim-tracker-net" mreži,
+## bez izlaza na internet; javno: eksterni servis "postgres" na "web" mreži).
+## Ako je poznata tačna major verzija sa sql.ba101.top, uskladiti tag ispod.
+##
+## Image se na VM prenosi offline (docker save/load) — vidi
+## scripts/postgres-image-prepare.sh i scripts/postgres-image-load.sh.
 services:
-  mysql:
-    container_name: sim-tracker-mysql
-    image: mysql:8.4
+  postgres:
+    container_name: sim-tracker-postgres
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      # PREPORUKA: ove vrijednosti postaviti kroz .env fajl na VM-u
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-nije,kikiriki}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-sim_cards}
-      - MYSQL_USER=${MYSQL_USER:-sim_app}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-nije,kikiriki}
-    command: >
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
+      # PREPORUKA: ove vrijednosti postaviti kroz .env fajl na VM-u (root .env)
+      - POSTGRES_DB=${POSTGRES_DB:-sim_cards}
+      - POSTGRES_USER=${POSTGRES_USER:-sim_app}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-nije,kikiriki}
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sim_app} -d ${POSTGRES_DB:-sim_cards}"]
       interval: 10s
       timeout: 5s
       retries: 10
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - app
 
   dbadmin:
     container_name: sim-tracker-dbadmin
-    image: phpmyadmin:5-apache
+    image: dpage/pgadmin4:latest
     restart: unless-stopped
     environment:
-      - PMA_HOST=mysql
-      - PMA_PORT=3306
-      - PMA_ARBITRARY=0
-      - PMA_ABSOLUTE_URI=${PMA_ABSOLUTE_URI:-http://10.10.10.30/dbadmin/}
-      # Upload limita (po potrebi za import)
-      - UPLOAD_LIMIT=256M
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:-admin@simtracker.local}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD:-nije,kikiriki}
+      # Rad iza reverse proxy-ja na sub-putanji /dbadmin. VAŽNO: za razliku
+      # od phpMyAdmin-a (koji je koristio stripprefix), pgAdmin OČEKUJE da
+      # mu stigne CIJELA putanja (sa /dbadmin) — sam je interno skida preko
+      # SCRIPT_NAME. Zato NEMA stripprefix middleware-a na ruti ispod — ako
+      # se doda, pgAdmin puca sa "Request path '/' does not start with
+      # SCRIPT_NAME '/dbadmin'".
+      - SCRIPT_NAME=/dbadmin
+      - PGADMIN_LISTEN_PORT=80
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     volumes:
-      - ./dbadmin/apache-servername.conf:/etc/apache2/conf-enabled/servername.conf:ro
+      - pgadmin-data:/var/lib/pgadmin
     networks:
       - app
     labels:
@@ -45,9 +56,7 @@ services:
       - "traefik.http.routers.sim_dbadmin.rule=(Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/dbadmin`)"
       - traefik.http.routers.sim_dbadmin.entrypoints=web
       - traefik.http.routers.sim_dbadmin.priority=30
-      - traefik.http.routers.sim_dbadmin.middlewares=sim_dbadmin_stripprefix
       - traefik.http.routers.sim_dbadmin.service=sim_dbadmin_svc
-      - traefik.http.middlewares.sim_dbadmin_stripprefix.stripprefix.prefixes=/dbadmin
       - traefik.http.services.sim_dbadmin_svc.loadbalancer.server.port=80
 
 networks:
@@ -56,5 +65,7 @@ networks:
     name: sim-tracker-net
 
 volumes:
-  mysql-data:
+  postgres-data:
+    driver: local
+  pgadmin-data:
     driver: local

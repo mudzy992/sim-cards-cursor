@@ -84,7 +84,7 @@ export class ShipmentsService {
       ...(filter.search
         ? {
             OR: [
-              { name: { contains: filter.search } },
+              { name: { contains: filter.search} },
               { provider: { contains: filter.search } },
             ],
           }

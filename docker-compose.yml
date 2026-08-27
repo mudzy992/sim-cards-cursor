@@ -7,6 +7,11 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env.host
+    # DATABASE_URL (u backend/.env.host) koristi host "postgres" umjesto
+    # sql.ba101.top:5432 — pretpostavka je da Postgres servis već postoji
+    # na "web" mreži (isti pattern kao Traefik: eksterni servis, ne
+    # definiše se ovdje). Ako Postgres servis ima drugačiji naziv na "web"
+    # mreži, uskladiti host u backend/.env.host.
     networks:
       - web
     volumes:

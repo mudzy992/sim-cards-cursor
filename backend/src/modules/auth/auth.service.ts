@@ -11,6 +11,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import { PrismaService } from '../../prisma/prisma.service';
 import { baseUsername, generateUniqueUsername } from '../../common/utils/username-generator.util';
+import { normalizeEmail } from '../../common/utils/email-normalizer.util';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -101,8 +102,9 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto, createdById?: string) {
+    const normalizedEmail = normalizeEmail(registerDto.email);
     const existing = await this.prisma.user.findUnique({
-      where: { email: registerDto.email },
+      where: { email: normalizedEmail },
       select: { id: true },
     });
 
@@ -124,7 +126,7 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        email: registerDto.email,
+        email: normalizedEmail,
         username,
         password: passwordHash,
         firstName: registerDto.firstName,
@@ -305,7 +307,7 @@ export class AuthService {
   private async findUserByEmailOrUsername(emailOrUsername: string) {
     const isEmail = emailOrUsername.includes('@');
     if (isEmail) {
-      return this.prisma.user.findUnique({ where: { email: emailOrUsername } });
+      return this.prisma.user.findUnique({ where: { email: normalizeEmail(emailOrUsername) } });
     }
     return this.prisma.user.findUnique({ where: { username: emailOrUsername } });
   }
@@ -313,7 +315,7 @@ export class AuthService {
   private async findUserWithBranch(emailOrUsername: string) {
     const isEmail = emailOrUsername.includes('@');
     const where = isEmail
-      ? { email: emailOrUsername }
+      ? { email: normalizeEmail(emailOrUsername) }
       : { username: emailOrUsername };
     return this.prisma.user.findUnique({
       where,

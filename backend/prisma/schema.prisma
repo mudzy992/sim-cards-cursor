@@ -2,8 +2,14 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// PostgreSQL je primarna baza od migracije (avgust 2026).
+// MySQL konfiguracija je zadržana kao backup/rollback referenca — vidi
+// docs/MIGRATION_MYSQL_TO_POSTGRES.md i backend/.env (MYSQL_BACKUP_DATABASE_URL).
+// NAPOMENA: Prisma "provider" se ne može birati dinamički preko env-a — bira
+// se ovdje, na build-time. Za rollback na MySQL treba vratiti "mysql" ovdje
+// i ponovo generisati klijent (vidi migracioni dokument, sekcija Rollback).
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

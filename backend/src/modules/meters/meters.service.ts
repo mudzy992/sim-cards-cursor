@@ -138,7 +138,7 @@ export class MetersService {
     const where: Record<string, unknown> = {};
     if (meterTypeDefinitionId) where.meterTypeDefinitionId = meterTypeDefinitionId;
     if (serialNumber?.trim()) {
-      where.serialNumber = { contains: serialNumber.trim() };
+      where.serialNumber = { contains: serialNumber.trim(), mode: 'insensitive' };
     }
     if (simCardState) {
       where.simCardState = simCardState;

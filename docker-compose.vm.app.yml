@@ -3,29 +3,47 @@ services:
     container_name: sim-tracker-backend-vm
     build:
       context: ./backend
+      dockerfile: Dockerfile.vm
+      args:
+        # Tag deps image-a koji je već učitan lokalno na VM-u (docker load) —
+        # vidi scripts/vm-deps-build.sh / vm-deps-load.sh i
+        # backend/Dockerfile.deps. Podesiti kroz .env (DEPS_IMAGE_TAG) ili
+        # override-ovati u komandnoj liniji (--build-arg).
+        - DEPS_IMAGE=${DEPS_IMAGE_TAG:-simtracker-backend-deps:latest}
     restart: unless-stopped
     env_file:
       - ./backend/.env.prod
     environment:
-      - DATABASE_URL=mysql://${MYSQL_USER:-sim_app}:${MYSQL_PASSWORD:-nije,kikiriki}@mysql:3306/${MYSQL_DATABASE:-sim_cards}
-    depends_on:
-      mysql:
-        condition: service_healthy
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sim_app}:${POSTGRES_PASSWORD:-nije,kikiriki}@sim-tracker-postgres:5432/${POSTGRES_DB:-sim_cards}
+    # NEMA depends_on ka postgres/dbadmin — ti servisi su definisani u
+    # docker-compose.vm.db.yml (odvojen fajl/projekat). `depends_on` u
+    # Compose-u referencira servis unutar ISTOG seta -f fajlova koji se
+    # zajedno prosljeđuju datoj komandi; kad se ovaj fajl pokreće sam
+    # (`docker compose -f docker-compose.vm.app.yml up -d backend`), Compose
+    # ne vidi "postgres" servis uopšte i baca "undefined service" grešku
+    # (bez obzira na naziv/hostname). U praksi Postgres je dugotrajno
+    # pokrenut i rijetko se restartuje, pa ovo nije problem u svakodnevnom
+    # radu. Ako ipak treba garantovano čekanje na zdrav Postgres prije
+    # starta backend-a, pokrenuti oba fajla zajedno u jednoj komandi:
+    #   docker compose -f docker-compose.vm.db.yml -f docker-compose.vm.app.yml up -d backend
+    # (tada depends_on iz app.yml postaje validan jer Compose spaja oba
+    # fajla u jedan projekat).
     volumes:
       # Globalno pravilo za upload mount
       - /mnt/shared-app-files/sim-cards:/usr/app/uploads
     networks:
       - app
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3003/api/health || exit 1"]
+      test: ["CMD", "node", "-e", "const http = require('http'); const req = http.get('http://127.0.0.1:3003/api/docs', (res) => { process.exit(res.statusCode >= 200 && res.statusCode < 400 ? 0 : 1); }); req.on('error', () => process.exit(1));"]
       interval: 10s
       timeout: 5s
       retries: 10
+
     labels:
       - traefik.enable=true
 
       # Backend HTTP: public /backend/* -> internal /* (Nest stays on /api)
-      - "traefik.http.routers.sim_backend.rule=(Host(`ep-sim.epbih.ba`) || Host(`10.50.255.189`) || Host(`ep-web-sim`) || Host(`10.10.10.30`)) && PathPrefix(`/backend`)"
+      - "traefik.http.routers.sim_backend.rule=(Host(`ep-sim.epbih.ba`) || Host(`10.50.255.189`) || Host(`ep-web-sim`) || Host(`10.10.10.30`)) && (PathPrefix(`/backend`) || PathPrefix(`/api`))"
       - traefik.http.routers.sim_backend.entrypoints=web
       - traefik.http.routers.sim_backend.priority=10
       - traefik.http.routers.sim_backend.middlewares=sim_backend_stripprefix
@@ -49,9 +67,12 @@ services:
     container_name: sim-tracker-frontend-vm
     build:
       context: ./frontend
-      args:
-        - VITE_API_BASE_URL=/backend/api
-        - VITE_API_BASE_URLS=/backend/api
+      dockerfile: Dockerfile.vm
+      # Nema build args ovdje — VITE_API_BASE_URL/VITE_API_BASE_URLS su već
+      # "upečeni" u ./frontend/dist prilikom `npm run build` koraka koji se
+      # radi UNAPRIJED na mašini sa internetom (scripts/vm-frontend-build.sh).
+      # Ovaj build korak samo kopira taj gotov dist/ u nginx image — bez
+      # interneta, bez node-a.
     restart: unless-stopped
     depends_on:
       - backend

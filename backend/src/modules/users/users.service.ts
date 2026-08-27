@@ -10,6 +10,7 @@ import { PaginatedResult } from '../../common/interfaces/paginated-result.interf
 import { PrismaService } from '../../prisma/prisma.service';
 import { scopeWhere, ScopeContext } from '../../common/utils/scope-filter.util';
 import { baseUsername, generateUniqueUsername } from '../../common/utils/username-generator.util';
+import { normalizeEmail } from '../../common/utils/email-normalizer.util';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserFilterDto } from './dto/user-filter.dto';
@@ -38,8 +39,9 @@ export class UsersService {
   ) {}
 
   async create(dto: CreateUserDto, actorId?: string): Promise<UserListItem> {
+    const normalizedEmail = normalizeEmail(dto.email);
     const exists = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email: normalizedEmail },
       select: { id: true },
     });
 
@@ -61,7 +63,7 @@ export class UsersService {
 
     const created = await this.prisma.user.create({
       data: {
-        email: dto.email,
+        email: normalizedEmail,
         username,
         password: passwordHash,
         firstName: dto.firstName,
@@ -156,7 +158,7 @@ export class UsersService {
     const updated = await this.prisma.user.update({
       where: { id },
       data: {
-        email: dto.email,
+        email: dto.email !== undefined ? normalizeEmail(dto.email) : undefined,
         firstName: dto.firstName,
         lastName: dto.lastName,
         phone: dto.phone,
