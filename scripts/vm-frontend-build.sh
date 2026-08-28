@@ -17,6 +17,15 @@ source ./lib.sh
 
 require_cmd npm
 
+# Zaštita od Git Bash (MSYS2) automatske konverzije putanja na Windowsu:
+# ako se ova skripta pokreće kroz Git Bash, MSYS po defaultu "prepoznaje"
+# svaku vrijednost koja liči na apsolutnu Unix putanju (počinje sa "/") i
+# tiho je pretvara u Windows putanju PRIJE nego stigne do npm-a/Vite-a —
+# npr. "/backend/api" postane "C:/Program Files/Git/backend/api", što se
+# onda "upeče" u build i login tiho ne radi. MSYS_NO_PATHCONV=1 isključuje
+# tu konverziju; na Linuxu/macOS-u ovo je no-op (MSYS ne postoji).
+export MSYS_NO_PATHCONV=1
+
 VITE_API_BASE_URL="${VITE_API_BASE_URL:-/backend/api}"
 VITE_API_BASE_URLS="${VITE_API_BASE_URLS:-/backend/api}"
 
@@ -30,6 +39,16 @@ step "npm run build (VITE_API_BASE_URL=${VITE_API_BASE_URL})"
   npm run build)
 
 ok "Build gotov: ${ROOT_DIR}/frontend/dist"
+
+# Sigurnosna provjera: da MSYS/Git-Bash path-conversion (ili neka druga
+# slična zamka) nije pretvorila "/backend/api" u nešto pogrešno (npr.
+# Windows putanju). Ako se ovo javi, build NE prenositi na VM.
+if grep -qE "Program Files|[A-Za-z]:/.*backend/api" "${ROOT_DIR}/frontend/dist/assets/"*.js 2>/dev/null; then
+  err "Detektovana pogrešna (Windows-mangled) vrijednost VITE_API_BASE_URL u build-u!"
+  echo "Provjeri da li je MSYS_NO_PATHCONV=1 zaista primijenjen (Git Bash na Windowsu)."
+  exit 1
+fi
+ok "Provjera prošla: VITE_API_BASE_URL nije mangled u build-u."
 
 OUT_FILE="${ARTIFACTS_DIR}/frontend-dist-${IMAGE_TAG}.tar.gz"
 step "Pakovanje u ${OUT_FILE}"
