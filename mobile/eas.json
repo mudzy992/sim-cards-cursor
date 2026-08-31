@@ -8,20 +8,29 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://simtracker.ba101.top/backend/api",
+        "EXPO_PUBLIC_API_BASE_URL": "http://10.50.255.189/api",
         "NODE_ENV": "development"
       },
       "android": {
         "buildType": "apk"
       }
     },
-    "preview": {
-      "distribution": "internal"
+
+    "production-lan": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://10.50.255.189/api",
+        "NODE_ENV": "production"
+      },
+      "android": {
+        "buildType": "apk"
+      }
     },
-    "production": {
+
+    "production-cloud": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://10.50.255.189/backend/api",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.simtracker.ba101.top",
         "NODE_ENV": "production"
       },
       "android": {
@@ -29,7 +38,8 @@
       }
     }
   },
+
   "submit": {
-    "production": { }
+    "production-cloud": {}
   }
 }

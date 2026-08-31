@@ -53,7 +53,7 @@ async function bootstrap() {
           'FRONTEND_URLS',
           config.get<string>(
             'FRONTEND_URL',
-            'https://simtracker.ba101.top',
+            'https://simtracker.ba101.top'
           ),
         ) ?? ''
       )
@@ -119,6 +119,11 @@ async function bootstrap() {
   });
 
   app.useGlobalPipes(new AppValidationPipe());
+  const globalPrefix = config.get<string>('API_GLOBAL_PREFIX', '');
+
+    if (globalPrefix) {
+        app.setGlobalPrefix(globalPrefix);
+    }
 
   app.useGlobalFilters(
     new PrismaExceptionFilter(),
