@@ -25,6 +25,7 @@ services:
       ADMIN_FIRST_NAME: ${ADMIN_FIRST_NAME}
       ADMIN_LAST_NAME: ${ADMIN_LAST_NAME}
       SWAGGER_PUBLIC_BASE_PATH: ${SWAGGER_PUBLIC_BASE_PATH}
+      API_GLOBAL_PREFIX: ${API_GLOBAL_PREFIX}
     volumes:
       - /mnt/shared-app-files/sim-cards-codex:/usr/app/uploads
     networks:
@@ -40,6 +41,7 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
         VITE_API_BASE_URLS: ${VITE_API_BASE_URLS}
+        VITE_API_GLOBAL_PREFIX: ${VITE_API_GLOBAL_PREFIX}
     restart: unless-stopped
     expose:
       - "80"

@@ -46,17 +46,13 @@ async function bootstrap() {
 
   const isDev = appEnv === 'development';
 
+  const frontendUrls =
+    config.get<string>('FRONTEND_URL') ??
+    'https://simtracker.ba101.top,https://api.simtracker.ba101.top';
+
   const envOrigins = [
     ...new Set(
-      (
-        config.get<string>(
-          'FRONTEND_URLS',
-          config.get<string>(
-            'FRONTEND_URL',
-            'https://simtracker.ba101.top'
-          ),
-        ) ?? ''
-      )
+      frontendUrls
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean),
