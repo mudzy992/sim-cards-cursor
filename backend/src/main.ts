@@ -37,7 +37,6 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
-  app.setGlobalPrefix('api');
   app.use(helmet());
 
   const appEnv = config.get<string>(
@@ -54,7 +53,7 @@ async function bootstrap() {
           'FRONTEND_URLS',
           config.get<string>(
             'FRONTEND_URL',
-            'http://ep-sim.epbih.ba',
+            'https://simtracker.ba101.top',
           ),
         ) ?? ''
       )
@@ -156,7 +155,7 @@ async function bootstrap() {
   ];
 
   SwaggerModule.setup(
-    'api/docs',
+    'docs',
     app,
     document,
   );
@@ -172,11 +171,11 @@ async function bootstrap() {
   await app.listen(port);
 
   logger.log(
-    `API running at http://localhost:${port}/api`,
+    `API running at http://localhost:${port}`,
   );
 
   logger.log(
-    `Swagger at http://localhost:${port}/api/docs`,
+    `Swagger at http://localhost:${port}/docs`,
   );
 }
 
