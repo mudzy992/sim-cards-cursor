@@ -2,7 +2,7 @@ import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/store/auth.store';
 
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api';
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://api.simtracker.ba101.top';
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
