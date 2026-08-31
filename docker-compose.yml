@@ -3,50 +3,47 @@ services:
     container_name: sim-tracker-backend
     build:
       context: ./backend
-      # Ovdje će se koristiti onaj optimizirani Dockerfile (node:20) koji smo ranije dogovorili
+      dockerfile: Dockerfile
     restart: unless-stopped
-    env_file:
-      - ./backend/.env.host
-    # DATABASE_URL (u backend/.env.host) koristi host "postgres" umjesto
-    # sql.ba101.top:5432 — pretpostavka je da Postgres servis već postoji
-    # na "web" mreži (isti pattern kao Traefik: eksterni servis, ne
-    # definiše se ovdje). Ako Postgres servis ima drugačiji naziv na "web"
-    # mreži, uskladiti host u backend/.env.host.
-    networks:
-      - web
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      MYSQL_BACKUP_DATABASE_URL: ${MYSQL_BACKUP_DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
+      PORT: ${PORT}
+      FRONTEND_URLS: ${FRONTEND_URLS}
+      UPLOAD_ROOT_PATH: ${UPLOAD_ROOT_PATH}
+      UPLOAD_PUBLIC_PREFIX: ${UPLOAD_PUBLIC_PREFIX}
+      APP_ENV: ${APP_ENV}
+      THROTTLE_TTL: ${THROTTLE_TTL}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT}
+      BCRYPT_SALT_ROUNDS: ${BCRYPT_SALT_ROUNDS}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_FIRST_NAME: ${ADMIN_FIRST_NAME}
+      ADMIN_LAST_NAME: ${ADMIN_LAST_NAME}
+      SWAGGER_PUBLIC_BASE_PATH: ${SWAGGER_PUBLIC_BASE_PATH}
     volumes:
       - /mnt/shared-app-files/sim-cards-codex:/usr/app/uploads
-    labels:
-      - 'traefik.enable=true'
-      - 'traefik.http.routers.simtracker-backend.entrypoints=websecure'
-      # Nova domena za backend
-      - 'traefik.http.routers.simtracker-backend.rule=Host(`simtracker.ba101.top`) && PathPrefix(`/backend`)'
-      - 'traefik.http.routers.simtracker-backend.tls=true'
-      - 'traefik.http.routers.simtracker-backend.tls.certresolver=le'
-      - 'traefik.http.services.simtracker-backend.loadbalancer.server.port=3003'
-      # Middleware za skidanje /backend prefiksa prije nego zahtjev stigne do NestJS-a
-      - 'traefik.http.middlewares.simtracker-backend-stripbackend.stripprefix.prefixes=/backend'
-      - 'traefik.http.routers.simtracker-backend.middlewares=simtracker-backend-stripbackend'
+    networks:
+      - db_net
+    expose:
+      - "3003"
 
   frontend:
     container_name: sim-tracker-frontend
     build:
       context: ./frontend
+      dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=/backend/api
-        - VITE_API_BASE_URLS=/backend/api
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_API_BASE_URLS: ${VITE_API_BASE_URLS}
     restart: unless-stopped
-    networks:
-      - web
-    labels:
-      - 'traefik.enable=true'
-      - 'traefik.http.routers.simtracker-frontend.entrypoints=websecure'
-      # Nova domena za frontend
-      - 'traefik.http.routers.simtracker-frontend.rule=Host(`simtracker.ba101.top`)'
-      - 'traefik.http.routers.simtracker-frontend.tls=true'
-      - 'traefik.http.routers.simtracker-frontend.tls.certresolver=le'
-      - 'traefik.http.services.simtracker-frontend.loadbalancer.server.port=3004'
+    expose:
+      - "80"
 
 networks:
-  web:
+  db_net:
     external: true

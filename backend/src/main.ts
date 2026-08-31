@@ -5,9 +5,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { Prisma } from '@prisma/client';
 
-// Prisma Decimal ne može se serijalizovati u JSON – override toJSON
 try {
-  const DecimalProto = Prisma?.Decimal?.prototype as { toJSON?: () => unknown } | undefined;
+  const DecimalProto = Prisma?.Decimal?.prototype as
+    | { toJSON?: () => unknown }
+    | undefined;
+
   if (DecimalProto) {
     DecimalProto.toJSON = function (this: { toString: () => string }) {
       return Number(this.toString());
@@ -29,44 +31,64 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
   app.useWebSocketAdapter(new IoAdapter(app));
+
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
   app.setGlobalPrefix('api');
   app.use(helmet());
-  // APP_ENV je jedina istina za okruženje (development / production) – čita se iz .env
-  // Ako APP_ENV nije postavljen, fallback je na NODE_ENV ili 'development'
-  const appEnv = config.get<string>('APP_ENV', process.env.NODE_ENV || 'development');
+
+  const appEnv = config.get<string>(
+    'APP_ENV',
+    process.env.NODE_ENV || 'development',
+  );
+
   const isDev = appEnv === 'development';
 
   const envOrigins = [
     ...new Set(
-      (config
-        .get<string>('FRONTEND_URLS', config.get<string>('FRONTEND_URL', 'http://ep-sim.epbih.ba'))
-        ?.split(',')
+      (
+        config.get<string>(
+          'FRONTEND_URLS',
+          config.get<string>(
+            'FRONTEND_URL',
+            'http://ep-sim.epbih.ba',
+          ),
+        ) ?? ''
+      )
+        .split(',')
         .map((s) => s.trim())
-        .filter(Boolean) ?? []),
+        .filter(Boolean),
     ),
   ];
 
-  const allowedHostnames = new Set<string>(['localhost', '127.0.0.1']);
+  const allowedHostnames = new Set<string>([
+    'localhost',
+    '127.0.0.1',
+  ]);
+
   for (const envOrigin of envOrigins) {
     try {
       allowedHostnames.add(new URL(envOrigin).hostname);
     } catch {
-      // ignore
+      // ignore invalid origin
     }
   }
 
   const allowedOriginsExact = new Set<string>([
-    ...(isDev ? ['http://localhost:3004', 'http://localhost:5173'] : []),
+    ...(isDev
+      ? [
+          'http://localhost:3004',
+          'http://localhost:5173',
+        ]
+      : []),
     ...envOrigins,
   ]);
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Dozvoli zahtjeve bez Origin headera (npr. Postman, backend-2-backend)
       if (!origin) {
         return callback(null, true);
       }
@@ -77,6 +99,7 @@ async function bootstrap() {
 
       try {
         const url = new URL(origin);
+
         if (allowedHostnames.has(url.hostname)) {
           return callback(null, true);
         }
@@ -84,14 +107,25 @@ async function bootstrap() {
         // ignore
       }
 
-      logger.warn(`CORS blocked for origin: ${origin} (env=${appEnv})`);
-      return callback(new Error('Not allowed by CORS'), false);
+      logger.warn(
+        `CORS blocked for origin: ${origin} (env=${appEnv})`,
+      );
+
+      return callback(
+        new Error('Not allowed by CORS'),
+        false,
+      );
     },
     credentials: true,
   });
 
   app.useGlobalPipes(new AppValidationPipe());
-  app.useGlobalFilters(new PrismaExceptionFilter(), new HttpExceptionFilter());
+
+  app.useGlobalFilters(
+    new PrismaExceptionFilter(),
+    new HttpExceptionFilter(),
+  );
+
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
     new TimeoutInterceptor(),
@@ -105,20 +139,45 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  const document = SwaggerModule.createDocument(
+    app,
+    swaggerConfig,
+  );
+
   const publicBasePath = config.get<string>(
     'SWAGGER_PUBLIC_BASE_PATH',
-    !isDev ? '/backend' : '',
+    '',
   );
-  document.servers = [{ url: `${publicBasePath}` }];
-  SwaggerModule.setup('api/docs', app, document);
 
-  await app.get(PrismaService).enableShutdownHooks(app);
+  document.servers = [
+    {
+      url: publicBasePath,
+    },
+  ];
 
-  const port = Number(config.get('PORT', 3003));
+  SwaggerModule.setup(
+    'api/docs',
+    app,
+    document,
+  );
+
+  await app
+    .get(PrismaService)
+    .enableShutdownHooks(app);
+
+  const port = Number(
+    config.get('PORT', 3003),
+  );
+
   await app.listen(port);
-  logger.log(`API running at http://localhost:${port}/api`);
-  logger.log(`Swagger at http://localhost:${port}/api/docs`);
+
+  logger.log(
+    `API running at http://localhost:${port}/api`,
+  );
+
+  logger.log(
+    `Swagger at http://localhost:${port}/api/docs`,
+  );
 }
 
 void bootstrap();
