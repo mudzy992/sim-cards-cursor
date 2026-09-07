@@ -625,7 +625,7 @@ export default function ShipmentPrintPage() {
 
         {/* -------------------------------- desni pregled ------------------------------- */}
         <div ref={previewContainerRef} className="min-w-0">
-          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-white/70 px-3 py-2 shadow-sm ring-1 ring-slate-200">
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg px-3 py-2 shadow-sm bg-slate-300">
             <Segmented
               size="small"
               value={zoomMode}

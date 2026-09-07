@@ -1,12 +1,6 @@
 import { memo } from 'react';
 import type { LabelLineSpec } from './label-formats';
 
-/**
- * Sadržaj jedne etikete — lista dinamički sastavljenih linija
- * (ICCID / interna IP / javna IP / datum prijema), prema uključenim poljima.
- * Ista komponenta se renderuje i u ekranskom pregledu i u print DOM-u,
- * pa je WYSIWYG dosljedan 1:1.
- */
 export interface SimLabelContentProps {
   lines: LabelLineSpec[];
   gapMm?: number;

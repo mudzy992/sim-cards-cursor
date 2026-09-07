@@ -359,6 +359,7 @@ export class ShipmentsService {
       const preview = this.excelImportService.preview(parsed, resolvedMapping, existing);
       return {
         mode: 'preview' as const,
+        fileName: file.originalname,
         ...preview,
       };
     }

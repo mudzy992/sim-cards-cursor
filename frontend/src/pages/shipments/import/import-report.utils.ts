@@ -1,7 +1,3 @@
-/**
- * Izvještaji o redovima sa greškom: CSV export i print (A4).
- * Nezavisno od UI biblioteke — čist DOM/Blob, radi i na zatvorenoj mreži.
- */
 import type { ImportPreviewRow } from '@/types/import.types';
 
 const CSV_HEADERS = [
@@ -17,27 +13,35 @@ const CSV_HEADERS = [
 ];
 
 const csvEscape = (value: string | null | undefined): string => {
-  const v = value ?? '';
-  return /[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  const v = value != null ? String(value) : '';
+  return /[";\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 };
 
 const rowToCells = (row: ImportPreviewRow): string[] => [
-  String(row.rowNumber),
-  row.data.iccid ?? '',
-  row.data.ipAddress ?? '',
-  row.data.publicIpAddress ?? '',
-  row.data.phoneNumber ?? '',
-  row.data.apn ?? '',
-  row.issues.map((i) => i.message).join(' | '),
+  String(row.rowNumber ?? ''),
+  row.data?.iccid ?? '',
+  row.data?.ipAddress ?? '',
+  row.data?.publicIpAddress ?? '',
+  row.data?.phoneNumber ?? '',
+  row.data?.apn ?? '',
+  (row.issues ?? [])
+    .map((i) => i?.message || '')
+    .filter(Boolean)
+    .join(' | '),
   row.duplicateOf?.shipmentName ?? '',
-  row.duplicateOf ? new Date(row.duplicateOf.receivedDate).toLocaleDateString('bs-BA') : '',
+  row.duplicateOf?.receivedDate
+    ? new Date(row.duplicateOf.receivedDate).toLocaleDateString('bs-BA')
+    : '',
 ];
 
 /**
  * CSV sa `;` separatorom i BOM-om → Excel na Windowsu ispravno otvara
  * naša slova (č, ć, ž, š, đ) bez dodatnog podešavanja.
  */
-export function exportIssuesToCsv(rows: ImportPreviewRow[], fileName: string): void {
+export function exportIssuesToCsv(rows: ImportPreviewRow[], fileName?: string | null): void {
+  const safeName = (fileName && typeof fileName === 'string' ? fileName : 'import_kartica')
+    .replace(/\.(xlsx|xls|csv)$/i, '');
+
   const lines = [
     CSV_HEADERS.join(';'),
     ...rows.map((row) => rowToCells(row).map(csvEscape).join(';')),
@@ -48,7 +52,7 @@ export function exportIssuesToCsv(rows: ImportPreviewRow[], fileName: string): v
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = fileName.replace(/\.(xlsx|xls|csv)$/i, '') + '_greske.csv';
+  link.download = `${safeName}_greske.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -58,26 +62,31 @@ export function exportIssuesToCsv(rows: ImportPreviewRow[], fileName: string): v
 /** Print izvještaja o greškama u zasebnom prozoru (ne dira glavni DOM). */
 export function printIssuesReport(
   rows: ImportPreviewRow[],
-  meta: { fileName: string; shipmentName: string },
+  meta?: { fileName?: string | null; shipmentName?: string | null },
 ): void {
   const win = window.open('', '_blank', 'width=1024,height=768');
   if (!win) return;
+
+  const safeFileName = meta?.fileName || 'import_kartica';
+  const safeShipmentName = meta?.shipmentName || 'Isporuka';
 
   const bodyRows = rows
     .map(
       (row) => `
       <tr>
-        <td class="num">${row.rowNumber}</td>
-        <td class="mono">${escapeHtml(row.data.iccid ?? '—')}</td>
-        <td class="mono">${escapeHtml(row.data.ipAddress ?? '—')}</td>
-        <td>${row.issues.map((i) => `<div class="issue">${escapeHtml(i.message)}</div>`).join('')}</td>
+        <td class="num">${row.rowNumber ?? ''}</td>
+        <td class="mono">${escapeHtml(row.data?.iccid ?? '—')}</td>
+        <td class="mono">${escapeHtml(row.data?.ipAddress ?? '—')}</td>
+        <td>${(row.issues ?? [])
+          .map((i) => `<div class="issue">${escapeHtml(i?.message || '')}</div>`)
+          .join('')}</td>
       </tr>`,
     )
     .join('');
 
   win.document.write(`<!doctype html>
 <html lang="bs"><head><meta charset="utf-8" />
-<title>Greške u importu — ${escapeHtml(meta.fileName)}</title>
+<title>Greške u importu — ${escapeHtml(safeFileName)}</title>
 <style>
   @page { size: A4 portrait; margin: 14mm; }
   * { box-sizing: border-box; }
@@ -96,8 +105,8 @@ export function printIssuesReport(
 <body>
   <h1>Izvještaj o greškama pri importu</h1>
   <div class="meta">
-    Isporuka: <strong>${escapeHtml(meta.shipmentName)}</strong> ·
-    Fajl: <strong>${escapeHtml(meta.fileName)}</strong> ·
+    Isporuka: <strong>${escapeHtml(safeShipmentName)}</strong> ·
+    Fajl: <strong>${escapeHtml(safeFileName)}</strong> ·
     Redova sa greškom: <strong>${rows.length}</strong> ·
     Izvještaj generisan: ${new Date().toLocaleString('bs-BA')}
   </div>
@@ -111,8 +120,9 @@ export function printIssuesReport(
   setTimeout(() => win.print(), 350);
 }
 
-function escapeHtml(text: string): string {
-  return text
+function escapeHtml(text: unknown): string {
+  if (text == null) return '';
+  return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

@@ -1,13 +1,3 @@
-/**
- * Modul: Print etiketa za isporuku SIM kartica
- * -----------------------------------------------------------------------------
- * Geometrija A4 etiketnih papira, preset formata, paginacija etiketa u listove
- * i pomoćne funkcije za dimenzionisanje fonta.
- *
- * SVE dimenzije su u milimetrima (mm) — preslikavaju se direktno u CSS (mm)
- * za print, te se samo za ekranski pregled skaliraju u px.
- */
-
 export const A4_WIDTH_MM = 210;
 export const A4_HEIGHT_MM = 297;
 
