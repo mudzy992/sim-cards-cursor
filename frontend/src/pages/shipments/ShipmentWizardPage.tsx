@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   Button,
@@ -20,13 +20,19 @@ import { ArrowLeftOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { shipmentsApi } from '@/api/shipments.api';
+import { distributionsApi } from '@/api/distributions.api';
+import { useAuthStore } from '@/store/auth.store';
+import type { CreateShipmentInput, ShipmentItem } from '@/types/shipment.types';
 import { ShipmentImportPanel } from './import/ShipmentImportPanel';
-import type { ShipmentItem } from '@/types/shipment.types';
 
 /**
  * Kreiranje isporuke kroz stepper:
  *  1) Podaci o isporuci  →  2) Import kartica (isporuka je već odabrana)  →  3) Gotovo
  * Import je opcion — isporuka se može ostaviti prazna i puniti kasnije.
+ *
+ * Logika distribucije naslijeđena sa ShipmentCreatePage:
+ *  - DIST_ADMIN: distribucija je predpopunjena njegovom i Select je zaključan
+ *  - SYSTEM_ADMIN: bira iz liste distribucija
  */
 type FormValues = {
   name: string;
@@ -45,25 +51,61 @@ export default function ShipmentWizardPage() {
   const [messageApi, contextHolder] = message.useMessage();
   const queryClient = useQueryClient();
 
+  const currentUser = useAuthStore((s) => s.user);
+  const isDistAdmin = currentUser?.role === 'DIST_ADMIN';
+  const distAdminDistributionId = currentUser?.distributionId ?? null;
+
+  // DIST_ADMIN — fiksirana distribucija (ista logika kao na staroj create stranici)
+  useEffect(() => {
+    if (!isDistAdmin || !distAdminDistributionId) return;
+    form.setFieldsValue({ distributionId: distAdminDistributionId });
+  }, [form, distAdminDistributionId, isDistAdmin]);
+
+  const distributionsQuery = useQuery({
+    queryKey: ['distributions', 'list'],
+    queryFn: () => distributionsApi.list(),
+    enabled: !isDistAdmin,
+  });
+  const distributions = distributionsQuery.data ?? [];
+
   const createMutation = useMutation({
-    mutationFn: (values: FormValues) =>
-      shipmentsApi.create({
+    mutationFn: (values: FormValues) => {
+      const distributionId = values.distributionId ?? distAdminDistributionId ?? '';
+
+      // klijentska zaštita: odabrana distribucija mora postojati u listi sa servera
+      // (blokira slučaj da zastarele/lačne vrijednosti stignu do backend-a)
+      if (!isDistAdmin) {
+        const known = distributions.some((d) => d.id === distributionId);
+        if (!distributionId || !known) {
+          throw new Error('Odaberite važeću distribuciju iz liste.');
+        }
+      }
+
+      const payload: CreateShipmentInput = {
         name: values.name.trim(),
         provider: values.provider.trim(),
         receivedDate: values.receivedDate.toISOString(),
         notes: values.notes?.trim() || undefined,
-        distributionId: values.distributionId ?? '',
-      }),
+        distributionId,
+      };
+      return shipmentsApi.create(payload);
+    },
     onSuccess: async (created) => {
       setShipment(created);
       setStep(1);
       messageApi.success('Isporuka je kreirana — nastavite sa importom kartica.');
       await queryClient.invalidateQueries({ queryKey: ['shipments'] });
     },
-    onError: (e: unknown) => {
-      const serverMessage = (e as { response?: { data?: { message?: string } } })?.response?.data
-        ?.message;
-      messageApi.error(serverMessage ?? 'Kreiranje isporuke nije uspjelo.');
+    onError: (error: unknown) => {
+      // klijentska greška (lokalna validacija) nema `response` — prikaži nju
+      const serverMessage = (error as { response?: { data?: { message?: string } } })?.response
+        ?.data?.message;
+      const localMessage = error instanceof Error ? error.message : undefined;
+      messageApi.error(
+        typeof serverMessage === 'string'
+          ? serverMessage
+          : (localMessage ?? 'Kreiranje isporuke nije uspjelo.'),
+      );
     },
   });
 
@@ -128,16 +170,19 @@ export default function ShipmentWizardPage() {
               </Form.Item>
             </div>
 
-            <Form.Item name="distributionId" label="Distribucija">
+            <Form.Item
+              name="distributionId"
+              label="Distribucija"
+              rules={[{ required: true, message: 'Distribucija je obavezna' }]}
+            >
               <Select
-                allowClear
-                placeholder="Odaberite distribuciju (sistem admin)"
-                options={[
-                  { value: 'dist-sarajevo', label: 'ED Sarajevo' },
-                  { value: 'dist-mostar', label: 'ED Mostar' },
-                  { value: 'dist-tuzla', label: 'ED Tuzla' },
-                  { value: 'dist-zenica', label: 'ED Zenica' },
-                ]}
+                placeholder={isDistAdmin ? undefined : 'Odaberite distribuciju'}
+                options={distributions.map((d) => ({
+                  label: `${d.name} (${d.code})`,
+                  value: d.id,
+                }))}
+                loading={distributionsQuery.isLoading}
+                disabled={isDistAdmin}
               />
             </Form.Item>
 
