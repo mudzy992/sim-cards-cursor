@@ -29,6 +29,8 @@ import MeterTypeFieldsPage from '@/pages/meter-type-fields/MeterTypeFieldsPage'
 import MeterTypeUpsertPage from '@/pages/meter-types/MeterTypeUpsertPage'
 import { MetersAccessGuard } from '@/components/common/MetersAccessGuard'
 import ShipmentPrintPage from '@/pages/shipments/ShipmentPrintPage';
+import ShipmentWizardPage from '@/pages/shipments/ShipmentWizardPage';
+import ShipmentEditPage from '@/pages/shipments/ShipmentEditPage';
 
 export const router = createBrowserRouter([
   {
@@ -69,13 +71,17 @@ export const router = createBrowserRouter([
               </RoleGuard>
             ),
           },
-          {
-            path: '/shipments/new',
-            element: (
-              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
-                <ShipmentCreatePage />
-              </RoleGuard>
-            ),
+          { path: '/shipments/new',
+            element:
+            <RoleGuard allow={['SYSTEM_ADMIN','DIST_ADMIN']}>
+                <ShipmentWizardPage />
+                </RoleGuard>
+          },
+          { path: '/shipments/:id/edit',
+            element:
+            <RoleGuard allow={['SYSTEM_ADMIN','DIST_ADMIN']}>
+                <ShipmentEditPage />
+                </RoleGuard>
           },
           {
             path: '/shipments/:id',

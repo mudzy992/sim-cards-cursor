@@ -1,15 +1,20 @@
 import { axiosInstance } from './axios.instance';
 import type { ApiEnvelope } from '@/types/common.types';
+import { normalizePreviewRow } from '@/types/import.types';
 import type {
-  CreateShipmentInput,
-  ImportColumnMapping,
-  ShipmentImportApply,
-  ShipmentImportPreview,
+    CreateShipmentInput,
   ShipmentItem,
   ShipmentListParams,
   ShipmentSimCardsResponse,
   ShipmentsResponse,
 } from '@/types/shipment.types';
+
+import type {
+  BackendShipmentImportPreview,
+  ImportColumnMapping,
+  ShipmentImportApply,
+  ShipmentImportPreview,
+} from '@/types/import.types';
 
 export const shipmentsApi = {
   list: async (params?: ShipmentListParams): Promise<ShipmentsResponse> => {
@@ -49,6 +54,13 @@ export const shipmentsApi = {
     const response = await axiosInstance.post<ApiEnvelope<ShipmentItem>>('/shipments', payload);
     return response.data.data;
   },
+  update: async (
+    id: string,
+    payload: { name?: string; provider?: string; receivedDate?: string; notes?: string | null; distributionId?: string },
+  ): Promise<ShipmentItem> => {
+    const response = await axiosInstance.patch<ApiEnvelope<ShipmentItem>>(`/shipments/${id}`, payload);
+    return response.data.data;
+  },
   remove: async (id: string): Promise<{
     deleted: boolean;
     deletedSimCards: number;
@@ -64,21 +76,27 @@ export const shipmentsApi = {
     file: File;
     columnMapping?: ImportColumnMapping;
     applyImport?: boolean;
+    selectedRowNumbers?: number[];      // NOVO
   }): Promise<ShipmentImportPreview | ShipmentImportApply> => {
     const formData = new FormData();
     formData.append('file', params.file);
     formData.append('applyImport', params.applyImport ? 'true' : 'false');
-    if (params.columnMapping) {
-      formData.append('columnMapping', JSON.stringify(params.columnMapping));
+    if (params.columnMapping) formData.append('columnMapping', JSON.stringify(params.columnMapping));
+    if (params.selectedRowNumbers?.length) {
+      formData.append('selectedRowNumbers', JSON.stringify(params.selectedRowNumbers));
     }
+    const response = await axiosInstance.post<ApiEnvelope<BackendShipmentImportPreview | ShipmentImportApply>>(
+      `/shipments/${params.shipmentId}/import`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    const data = response.data.data;
 
-    const response = await axiosInstance.post<
-      ApiEnvelope<ShipmentImportPreview | ShipmentImportApply>
-    >(`/shipments/${params.shipmentId}/import`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data.data;
+    // Backend redove (errors[]/warning[] stringovi) prebaciti u strukturirane
+    // issues — kompatibilnost sa review tabelom (filteri po kodovima greške).
+    if (data.mode === 'preview') {
+      return { ...data, previewRows: data.previewRows.map(normalizePreviewRow) };
+    }
+    return data;
   },
 };

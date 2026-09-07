@@ -330,58 +330,57 @@ export class ShipmentsService {
     await this.ensureShipmentExists(shipmentId, scope);
 
     if (!file?.buffer || file.size <= 0) {
-      throw new BadRequestException('Uploaded file is required');
+      throw new BadRequestException('Fajl je obavezan za import.');
     }
 
     if (!this.isSupportedFile(file.originalname, file.mimetype)) {
-      throw new BadRequestException('Only .xlsx, .xls, and .csv files are supported');
+      throw new BadRequestException('Nepodržan format fajla. Dozvoljeno: .xlsx, .xls, .csv');
     }
 
     const parsed = this.excelImportService.parse(file.buffer);
-    const suggested = this.columnMapperService.suggest(parsed.headers);
-    const providedMapping = this.parseMappingInput(dto.columnMapping);
-    const resolvedMapping = this.columnMapperService.merge(suggested, providedMapping);
-    const existingIccids = await this.fetchExistingIccids();
-
-    const preview = this.excelImportService.preview(
-      parsed,
-      resolvedMapping,
-      existingIccids,
+    const resolvedMapping = this.columnMapperService.merge(
+      this.columnMapperService.suggest(parsed.headers),
+      this.parseMappingInput(dto.columnMapping),
     );
+    const existing = await this.fetchExistingIccidMap();
 
-    const applyImport = dto.applyImport === 'true';
-    if (!applyImport) {
+    if (dto.applyImport !== 'true') {
+      const preview = this.excelImportService.preview(parsed, resolvedMapping, existing);
       return {
-        mode: 'preview',
+        mode: 'preview' as const,
         ...preview,
       };
     }
 
-    if (!preview.canImport) {
-      throw new BadRequestException({
-        message: 'Import cannot be applied because preview contains invalid rows',
-        preview,
-      });
+    const validation = this.excelImportService.validate(parsed, resolvedMapping, existing);
+
+    let selectedRowNumbers: number[] | undefined;
+    if (dto.selectedRowNumbers) {
+      try {
+        const raw = JSON.parse(dto.selectedRowNumbers) as unknown;
+        if (!Array.isArray(raw) || raw.some((n) => typeof n !== 'number')) {
+          throw new Error('invalid');
+        }
+        selectedRowNumbers = raw as number[];
+      } catch {
+        throw new BadRequestException('selectedRowNumbers must be a JSON array of numbers');
+      }
     }
 
-    const validation = this.excelImportService.validate(
-      parsed,
-      resolvedMapping,
-      existingIccids,
-    );
-
-    const createManyData = this.excelImportService.toCreateManyData(
+    const data = this.excelImportService.toCreateManyData(
       validation.rows,
       shipmentId,
+      selectedRowNumbers,
     );
+
+    if (data.length === 0) {
+      throw new BadRequestException('Nije odabran nijedan ispravan red za import.');
+    }
 
     let inserted: { count: number };
     try {
       inserted = await this.prisma.simCard.createMany({
-        data: createManyData.map((item) => ({
-          ...item,
-          status: SimCardStatus.AVAILABLE,
-        })),
+        data: data.map((item) => ({ ...item, status: SimCardStatus.AVAILABLE })),
       });
     } catch (error) {
       if (
@@ -396,12 +395,12 @@ export class ShipmentsService {
     const shipmentSimTotal = await this.prisma.simCard.count({
       where: { shipmentId },
     });
-
     await this.prisma.shipment.update({
       where: { id: shipmentId },
       data: {
         totalCards: shipmentSimTotal,
         status: ShipmentStatus.COMPLETED,
+        originalFileName: file.originalname,
       },
     });
 
@@ -413,15 +412,20 @@ export class ShipmentsService {
       details: {
         fileName: file.originalname,
         inserted: inserted.count,
+        skipped: validation.summary.totalRows - inserted.count,
         totalRows: validation.summary.totalRows,
+        selectedRows: selectedRowNumbers?.length ?? validation.summary.validRows,
+        duplicatesInFile: validation.summary.duplicatesInFile,
+        duplicatesInDatabase: validation.summary.duplicatesInDatabase,
       },
       ipAddress,
     });
 
     return {
-      mode: 'import',
+      mode: 'import' as const,
       fileName: file.originalname,
       insertedRows: inserted.count,
+      skippedRows: validation.summary.totalRows - inserted.count,
       totalRows: validation.summary.totalRows,
       summary: validation.summary,
       resolvedMapping,
@@ -458,11 +462,19 @@ export class ShipmentsService {
     }
   }
 
-  private async fetchExistingIccids(): Promise<Set<string>> {
+  private async fetchExistingIccidMap(): Promise<Map<string, { shipmentId: string; shipmentName: string; receivedDate: Date }>> {
     const existing = await this.prisma.simCard.findMany({
-      select: { iccid: true },
+      select: {
+        iccid: true,
+        shipment: { select: { id: true, name: true, receivedDate: true } },
+      },
     });
-    return new Set(existing.map((item) => item.iccid));
+    return new Map(
+      existing.map((item) => [
+        item.iccid,
+        { shipmentId: item.shipment.id, shipmentName: item.shipment.name, receivedDate: item.shipment.receivedDate },
+      ]),
+    );
   }
 
   private isSupportedFile(fileName: string, mimeType: string): boolean {

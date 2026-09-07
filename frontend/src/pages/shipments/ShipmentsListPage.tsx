@@ -13,7 +13,7 @@ import {
   message,
 } from 'antd';
 import { useMemo, useState } from 'react';
-import { InboxOutlined, CreditCardOutlined, PlusOutlined, PrinterOutlined } from '@ant-design/icons';
+import { InboxOutlined, CreditCardOutlined, PlusOutlined, PrinterOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { shipmentsApi } from '@/api/shipments.api';
 import { simCardsApi } from '@/api/sim-cards.api';
@@ -22,7 +22,6 @@ import { useAuthStore } from '@/store/auth.store';
 import { getSimCardStatusLabel } from '@/utils/labels.utils'
 import type {
   ShipmentItem,
-  ShipmentListParams,
   ShipmentStatus,
 } from '@/types/shipment.types';
 import type { SimCardItem, SimCardListParams, SimCardStatus } from '@/types/sim-card.types';
@@ -44,6 +43,14 @@ const simStatusColor: Record<string, string> = {
 };
 
 const shipmentStatusOptions: ShipmentStatus[] = ['RECEIVED', 'PROCESSING', 'COMPLETED'];
+
+type ShipmentListParams = {
+  page: number;
+  limit: number;
+  search?: string;
+  provider?: string;
+  status?: ShipmentStatus;
+};
 
 const simStatusOptions: SimCardStatus[] = [
   'AVAILABLE',
@@ -160,7 +167,7 @@ export default function ShipmentsListPage() {
   );
 
   const handleShipmentSearch = () => {
-    setShipmentFilters((prev) => ({
+    setShipmentFilters((prev: ShipmentListParams) => ({
       ...prev,
       page: 1,
       search: searchInput.trim() || undefined,
@@ -227,7 +234,7 @@ export default function ShipmentsListPage() {
               style={{ width: 160 }}
               value={shipmentFilters.status}
               onChange={(value) =>
-                setShipmentFilters((prev) => ({ ...prev, page: 1, status: value }))
+                setShipmentFilters((prev: ShipmentListParams) => ({ ...prev, page: 1, status: value }))
               }
               options={shipmentStatusOptions.map((s) => ({ label: s, value: s }))}
             />
@@ -246,7 +253,7 @@ export default function ShipmentsListPage() {
               showSizeChanger: true,
               showTotal: (total) => `Ukupno: ${total}`,
               onChange: (page, pageSize) =>
-                setShipmentFilters((prev) => ({
+                setShipmentFilters((prev: ShipmentListParams) => ({
                   ...prev,
                   page,
                   limit: pageSize ?? 20,
@@ -298,6 +305,9 @@ export default function ShipmentsListPage() {
                         shipment={{ id: row.id, name: row.name, simCardsCount: row._count?.simCards ?? 0 }}
                         role={currentUserRole}
                     />
+                    <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/shipments/${row.id}/edit`)}>
+                      Izmijeni
+                    </Button>
                     </Space>
                 ),
                 },

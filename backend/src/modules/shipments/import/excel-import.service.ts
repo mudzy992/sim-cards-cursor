@@ -4,10 +4,16 @@ import { ImportDomainKey } from './column-mapper.service';
 
 type RawRow = Record<string, string>;
 
-export type ParsedFile = {
-  headers: string[];
-  rows: RawRow[];
+export type ParsedFile = { headers: string[]; rows: RawRow[] };
+
+/** Izvorna isporuka postojećeg ICCID-a (za duplikat info u preview-u). */
+export type ExistingIccidInfo = {
+  shipmentId: string;
+  shipmentName: string;
+  receivedDate: Date;
 };
+
+export type ExistingIccidMap = Map<string, ExistingIccidInfo>;
 
 export type PreviewRow = {
   rowNumber: number;
@@ -20,6 +26,12 @@ export type PreviewRow = {
   };
   errors: string[];
   warning: string[];
+  /** popunjeno kad je ICCID duplikat iz ranije isporuke */
+  duplicateOf?: ExistingIccidInfo | null;
+  /** popunjeno kad je ICCID duplikat unutar istog fajla (broj reda originala) */
+  duplicateInFileOfRow?: number | null;
+  /** true ako red nema grešaka (upozorenja ne blokiraju) */
+  importable: boolean;
 };
 
 export type PreviewSummary = {
@@ -51,12 +63,20 @@ function safeString(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }
-
-  return String(value).replace(/^\uFEFF/, '').trim();
+  return String(value).replace(/^﻿/, '').trim();
 }
 
 function normalizeIccid(value: string): string {
   return value.replace(/\s+/g, '');
+}
+
+/** dd.mm.yyyy bez oslanjanja na serverski locale. */
+function formatBsDate(input: Date | string): string {
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return String(input);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}.${mm}.${d.getFullYear()}`;
 }
 
 export class ExcelImportService {
@@ -67,9 +87,8 @@ export class ExcelImportService {
       if (!sheetName) {
         throw new BadRequestException('Excel file does not contain any sheet');
       }
-
       const worksheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+      const rows = XLSX.utils.sheet_to_json<RawRow>(worksheet, {
         raw: false,
         defval: '',
       });
@@ -96,7 +115,6 @@ export class ExcelImportService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-
       throw new BadRequestException('Failed to parse uploaded file as Excel/CSV');
     }
   }
@@ -104,13 +122,13 @@ export class ExcelImportService {
   validate(
     parsed: ParsedFile,
     mapping: Record<ImportDomainKey, string | null>,
-    existingIccids: Set<string>,
+    existing: ExistingIccidMap,
   ): ValidationResult {
     if (!mapping.iccid || !mapping.ipAddress) {
       throw new BadRequestException('Column mapping must include iccid and ipAddress');
     }
 
-    const seenInFile = new Set<string>();
+    const seenInFile = new Map<string, number>();
     let duplicatesInFile = 0;
     let duplicatesInDatabase = 0;
 
@@ -129,50 +147,59 @@ export class ExcelImportService {
       const apn = mapping.apn ? safeString(row[mapping.apn]) || null : null;
 
       if (!iccid) {
-        errors.push('ICCID is required');
+        errors.push('ICCID nedostaje');
       } else if (!/^\d{10,30}$/.test(iccid)) {
-        errors.push('ICCID format is invalid');
+        errors.push('ICCID nije ispravan (očekuje se 10–30 cifara)');
       }
 
       if (!ipAddress) {
-        errors.push('ipAddress is required');
+        errors.push('Interna IP adresa nedostaje');
       } else if (!IPV4_REGEX.test(ipAddress)) {
-        errors.push('ipAddress format is invalid');
+        errors.push(`Interna IP adresa nije ispravna (${ipAddress})`);
       }
 
       if (publicIpAddress && !IPV4_REGEX.test(publicIpAddress)) {
-        errors.push('publicIpAddress format is invalid');
+        errors.push(`Javna IP adresa nije ispravna (${publicIpAddress})`);
       }
 
-      if (iccid) {
-        if (seenInFile.has(iccid)) {
-          duplicatesInFile += 1;
-          errors.push('Duplicate ICCID in uploaded file');
-        }
-        seenInFile.add(iccid);
+      let duplicateInFileOfRow: number | null = null;
+      let duplicateOf: ExistingIccidInfo | null = null;
 
-        if (existingIccids.has(iccid)) {
+      if (iccid) {
+        // duplikat unutar fajla → uz redni broj prvog pojavljivanja
+        const firstRow = seenInFile.get(iccid);
+        if (firstRow !== undefined) {
+          duplicatesInFile += 1;
+          duplicateInFileOfRow = firstRow;
+          errors.push(`Duplikat unutar fajla — isti ICCID je već u redu ${firstRow}`);
+        } else {
+          seenInFile.set(iccid, rowNumber);
+        }
+
+        // duplikat iz baze → uz naziv isporuke i datum prijema
+        const hit = existing.get(iccid);
+        if (hit) {
           duplicatesInDatabase += 1;
-          warning.push('ICCID already exists in database');
-          errors.push('ICCID already exists in database');
+          duplicateOf = hit;
+          errors.push(
+            `ICCID već postoji u isporuci „${hit.shipmentName}" (prijem ${formatBsDate(hit.receivedDate)})`,
+          );
         }
       }
 
       return {
         rowNumber,
-        data: {
-          iccid,
-          ipAddress,
-          publicIpAddress,
-          phoneNumber,
-          apn,
-        },
+        data: { iccid, ipAddress, publicIpAddress, phoneNumber, apn },
         errors,
         warning,
+        duplicateOf,
+        duplicateInFileOfRow,
+        importable: errors.length === 0,
       };
     });
 
     const validRows = rows.filter((row) => row.errors.length === 0).length;
+
     const summary: PreviewSummary = {
       totalRows: rows.length,
       validRows,
@@ -181,19 +208,16 @@ export class ExcelImportService {
       duplicatesInDatabase,
     };
 
-    return {
-      rows,
-      summary,
-      canImport: summary.validRows > 0 && summary.invalidRows === 0,
-    };
+    // IZMJENA: parcijalni import je dozvoljen — dovoljan je bar jedan ispravan red
+    return { rows, summary, canImport: summary.validRows > 0 };
   }
 
   preview(
     parsed: ParsedFile,
     mapping: Record<ImportDomainKey, string | null>,
-    existingIccids: Set<string>,
+    existing: ExistingIccidMap,
   ): PreviewResponse {
-    const validation = this.validate(parsed, mapping, existingIccids);
+    const validation = this.validate(parsed, mapping, existing);
 
     return {
       headers: parsed.headers,
@@ -204,9 +228,21 @@ export class ExcelImportService {
     };
   }
 
-  toCreateManyData(rows: PreviewRow[], shipmentId: string) {
+  /**
+   * Priprema redove za createMany — uzima SAMO ispravne redove, i to samo one
+   * koje je korisnik označio u review-u (ako je selekcija proslijeđena).
+   */
+  toCreateManyData(
+    rows: PreviewRow[],
+    shipmentId: string,
+    selectedRowNumbers?: number[],
+  ) {
+    const selected =
+      selectedRowNumbers && selectedRowNumbers.length > 0 ? new Set(selectedRowNumbers) : null;
+
     return rows
       .filter((row) => row.errors.length === 0)
+      .filter((row) => (selected ? selected.has(row.rowNumber) : true))
       .map((row) => ({
         iccid: row.data.iccid!,
         ipAddress: row.data.ipAddress!,

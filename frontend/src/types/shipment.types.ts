@@ -1,11 +1,34 @@
 export type ShipmentStatus = 'RECEIVED' | 'PROCESSING' | 'COMPLETED';
 
-export type ShipmentListParams = {
-  page?: number;
-  limit?: number;
-  search?: string;
-  provider?: string;
-  status?: ShipmentStatus;
+export type SimCardStatus =
+  | 'AVAILABLE'
+  | 'ASSIGNED'
+  | 'INSTALLED'
+  | 'DEMOUNTED'
+  | 'DEFECTIVE'
+  | 'RETURNED'
+  | 'DEACTIVATED';
+
+export type SimCardAssignee = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+} | null;
+
+export type ShipmentSimCard = {
+  id: string;
+  iccid: string;
+  ipAddress: string;
+  publicIpAddress: string | null;
+  status: SimCardStatus;
+  phoneNumber: string | null;
+  apn: string | null;
+  shipmentId: string;
+  assignedTo: SimCardAssignee;
+  assignedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ShipmentItem = {
@@ -17,41 +40,23 @@ export type ShipmentItem = {
   status: ShipmentStatus;
   notes?: string | null;
   originalFileName?: string | null;
-  importedBy: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
-  _count: {
-    simCards: number;
-  };
+  distributionId?: string | null;
+  importedBy: { id: string; email: string; firstName: string; lastName: string };
+  _count: { simCards: number };
   createdAt: string;
   updatedAt: string;
 };
 
-export type ShipmentsResponse = {
-  items: ShipmentItem[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
+export type ShipmentListParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  provider?: string;
+  status?: ShipmentStatus;
 };
 
-export type ShipmentSimCardsResponse = {
-  items: Array<{
-    id: string;
-    iccid: string;
-    ipAddress: string;
-    publicIpAddress?: string | null;
-    status: string;
-    assignedTo?: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-    } | null;
-  }>;
+export type ShipmentsResponse = {
+  items: ShipmentItem[];
   page: number;
   limit: number;
   total: number;
@@ -68,49 +73,18 @@ export type CreateShipmentInput = {
   distributionId: string;
 };
 
-export type ImportColumnMapping = {
-  iccid?: string;
-  ipAddress?: string;
-  publicIpAddress?: string;
-  phoneNumber?: string;
-  apn?: string;
+export type ShipmentSimCardsResponse = {
+  items: ShipmentSimCard[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 };
 
-export type ImportPreviewRow = {
-  rowNumber: number;
-  data: {
-    iccid: string | null;
-    ipAddress: string | null;
-    publicIpAddress: string | null;
-    phoneNumber: string | null;
-    apn: string | null;
-  };
-  errors: string[];
-  warning: string[];
-};
-
-export type ImportSummary = {
-  totalRows: number;
-  validRows: number;
-  invalidRows: number;
-  duplicatesInFile: number;
-  duplicatesInDatabase: number;
-};
-
-export type ShipmentImportPreview = {
-  mode: 'preview';
-  headers: string[];
-  resolvedMapping: Record<string, string | null>;
-  summary: ImportSummary;
-  previewRows: ImportPreviewRow[];
-  canImport: boolean;
-};
-
-export type ShipmentImportApply = {
-  mode: 'import';
-  fileName: string;
-  insertedRows: number;
-  totalRows: number;
-  summary: ImportSummary;
-  resolvedMapping: Record<string, string | null>;
-};
+export type {
+  ImportColumnMapping,
+  ImportPreviewRow,
+  ImportSummary,
+  ShipmentImportPreview,
+  ShipmentImportApply,
+} from './import.types';
