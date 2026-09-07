@@ -84,6 +84,7 @@ export class ShipmentsController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @ApiOperation({ summary: 'Brisanje isporuke' })
   remove(
     @Param('id') id: string,

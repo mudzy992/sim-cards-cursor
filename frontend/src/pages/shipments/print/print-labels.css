@@ -1,0 +1,121 @@
+/**
+ * Print stilovi za A4 etikete.
+ * Važno:
+ *  - @page bez margina (margine dolaze iz geometrije papira, ne iz browsera)
+ *  - u printu se sakriva CIJELA aplikacija (#root) i prikazuje samo print-root
+ *    (renderovan kroz portal direktno u <body>), tako da layout aplikacije
+ *    (sidebar/header) nikad ne završi na papiru.
+ */
+
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+.label-print-root {
+  display: none;
+}
+
+@media print {
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body > #root {
+    display: none !important;
+  }
+
+  .label-print-root {
+    display: block !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+.lp-sheet {
+  width: 210mm;
+  height: 296.8mm; /* ~297mm: sprječava "ghost" prazan list zbog zaokruživanja */
+  overflow: hidden;
+  page-break-after: always;
+  break-inside: avoid;
+  background: #ffffff;
+}
+
+.lp-sheet:last-child {
+  page-break-after: auto;
+}
+
+.lp-grid {
+  display: grid;
+}
+
+.lp-cell {
+  overflow: hidden;
+}
+
+/* Kalibracioni okvir — samo kad korisnik eksplicitno uključi */
+.lp-cell--outline {
+  outline: 0.15mm solid #94a3b8;
+  outline-offset: -0.075mm;
+}
+
+/* ------------------------- tipografija etikete ---------------------------- */
+
+.lp-label {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  color: #0f172a;
+  font-family: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, Consolas,
+    'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-label__line {
+  line-height: 1.18;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* ----------------------- ekranski pregled (preview) ----------------------- */
+
+.lp-preview-cell {
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.lp-preview-cell--clickable {
+  cursor: pointer;
+}
+
+.lp-preview-cell--clickable:hover {
+  box-shadow: inset 0 0 0 2px rgba(31, 95, 214, 0.75);
+  z-index: 2;
+}
+
+.lp-preview-cell--used {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(100, 116, 139, 0.10) 0px,
+    rgba(100, 116, 139, 0.10) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+.lp-preview-cell--used:hover {
+  box-shadow: inset 0 0 0 2px rgba(217, 119, 6, 0.8);
+}

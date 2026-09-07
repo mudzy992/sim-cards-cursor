@@ -5,6 +5,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { shipmentsApi } from '@/api/shipments.api';
 import { getSimCardStatusLabel } from '@/utils/labels.utils'
 import type { ShipmentSimCardsResponse } from '@/types/shipment.types';
+import { PrinterOutlined } from '@ant-design/icons';
+import { ShipmentDeleteButton } from './ShipmentDeleteButton';
+import { useAuthStore } from '@/store/auth.store';
 type ShipmentSimCard = ShipmentSimCardsResponse['items'][number];
 
 const statusColor: Record<string, string> = {
@@ -26,6 +29,7 @@ export default function ShipmentDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [pagination, setPagination] = useState({ page: 1, limit: 100 });
+  const currentUserRole = useAuthStore((s) => s.user?.role);
 
   const shipmentQuery = useQuery({
     queryKey: ['shipments', 'details', id],
@@ -47,6 +51,22 @@ export default function ShipmentDetailsPage() {
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Space>
         <Button onClick={() => navigate('/shipments')}>Nazad</Button>
+        <Button
+        icon={<PrinterOutlined />}
+        onClick={() => navigate(`/shipments/${id}/print`)}
+        >
+        Etikete za print
+        </Button>
+        <ShipmentDeleteButton
+            shipment={{
+                id: shipment!.id,
+                name: shipment!.name,
+                simCardsCount: shipment!._count?.simCards ?? shipment!.totalCards ?? 0,
+            }}
+            role={currentUserRole}
+            size="middle"
+            onDeleted={() => navigate('/shipments')}
+            />
         <Typography.Title level={3} className="!mb-0">
           Detalji isporuke
         </Typography.Title>

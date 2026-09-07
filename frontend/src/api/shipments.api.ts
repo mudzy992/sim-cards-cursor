@@ -29,12 +29,35 @@ export const shipmentsApi = {
     );
     return response.data.data;
   },
+  listAllSimCards: async (
+    id: string,
+    onProgress?: (fetched: number, total: number) => void,
+  ): Promise<ShipmentSimCardsResponse['items']> => {
+    const limit = 100;
+    const first = await shipmentsApi.listSimCards(id, { page: 1, limit });
+    const all = [...first.items];
+    onProgress?.(all.length, first.total);
+    while (all.length < first.total) {
+      const nextPage = Math.floor(all.length / limit) + 1;
+      const next = await shipmentsApi.listSimCards(id, { page: nextPage, limit });
+      all.push(...next.items);
+      onProgress?.(Math.min(all.length, first.total), first.total);
+    }
+    return all;
+  },
   create: async (payload: CreateShipmentInput): Promise<ShipmentItem> => {
     const response = await axiosInstance.post<ApiEnvelope<ShipmentItem>>('/shipments', payload);
     return response.data.data;
   },
-  remove: async (id: string): Promise<void> => {
-    await axiosInstance.delete(`/shipments/${id}`)
+  remove: async (id: string): Promise<{
+    deleted: boolean;
+    deletedSimCards: number;
+    deletedSimEvents: number;
+  }> => {
+    const response = await axiosInstance.delete<
+      ApiEnvelope<{ deleted: boolean; deletedSimCards: number; deletedSimEvents: number }>
+    >(`/shipments/${id}`);
+    return response.data.data;
   },
   importExcel: async (params: {
     shipmentId: string;

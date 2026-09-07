@@ -13,7 +13,7 @@ import {
   message,
 } from 'antd';
 import { useMemo, useState } from 'react';
-import { InboxOutlined, CreditCardOutlined, PlusOutlined } from '@ant-design/icons';
+import { InboxOutlined, CreditCardOutlined, PlusOutlined, PrinterOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { shipmentsApi } from '@/api/shipments.api';
 import { simCardsApi } from '@/api/sim-cards.api';
@@ -26,6 +26,7 @@ import type {
   ShipmentStatus,
 } from '@/types/shipment.types';
 import type { SimCardItem, SimCardListParams, SimCardStatus } from '@/types/sim-card.types';
+import { ShipmentDeleteButton } from './ShipmentDeleteButton';
 
 const shipmentStatusColor: Record<string, string> = {
   RECEIVED: 'blue',
@@ -283,27 +284,23 @@ export default function ShipmentsListPage() {
               },
               {
                 title: 'Akcije',
-                width: 140,
-                render: (_: unknown, row) => {
-                  const simCount = row._count?.simCards ?? 0
-                  const canDelete = canManageShipments && simCount === 0
-                  if (!canDelete) return null
-                  return (
-                    <Popconfirm
-                      title="Obrisati isporuku?"
-                      description="Isporuka nema SIM kartica i može se obrisati."
-                      okText="Obriši"
-                      cancelText="Odustani"
-                      okButtonProps={{ danger: true, loading: removeShipmentMutation.isPending }}
-                      onConfirm={() => removeShipmentMutation.mutate(row.id)}
+                width: 240,
+                render: (_: unknown, row) => (
+                    <Space size={8}>
+                    <Button
+                        size="small"
+                        icon={<PrinterOutlined />}
+                        onClick={() => navigate(`/shipments/${row.id}/print`)}
                     >
-                      <Button danger size="small">
-                        Obriši
-                      </Button>
-                    </Popconfirm>
-                  )
+                        Etikete
+                    </Button>
+                    <ShipmentDeleteButton
+                        shipment={{ id: row.id, name: row.name, simCardsCount: row._count?.simCards ?? 0 }}
+                        role={currentUserRole}
+                    />
+                    </Space>
+                ),
                 },
-              },
             ]}
             data-tour-id="shipments-table"
           />

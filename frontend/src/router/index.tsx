@@ -28,6 +28,7 @@ import BranchEmailRecipientsPage from '@/pages/branch-email-recipients/BranchEma
 import MeterTypeFieldsPage from '@/pages/meter-type-fields/MeterTypeFieldsPage'
 import MeterTypeUpsertPage from '@/pages/meter-types/MeterTypeUpsertPage'
 import { MetersAccessGuard } from '@/components/common/MetersAccessGuard'
+import ShipmentPrintPage from '@/pages/shipments/ShipmentPrintPage';
 
 export const router = createBrowserRouter([
   {
@@ -84,6 +85,7 @@ export const router = createBrowserRouter([
               </RoleGuard>
             ),
           },
+          { path: '/shipments/:id/print', element: <ShipmentPrintPage /> },
           {
             path: '/meters',
             element: (

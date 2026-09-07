@@ -191,16 +191,14 @@ export class ShipmentsService {
   }
 
   async remove(id: string, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
+    const isSystemAdmin = scope?.role === 'SYSTEM_ADMIN';
     const scopeClause = scopeWhere(scope, { distributionIdField: 'distributionId' });
+
     const shipment = await this.prisma.shipment.findFirst({
-      where: {
-        id,
-        ...(scopeClause ? { AND: [scopeClause] } : {}),
-      },
+      where: { id, ...(scopeClause ? { AND: [scopeClause] } : {}) },
       include: {
-        _count: {
-          select: { simCards: true },
-        },
+        _count: { select: { simCards: true } },
+        simCards: { select: { id: true, iccid: true, status: true } },
       },
     });
 
@@ -208,21 +206,71 @@ export class ShipmentsService {
       throw new NotFoundException('Shipment not found');
     }
 
-    if (shipment._count.simCards > 0) {
-      throw new BadRequestException('Shipment cannot be deleted while it contains SIM cards');
+    const simCount = shipment._count.simCards;
+
+    // ── Prazna isporuka: postojeće ponašanje (SYSTEM_ADMIN i DIST_ADMIN) ──
+    if (simCount === 0) {
+      await this.prisma.shipment.delete({ where: { id } });
+      await this.activityLogService.log({
+        userId: actorId,
+        action: 'DELETE',
+        entity: 'shipment',
+        entityId: id,
+        details: { name: shipment.name, provider: shipment.provider, deletedSimCards: 0 },
+        ipAddress,
+      });
+      return { deleted: true, deletedSimCards: 0, deletedSimEvents: 0 };
     }
 
-    await this.prisma.shipment.delete({ where: { id } });
+    // ── Kompletna isporuka: isključivo SYSTEM_ADMIN ──
+    if (!isSystemAdmin) {
+      throw new BadRequestException(
+        'Kompletnu isporuku sa SIM karticama može obrisati samo sistem administrator.',
+      );
+    }
+
+    // ── Sigurnosna pravila: kartice u operativnoj upotrebi ne smiju nestati ──
+    const simCardIds = shipment.simCards.map((c) => c.id);
+    const operationalCount = shipment.simCards.filter(
+      (c) => c.status === SimCardStatus.ASSIGNED || c.status === SimCardStatus.INSTALLED,
+    ).length;
+
+    const [metersCount, installationRecordsCount] = await this.prisma.$transaction([
+      this.prisma.meter.count({ where: { simCardId: { in: simCardIds } } }),
+      this.prisma.installationRecord.count({ where: { simCardId: { in: simCardIds } } }),
+    ]);
+
+    if (operationalCount > 0 || metersCount > 0 || installationRecordsCount > 0) {
+      throw new BadRequestException(
+        `Isporuku nije moguće obrisati: ${operationalCount} kartica je dodijeljeno/ugrađeno, ` +
+          `${metersCount} je povezano na brojila, ${installationRecordsCount} ima evidencije ugradnje. ` +
+          `Prvo ih demontirajte/deaktivirajte.`,
+      );
+    }
+
+    // ── Transakcijsko brisanje (FK su RESTRICT → redoslijed je bitan) ──
+    const { deletedSimCards, deletedSimEvents } = await this.prisma.$transaction(async (tx) => {
+      const events = await tx.simEvent.deleteMany({ where: { simCardId: { in: simCardIds } } });
+      const cards = await tx.simCard.deleteMany({ where: { shipmentId: id } });
+      await tx.shipment.delete({ where: { id } });
+      return { deletedSimCards: cards.count, deletedSimEvents: events.count };
+    });
 
     await this.activityLogService.log({
       userId: actorId,
       action: 'DELETE',
       entity: 'shipment',
       entityId: id,
+      details: {
+        name: shipment.name,
+        provider: shipment.provider,
+        deletedSimCards,
+        deletedSimEvents,
+      },
       ipAddress,
     });
 
-    return { deleted: true };
+    return { deleted: true, deletedSimCards, deletedSimEvents };
   }
 
   async findShipmentSimCards(
