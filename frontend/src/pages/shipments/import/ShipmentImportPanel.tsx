@@ -141,7 +141,7 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
           </div>)}]} />
         <ImportReviewTable preview={preview} shipmentName={shipmentName}
           selectedRowNumbers={selected} onChangeSelection={setSelected} />
-        <div className="mt-4 flex justify-end gap-2 border-t pt-4">
+        <div className="flex justify-end gap-2 pt-4 mt-4 border-t">
           {footer}
           <Button type="primary" icon={<UploadOutlined />} disabled={selected.length === 0}
             loading={applyMutation.isPending} onClick={() => applyMutation.mutate()}>
