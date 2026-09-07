@@ -75,7 +75,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   const showMenuButton = Boolean(onMobileMenuClick) && isMobile
 
   return (
-    <AntHeader className="!bg-white !px-4 sm:!px-6 border-b border-slate-200">
+    <AntHeader className="app-header !bg-surface/80 !px-4 sm:!px-6 border-b border-slate-200">
       <div className="flex h-full items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {showMenuButton && (
@@ -88,8 +88,11 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
             />
           )}
           <div className="flex min-w-0 items-center gap-2">
-            <Typography.Text strong className="min-w-0 truncate">
-              Dobrodošli, {user?.firstName ?? 'Korisnik'}
+            <Typography.Text className="min-w-0 truncate text-slate-500">
+              Dobrodošli,{' '}
+              <span className="font-semibold text-slate-900">
+                {user?.firstName ?? 'Korisnik'}
+              </span>
             </Typography.Text>
             <div className="flex shrink-0 items-center gap-2">
               {roleTag ? <Tooltip title={roleLabel}>{roleTag}</Tooltip> : null}

@@ -23,6 +23,20 @@ type SidebarProps = {
   onMobileClose: () => void
 }
 
+function Brand() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
+        S
+      </div>
+      <div className="min-w-0 leading-tight">
+        <div className="truncate text-[15px] font-semibold text-slate-900">SIM Tracker</div>
+        <div className="truncate text-[11px] text-slate-500">Upravljačka konzola</div>
+      </div>
+    </div>
+  )
+}
+
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
   const screens = Grid.useBreakpoint()
@@ -156,7 +170,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         placement="left"
         width={260}
         bodyStyle={{ padding: 0 }}
-        title={<div className="px-2 py-1 text-base font-semibold">SIM Tracker</div>}
+        title={<Brand />}
       >
         {menuNode}
       </Drawer>
@@ -164,8 +178,10 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   }
 
   return (
-    <Sider width={240} theme="light" breakpoint="lg" collapsedWidth={0}>
-      <div className="px-4 py-4 text-lg font-semibold">SIM Tracker</div>
+    <Sider width={240} theme="dark" breakpoint="lg" collapsedWidth={0} className="app-sider">
+      <div className="px-4 py-5">
+        <Brand />
+      </div>
       {menuNode}
     </Sider>
   );

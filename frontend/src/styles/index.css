@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: dark;
+}
+
 html,
 body,
 #root {
@@ -10,6 +14,116 @@ body,
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f8fafc;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  background-color: #09090b;
+  color: #f4f4f6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(99, 102, 241, 0.35);
+  color: #f8f8fa;
+}
+
+/* Slim, dark-friendly scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2b2c33 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #2b2c33;
+  border-radius: 999px;
+  border: 2px solid #09090b;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #3f3f46;
+}
+
+/* Consistent focus ring across native + custom elements */
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/*
+ * Print / label preview scope.
+ *
+ * ShipmentPrintPage (and the LabelSheetPreview it renders) simulate a
+ * physical A4 sheet of labels. That preview must stay light regardless of
+ * the app's dark theme — printing dark backgrounds wastes ink and the
+ * on-screen preview should match the paper output. We restore the original
+ * light neutral values here, scoped to `.print-preview-scope`, without
+ * touching the component markup.
+ */
+.print-preview-scope {
+  --pp-slate-50: #f8fafc;
+  --pp-slate-100: #f1f5f9;
+  --pp-slate-200: #e2e8f0;
+  --pp-slate-300: #cbd5e1;
+  --pp-slate-400: #94a3b8;
+  --pp-slate-500: #64748b;
+  --pp-slate-600: #475569;
+  --pp-slate-800: #1e293b;
+}
+
+.print-preview-scope .bg-white {
+  background-color: #fff !important;
+}
+.print-preview-scope .bg-white\/70 {
+  background-color: rgb(255 255 255 / 0.7) !important;
+}
+.print-preview-scope .bg-slate-50 {
+  background-color: var(--pp-slate-50) !important;
+}
+.print-preview-scope .bg-slate-100 {
+  background-color: var(--pp-slate-100) !important;
+}
+.print-preview-scope .border-slate-100 {
+  border-color: var(--pp-slate-100) !important;
+}
+.print-preview-scope .border-slate-200 {
+  border-color: var(--pp-slate-200) !important;
+}
+.print-preview-scope .border-slate-400 {
+  border-color: var(--pp-slate-400) !important;
+}
+.print-preview-scope .ring-slate-200 {
+  --tw-ring-color: var(--pp-slate-200) !important;
+}
+.print-preview-scope .ring-slate-300 {
+  --tw-ring-color: var(--pp-slate-300) !important;
+}
+.print-preview-scope .text-slate-400 {
+  color: var(--pp-slate-400) !important;
+}
+.print-preview-scope .text-slate-500 {
+  color: var(--pp-slate-500) !important;
+}
+.print-preview-scope .text-slate-600 {
+  color: var(--pp-slate-600) !important;
+}
+.print-preview-scope .text-slate-800 {
+  color: var(--pp-slate-800) !important;
 }

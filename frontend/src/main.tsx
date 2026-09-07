@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider } from 'antd';
 import App from './App';
+import { antdTheme } from './styles/theme';
 import './styles/index.css';
 import './styles/antd-overrides.css';
 
@@ -10,7 +11,7 @@ const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <ConfigProvider>
+    <ConfigProvider theme={antdTheme}>
       <QueryClientProvider client={queryClient}>
         <App />
       </QueryClientProvider>

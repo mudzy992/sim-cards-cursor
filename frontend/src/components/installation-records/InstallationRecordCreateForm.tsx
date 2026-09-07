@@ -229,7 +229,7 @@ export default function InstallationRecordCreateForm({
     <>
       {messageContextHolder}
       {!embedded && (
-        <p className="text-gray-500 mb-4">
+        <p className="text-slate-500 mb-4">
           Zapisnik se kreira kada se SIM kartici pridružuje brojilo. Možete odabrati postojeće
           brojilo ili unijeti novo (kao na terenu – tip, serijski broj, lokacija).
         </p>

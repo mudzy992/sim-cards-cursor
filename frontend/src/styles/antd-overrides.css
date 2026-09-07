@@ -2,6 +2,30 @@
   line-height: normal;
 }
 
+/* Sticky, translucent, blurred header — Next.js/Vercel-dashboard style */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+}
+
+/* Sidebar: subtle right hairline instead of a hard box shadow */
+.app-sider {
+  border-right: 1px solid #1e1f24;
+}
+
+.app-sider .ant-menu {
+  background: transparent;
+  padding: 8px;
+}
+
+.app-sider .ant-menu-item {
+  margin-inline: 0 !important;
+  width: 100% !important;
+}
+
 /* Global mobile safety: tables/descriptions should not overflow cards */
 .ant-table-wrapper {
   max-width: 100%;
@@ -19,4 +43,19 @@
 .ant-descriptions-view {
   max-width: 100%;
   overflow-x: auto;
+}
+
+/* Slightly crisper card borders on dark surfaces */
+.ant-card {
+  border-color: #1e1f24;
+}
+
+.ant-table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keep the physical A4 label preview literally white on screen */
+.print-preview-scope .ant-card,
+.print-preview-scope .ant-tag {
+  color-scheme: light;
 }

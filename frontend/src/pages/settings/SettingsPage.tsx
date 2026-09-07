@@ -90,7 +90,7 @@ function SettingsNotificationsSection() {
           />
         </Space>
 
-        <div className="border-t border-neutral-200 dark:border-neutral-700" />
+        <div className="border-t border-slate-200" />
 
         <Space align="start" className="w-full justify-between">
           <div className="space-y-1 max-w-xl">
@@ -110,7 +110,7 @@ function SettingsNotificationsSection() {
           />
         </Space>
 
-        <div className="border-t border-neutral-200 dark:border-neutral-700" />
+        <div className="border-t border-slate-200" />
 
         <Space align="start" className="w-full justify-between">
           <div className="space-y-1 max-w-xl">

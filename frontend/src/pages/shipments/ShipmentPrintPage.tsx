@@ -281,7 +281,7 @@ export default function ShipmentPrintPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1500px]">
+    <div className="print-preview-scope mx-auto max-w-[1500px]">
       {/* zaglavlje */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>

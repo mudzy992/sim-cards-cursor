@@ -90,7 +90,9 @@ export function NotificationBell() {
   return (
     <Dropdown
       dropdownRender={() => (
-        <div className="bg-white rounded shadow-lg border">{dropdownContent}</div>
+        <div className="bg-surface-raised rounded-xl shadow-card border border-slate-200">
+          {dropdownContent}
+        </div>
       )}
       trigger={['click']}
       placement="bottomRight"

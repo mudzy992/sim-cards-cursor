@@ -21,32 +21,34 @@ export function AppLayout() {
   return (
     <Layout className="min-h-screen bg-slate-50">
       <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
-      <Layout>
+      <Layout className="bg-slate-50">
         <Header onMobileMenuClick={() => setMobileNavOpen(true)} />
-        <Content className="px-6 py-5">
-          <Breadcrumb />
-          {user?.role === 'SYSTEM_ADMIN' && featuresQuery.data?.missingKeys?.length ? (
-            <Alert
-              type="warning"
-              className="mb-4"
-              message="Sistem nije potpuno podešen"
-              description={
-                <div>
-                  <div>Nedostaju ili nisu podešene ključne postavke:</div>
-                  <ul className="list-disc ml-5">
-                    {featuresQuery.data.missingKeys.map((k) => (
-                      <li key={k}>
-                        <code>{k}</code>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              }
-              showIcon
-            />
-          ) : null}
-          <div className="rounded-md bg-white p-4 shadow-sm">
-            <Outlet />
+        <Content className="px-4 py-5 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-[1400px]">
+            <Breadcrumb />
+            {user?.role === 'SYSTEM_ADMIN' && featuresQuery.data?.missingKeys?.length ? (
+              <Alert
+                type="warning"
+                className="mb-4"
+                message="Sistem nije potpuno podešen"
+                description={
+                  <div>
+                    <div>Nedostaju ili nisu podešene ključne postavke:</div>
+                    <ul className="list-disc ml-5">
+                      {featuresQuery.data.missingKeys.map((k) => (
+                        <li key={k}>
+                          <code>{k}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                }
+                showIcon
+              />
+            ) : null}
+            <div className="rounded-2xl border border-slate-200 bg-surface p-4 shadow-card sm:p-6">
+              <Outlet />
+            </div>
           </div>
         </Content>
         <Footer />

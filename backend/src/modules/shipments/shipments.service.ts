@@ -34,8 +34,19 @@ export class ShipmentsService {
       scope?.role === 'DIST_ADMIN' && scope.distributionId
         ? scope.distributionId
         : dto.distributionId;
-    if (scope?.role === 'SYSTEM_ADMIN' && !distributionId) {
-      throw new BadRequestException('Distribucija je obavezna pri kreiranju isporuke.');
+    if (scope?.role === 'SYSTEM_ADMIN') {
+      if (!distributionId) {
+        throw new BadRequestException('Distribucija je obavezna pri kreiranju isporuke.');
+      }
+      const distribution = await this.prisma.distribution.findUnique({
+        where: { id: distributionId },
+        select: { id: true },
+      });
+      if (!distribution) {
+        throw new BadRequestException(
+          'Odabrana distribucija ne postoji u bazi. Osvježite stranicu i odaberite ponovo.',
+        );
+      }
     }
     const shipment = await this.prisma.shipment.create({
       data: {
