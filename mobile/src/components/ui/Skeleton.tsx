@@ -5,7 +5,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View, type ViewStyle } from 'react-native';
 import { palette, radii, spacing } from '@/theme/tokens';
-import React from 'react';
 
 export interface SkeletonProps {
   width?: number | string;

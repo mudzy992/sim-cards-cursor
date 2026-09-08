@@ -6,7 +6,6 @@ import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radii, spacing, type } from '@/theme/tokens';
 import { ActionButton, type ActionButtonVariant } from './ActionButton';
-import React from 'react';
 
 export interface EmptyStateProps {
   icon: keyof typeof Ionicons.glyphMap;

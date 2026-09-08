@@ -167,19 +167,33 @@ export default function HomeScreen() {
             })}
           </Text>
         </View>
-        <Pressable
-          onPress={() => router.push('/notifications')}
-          accessibilityRole="button"
-          accessibilityLabel="Notifikacije"
-          style={({ pressed }) => [styles.bell, pressed && styles.pressedSoft]}
-        >
-          <Ionicons name="notifications-outline" size={20} color={palette.textPrimary} />
-          {unreadCount > 0 ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-            </View>
-          ) : null}
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => router.push('/notifications')}
+            accessibilityRole="button"
+            accessibilityLabel="Notifikacije"
+            style={({ pressed }) => [styles.iconButton, pressed && styles.pressedSoft]}
+          >
+            <Ionicons name="notifications-outline" size={20} color={palette.textPrimary} />
+            {unreadCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+          {/* Profil je uklonjen iz tab trake — pristup je ovdje */}
+          <Pressable
+            onPress={() => router.push('/(app)/(tabs)/profile')}
+            accessibilityRole="button"
+            accessibilityLabel="Profil i postavke"
+            style={({ pressed }) => [styles.avatarButton, pressed && styles.pressedSoft]}
+          >
+            <Text style={styles.avatarText}>
+              {(user?.firstName?.[0] ?? '').toUpperCase()}
+              {(user?.lastName?.[0] ?? '').toUpperCase()}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
@@ -378,7 +392,8 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     textTransform: 'capitalize',
   },
-  bell: {
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  iconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -387,6 +402,20 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: palette.graphite,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: palette.inverse,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   pressedSoft: { opacity: 0.75 },
   badge: {

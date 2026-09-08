@@ -33,9 +33,9 @@ cat <<EOF
 
 ${c_bold}Sljedeći koraci (na VM-u):${c_reset}
   1) Prebaciti fajl na VM, npr.:
-     scp "${OUT_FILE}" <user>@<vm-host>:/tmp/
+     scp "${OUT_FILE}" <user>@<vm-host>:/home/epbih/GitHub/sim-cards-web/artifacts/
 
   2) Na VM-u pokrenuti:
-     ./scripts/vm-deps-load.sh /tmp/$(basename "$OUT_FILE")
+     ./scripts/vm-deps-load.sh /home/epbih/GitHub/sim-cards-web/artifacts/$(basename "$OUT_FILE")
 
 EOF

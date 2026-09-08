@@ -58,7 +58,7 @@ ok "Sačuvano: ${OUT_FILE} ($(du -h "$OUT_FILE" | cut -f1))"
 cat <<EOF
 
 ${c_bold}Sljedeći koraci (na VM-u):${c_reset}
-  1) scp "${OUT_FILE}" <user>@<vm-host>:/tmp/
-  2) Na VM-u: ./scripts/vm-frontend-deploy.sh /tmp/$(basename "$OUT_FILE")
+  1) scp "${OUT_FILE}" <user>@<vm-host>:/home/epbih/GitHub/sim-cards-web/artifacts/
+  2) Na VM-u: ./scripts/vm-frontend-deploy.sh /home/epbih/GitHub/sim-cards-web/artifacts/$(basename "$OUT_FILE")
 
 EOF

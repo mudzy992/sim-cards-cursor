@@ -1,125 +1,59 @@
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
-import { Ionicons } from '@expo/vector-icons'
-import { colors } from '@/theme/colors'
-import { ScreenHeader } from '@/components/common/ScreenHeader'
-import { Screen } from '@/components/common/Screen'
-import { Card } from '@/components/common/Card'
-import { useAppVersion } from '@/hooks/useAppVersion'
+import { useAppVersion } from '@/hooks/useAppVersion';
+import { palette, radii, spacing, type } from '@/theme/tokens';
+import { ScreenTitleBar } from '@/components/ui/ScreenTitleBar';
+import { Section } from '@/components/ui/Section';
+import { Panel } from '@/components/ui/Panel';
+import { ListRow } from '@/components/ui/ListRow';
+import { ActionButton } from '@/components/ui/ActionButton';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { versionName, buildNumber } = useAppVersion();
+  const confirmLogout = () => Alert.alert('Odjava', 'Želite li se odjaviti sa ovog uređaja?', [
+    { text: 'Odustani', style: 'cancel' },
+    { text: 'Odjavi se', style: 'destructive', onPress: () => void logout().then(() => router.replace('/(auth)/login')) },
+  ]);
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/(auth)/login');
-  };
-
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScreenHeader
-        title="Profil"
-        subtitle={user ? `${user.firstName} ${user.lastName}` : '—'}
-      />
-      <Screen scroll contentStyle={{ paddingTop: 14, gap: 12 }}>
-        <Card style={{ gap: 6 }}>
-          <Text style={{ color: colors.text, fontWeight: '800' }}>
-            {user?.firstName} {user?.lastName}
-          </Text>
-          <Text style={{ color: colors.textMuted }}>{user?.email ?? '—'}</Text>
-          <Text style={{ color: colors.textMuted }}>Role: {user?.role ?? '—'}</Text>
-        </Card>
-
-        <Card style={{ gap: 6 }}>
-          <Text style={{ color: colors.text, fontWeight: '800' }}>Verzija aplikacije</Text>
-          <Text style={{ color: colors.textMuted }}>
-            {versionName} (build {buildNumber})
-          </Text>
-        </Card>
-
-        <View style={{ gap: 10 }}>
-          <Pressable
-            onPress={() => router.push('/(app)/offline-inventory')}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.9 : 1,
-            })}
-          >
-            <Card style={{ padding: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 10,
-                      backgroundColor: colors.surfaceMuted,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Ionicons name="albums-outline" size={18} color={colors.primary} />
-                  </View>
-                  <View style={{ gap: 2 }}>
-                    <Text style={{ fontWeight: '800', color: colors.text }}>Offline inventar</Text>
-                    <Text style={{ fontSize: 12, color: colors.textMuted }}>SIM kartice dostupne bez interneta</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </View>
-            </Card>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/(app)/outbox')}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.9 : 1,
-            })}
-          >
-            <Card style={{ padding: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 10,
-                      backgroundColor: colors.surfaceMuted,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Ionicons name="cloud-upload-outline" size={18} color={colors.primary} />
-                  </View>
-                  <View style={{ gap: 2 }}>
-                    <Text style={{ fontWeight: '800', color: colors.text }}>Neposlato</Text>
-                    <Text style={{ fontSize: 12, color: colors.textMuted }}>Stavke za slanje kada mreža dođe</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </View>
-            </Card>
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={() => void handleLogout()}
-          style={({ pressed }) => ({
-            backgroundColor: pressed ? '#b91c1c' : colors.danger,
-            padding: 14,
-            borderRadius: 12,
-            alignItems: 'center',
-          })}
-        >
-          <Text style={{ color: '#fff', fontWeight: '900' }}>Odjava</Text>
-        </Pressable>
-      </Screen>
+  return <SafeAreaView style={styles.root} edges={['top']}>
+    <ScreenTitleBar title="Profil" subtitle="Korisnik i podaci uređaja" />
+    <View style={styles.content}>
+      <View style={styles.identity}>
+        <View style={styles.avatar}><Text style={styles.avatarText}>{user?.firstName?.[0] ?? ''}{user?.lastName?.[0] ?? ''}</Text></View>
+        <View style={styles.identityBody}><Text style={styles.name}>{user?.firstName} {user?.lastName}</Text>
+          <Text style={type.caption}>{user?.email ?? '—'}</Text></View>
+      </View>
+      <Section label="Organizacija">
+        <Panel padding="none"><View style={styles.panelInner}>
+          <ListRow title="Uloga" value={user?.role ?? '—'} />
+          <ListRow title="Poslovnica" value={user?.branch?.name ?? '—'} divider />
+        </View></Panel>
+      </Section>
+      <Section label="Offline rad">
+        <Panel padding="none"><View style={styles.panelInner}>
+          <ListRow title="Offline inventar" subtitle="SIM kartice dostupne bez interneta" icon="archive-outline" iconTone="info" onPress={() => router.push('/(app)/offline-inventory')} />
+          <ListRow title="Neposlato" subtitle="Akcije koje čekaju mrežu" icon="cloud-upload-outline" iconTone="warning" onPress={() => router.push('/(app)/outbox')} divider />
+        </View></Panel>
+      </Section>
+      <Section label="Aplikacija">
+        <ListRow title="Verzija" value={`${versionName} (${buildNumber})`} />
+      </Section>
+      <ActionButton title="Odjavi se" icon="log-out-outline" variant="danger" onPress={confirmLogout} />
     </View>
-  );
+  </SafeAreaView>;
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: palette.background },
+  content: { padding: spacing.xl },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginBottom: spacing.xxl },
+  avatar: { width: 64, height: 64, borderRadius: radii.lg, backgroundColor: palette.graphite, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: palette.inverse, fontSize: 21, fontWeight: '700', letterSpacing: 0.5 },
+  identityBody: { flex: 1 },
+  name: { fontSize: 21, fontWeight: '700', color: palette.textPrimary, marginBottom: 3 },
+  panelInner: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xs },
+});

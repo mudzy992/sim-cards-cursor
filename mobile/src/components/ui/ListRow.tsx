@@ -5,7 +5,7 @@
  */
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radii, spacing, type, HIT_TARGET } from '@/theme/tokens';
+import { palette, radii, spacing, type } from '@/theme/tokens';
 import type { StatusTone } from './StatusBadge';
 import React from 'react';
 

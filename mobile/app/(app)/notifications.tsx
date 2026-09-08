@@ -1,141 +1,77 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  Text,
-  View,
-} from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { notificationsApi } from '@/api/notifications.api';
-import type { Notification } from '@/api/notifications.api';
-import { colors } from '@/theme/colors';
-import { normalizeDeepLink } from '@/utils/deeplink'
-
-function NotificationItem({
-  item,
-  onPress,
-}: {
-  item: Notification;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        padding: 16,
-        backgroundColor: item.isRead ? '#f8fafc' : '#f0fdf4',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-      }}
-    >
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-        <Text
-          style={{
-            fontSize: 15,
-            fontWeight: item.isRead ? '400' : '600',
-            color: '#0f172a',
-            flex: 1,
-          }}
-          numberOfLines={1}
-        >
-          {item.title}
-        </Text>
-        <Text style={{ fontSize: 11, color: '#94a3b8' }}>
-          {new Date(item.createdAt).toLocaleDateString()}
-        </Text>
-      </View>
-      <Text
-        style={{ fontSize: 13, color: '#64748b' }}
-        numberOfLines={2}
-      >
-        {item.message}
-      </Text>
-    </Pressable>
-  );
-}
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { notificationsApi, type Notification } from '@/api/notifications.api';
+import { normalizeDeepLink } from '@/utils/deeplink';
+import { palette, spacing, type } from '@/theme/tokens';
+import { ScreenTitleBar } from '@/components/ui/ScreenTitleBar';
+import { ActionButton } from '@/components/ui/ActionButton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const query = useQuery({ queryKey: ['notifications-list'], queryFn: () => notificationsApi.list({ limit: 50 }) });
+  const notifications = query.data ?? [];
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+    void queryClient.invalidateQueries({ queryKey: ['notifications-list'] });
+  };
+  const markRead = useMutation({ mutationFn: (id: string) => notificationsApi.markAsRead(id), onSuccess: invalidate });
+  const markAll = useMutation({ mutationFn: () => notificationsApi.markAllAsRead(), onSuccess: invalidate });
+  const unread = notifications.filter((item) => !item.isRead).length;
 
-  const { data: notifications = [], isLoading, refetch } = useQuery({
-    queryKey: ['notifications-list'],
-    queryFn: () => notificationsApi.list({ limit: 50 }),
-  });
-
-  const markAsReadMutation = useMutation({
-    mutationFn: (id: string) => notificationsApi.markAsRead(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
-      void queryClient.invalidateQueries({ queryKey: ['notifications-list'] });
-    },
-  });
-
-  const markAllAsReadMutation = useMutation({
-    mutationFn: () => notificationsApi.markAllAsRead(),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
-      void queryClient.invalidateQueries({ queryKey: ['notifications-list'] });
-    },
-  });
-
-  const handleItemPress = (item: Notification) => {
-    if (!item.isRead) {
-      markAsReadMutation.mutate(item.id);
-    }
-    const normalized = normalizeDeepLink(item.link) ?? '/notifications'
-    router.push(normalized as never)
+  const open = (item: Notification) => {
+    if (!item.isRead) markRead.mutate(item.id);
+    router.push((normalizeDeepLink(item.link) ?? '/notifications') as never);
   };
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-
-  return (
-    <>
-      <Stack.Screen
-        options={{
-          title: 'Notifikacije',
-          headerRight: () =>
-            unreadCount > 0 ? (
-              <Pressable
-                onPress={() => markAllAsReadMutation.mutate()}
-                style={{ padding: 8 }}
-              >
-                <Text style={{ color: colors.link, fontSize: 14, fontWeight: '500' }}>
-                  Označi sve pročitano
-                </Text>
-              </Pressable>
-            ) : null,
-        }}
-      />
-      {isLoading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+  return <SafeAreaView style={styles.root} edges={['top']}>
+    <ScreenTitleBar title="Notifikacije" subtitle={unread ? `${unread} nepročitanih` : 'Sve je pročitano'}
+      actionLabel={unread ? 'Pročitaj sve' : undefined} actionIcon={unread ? 'checkmark-done' : undefined}
+      onAction={unread ? () => markAll.mutate() : undefined} />
+    {query.isLoading ? <View style={styles.loading}><SkeletonRows count={6} /></View> : query.isError ? (
+      <View style={styles.state}><Text style={styles.error}>Notifikacije nije moguće učitati.</Text>
+        <ActionButton title="Pokušaj ponovo" onPress={() => void query.refetch()} /></View>
+    ) : <FlatList data={notifications} keyExtractor={(item) => item.id} contentContainerStyle={styles.list}
+      refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} colors={[palette.brand]} />}
+      ListEmptyComponent={<EmptyState icon="notifications-off-outline" title="Nema notifikacija"
+        description="Nova zaduženja i važne operativne poruke pojavit će se ovdje." />}
+      renderItem={({ item }) => <Pressable onPress={() => open(item)}
+        style={({ pressed }) => [styles.row, !item.isRead && styles.rowUnread, pressed && styles.pressed]}>
+        <View style={[styles.icon, !item.isRead && styles.iconUnread]}>
+          <Ionicons name={item.isRead ? 'notifications-outline' : 'notifications'} size={18}
+            color={item.isRead ? palette.textMuted : palette.brand} />
         </View>
-      ) : (
-        <FlatList
-          data={notifications}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <NotificationItem item={item} onPress={() => handleItemPress(item)} />
-          )}
-          ListEmptyComponent={
-            <View style={{ padding: 32, alignItems: 'center' }}>
-              <Text style={{ color: '#94a3b8', fontSize: 15 }}>
-                Nema notifikacija
-              </Text>
-            </View>
-          }
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoading}
-              onRefresh={() => void refetch()}
-              colors={[colors.primary]}
-            />
-          }
-        />
-      )}
-    </>
-  );
+        <View style={styles.rowBody}>
+          <View style={styles.titleRow}><Text style={[type.bodyStrong, item.isRead && styles.readTitle]} numberOfLines={1}>{item.title}</Text>
+            {!item.isRead ? <View style={styles.unreadDot} /> : null}</View>
+          <Text style={[type.caption, styles.message]} numberOfLines={3}>{item.message}</Text>
+          <Text style={styles.date}>{new Date(item.createdAt).toLocaleString('bs-BA')}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={palette.textMuted} />
+      </Pressable>} />}
+  </SafeAreaView>;
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: palette.background },
+  loading: { padding: spacing.xl },
+  state: { padding: spacing.xl },
+  error: { color: palette.danger, marginBottom: spacing.lg },
+  list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, flexGrow: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.border },
+  rowUnread: { backgroundColor: palette.brandSoft },
+  pressed: { opacity: 0.72 },
+  icon: { width: 36, height: 36, borderRadius: 10, backgroundColor: palette.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
+  iconUnread: { backgroundColor: palette.brandSoftStrong },
+  rowBody: { flex: 1, minWidth: 0 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  readTitle: { color: palette.textSecondary },
+  unreadDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: palette.brand },
+  message: { marginTop: 3, lineHeight: 18 },
+  date: { marginTop: spacing.sm, color: palette.textMuted, fontSize: 11 },
+});

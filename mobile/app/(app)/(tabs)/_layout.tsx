@@ -1,19 +1,32 @@
 /**
- * TabsLayout — REDIZAJN (Faza 2)
- * Badge logika (install/demount PENDING taskovi, refresh 45s) IDENTICNA originalu.
- * Prezentacija: refinirana tab traka per instrukcije.md
- *  - brand aktivna boja, neutralna neaktivna
- *  - headerShown: false jer ekrani renderuju vlastite header blokove
- *    (ako neki ekran nema vlastiti header → vidi napomenu u REDESIGN-PHASE-1.md)
+ * TabsLayout — REDIZAJN tab navigacije.
+ *
+ * Izmjene u odnosu na prethodnu verziju:
+ *  1) 6 tabova -> 5. "Profil" je uklonjen iz trake (href: null) jer je rijetko
+ *     koristen; ostaje dostupan preko avatara u headeru Pocetne. Ruta i dalje
+ *     postoji, pa svi router.push('/(app)/(tabs)/profile') pozivi rade.
+ *  2) Redoslijed prati stvarni terenski tok i stavlja skeniranje u centar:
+ *     Pocetna · Ugradnja · [SKEN] · Demontaza · Zapisnici
+ *  3) Skeniranje je vizuelno dominantno (brand krug), bez labele — primarna
+ *     akcija aplikacije prema instrukcije.md §11.
+ *  4) Badge logika za install/demount ostaje IDENTICNA (PENDING, refresh 45s).
  */
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { installTasksApi } from '@/api/install-tasks.api';
 import { demountTasksApi } from '@/api/demount-tasks.api';
 import { palette } from '@/theme/tokens';
+
+function ScanTabIcon({ focused }: { focused: boolean }) {
+  return (
+    <View style={[styles.scanButton, focused && styles.scanButtonActive]}>
+      <Ionicons name="barcode-outline" size={26} color={palette.inverse} />
+    </View>
+  );
+}
 
 export default function TabsLayout() {
   const [installBadge, setInstallBadge] = useState<number | undefined>(undefined);
@@ -38,10 +51,10 @@ export default function TabsLayout() {
       }
     };
     void load();
-    const t = setInterval(() => void load(), 45_000);
+    const timer = setInterval(() => void load(), 45_000);
     return () => {
       alive = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, []);
 
@@ -56,66 +69,76 @@ export default function TabsLayout() {
           tabBarLabelStyle: styles.tabLabel,
           tabBarStyle: styles.tabBar,
           tabBarItemStyle: styles.tabItem,
+          tabBarBadgeStyle: styles.badge,
         }}
       >
+        {/* 1 — Početna */}
         <Tabs.Screen
           name="home"
           options={{
             title: 'Početna',
             tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={size - 2} color={color} />
             ),
           }}
         />
+
+        {/* 2 — Ugradnja */}
         <Tabs.Screen
           name="install"
           options={{
             title: 'Ugradnja',
             tabBarBadge: installBadge,
-            tabBarBadgeStyle: styles.badge,
             tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'construct' : 'construct-outline'} size={size} color={color} />
+              <Ionicons
+                name={focused ? 'construct' : 'construct-outline'}
+                size={size - 2}
+                color={color}
+              />
             ),
           }}
         />
+
+        {/* 3 — Skeniranje (centralna primarna akcija) */}
         <Tabs.Screen
           name="scan"
           options={{
             title: 'Skeniraj',
-            tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'barcode' : 'barcode-outline'} size={size} color={color} />
-            ),
+            tabBarLabel: () => null,
+            tabBarAccessibilityLabel: 'Skeniraj SIM karticu',
+            tabBarIcon: ({ focused }) => <ScanTabIcon focused={focused} />,
           }}
         />
-        <Tabs.Screen
-          name="records"
-          options={{
-            title: 'Zapisnici',
-            tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'albums' : 'albums-outline'} size={size} color={color} />
-            ),
-          }}
-        />
+
+        {/* 4 — Demontaža */}
         <Tabs.Screen
           name="demount"
           options={{
             title: 'Demontaža',
             tabBarBadge: demountBadge,
-            tabBarBadgeStyle: styles.badge,
             tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'remove-circle' : 'remove-circle-outline'} size={size} color={color} />
+              <Ionicons
+                name={focused ? 'remove-circle' : 'remove-circle-outline'}
+                size={size - 2}
+                color={color}
+              />
             ),
           }}
         />
+
+        {/* 5 — Zapisnici */}
         <Tabs.Screen
-          name="profile"
+          name="records"
           options={{
-            title: 'Profil',
+            title: 'Zapisnici',
             tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+              <Ionicons name={focused ? 'albums' : 'albums-outline'} size={size - 2} color={color} />
             ),
           }}
         />
+
+        {/* Profil — ruta ostaje aktivna, ali van tab trake */}
+        <Tabs.Screen name="profile" options={{ href: null, title: 'Profil' }} />
       </Tabs>
     </>
   );
@@ -126,17 +149,33 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface,
     borderTopWidth: 1,
     borderTopColor: palette.border,
-    height: Platform.select({ ios: 84, default: 62 }),
-    paddingTop: 6,
-    paddingBottom: Platform.select({ ios: 28, default: 8 }),
+    height: Platform.select({ ios: 86, default: 66 }),
+    paddingTop: 8,
+    paddingBottom: Platform.select({ ios: 28, default: 10 }),
+    paddingHorizontal: 4,
   },
-  tabItem: { paddingVertical: 2 },
-  tabLabel: { fontSize: 11, fontWeight: '600' },
+  tabItem: { paddingVertical: 0 },
+  tabLabel: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   badge: {
     backgroundColor: palette.danger,
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
+    minWidth: 17,
+    height: 17,
     lineHeight: 16,
   },
+  scanButton: {
+    width: 50,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: palette.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanButtonActive: { backgroundColor: palette.brandPressed },
 });

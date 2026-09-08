@@ -1,22 +1,10 @@
+/** Redizajnirani produkcijski ekran demontaze. */
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import {
   demountTasksApi,
   type DemountCompletionResolution,
@@ -26,161 +14,132 @@ import {
   type RemovedSimDisposition,
 } from '@/api/demount-tasks.api';
 import { simCardsApi } from '@/api/sim-cards.api';
-import { useAuthStore } from '@/store/auth.store'
-import { listOutbox } from '@/offline/outbox'
-import { colors } from '@/theme/colors';
-import { ScreenHeader } from '@/components/common/ScreenHeader'
-import { Card } from '@/components/common/Card'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-
-const statusLabels: Record<DemountTaskStatus, string> = {
-  PENDING: 'Čeka',
-  IN_PROGRESS: 'U toku',
-  COMPLETED: 'Završeno',
-  CANCELLED: 'Otkazano',
-};
-
-const statusActions: Record<DemountTaskStatus, DemountTaskStatus[]> = {
-  PENDING: ['IN_PROGRESS'],
-  IN_PROGRESS: ['PENDING'],
-  COMPLETED: [],
-  CANCELLED: [],
-};
+import { useAuthStore } from '@/store/auth.store';
+import { listOutbox } from '@/offline/outbox';
+import { palette, spacing, type } from '@/theme/tokens';
+import { ScreenTitleBar } from '@/components/ui/ScreenTitleBar';
+import { Panel } from '@/components/ui/Panel';
+import { ActionButton } from '@/components/ui/ActionButton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonRows } from '@/components/ui/Skeleton';
+import { Field } from '@/components/ui/Field';
+import { WorkflowSteps } from '@/components/ui/WorkflowSteps';
+import { ChoiceRow } from '@/components/ui/ChoiceRow';
+import { ListRow } from '@/components/ui/ListRow';
+import { TaskCard } from '@/features/tasks/TaskCard';
+import { TaskFilterBar, taskMatchesFilter, type TaskFilter } from '@/features/tasks/TaskFilterBar';
+import { WorkflowModal } from '@/features/tasks/WorkflowModal';
 
 const resolutionLabels: Record<DemountCompletionResolution, string> = {
-  FULL_DEMOUNT: 'Potpuna demontaža (brojilo + SIM)',
+  FULL_DEMOUNT: 'Potpuna demontaža brojila i SIM-a',
   REPLACE_SIM: 'Demontaža SIM-a i zamjena novom',
-  REMOVE_SIM_ONLY: 'Demontaža SIM-a bez zamjene (NO_SIM)',
+  REMOVE_SIM_ONLY: 'Demontaža SIM-a bez zamjene',
 };
-
+const resolutionDescriptions: Record<DemountCompletionResolution, string> = {
+  FULL_DEMOUNT: 'Brojilo se skida sa lokacije i ostaje bez aktivne SIM kartice.',
+  REPLACE_SIM: 'Stara SIM se uklanja, a nova kartica se odmah ugrađuje.',
+  REMOVE_SIM_ONLY: 'Brojilo ostaje na lokaciji bez SIM kartice.',
+};
 const removedSimLabels: Record<RemovedSimDisposition, string> = {
-  MARK_DEFECTIVE: 'Uklonjena SIM je neispravna (označi kao neispravnu)',
-  RETURN_TO_STOCK: 'Uklonjena SIM je ispravna (vrati u zalihe za drugo brojilo)',
+  MARK_DEFECTIVE: 'Označi uklonjenu SIM kao neispravnu',
+  RETURN_TO_STOCK: 'Vrati uklonjenu SIM u zalihe',
 };
-
-const meterDemountLabels: Record<MeterDemountCategory, string> = {
+const meterCategoryLabels: Record<MeterDemountCategory, string> = {
   METER_FAULTY: 'Brojilo neispravno',
   TEMPORARY_REMOVAL: 'Privremena demontaža SIM-a',
-  MAINTENANCE: 'Servis / održavanje',
+  MAINTENANCE: 'Servis ili održavanje',
   OTHER: 'Ostalo',
+};
+
+type DemountWizard = {
+  task: DemountTaskItem;
+  step: 1 | 2;
+  isLocked: boolean;
+  resolution?: DemountCompletionResolution;
+  reason: string;
+  removedSimDisposition?: RemovedSimDisposition;
+  meterDemountCategory?: MeterDemountCategory;
+  newSimCardId?: string;
+  newSimIccid?: string;
+  newSimIpAddress?: string;
 };
 
 export default function DemountScreen() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user)
-  const insets = useSafeAreaInsets()
-  const search = useLocalSearchParams<{ pickedIccid?: string; wizardTaskId?: string }>();
+  const user = useAuthStore((state) => state.user);
+  const search = useLocalSearchParams<{ pickedIccid?: string | string[]; wizardTaskId?: string | string[] }>();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<DemountTaskItem[]>([]);
-  const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set())
+  const [filter, setFilter] = useState<TaskFilter>('ACTIVE');
+  const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [wizard, setWizard] = useState<{
-    task: DemountTaskItem;
-    step: 1 | 2;
-    isLocked: boolean;
-    resolution?: DemountCompletionResolution;
-    reason: string;
-    newSimCardId?: string;
-    newSimIccid?: string;
-    newSimIpAddress?: string;
-    removedSimDisposition?: RemovedSimDisposition;
-    meterDemountCategory?: MeterDemountCategory;
-  } | null>(null);
+  const [wizard, setWizard] = useState<DemountWizard | null>(null);
   const [wizardSubmitting, setWizardSubmitting] = useState(false);
 
   const load = useCallback(async (refresh = false) => {
-    if (refresh) setIsRefreshing(true);
-    else setIsLoading(true);
+    if (refresh) setIsRefreshing(true); else setIsLoading(true);
     setError(null);
     try {
       const data = await demountTasksApi.getMy();
       setItems(data);
       if (user) {
-        const outbox = await listOutbox(user)
-        const ids = new Set(outbox.map((i) => i.meta?.taskId).filter(Boolean) as string[])
-        setPendingTaskIds(ids)
-      } else {
-        setPendingTaskIds(new Set())
-      }
+        const outbox = await listOutbox(user);
+        setPendingTaskIds(new Set(outbox.map((item) => item.meta?.taskId).filter(Boolean) as string[]));
+      } else setPendingTaskIds(new Set());
     } catch (err) {
-      if (axios.isAxiosError(err) && !err.response) {
-        setError('Backend nije dostupan.');
-      } else {
-        setError('Nije moguće učitati zadatke demontaže.');
-      }
+      setError(axios.isAxiosError(err) && !err.response
+        ? 'Backend nije dostupan. Prikaz lokalnih zadataka nije uspio.'
+        : 'Nije moguće učitati zadatke demontaže.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, [user]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load(false);
-    }, [load]),
-  );
+  useFocusEffect(useCallback(() => { void load(false); }, [load]));
 
   useEffect(() => {
-    const rawIccid =
-      typeof search.pickedIccid === 'string'
-        ? search.pickedIccid
-        : search.pickedIccid?.[0];
-    const rawTaskId =
-      typeof search.wizardTaskId === 'string'
-        ? search.wizardTaskId
-        : search.wizardTaskId?.[0];
-    if (!rawIccid?.trim() || !rawTaskId) {
-      return;
-    }
+    const rawIccid = typeof search.pickedIccid === 'string' ? search.pickedIccid : search.pickedIccid?.[0];
+    const rawTaskId = typeof search.wizardTaskId === 'string' ? search.wizardTaskId : search.wizardTaskId?.[0];
+    if (!rawIccid?.trim() || !rawTaskId) return;
     let cancelled = false;
     void (async () => {
       try {
         const card = await simCardsApi.scanByIccidWithOffline(rawIccid.trim());
         if (cancelled) return;
-        setWizard((w) => {
-          if (!w || w.task.id !== rawTaskId) return w;
-          return {
-            ...w,
-            newSimCardId: card.id,
-            newSimIccid: card.iccid,
-            newSimIpAddress: card.ipAddress,
-          };
-        });
+        setWizard((current) => current?.task.id === rawTaskId ? {
+          ...current,
+          newSimCardId: card.id,
+          newSimIccid: card.iccid,
+          newSimIpAddress: card.ipAddress,
+        } : current);
       } catch {
-        if (!cancelled) {
-          Alert.alert('Greška', 'Skenirana SIM nije pronađena ili nije dostupna.');
-        }
+        if (!cancelled) Alert.alert('Skeniranje nije uspjelo', 'Skenirana SIM nije pronađena ili nije dostupna.');
       } finally {
-        if (!cancelled) {
-          router.replace('/(app)/(tabs)/demount' as const);
-        }
+        if (!cancelled) router.replace('/(app)/(tabs)/demount' as const);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [search.pickedIccid, search.wizardTaskId, router]);
 
-  const handleStatusChange = async (task: DemountTaskItem, newStatus: DemountTaskStatus) => {
+  const filteredItems = useMemo(() => items.filter((item) => taskMatchesFilter(item.status, filter)), [items, filter]);
+
+  const changeStatus = async (task: DemountTaskItem, status: DemountTaskStatus) => {
     setUpdatingId(task.id);
     try {
-      await demountTasksApi.updateStatus(task.id, newStatus);
-      void load(true);
+      await demountTasksApi.updateStatus(task.id, status);
+      await load(true);
     } catch (err) {
-      const msg =
-        axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
-          ? err.response.data.message
-          : 'Ažuriranje statusa nije uspjelo.';
-      Alert.alert('Greška', msg);
-    } finally {
-      setUpdatingId(null);
-    }
+      const message = axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
+        ? err.response.data.message : 'Ažuriranje statusa nije uspjelo.';
+      Alert.alert('Greška', message);
+    } finally { setUpdatingId(null); }
   };
 
-  const handleOpenWizard = (task: DemountTaskItem) => {
-    const isLocked = Boolean(task.requestedResolution)
+  const openWizard = (task: DemountTaskItem) => {
+    const isLocked = Boolean(task.requestedResolution);
     setWizard({
       task,
       step: isLocked ? 2 : 1,
@@ -189,450 +148,155 @@ export default function DemountScreen() {
       reason: task.requestedReason ?? '',
       removedSimDisposition: task.requestedRemovedSimDisposition ?? undefined,
       meterDemountCategory: task.requestedMeterDemountCategory ?? undefined,
-      newSimCardId: undefined,
-      newSimIccid: undefined,
-      newSimIpAddress: undefined,
     });
   };
 
-  const handleWizardSubmit = async () => {
-    if (!wizard?.resolution) {
-      Alert.alert('Nedostaje izbor', 'Odaberite tip završetka.');
-      return;
-    }
+  const updateWizard = (patch: Partial<DemountWizard>) => setWizard((current) => current ? { ...current, ...patch } : current);
+  const scanNewSim = () => {
+    if (!wizard) return;
+    router.push({ pathname: '/(app)/(tabs)/scan', params: { afterScan: 'demount', demountTaskId: wizard.task.id } });
+  };
+
+  const submitWizard = async () => {
+    if (!wizard?.resolution) { Alert.alert('Nedostaje izbor', 'Odaberite način završetka demontaže.'); return; }
+    if (!wizard.removedSimDisposition) { Alert.alert('Nedostaje izbor', 'Odaberite ishod uklonjene SIM kartice.'); return; }
+    const needsCategory = wizard.resolution === 'FULL_DEMOUNT' || wizard.resolution === 'REMOVE_SIM_ONLY';
+    if (needsCategory && !wizard.meterDemountCategory) { Alert.alert('Nedostaje kategorija', 'Odaberite kategoriju demontaže.'); return; }
+    if (wizard.resolution === 'REPLACE_SIM' && !wizard.newSimCardId) { Alert.alert('Nedostaje nova SIM', 'Skenirajte karticu koja zamjenjuje staru.'); return; }
     const reason = wizard.reason.trim();
-    if (reason.length < 3) {
-      Alert.alert('Obrazloženje', 'Unesite obrazloženje (najmanje 3 znaka).');
-      return;
-    }
-    if (wizard.resolution === 'REPLACE_SIM' && !wizard.newSimCardId) {
-      Alert.alert('Nova SIM', 'Skenirajte ili učitajte novu SIM karticu.');
-      return;
-    }
-    if (!wizard.removedSimDisposition) {
-      Alert.alert('SIM', 'Odaberite šta se dešava sa uklonjenom SIM karticom.');
-      return;
-    }
-    if (
-      (wizard.resolution === 'FULL_DEMOUNT' || wizard.resolution === 'REMOVE_SIM_ONLY') &&
-      !wizard.meterDemountCategory
-    ) {
-      Alert.alert('Brojilo', 'Odaberite kategoriju demontaže brojila (bez SIM-a).');
-      return;
-    }
+    if (!reason) { Alert.alert('Nedostaje obrazloženje', 'Unesite razlog demontaže ili zamjene.'); return; }
+
     setWizardSubmitting(true);
     try {
       await demountTasksApi.complete(wizard.task.id, {
         resolution: wizard.resolution,
         reason,
         removedSimDisposition: wizard.removedSimDisposition,
-        ...(wizard.resolution === 'FULL_DEMOUNT' || wizard.resolution === 'REMOVE_SIM_ONLY'
-          ? { meterDemountCategory: wizard.meterDemountCategory! }
-          : {}),
-        ...(wizard.resolution === 'REPLACE_SIM' && wizard.newSimCardId
-          ? { newSimCardId: wizard.newSimCardId }
-          : {}),
+        ...(wizard.meterDemountCategory ? { meterDemountCategory: wizard.meterDemountCategory } : {}),
+        ...(wizard.resolution === 'REPLACE_SIM' && wizard.newSimCardId ? { newSimCardId: wizard.newSimCardId } : {}),
       });
       setWizard(null);
-      void load(true);
+      await load(true);
     } catch (err) {
-      const msg =
-        axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
-          ? err.response.data.message
-          : 'Završetak zadatka nije uspio.';
-      Alert.alert('Greška', msg);
-    } finally {
-      setWizardSubmitting(false);
-    }
+      const message = axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
+        ? err.response.data.message : 'Završetak zadatka nije uspio.';
+      Alert.alert('Greška', message);
+    } finally { setWizardSubmitting(false); }
   };
 
-  const handleScanNewSim = () => {
-    if (!wizard) return;
-    router.push({
-      pathname: '/(app)/(tabs)/scan',
-      params: { afterScan: 'demount', demountTaskId: wizard.task.id },
-    });
-  };
-
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  const activeCount = items.filter((item) => item.status === 'PENDING' || item.status === 'IN_PROGRESS').length;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScreenHeader
-        title="Zadaci demontaže"
-        subtitle="Završetak ide kroz wizard: tip, obrazloženje, opcionalno sken nove SIM."
-      />
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <ScreenTitleBar title="Demontaža" subtitle={`${activeCount} aktivnih zadataka`}
+        actionIcon="refresh" actionLabel="Osvježi" onAction={() => void load(true)} />
+      <TaskFilterBar value={filter} onChange={setFilter} counts={{ active: activeCount }} />
+      {isLoading ? <View style={styles.loading}><SkeletonRows count={5} /></View> : error ? (
+        <View style={styles.stateWrap}><Panel tone="danger">
+          <Text style={styles.errorTitle}>Zadaci nisu dostupni</Text><Text style={styles.errorText}>{error}</Text>
+          <ActionButton title="Pokušaj ponovo" icon="refresh" onPress={() => void load(true)} />
+        </Panel></View>
+      ) : (
+        <FlatList data={filteredItems} keyExtractor={(item) => item.id} contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} colors={[palette.brand]} />}
+          ListEmptyComponent={<EmptyState icon="checkmark-done-circle-outline"
+            title={filter === 'ACTIVE' ? 'Sve je riješeno' : 'Nema zadataka u ovom prikazu'}
+            description={filter === 'ACTIVE' ? 'Trenutno nemate aktivnih zadataka demontaže.' : 'Promijenite filter ili osvježite listu.'} />}
+          renderItem={({ item }) => <TaskCard
+            title={item.meter?.serialNumber ?? item.meterId} status={item.status} createdAt={item.createdAt}
+            createdBy={item.createdBy ? `${item.createdBy.firstName} ${item.createdBy.lastName}` : null}
+            pendingOffline={pendingTaskIds.has(item.id)} note={item.notes}
+            metadata={[
+              ...(item.meter?.simCard ? [{ label: 'SIM / IP', value: `${item.meter.simCard.iccid} · ${item.meter.simCard.ipAddress}` }] : []),
+              ...(item.meter?.meterTypeDefinition?.name ? [{ label: 'Tip brojila', value: item.meter.meterTypeDefinition.name }] : []),
+              ...(item.completionResolution && item.status === 'COMPLETED' ? [{ label: 'Način', value: resolutionLabels[item.completionResolution] }] : []),
+            ]}
+            updating={updatingId === item.id}
+            primaryLabel={item.status === 'PENDING' ? 'Započni' : item.status === 'IN_PROGRESS' ? 'Završi demontažu' : undefined}
+            onPrimary={item.status === 'PENDING' ? () => void changeStatus(item, 'IN_PROGRESS') : item.status === 'IN_PROGRESS' ? () => openWizard(item) : undefined}
+            secondaryLabel={item.status === 'IN_PROGRESS' ? 'Vrati inicijatoru' : undefined}
+            onSecondary={item.status === 'IN_PROGRESS' ? () => void changeStatus(item, 'PENDING') : undefined} />}
+        />
+      )}
 
-      {error ? (
-        <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 8 }}>
-          <Text style={{ color: colors.danger, fontWeight: '700' }}>{error}</Text>
-          <Pressable
-            onPress={() => void load(true)}
-            style={{
-              alignSelf: 'flex-start',
-              backgroundColor: colors.primary,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 10,
-            }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '800' }}>Pokušaj ponovo</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      <WorkflowModal visible={Boolean(wizard)} title="Završetak demontaže"
+        subtitle={wizard ? `Brojilo ${wizard.task.meter?.serialNumber ?? wizard.task.meterId}` : undefined}
+        onClose={() => setWizard(null)}
+        footer={wizard?.step === 2 ? <ActionButton title="Potvrdi završetak" icon="checkmark"
+          onPress={() => void submitWizard()} loading={wizardSubmitting} size="lg" /> : undefined}>
+        {wizard ? <>
+          <WorkflowSteps header="DEMONTAŽA · VOĐENI POSTUPAK" steps={[
+            { key: 'task', label: 'Zadatak preuzet', state: 'done', detail: wizard.task.meter?.serialNumber ?? wizard.task.meterId },
+            { key: 'resolution', label: 'Način završetka', state: wizard.resolution ? 'done' : 'current', detail: wizard.resolution ? resolutionLabels[wizard.resolution] : undefined },
+            { key: 'details', label: 'Ishod i obrazloženje', state: wizard.step === 2 ? 'current' : 'pending' },
+            { key: 'confirm', label: 'Potvrda', state: 'pending' },
+          ]} />
 
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 20 }}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
-        }
-        ListEmptyComponent={
-          <Text style={{ color: colors.textMuted, marginTop: 24, textAlign: 'center' }}>
-            Nema zadataka demontaže.
-          </Text>
-        }
-        renderItem={({ item }) => (
-          <Card style={{ marginBottom: 10 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ fontWeight: '800', fontSize: 16, color: colors.text }}>
-                  {item.meter?.serialNumber ?? 'Brojilo'}
-                </Text>
-                {pendingTaskIds.has(item.id) ? (
-                  <View style={{ backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#991b1b' }}>
-                      Neposlato
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <View
-                style={{
-                  backgroundColor:
-                    item.status === 'COMPLETED'
-                      ? '#dcfce7'
-                      : item.status === 'CANCELLED'
-                        ? '#fee2e2'
-                        : '#fef3c7',
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '800',
-                    color:
-                      item.status === 'COMPLETED'
-                        ? '#166534'
-                        : item.status === 'CANCELLED'
-                          ? '#991b1b'
-                          : '#92400e',
-                  }}
-                >
-                  {statusLabels[item.status]}
-                </Text>
-              </View>
-            </View>
-            {item.completionResolution && item.status === 'COMPLETED' ? (
-              <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 4 }}>
-                Način: {resolutionLabels[item.completionResolution]}
-              </Text>
-            ) : null}
-            {item.meter?.simCard && (
-              <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-                SIM: {item.meter.simCard.iccid} • IP: {item.meter.simCard.ipAddress}
-              </Text>
-            )}
-            {item.meter?.meterTypeDefinition && (
-              <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-                Tip: {item.meter.meterTypeDefinition.name}
-              </Text>
-            )}
-            {item.status === 'IN_PROGRESS' ? (
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <Pressable
-                  disabled={updatingId === item.id}
-                  onPress={() => handleOpenWizard(item)}
-                  style={({ pressed }) => ({
-                    backgroundColor: pressed ? colors.primaryPressed : colors.primary,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 10,
-                    opacity: updatingId === item.id ? 0.7 : 1,
-                  })}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
-                    Završi demontažu
-                  </Text>
-                </Pressable>
-                {statusActions[item.status].map((status) => (
-                  <Pressable
-                    key={status}
-                    disabled={updatingId === item.id}
-                    onPress={() => handleStatusChange(item, status)}
-                    style={({ pressed }) => ({
-                      backgroundColor: pressed ? '#94a3b8' : '#64748b',
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 10,
-                      opacity: updatingId === item.id ? 0.7 : 1,
-                    })}
-                  >
-                    {updatingId === item.id ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
-                        Vrati inicijatoru
-                      </Text>
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-            {item.status !== 'IN_PROGRESS' && statusActions[item.status].length > 0 ? (
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                {statusActions[item.status].map((status) => (
-                  <Pressable
-                    key={status}
-                    disabled={updatingId === item.id}
-                    onPress={() => handleStatusChange(item, status)}
-                    style={({ pressed }) => ({
-                      backgroundColor: pressed ? colors.primaryPressed : colors.primary,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 10,
-                      opacity: updatingId === item.id ? 0.7 : 1,
-                    })}
-                  >
-                    {updatingId === item.id ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
-                        {status === 'IN_PROGRESS'
-                          ? 'Započni'
-                          : status === 'CANCELLED'
-                            ? 'Otkaži'
-                            : 'Vrati inicijatoru'}
-                      </Text>
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-          </Card>
-        )}
-      />
+          {wizard.step === 1 ? <>
+            <Text style={[type.sectionLabel, styles.sectionTitle]}>Odaberite način završetka</Text>
+            {(Object.keys(resolutionLabels) as DemountCompletionResolution[]).map((key) =>
+              <ChoiceRow key={key} label={resolutionLabels[key]} description={resolutionDescriptions[key]}
+                selected={wizard.resolution === key} onPress={() => updateWizard({ resolution: key, step: 2 })} />)}
+          </> : <>
+            {!wizard.isLocked ? <ActionButton title="Promijeni način završetka" variant="ghost" icon="arrow-back"
+              onPress={() => updateWizard({ step: 1 })} style={styles.backAction} /> : null}
+            <Text style={[type.sectionLabel, styles.sectionTitle]}>Način završetka</Text>
+            <Panel tone="info"><Text style={type.bodyStrong}>{wizard.resolution ? resolutionLabels[wizard.resolution] : '—'}</Text>
+              {wizard.isLocked ? <Text style={[type.caption, styles.lockedText]}>Definisao inicijator zadatka</Text> : null}</Panel>
 
-      <Modal visible={wizard !== null} animationType="slide" transparent>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(15,23,42,0.45)',
-            justifyContent: 'flex-end',
-          }}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-            keyboardVerticalOffset={0}
-          >
-            <View
-              style={{
-                backgroundColor: colors.surface,
-                borderTopLeftRadius: 18,
-                borderTopRightRadius: 18,
-                maxHeight: '88%',
-                padding: 16,
-                paddingBottom: 16 + insets.bottom,
-                gap: 12,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>Završetak demontaže</Text>
-                <Pressable
-                  onPress={() => setWizard(null)}
-                  hitSlop={12}
-                  accessibilityLabel="Zatvori"
-                >
-                  <Ionicons name="close" size={26} color={colors.textMuted} />
-                </Pressable>
-              </View>
-              {wizard ? (
-                <ScrollView
-                  keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{ gap: 12, paddingBottom: 20 + insets.bottom }}
-                >
-                <Text style={{ color: colors.textMuted }}>
-                  Brojilo: {wizard.task.meter?.serialNumber ?? wizard.task.meterId}
-                </Text>
-                {wizard.step === 1 ? (
-                  <View style={{ gap: 10 }}>
-                    <Text style={{ fontWeight: '600' }}>Odaberite rezoluciju</Text>
-                    {(Object.keys(resolutionLabels) as DemountCompletionResolution[]).map((key) => (
-                      <Pressable
-                        key={key}
-                        onPress={() =>
-                          setWizard((w) => (w ? { ...w, resolution: key, step: 2 } : w))
-                        }
-                        style={({ pressed }) => ({
-                          borderWidth: 1,
-                          borderColor: wizard.resolution === key ? colors.primary : colors.border,
-                          backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-                          padding: 12,
-                          borderRadius: 12,
-                        })}
-                      >
-                        <Text style={{ fontWeight: '600' }}>{resolutionLabels[key]}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={{ gap: 12 }}>
-                    {!wizard.isLocked ? (
-                      <Pressable onPress={() => setWizard((w) => (w ? { ...w, step: 1 } : w))}>
-                        <Text style={{ color: colors.primary, fontWeight: '600' }}>← Nazad</Text>
-                      </Pressable>
-                    ) : null}
+            <Text style={[type.sectionLabel, styles.sectionTitle]}>Ishod uklonjene SIM</Text>
+            {wizard.isLocked ? <Panel><Text style={type.bodyStrong}>{wizard.removedSimDisposition ? removedSimLabels[wizard.removedSimDisposition] : '—'}</Text></Panel>
+              : (Object.keys(removedSimLabels) as RemovedSimDisposition[]).map((key) =>
+                <ChoiceRow key={key} label={removedSimLabels[key]} selected={wizard.removedSimDisposition === key}
+                  onPress={() => updateWizard({ removedSimDisposition: key })} />)}
 
-                    <Text style={{ fontWeight: '600' }}>Rezolucija (inicijator)</Text>
-                    <Text style={{ color: colors.textMuted }}>
-                      {wizard.resolution ? resolutionLabels[wizard.resolution] : '—'}
-                    </Text>
+            {wizard.resolution === 'FULL_DEMOUNT' || wizard.resolution === 'REMOVE_SIM_ONLY' ? <>
+              <Text style={[type.sectionLabel, styles.sectionTitle]}>Kategorija demontaže</Text>
+              {wizard.isLocked ? <Panel><Text style={type.bodyStrong}>{wizard.meterDemountCategory ? meterCategoryLabels[wizard.meterDemountCategory] : '—'}</Text></Panel>
+                : (Object.keys(meterCategoryLabels) as MeterDemountCategory[]).map((key) =>
+                  <ChoiceRow key={key} label={meterCategoryLabels[key]} selected={wizard.meterDemountCategory === key}
+                    onPress={() => updateWizard({ meterDemountCategory: key })} />)}
+            </> : null}
 
-                    <Text style={{ fontWeight: '600' }}>Ishod uklonjene SIM (inicijator)</Text>
-                    {wizard.isLocked ? (
-                      <Text style={{ color: colors.textMuted }}>
-                        {wizard.removedSimDisposition ? removedSimLabels[wizard.removedSimDisposition] : '—'}
-                      </Text>
-                    ) : (
-                      (Object.keys(removedSimLabels) as RemovedSimDisposition[]).map((key) => (
-                        <Pressable
-                          key={key}
-                          onPress={() =>
-                            setWizard((w) => (w ? { ...w, removedSimDisposition: key } : w))
-                          }
-                          style={({ pressed }) => ({
-                            borderWidth: 1,
-                            borderColor: wizard.removedSimDisposition === key ? colors.primary : colors.border,
-                            backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-                            padding: 12,
-                            borderRadius: 12,
-                          })}
-                        >
-                          <Text style={{ fontWeight: '600', fontSize: 13 }}>{removedSimLabels[key]}</Text>
-                        </Pressable>
-                      ))
-                    )}
-                    {wizard.resolution &&
-                    (wizard.resolution === 'FULL_DEMOUNT' ||
-                      wizard.resolution === 'REMOVE_SIM_ONLY') ? (
-                      <View style={{ gap: 10 }}>
-                        <Text style={{ fontWeight: '600' }}>Brojilo ostaje bez SIM-a — kategorija</Text>
-                        {wizard.isLocked ? (
-                          <Text style={{ color: colors.textMuted }}>
-                            {wizard.meterDemountCategory ? meterDemountLabels[wizard.meterDemountCategory] : '—'}
-                          </Text>
-                        ) : (
-                          (Object.keys(meterDemountLabels) as MeterDemountCategory[]).map((key) => (
-                            <Pressable
-                              key={key}
-                              onPress={() =>
-                                setWizard((w) => (w ? { ...w, meterDemountCategory: key } : w))
-                              }
-                              style={({ pressed }) => ({
-                                borderWidth: 1,
-                                borderColor: wizard.meterDemountCategory === key ? colors.primary : colors.border,
-                                backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-                                padding: 12,
-                                borderRadius: 12,
-                              })}
-                            >
-                              <Text style={{ fontWeight: '600', fontSize: 13 }}>{meterDemountLabels[key]}</Text>
-                            </Pressable>
-                          ))
-                        )}
-                      </View>
-                    ) : null}
-                    <Text style={{ fontWeight: '600' }}>Obrazloženje</Text>
-                    <TextInput
-                      value={wizard.reason}
-                      editable={!wizard.isLocked}
-                      onChangeText={(text) => setWizard((w) => (w ? { ...w, reason: text } : w))}
-                      placeholder="Opišite razlog demontaže / zamjene"
-                      multiline
-                      numberOfLines={4}
-                      style={{
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        borderRadius: 12,
-                        padding: 12,
-                        minHeight: 100,
-                        textAlignVertical: 'top',
-                        backgroundColor: colors.surface,
-                      }}
-                    />
-                    {wizard.resolution === 'REPLACE_SIM' ? (
-                      <View style={{ gap: 8 }}>
-                        <Text style={{ fontWeight: '600' }}>Nova SIM</Text>
-                        {wizard.newSimIccid ? (
-                          <Text style={{ color: '#166534' }}>
-                            Odabrano: {wizard.newSimIccid} • IP: {wizard.newSimIpAddress?.trim() || '–'}
-                          </Text>
-                        ) : (
-                          <Text style={{ color: colors.textMuted }}>
-                            Skenirajte karticu koja će zamijeniti staru.
-                          </Text>
-                        )}
-                        <Pressable
-                          onPress={handleScanNewSim}
-                          style={({ pressed }) => ({
-                            alignSelf: 'flex-start',
-                            backgroundColor: pressed ? colors.primaryPressed : colors.primary,
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            borderRadius: 10,
-                          })}
-                        >
-                          <Text style={{ color: '#fff', fontWeight: '600' }}>Skeniraj novu SIM</Text>
-                        </Pressable>
-                      </View>
-                    ) : null}
-                    <Pressable
-                      disabled={wizardSubmitting}
-                      onPress={() => void handleWizardSubmit()}
-                      style={({ pressed }) => ({
-                        backgroundColor: pressed ? colors.primaryPressed : colors.primary,
-                        padding: 14,
-                        borderRadius: 12,
-                        alignItems: 'center',
-                        opacity: wizardSubmitting ? 0.7 : 1,
-                      })}
-                    >
-                      {wizardSubmitting ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>Potvrdi završetak</Text>
-                      )}
-                    </Pressable>
-                  </View>
-                )}
-                </ScrollView>
-              ) : null}
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
-    </View>
+            {wizard.resolution === 'REPLACE_SIM' ? <>
+              <Text style={[type.sectionLabel, styles.sectionTitle]}>Nova SIM kartica</Text>
+              <Panel tone={wizard.newSimCardId ? 'success' : 'info'}>
+                {wizard.newSimIccid ? <><Text style={type.dataLarge}>{wizard.newSimIccid}</Text>
+                  <Text style={[type.dataSmall, styles.ipText]}>IP {wizard.newSimIpAddress?.trim() || '—'}</Text></>
+                  : <Text style={type.body}>Skenirajte karticu koja će zamijeniti staru.</Text>}
+                <ActionButton title={wizard.newSimCardId ? 'Promijeni novu SIM' : 'Skeniraj novu SIM'} icon="barcode-outline"
+                  onPress={scanNewSim} variant={wizard.newSimCardId ? 'secondary' : 'primary'} style={styles.panelAction} />
+              </Panel>
+            </> : null}
+
+            <Text style={[type.sectionLabel, styles.sectionTitle]}>Obrazloženje</Text>
+            <Field label="Razlog demontaže ili zamjene" required value={wizard.reason}
+              onChangeText={(value) => updateWizard({ reason: value })}
+              placeholder="Opišite razlog i izvedenu radnju" multiline />
+
+            <Text style={[type.sectionLabel, styles.sectionTitle]}>Trenutno brojilo</Text>
+            <Panel padding="none"><View style={styles.panelInner}>
+              <ListRow title="Serijski broj" value={wizard.task.meter?.serialNumber ?? wizard.task.meterId} valueMono />
+              {wizard.task.meter?.simCard ? <ListRow title="Ugrađena SIM" value={wizard.task.meter.simCard.iccid} valueMono divider /> : null}
+            </View></Panel>
+          </>}
+        </> : null}
+      </WorkflowModal>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: palette.background },
+  loading: { padding: spacing.xl },
+  stateWrap: { padding: spacing.xl },
+  errorTitle: { ...type.bodyStrong, color: palette.danger, marginBottom: spacing.xs },
+  errorText: { ...type.caption, marginBottom: spacing.lg },
+  list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, flexGrow: 1 },
+  sectionTitle: { marginTop: spacing.xl, marginBottom: spacing.md },
+  backAction: { alignSelf: 'flex-start', marginTop: spacing.sm },
+  lockedText: { marginTop: spacing.xs },
+  ipText: { marginTop: spacing.xs },
+  panelAction: { marginTop: spacing.lg },
+  panelInner: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xs },
+});

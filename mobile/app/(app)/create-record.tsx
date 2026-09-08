@@ -1,37 +1,33 @@
+/** Novi priključak — vođeni zapisnik ugradnje, produkcijski payload 1:1. */
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker';
-import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { installationRecordsApi, queueInstallationRecord, type CreateInstallationRecordPayload } from '@/api/installation-records.api';
-import { meterTypeDefinitionsApi, type MeterTypeFieldItem } from '@/api/meter-type-definitions.api';
+import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import { useAuthStore } from '@/store/auth.store';
-import { useConnectivity } from '@/hooks/useConnectivity'
-import { colors } from '@/theme/colors';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
-import { ScreenHeader } from '@/components/common/ScreenHeader'
-import { Card } from '@/components/common/Card'
+import { useConnectivity } from '@/hooks/useConnectivity';
+import { palette, spacing, type } from '@/theme/tokens';
+import { ScreenTitleBar } from '@/components/ui/ScreenTitleBar';
+import { WorkflowSteps } from '@/components/ui/WorkflowSteps';
+import { Field } from '@/components/ui/Field';
+import { Panel } from '@/components/ui/Panel';
+import { ActionButton } from '@/components/ui/ActionButton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { MeterTypePicker } from '@/features/records/MeterTypePicker';
+import { DynamicMeterFields, validateRequiredDynamicFields } from '@/features/tasks/DynamicMeterFields';
+import { LocationFields } from '@/features/records/LocationFields';
+import { PhotoCapture } from '@/features/records/PhotoCapture';
 
 export default function CreateRecordScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ simCardId?: string }>();
-  const simCardId = params.simCardId?.trim() ?? '';
-  const userId = useAuthStore((state) => state.user?.id);
-  const userBranch = useAuthStore((state) => state.user?.branch);
-  const userRole = useAuthStore((state) => state.user?.role);
-  const { isOnline } = useConnectivity()
+  const params = useLocalSearchParams<{ simCardId?: string | string[] }>();
+  const simCardId = (typeof params.simCardId === 'string' ? params.simCardId : params.simCardId?.[0])?.trim() ?? '';
+  const user = useAuthStore((state) => state.user);
+  const { isOnline } = useConnectivity();
 
   const [meterTypeId, setMeterTypeId] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -40,717 +36,180 @@ export default function CreateRecordScreen() {
   const [installationAddress, setInstallationAddress] = useState('');
   const [city, setCity] = useState('');
   const [municipality, setMunicipality] = useState('');
-
-  useEffect(() => {
-    if (userRole === 'USER' && userBranch?.name) {
-      setMunicipality(userBranch.name);
-    }
-  }, [userRole, userBranch?.name]);
   const [measuringPoint, setMeasuringPoint] = useState('');
-  const [installationDate, setInstallationDate] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
+  const [installationDate, setInstallationDate] = useState(new Date().toISOString().slice(0, 10));
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [notes, setNotes] = useState('');
   const [photoPaths, setPhotoPaths] = useState<string[]>([]);
-  const [localPhotoUris, setLocalPhotoUris] = useState<string[]>([])
+  const [localPhotoUris, setLocalPhotoUris] = useState<string[]>([]);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [dynamicFieldValues, setDynamicFieldValues] = useState<Record<string, unknown>>({});
-  const [clientRequestId] = useState(
-    () => `crid_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-  )
-
-  const meterTypeFieldsQuery = useQuery({
-    queryKey: ['meter-type-definitions', meterTypeId, 'fields'],
-    queryFn: () => meterTypeDefinitionsApi.listFields(meterTypeId),
-    enabled: Boolean(meterTypeId),
-  });
+  const [clientRequestId] = useState(() => `crid_${Date.now()}_${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
-    if (!meterTypeId) return;
-    setDynamicFieldValues({});
-  }, [meterTypeId]);
-
-  const buildPayload = (): CreateInstallationRecordPayload => {
-    if (!userId || !simCardId || !meterTypeId || !serialNumber.trim()) {
-      throw new Error('Tip brojila i serijski broj su obavezni.');
-    }
-
-    const lat = latitude ? parseFloat(latitude) : undefined;
-    const lon = longitude ? parseFloat(longitude) : undefined;
-    const yearNum = year ? parseInt(year, 10) : NaN;
-    const calibrationNum = calibrationYear ? parseInt(calibrationYear, 10) : NaN;
-    if (!Number.isFinite(yearNum) || !Number.isFinite(calibrationNum)) {
-      throw new Error('Godina proizvodnje i godina baždarenja su obavezne.');
-    }
-
-    const meterFields = Array.isArray(meterTypeFieldsQuery.data)
-      ? meterTypeFieldsQuery.data
-      : [];
-
-    const missingRequired: string[] = [];
-    for (const f of meterFields) {
-      if (!f.isOperatorFillable || !f.isRequired) continue;
-      const v = dynamicFieldValues[f.name];
-      const isEmpty =
-        v === undefined ||
-        v === null ||
-        (typeof v === 'string' && v.trim().length === 0);
-      if (isEmpty) missingRequired.push(f.label);
-    }
-    if (missingRequired.length > 0) {
-      throw new Error(`Obavezna polja: ${missingRequired.join(', ')}`);
-    }
-
-    return {
-      simCardId,
-      installedById: userId,
-      clientRequestId,
-      meterTypeDefinitionId: meterTypeId,
-      serialNumber: serialNumber.trim(),
-      year: yearNum,
-      calibrationYear: calibrationNum,
-      installationAddress: installationAddress.trim() || undefined,
-      installationDate: installationDate || undefined,
-      city: city.trim() || undefined,
-      municipality: municipality.trim() || undefined,
-      branchId: userBranch?.id,
-      measuringPoint: measuringPoint.trim() || undefined,
-      latitude: Number.isFinite(lat) ? lat : undefined,
-      longitude: Number.isFinite(lon) ? lon : undefined,
-      dynamicFieldValues: Object.keys(dynamicFieldValues).length > 0 ? dynamicFieldValues : undefined,
-      notes: notes.trim() || undefined,
-      photos: photoPaths.length > 0 ? photoPaths : undefined,
-      ...(localPhotoUris.length > 0 ? { localPhotoUris } : {}),
-    };
-  };
+    if (user?.role === 'USER' && user.branch?.name) setMunicipality(user.branch.name);
+  }, [user?.role, user?.branch?.name]);
+  useEffect(() => { setDynamicFieldValues({}); }, [meterTypeId]);
 
   const meterTypesQuery = useQuery({
     queryKey: ['meter-type-definitions', 'list'],
     queryFn: () => meterTypeDefinitionsApi.list(),
-    enabled: Boolean(userId),
+    enabled: Boolean(user?.id),
   });
+  const fieldsQuery = useQuery({
+    queryKey: ['meter-type-definitions', meterTypeId, 'fields'],
+    queryFn: () => meterTypeDefinitionsApi.listFields(meterTypeId),
+    enabled: Boolean(meterTypeId),
+  });
+  const meterTypes = Array.isArray(meterTypesQuery.data) ? meterTypesQuery.data : [];
+  const dynamicFields = Array.isArray(fieldsQuery.data) ? fieldsQuery.data : [];
+  const typesError = meterTypesQuery.isError || (meterTypesQuery.isFetched && !meterTypesQuery.isLoading && meterTypesQuery.data === undefined);
+
+  const validation = useMemo(() => {
+    const missing: string[] = [];
+    if (!meterTypeId) missing.push('tip brojila');
+    if (!serialNumber.trim()) missing.push('serijski broj');
+    if (!year.trim()) missing.push('godina proizvodnje');
+    if (!calibrationYear.trim()) missing.push('godina baždarenja');
+    missing.push(...validateRequiredDynamicFields(dynamicFields, dynamicFieldValues));
+    return missing;
+  }, [meterTypeId, serialNumber, year, calibrationYear, dynamicFields, dynamicFieldValues]);
+
+  const buildPayload = (): CreateInstallationRecordPayload & { localPhotoUris?: string[] } => {
+    if (!user?.id || !simCardId) throw new Error('Nedostaje korisnik ili SIM kartica.');
+    if (validation.length) throw new Error(`Obavezna polja: ${validation.join(', ')}`);
+    const yearNumber = Number.parseInt(year, 10);
+    const calibrationNumber = Number.parseInt(calibrationYear, 10);
+    if (!Number.isFinite(yearNumber) || !Number.isFinite(calibrationNumber)) throw new Error('Godine moraju biti cijeli brojevi.');
+    const lat = parseOptionalFloat(latitude);
+    const lon = parseOptionalFloat(longitude);
+    return {
+      simCardId,
+      installedById: user.id,
+      clientRequestId,
+      meterTypeDefinitionId: meterTypeId,
+      serialNumber: serialNumber.trim(),
+      year: yearNumber,
+      calibrationYear: calibrationNumber,
+      installationAddress: installationAddress.trim() || undefined,
+      installationDate: installationDate || undefined,
+      city: city.trim() || undefined,
+      municipality: municipality.trim() || undefined,
+      branchId: user.branch?.id,
+      measuringPoint: measuringPoint.trim() || undefined,
+      latitude: lat,
+      longitude: lon,
+      dynamicFieldValues: Object.keys(dynamicFieldValues).length ? dynamicFieldValues : undefined,
+      notes: notes.trim() || undefined,
+      photos: photoPaths.length ? photoPaths : undefined,
+      ...(localPhotoUris.length ? { localPhotoUris } : {}),
+    };
+  };
 
   const createMutation = useMutation({
     mutationFn: () => installationRecordsApi.create(buildPayload()),
     onSuccess: (created) => {
       if (created?.status === 'SEND_FAILED') {
-        Alert.alert(
-          'Upozorenje',
-          'Zapisnik je kreiran, ali slanje emaila nije uspjelo. Otvorite detalje i pokušajte ponovo.',
-          [
-            {
-              text: 'Detalji',
-              onPress: () =>
-                router.replace({
-                  pathname: '/(app)/record-details',
-                  params: { id: created.id },
-                }),
-            },
-            { text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') },
-          ],
-        );
+        Alert.alert('Zapisnik je kreiran', 'Slanje emaila nije uspjelo. Pokušajte ponovo iz detalja zapisnika.', [
+          { text: 'Detalji', onPress: () => router.replace({ pathname: '/(app)/record-details', params: { id: created.id } }) },
+          { text: 'Kasnije', onPress: () => router.replace('/(app)/(tabs)/records') },
+        ]);
         return;
       }
-      Alert.alert('Uspjeh', 'Zapisnik kreiran i poslan na email.', [
+      Alert.alert('Uspjeh', 'Zapisnik je kreiran i poslan na email.', [
         { text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') },
       ]);
     },
-    onError: async (err) => {
-      if (axios.isAxiosError(err) && !err.response) {
+    onError: async (error) => {
+      if (axios.isAxiosError(error) && !error.response) {
         try {
           await queueInstallationRecord(buildPayload());
-          Alert.alert(
-            'Offline režim',
-            'Nema mreže. Zapisnik je sačuvan lokalno i biće automatski poslan kada se veza uspostavi.',
-            [{ text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') }],
-          );
+          Alert.alert('Sačuvano offline', 'Zapisnik će biti automatski poslan kada se veza uspostavi.', [
+            { text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') },
+          ]);
           return;
-        } catch {
-          // ako čuvanje u lokalni queue padne, padamo na standardnu poruku
-        }
+        } catch { /* nastavi na standardnu poruku */ }
       }
-
-      const msg =
-        axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
-          ? err.response.data.message
-          : 'Kreiranje zapisnika nije uspjelo.';
-      Alert.alert('Greška', msg);
+      const message = axios.isAxiosError(error) && typeof error.response?.data?.message === 'string'
+        ? error.response.data.message : error instanceof Error ? error.message : 'Kreiranje zapisnika nije uspjelo.';
+      Alert.alert('Greška', message);
     },
   });
 
-  const meterTypeOptions = Array.isArray(meterTypesQuery.data) ? meterTypesQuery.data : [];
-  const canSubmit = Boolean(
-    simCardId && meterTypeId && serialNumber.trim() && userId,
-  );
-  const typesError =
-    meterTypesQuery.isError ||
-    (meterTypesQuery.data === undefined &&
-      !meterTypesQuery.isLoading &&
-      meterTypesQuery.isFetched);
-
   if (!simCardId) {
-    return (
-      <View style={{ flex: 1, padding: 16, justifyContent: 'center' }}>
-        <Text style={{ color: '#dc2626' }}>
-          Nedostaje SIM kartica. Vratite se na sken i zadužite karticu, zatim
-          odaberite "Kreiraj zapisnik".
-        </Text>
-        <Pressable
-          onPress={() => router.back()}
-          style={{
-            marginTop: 16,
-            backgroundColor: colors.primary,
-            padding: 12,
-            borderRadius: 8,
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ color: '#fff' }}>Natrag</Text>
-        </Pressable>
-      </View>
-    );
+    return <SafeAreaView style={styles.root} edges={['top']}>
+      <ScreenTitleBar title="Novi priključak" />
+      <EmptyState icon="alert-circle-outline" title="Nedostaje SIM kartica"
+        description="Vratite se na skeniranje, zadužite karticu i odaberite kreiranje zapisnika."
+        actionLabel="Nazad" onAction={() => router.back()} />
+    </SafeAreaView>;
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScreenHeader
-        title="Novi zapisnik"
-        subtitle="Unesite podatke o brojilu i lokaciji. Obavezno: tip brojila i serijski broj."
-      />
-      <KeyboardAwareScrollView
-        bottomOffset={62}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 24, gap: 12 }}
-        keyboardShouldPersistTaps="handled"
-      >
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <ScreenTitleBar title="Novi priključak" subtitle="Zapisnik ugradnje SIM kartice" />
+      <KeyboardAwareScrollView contentContainerStyle={styles.content} bottomOffset={24} keyboardShouldPersistTaps="handled">
+        <WorkflowSteps header="NOVI PRIKLJUČAK · PODACI" steps={[
+          { key: 'sim', label: 'SIM kartica', state: 'done', detail: simCardId },
+          { key: 'meter', label: 'Brojilo', state: meterTypeId && serialNumber ? 'done' : 'current' },
+          { key: 'location', label: 'Lokacija', state: meterTypeId && serialNumber ? 'current' : 'pending' },
+          { key: 'confirm', label: 'Potvrda', state: validation.length ? 'pending' : 'current' },
+        ]} />
 
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Tip brojila *</Text>
-        <View style={{ borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, minHeight: 52 }}>
-          {meterTypesQuery.isLoading ? (
-            <View style={{ padding: 12 }}>
-              <ActivityIndicator size="small" />
-            </View>
-          ) : typesError ? (
-            <View style={{ padding: 12 }}>
-              <Text style={{ color: '#dc2626', fontSize: 14 }}>
-                Nije moguće učitati tipove brojila. Provjerite mrežu i pokušajte ponovo.
-              </Text>
-            </View>
-          ) : meterTypeOptions.length === 0 ? (
-            <View style={{ padding: 12 }}>
-              <Text style={{ color: '#64748b', fontSize: 14 }}>
-                Nema definisanih tipova brojila. Administrator ih dodaje u aplikaciji.
-              </Text>
-            </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingVertical: 8, paddingHorizontal: 4 }}
-            >
-              {meterTypeOptions.map((t) => (
-                <Pressable
-                  key={t.id}
-                  onPress={() => setMeterTypeId(t.id)}
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 12,
-                    marginHorizontal: 4,
-                    borderRadius: 8,
-                    backgroundColor: meterTypeId === t.id ? colors.primary : colors.surfaceMuted,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: meterTypeId === t.id ? '#fff' : '#334155',
-                      fontWeight: meterTypeId === t.id ? '700' : '400',
-                      fontSize: 15,
-                    }}
-                  >
-                    {t.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          )}
+        <Text style={[type.sectionLabel, styles.sectionTitle]}>Brojilo</Text>
+        <MeterTypePicker items={meterTypes} value={meterTypeId} onChange={setMeterTypeId}
+          loading={meterTypesQuery.isLoading} error={typesError} />
+        <Field label="Serijski broj brojila" required value={serialNumber} onChangeText={setSerialNumber} autoCapitalize="characters" />
+        <View style={styles.twoFields}>
+          <Field label="Godina proizvodnje" required value={year} onChangeText={(v) => setYear(v.replace(/\D/g, ''))} keyboardType="number-pad" style={styles.flexField} />
+          <Field label="Godina baždarenja" required value={calibrationYear} onChangeText={(v) => setCalibrationYear(v.replace(/\D/g, ''))} keyboardType="number-pad" style={styles.flexField} />
         </View>
-      </View>
+        {meterTypeId ? <DynamicMeterFields fields={dynamicFields} values={dynamicFieldValues}
+          loading={fieldsQuery.isLoading} error={fieldsQuery.isError}
+          onChange={(name, value) => setDynamicFieldValues((current) => ({ ...current, [name]: value }))} /> : null}
 
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Serijski broj brojila *</Text>
-        <TextInput
-          value={serialNumber}
-          onChangeText={setSerialNumber}
-          placeholder="Unesite serijski broj s brojila"
-          keyboardType="number-pad"
-          inputMode="numeric"
-          style={{
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            padding: 12,
-            fontSize: 16,
-            backgroundColor: colors.surface,
-          }}
-        />
-      </View>
+        <Text style={[type.sectionLabel, styles.sectionTitle]}>Lokacija ugradnje</Text>
+        <Field label="Adresa instalacije" value={installationAddress} onChangeText={setInstallationAddress} placeholder="Ulica i broj" />
+        <Field label="Grad" value={city} onChangeText={setCity} />
+        <Field label="Općina" value={municipality} onChangeText={setMunicipality} />
+        <Field label="Mjerno mjesto" value={measuringPoint} onChangeText={setMeasuringPoint} />
+        <Field label="Datum instalacije" value={installationDate} onChangeText={setInstallationDate} placeholder="YYYY-MM-DD" />
+        <LocationFields latitude={latitude} longitude={longitude} onLatitude={setLatitude} onLongitude={setLongitude}
+          loading={isFetchingLocation} onLoading={setIsFetchingLocation} />
 
-      {meterTypeId ? (
-        <Card style={{ padding: 12, gap: 10 }}>
-          <Text style={{ fontWeight: '800', color: colors.text }}>Dodatna polja</Text>
+        <PhotoCapture isOnline={isOnline} serialNumber={serialNumber} year={year}
+          uploadedPaths={photoPaths} localUris={localPhotoUris} onUploaded={setPhotoPaths} onLocal={setLocalPhotoUris}
+          loading={isUploadingPhoto} onLoading={setIsUploadingPhoto} />
 
-          {meterTypeFieldsQuery.isLoading ? (
-            <View style={{ paddingVertical: 8 }}>
-              <ActivityIndicator size="small" />
-            </View>
-          ) : meterTypeFieldsQuery.isError ? (
-            <Text style={{ color: '#dc2626' }}>
-              Nije moguće učitati dodatna polja za odabrani tip brojila.
-            </Text>
-          ) : (
-            (() => {
-              const fields = Array.isArray(meterTypeFieldsQuery.data)
-                ? meterTypeFieldsQuery.data
-                : [];
-
-              if (fields.length === 0) {
-                return <Text style={{ color: colors.textMuted }}>Nema dodatnih polja.</Text>;
-              }
-
-              const renderField = (f: MeterTypeFieldItem) => {
-                const requiredMark = f.isRequired ? ' *' : '';
-                const current = dynamicFieldValues[f.name];
-
-                if (!f.isOperatorFillable) {
-                  return (
-                    <View key={f.id} style={{ gap: 4 }}>
-                      <Text style={{ fontWeight: '600' }}>{f.label}</Text>
-                      <Text style={{ color: '#64748b' }}>
-                        {f.defaultValue ?? '—'}
-                      </Text>
-                    </View>
-                  );
-                }
-
-                if (f.fieldType === 'BOOLEAN') {
-                  const boolValue = current === true || current === 'true';
-                  return (
-                    <View key={f.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontWeight: '600' }}>
-                        {f.label}
-                        {requiredMark}
-                      </Text>
-                      <Switch
-                        value={boolValue}
-                        onValueChange={(v) =>
-                          setDynamicFieldValues((prev) => ({ ...prev, [f.name]: v }))
-                        }
-                      />
-                    </View>
-                  );
-                }
-
-                const textValue =
-                  typeof current === 'string' || typeof current === 'number'
-                    ? String(current)
-                    : '';
-
-                return (
-                  <View key={f.id} style={{ gap: 4 }}>
-                    <Text style={{ fontWeight: '600' }}>
-                      {f.label}
-                      {requiredMark}
-                    </Text>
-                    <TextInput
-                      value={textValue}
-                      onChangeText={(v) => {
-                        if (f.fieldType === 'NUMBER') {
-                          const normalized = v.replace(',', '.');
-                          const num = normalized.length > 0 ? Number(normalized) : undefined;
-                          setDynamicFieldValues((prev) => ({
-                            ...prev,
-                            [f.name]: Number.isFinite(num) ? num : v,
-                          }));
-                          return;
-                        }
-                        setDynamicFieldValues((prev) => ({ ...prev, [f.name]: v }));
-                      }}
-                      placeholder={f.fieldType === 'DATE' ? 'YYYY-MM-DD' : ''}
-                      keyboardType={f.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'}
-                      style={{
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        borderRadius: 12,
-                        padding: 12,
-                        fontSize: 16,
-                        backgroundColor: colors.surface,
-                      }}
-                    />
-                  </View>
-                );
-              };
-
-              return (
-                <View style={{ gap: 12 }}>
-                  {fields
-                    .slice()
-                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-                    .map(renderField)}
-                </View>
-              );
-            })()
-          )}
-        </Card>
-      ) : null}
-
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Godina proizvodnje *</Text>
-        <TextInput
-          value={year}
-          onChangeText={setYear}
-          placeholder="npr. 2024"
-          keyboardType="number-pad"
-          style={{
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            padding: 12,
-            fontSize: 16,
-            backgroundColor: colors.surface,
-          }}
-        />
-      </View>
-
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Godina baždarenja *</Text>
-        <TextInput
-          value={calibrationYear}
-          onChangeText={setCalibrationYear}
-          placeholder="npr. 2025"
-          keyboardType="number-pad"
-          style={{
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            padding: 12,
-            fontSize: 16,
-            backgroundColor: colors.surface,
-          }}
-        />
-      </View>
-
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Adresa instalacije</Text>
-        <TextInput
-          value={installationAddress}
-          onChangeText={setInstallationAddress}
-          placeholder="Ulica, broj, mjesto"
-          style={{
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            padding: 12,
-            fontSize: 16,
-            backgroundColor: colors.surface,
-          }}
-        />
-      </View>
-
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ marginBottom: 4, fontWeight: '600' }}>Grad</Text>
-          <TextInput
-            value={city}
-            onChangeText={setCity}
-            placeholder="Grad"
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-              padding: 12,
-              fontSize: 16,
-              backgroundColor: colors.surface,
-            }}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ marginBottom: 4, fontWeight: '600' }}>Opština</Text>
-          <TextInput
-            value={municipality}
-            onChangeText={setMunicipality}
-            placeholder="Opština"
-            editable={userRole !== 'USER'}
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-              padding: 12,
-              fontSize: 16,
-              backgroundColor: userRole === 'USER' ? colors.surfaceMuted : colors.surface,
-            }}
-          />
-        </View>
-      </View>
-
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Mjerno mjesto</Text>
-        <TextInput
-          value={measuringPoint}
-          onChangeText={setMeasuringPoint}
-          placeholder="Opcionalno"
-          keyboardType="number-pad"
-          inputMode="numeric"
-          style={{
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            padding: 12,
-            fontSize: 16,
-            backgroundColor: colors.surface,
-          }}
-        />
-      </View>
-
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Datum instalacije</Text>
-        <TextInput
-          value={installationDate}
-          onChangeText={setInstallationDate}
-          placeholder="YYYY-MM-DD"
-          style={{
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            padding: 12,
-            fontSize: 16,
-            backgroundColor: colors.surface,
-          }}
-        />
-      </View>
-
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>
-          GPS lokacija (preporučeno – automatski dohvat)
-        </Text>
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Širina</Text>
-            <TextInput
-              value={latitude}
-              onChangeText={setLatitude}
-              placeholder="npr. 43.85"
-              keyboardType="decimal-pad"
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 12,
-                padding: 12,
-                fontSize: 16,
-                backgroundColor: colors.surface,
-              }}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Dužina</Text>
-            <TextInput
-              value={longitude}
-              onChangeText={setLongitude}
-              placeholder="npr. 18.41"
-              keyboardType="decimal-pad"
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 12,
-                padding: 12,
-                fontSize: 16,
-                backgroundColor: colors.surface,
-              }}
-            />
-          </View>
-          <Pressable
-            onPress={async () => {
-              setIsFetchingLocation(true);
-              try {
-                const { status } = await Location.requestForegroundPermissionsAsync();
-                if (status !== 'granted') {
-                  Alert.alert(
-                    'Dozvola za lokaciju',
-                    'Za automatski unos GPS koordinata potrebna je dozvola za lokaciju. Omogućite je u postavkama uređaja.',
-                    [{ text: 'OK' }],
-                  );
-                  return;
-                }
-                const loc = await Location.getCurrentPositionAsync({
-                  accuracy: Location.Accuracy.Balanced,
-                });
-                setLatitude(loc.coords.latitude.toFixed(6));
-                setLongitude(loc.coords.longitude.toFixed(6));
-              } catch (err) {
-                Alert.alert(
-                  'Greška',
-                  'Nije moguće dohvatiti lokaciju. Provjerite da je GPS uključen.',
-                  [{ text: 'OK' }],
-                );
-              } finally {
-                setIsFetchingLocation(false);
-              }
-            }}
-            disabled={isFetchingLocation}
-            style={{
-              backgroundColor: colors.primary,
-              paddingHorizontal: 14,
-              paddingVertical: 12,
-              borderRadius: 8,
-              justifyContent: 'center',
-              minHeight: 48,
-            }}
-          >
-            {isFetchingLocation ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="locate" size={20} color="#fff" />
-                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                  Dohvati
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        </View>
-      </View>
-
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Fotografije (opcionalno)</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          <Pressable
-            onPress={async () => {
-              const { status } = await ImagePicker.requestCameraPermissionsAsync();
-              if (status !== 'granted') {
-                Alert.alert(
-                  'Dozvola za kameru',
-                  'Za snimanje fotografija potrebna je dozvola za kameru.',
-                  [{ text: 'OK' }],
-                );
-                return;
-              }
-              const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ['images'],
-                allowsEditing: false,
-                quality: 0.8,
-              });
-              if (result.canceled || !result.assets[0]?.uri) return;
-              setIsUploadingPhoto(true);
-              try {
-                if (!isOnline) {
-                  setLocalPhotoUris((p) => [...p, result.assets[0].uri])
-                  return
-                }
-                const yearNum = year ? parseInt(year, 10) : undefined
-                const path = await installationRecordsApi.uploadPhoto(result.assets[0].uri, {
-                  serialNumber: serialNumber.trim(),
-                  year: Number.isFinite(yearNum as number) ? yearNum : undefined,
-                });
-                setPhotoPaths((p) => [...p, path]);
-              } catch (err) {
-                if (axios.isAxiosError(err) && !err.response) {
-                  setLocalPhotoUris((p) => [...p, result.assets[0].uri])
-                  return
-                }
-                Alert.alert(
-                  'Greška',
-                  axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
-                    ? err.response.data.message
-                    : 'Upload fotografije nije uspio.',
-                  [{ text: 'OK' }],
-                );
-              } finally {
-                setIsUploadingPhoto(false);
-              }
-            }}
-            disabled={isUploadingPhoto}
-            style={{
-              backgroundColor: '#f1f5f9',
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: '#e2e8f0',
-              borderStyle: 'dashed',
-            }}
-          >
-            {isUploadingPhoto ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="camera" size={24} color={colors.primary} />
-                <Text style={{ color: colors.primary, fontWeight: '600' }}>Dodaj fotografiju</Text>
-              </View>
-            )}
-          </Pressable>
-          {photoPaths.length > 0 && (
-            <Text style={{ color: '#64748b', fontSize: 14 }}>
-              Dodano: {photoPaths.length}
-            </Text>
-          )}
-          {localPhotoUris.length > 0 && (
-            <Text style={{ color: '#b45309', fontSize: 14 }}>
-              Na čekanju (offline): {localPhotoUris.length}
-            </Text>
-          )}
-        </View>
-      </View>
-
-      <View>
-        <Text style={{ marginBottom: 4, fontWeight: '600' }}>Napomena</Text>
-        <TextInput
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Opcionalno"
-          multiline
-          style={{
-            borderWidth: 1,
-          borderColor: colors.border,
-          borderRadius: 12,
-            padding: 12,
-            fontSize: 16,
-            minHeight: 60,
-          backgroundColor: colors.surface,
-          }}
-        />
-      </View>
-
-      <Pressable
-        disabled={!canSubmit || createMutation.isPending}
-        onPress={() => createMutation.mutate()}
-        style={{
-          backgroundColor: !canSubmit ? colors.disabled : colors.primary,
-          padding: 14,
-          borderRadius: 10,
-          alignItems: 'center',
-          marginTop: 8,
-        }}
-      >
-        <Text style={{ color: '#fff', fontWeight: '600' }}>
-          {createMutation.isPending ? 'Kreiranje...' : 'Kreiraj zapisnik'}
-        </Text>
-      </Pressable>
-
-      <Pressable
-        onPress={() => router.back()}
-        style={{
-          padding: 14,
-          borderRadius: 10,
-          alignItems: 'center',
-          borderWidth: 1,
-          borderColor: '#e2e8f0',
-        }}
-      >
-        <Text style={{ color: '#64748b' }}>Odustani</Text>
-      </Pressable>
+        <Text style={[type.sectionLabel, styles.sectionTitle]}>Završne informacije</Text>
+        <Field label="Napomena" value={notes} onChangeText={setNotes} placeholder="Opcionalno" multiline />
+        {validation.length ? <Panel tone="warning" style={styles.validation}>
+          <Text style={type.bodyStrong}>Za potvrdu popunite:</Text>
+          <Text style={[type.caption, styles.validationText]}>{validation.join(', ')}</Text>
+        </Panel> : null}
+        <ActionButton title="Kreiraj zapisnik" icon="checkmark" size="lg" loading={createMutation.isPending}
+          disabled={validation.length > 0} onPress={() => createMutation.mutate()} />
+        <ActionButton title="Odustani" variant="ghost" onPress={() => router.back()} style={styles.cancel} />
       </KeyboardAwareScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+function parseOptionalFloat(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number.parseFloat(value.replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: palette.background },
+  content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+  sectionTitle: { marginTop: spacing.xl, marginBottom: spacing.md },
+  twoFields: { flexDirection: 'row', gap: spacing.md },
+  flexField: { flex: 1 },
+  validation: { marginBottom: spacing.lg },
+  validationText: { marginTop: spacing.xs },
+  cancel: { marginTop: spacing.sm },
+});
