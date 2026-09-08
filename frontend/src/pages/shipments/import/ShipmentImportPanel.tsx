@@ -62,7 +62,24 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
 
   const applyMutation = useMutation({
     mutationFn: () =>
-      shipmentsApi.importExcel({ shipmentId, file: file!, applyImport: true, selectedRowNumbers: selected }),
+      shipmentsApi.importExcel({
+        shipmentId,
+        file: file!,
+        applyImport: true,
+        selectedRowNumbers: selected,
+        // Bez ovoga bi backend pri "apply" pozivu ponovo automatski predložio mapiranje kolona
+        // (jer polje columnMapping ne bi bilo poslano), čime bi se ignorisalo mapiranje koje je
+        // korisnik ručno odabrao/izmijenio u preview koraku.
+        columnMapping: preview?.resolvedMapping
+          ? {
+              iccid: mappingDraft.iccid ?? preview.resolvedMapping.iccid ?? undefined,
+              ipAddress: mappingDraft.ipAddress ?? preview.resolvedMapping.ipAddress ?? undefined,
+              publicIpAddress: mappingDraft.publicIpAddress ?? preview.resolvedMapping.publicIpAddress ?? undefined,
+              phoneNumber: mappingDraft.phoneNumber ?? preview.resolvedMapping.phoneNumber ?? undefined,
+              apn: mappingDraft.apn ?? preview.resolvedMapping.apn ?? undefined,
+            }
+          : mappingDraft,
+      }),
     onSuccess: (data) => {
       if (data.mode !== 'import') return;
       setResult(data);

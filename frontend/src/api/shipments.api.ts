@@ -85,10 +85,12 @@ export const shipmentsApi = {
     if (params.selectedRowNumbers?.length) {
       formData.append('selectedRowNumbers', JSON.stringify(params.selectedRowNumbers));
     }
+    // NAPOMENA: ne postavljati 'Content-Type' ručno za FormData — axios/browser mora sam
+    // izračunati "boundary" parametar; ručno postavljen header bez boundary-ja može dovesti do
+    // toga da server (busboy/multer) ne parsira multipart tijelo ispravno.
     const response = await axiosInstance.post<ApiEnvelope<BackendShipmentImportPreview | ShipmentImportApply>>(
       `/shipments/${params.shipmentId}/import`,
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     const data = response.data.data;
 
