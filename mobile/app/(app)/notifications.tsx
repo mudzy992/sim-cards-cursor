@@ -31,6 +31,7 @@ export default function NotificationsScreen() {
 
   return <SafeAreaView style={styles.root} edges={['top']}>
     <ScreenTitleBar title="Notifikacije" subtitle={unread ? `${unread} nepročitanih` : 'Sve je pročitano'}
+      onBack={() => router.back()}
       actionLabel={unread ? 'Pročitaj sve' : undefined} actionIcon={unread ? 'checkmark-done' : undefined}
       onAction={unread ? () => markAll.mutate() : undefined} />
     {query.isLoading ? <View style={styles.loading}><SkeletonRows count={6} /></View> : query.isError ? (

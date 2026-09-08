@@ -49,6 +49,7 @@ export function ActionButton(props: ActionButtonProps) {
         fullWidth && styles.fullWidth,
         borderStyle(variant),
         { backgroundColor: backgroundFor(variant, pressed, inactive) },
+        inactive && styles.inactive,
         style,
       ]}
     >
@@ -94,15 +95,16 @@ function backgroundFor(variant: ActionButtonVariant, pressed: boolean, inactive:
     case 'ghost':
       return pressed ? palette.surfaceMuted : 'transparent';
     case 'danger':
-      return pressed ? '#991B1B' : palette.danger;
+      return pressed ? '#B72E43' : '#D63F55';
     case 'dark':
-      return pressed ? palette.graphiteSoft : palette.graphite;
+      return pressed ? palette.surface : palette.graphiteSoft;
   }
 }
 
 function borderStyle(variant: ActionButtonVariant): ViewStyle | null {
   switch (variant) {
     case 'secondary':
+    case 'dark':
       return { borderWidth: 1, borderColor: palette.borderStrong };
     default:
       return null;
@@ -133,6 +135,7 @@ const styles = StyleSheet.create({
   content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   icon: { marginRight: spacing.sm },
   text: { fontWeight: '600', letterSpacing: 0.1 },
+  inactive: { opacity: 0.58 },
 });
 
 const sizeStyles = StyleSheet.create({

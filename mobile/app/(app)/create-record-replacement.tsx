@@ -177,7 +177,7 @@ export default function CreateRecordReplacementScreen() {
   });
 
   if (!simCardId) return <SafeAreaView style={styles.root} edges={['top']}>
-    <ScreenTitleBar title="Zamjena brojila" />
+    <ScreenTitleBar title="Zamjena brojila" onBack={() => router.back()} />
     <EmptyState icon="alert-circle-outline" title="Nedostaje SIM kartica"
       description="Vratite se na skeniranje i odaberite zamjenu brojila."
       actionLabel="Nazad" onAction={() => router.back()} />
@@ -185,7 +185,7 @@ export default function CreateRecordReplacementScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScreenTitleBar title="Zamjena brojila" subtitle={`Korak ${step} od 2`} />
+      <ScreenTitleBar title="Zamjena brojila" subtitle={`Korak ${step} od 2`} onBack={() => router.back()} />
       <KeyboardAwareScrollView contentContainerStyle={styles.content} bottomOffset={24} keyboardShouldPersistTaps="handled">
         <WorkflowSteps header="ZAMJENA · VOĐENI POSTUPAK" steps={[
           { key: 'old', label: 'Demontirano brojilo', state: step === 2 ? 'done' : 'current', detail: dmSerialNumber || undefined },

@@ -20,7 +20,8 @@ export default function ProfileScreen() {
   ]);
 
   return <SafeAreaView style={styles.root} edges={['top']}>
-    <ScreenTitleBar title="Profil" subtitle="Korisnik i podaci uređaja" />
+    <ScreenTitleBar title="Profil" subtitle="Korisnik i podaci uređaja"
+      onBack={() => router.replace('/(app)/(tabs)/home')} />
     <View style={styles.content}>
       <View style={styles.identity}>
         <View style={styles.avatar}><Text style={styles.avatarText}>{user?.firstName?.[0] ?? ''}{user?.lastName?.[0] ?? ''}</Text></View>

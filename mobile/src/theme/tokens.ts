@@ -6,51 +6,51 @@
  *  - skupljeni radius sistem (nema "pill" izjednacenosti)
  *  - tehnicka tipografija: podaci (ICCID, brojila) u monospace tretmanu
  *
- * Brand plava (#16489B) ostaje identitet aplikacije — koristi se selektivno.
- * Ne dira postojeci src/theme/colors.ts (backward-compatible), vec ga nadopunjuje.
+ * Dark-only tema: brand plava ostaje identitet, ali je osvijetljena radi
+ * pristupačnog kontrasta na grafitnim površinama.
  */
 import { Platform, type TextStyle } from 'react-native';
 import { colors } from '@/theme/colors';
 
 export const palette = {
   /* ------------------------------- brand -------------------------------- */
-  brand: colors.primary ?? '#16489B',
-  brandPressed: colors.primaryPressed ?? '#0F3576',
-  brandSoft: '#EBF0FA',
-  brandSoftStrong: '#DBE5F6',
+  brand: colors.primary,
+  brandPressed: colors.primaryPressed,
+  brandSoft: '#14213A',
+  brandSoftStrong: '#1C3357',
 
   /* ------------------------------ neutral -------------------------------- */
-  background: '#F4F5F7',
-  surface: colors.surface ?? '#FFFFFF',
-  surfaceMuted: colors.surfaceMuted ?? '#F1F3F5',
-  surfaceSunken: '#ECEEF1',
-  border: colors.border ?? '#E4E7EB',
-  borderStrong: '#CAD0D8',
+  background: colors.background,
+  surface: colors.surface,
+  surfaceMuted: colors.surfaceMuted,
+  surfaceSunken: '#070B12',
+  border: colors.border,
+  borderStrong: '#344155',
 
-  textPrimary: colors.text ?? '#0B1220',
-  textSecondary: '#475569',
-  textMuted: '#8A94A3',
+  textPrimary: colors.text,
+  textSecondary: '#AEB9C8',
+  textMuted: '#718096',
   inverse: '#FFFFFF',
 
-  graphite: '#111827',
-  graphiteSoft: '#1F2937',
+  graphite: '#050810',
+  graphiteSoft: '#0D1421',
   graphite0050: 'rgba(255,255,255,0.08)',
 
   /* ------------------------------ semantic ------------------------------- */
-  success: '#15803D',
-  successSoft: '#E7F6EC',
-  successBorder: '#BDE5CB',
-  warning: '#B45309',
-  warningSoft: '#FCF1E2',
-  warningBorder: '#F1D9B5',
-  danger: '#B91C1C',
-  dangerSoft: '#FBEAEA',
-  dangerBorder: '#F0C6C6',
-  info: '#1D4ED8',
-  infoSoft: '#E9EFFC',
-  infoBorder: '#C6D6F3',
+  success: '#4ADE80',
+  successSoft: '#10281B',
+  successBorder: '#1E5132',
+  warning: '#FBBF24',
+  warningSoft: '#2A2110',
+  warningBorder: '#5B471B',
+  danger: '#FB7185',
+  dangerSoft: '#2E151B',
+  dangerBorder: '#632938',
+  info: '#60A5FA',
+  infoSoft: '#12233D',
+  infoBorder: '#274C77',
 
-  overlayScrim: 'rgba(4, 10, 24, 0.64)',
+  overlayScrim: 'rgba(0, 0, 0, 0.78)',
 } as const;
 
 export const spacing = {
@@ -146,22 +146,22 @@ export const shadows = {
   /** suptilna elevacija povrsina — bez efekta "floatanja" */
   card: Platform.select({
     ios: {
-      shadowColor: '#0B1220',
-      shadowOpacity: 0.07,
+      shadowColor: '#000000',
+      shadowOpacity: 0.42,
       shadowRadius: 10,
       shadowOffset: { width: 0, height: 4 },
     },
-    android: { elevation: 2 },
+    android: { elevation: 3 },
     default: {},
   }),
   raised: Platform.select({
     ios: {
-      shadowColor: '#0B1220',
-      shadowOpacity: 0.14,
+      shadowColor: '#000000',
+      shadowOpacity: 0.58,
       shadowRadius: 18,
       shadowOffset: { width: 0, height: 8 },
     },
-    android: { elevation: 5 },
+    android: { elevation: 7 },
     default: {},
   }),
 } as const;

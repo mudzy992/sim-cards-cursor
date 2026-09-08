@@ -61,6 +61,7 @@ export default function OfflineInventoryScreen() {
 
   return <SafeAreaView style={styles.root} edges={['top']}>
     <ScreenTitleBar title="Offline inventar" subtitle={`${items.length} kartica na uređaju`}
+      onBack={() => router.back()}
       actionIcon="barcode-outline" actionLabel="Dodaj skenom"
       onAction={() => router.push({ pathname: '/(app)/(tabs)/scan', params: { afterScan: 'inventory' } })} />
     <View style={styles.connection}><ConnectionPill isOnline={isOnline} detail={isOnline ? 'Povuci za usklađivanje' : 'Lokalni podaci'} /></View>

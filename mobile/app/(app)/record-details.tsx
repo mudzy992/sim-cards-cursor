@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { installationRecordsApi, type RecordStatus } from '@/api/installation-records.api';
@@ -23,6 +23,7 @@ const statusMeta: Record<RecordStatus, { label: string; tone: StatusTone }> = {
 };
 
 export default function RecordDetailsScreen() {
+  const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const recordId = (typeof params.id === 'string' ? params.id : params.id?.[0])?.trim() ?? '';
   const recordQuery = useQuery({ queryKey: ['mobile-record-details', recordId], queryFn: () => installationRecordsApi.getById(recordId), enabled: Boolean(recordId) });
@@ -48,8 +49,8 @@ export default function RecordDetailsScreen() {
   });
 
   if (!recordId) return <SafeAreaView style={styles.root}><EmptyState icon="alert-circle-outline" title="Nedostaje ID zapisnika" /></SafeAreaView>;
-  if (recordQuery.isLoading) return <SafeAreaView style={styles.root}><ScreenTitleBar title="Zapisnik" /><View style={styles.loading}><SkeletonRows count={8} /></View></SafeAreaView>;
-  if (recordQuery.isError || !record) return <SafeAreaView style={styles.root}><ScreenTitleBar title="Zapisnik" />
+  if (recordQuery.isLoading) return <SafeAreaView style={styles.root}><ScreenTitleBar title="Zapisnik" onBack={() => router.back()} /><View style={styles.loading}><SkeletonRows count={8} /></View></SafeAreaView>;
+  if (recordQuery.isError || !record) return <SafeAreaView style={styles.root}><ScreenTitleBar title="Zapisnik" onBack={() => router.back()} />
     <EmptyState icon="cloud-offline-outline" title="Detalji nisu dostupni" description="Ne mogu učitati zapisnik."
       actionLabel="Pokušaj ponovo" onAction={() => void recordQuery.refetch()} /></SafeAreaView>;
 
@@ -74,7 +75,7 @@ export default function RecordDetailsScreen() {
   };
 
   return <SafeAreaView style={styles.root} edges={['top']}>
-    <ScreenTitleBar title={`Zapisnik ${record.recordNumber}`} subtitle={record.kind === 'METER_REPLACEMENT' ? 'Zamjena brojila' : 'Novi priključak'} />
+    <ScreenTitleBar title={`Zapisnik ${record.recordNumber}`} subtitle={record.kind === 'METER_REPLACEMENT' ? 'Zamjena brojila' : 'Novi priključak'} onBack={() => router.back()} />
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.statusRow}><StatusBadge tone={status.tone} label={status.label} showDot /></View>
 

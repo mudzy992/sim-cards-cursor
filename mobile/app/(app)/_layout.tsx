@@ -1,35 +1,29 @@
 import { Redirect, Stack, useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, BackHandler, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAppUpdateGate } from '@/hooks/useAppUpdateGate';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
-import { OfflineBanner } from '@/components/common/OfflineBanner'
-import { colors } from '@/theme/colors';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context'
-import {
-  ActivityIndicator,
-  Alert,
-  BackHandler,
-  Button,
-  Text,
-  View,
-} from 'react-native';
-import { useConnectivity } from '@/hooks/useConnectivity'
-import { useGlobalBlockingStore } from '@/store/global-blocking.store'
-import { normalizeDeepLink } from '../../src/utils/deeplink'
+import { OfflineBanner } from '@/components/common/OfflineBanner';
+import { useConnectivity } from '@/hooks/useConnectivity';
+import { useGlobalBlockingStore } from '@/store/global-blocking.store';
+import { normalizeDeepLink } from '../../src/utils/deeplink';
+import { palette, radii, spacing, type } from '@/theme/tokens';
+import { ActionButton } from '@/components/ui/ActionButton';
 
 const PrivateLayout = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const router = useRouter()
-  const { isOnline } = useConnectivity()
-  const [offlineBannerHeight, setOfflineBannerHeight] = useState(0)
-  const blocking = useGlobalBlockingStore((s) => ({
-    isBlocked: s.isBlocked,
-    title: s.title,
-    subtitle: s.subtitle,
-    consumeQueuedDeepLink: s.consumeQueuedDeepLink,
-  }))
+  const router = useRouter();
+  const { isOnline } = useConnectivity();
+  const [, setOfflineBannerHeight] = useState(0);
+  const blocking = useGlobalBlockingStore((state) => ({
+    isBlocked: state.isBlocked,
+    title: state.title,
+    subtitle: state.subtitle,
+    consumeQueuedDeepLink: state.consumeQueuedDeepLink,
+  }));
 
   usePushNotifications();
   useOfflineSync();
@@ -38,177 +32,106 @@ const PrivateLayout = () => {
 
   const stackScreenOptions = useMemo(
     () => ({
-      headerStyle: {
-        backgroundColor: colors.surface,
-      },
-      headerTintColor: colors.text,
-      headerTitleStyle: {
-        color: colors.text,
-        fontSize: 16,
-      },
+      headerStyle: { backgroundColor: palette.surface },
+      headerTintColor: palette.textPrimary,
+      headerTitleStyle: { color: palette.textPrimary, fontSize: 16 },
       headerTitleAlign: 'center' as const,
       headerLargeTitle: false,
-      statusBarStyle: 'dark' as const,
+      headerShadowVisible: true,
+      statusBarStyle: 'light' as const,
+      statusBarColor: palette.background,
+      contentStyle: { backgroundColor: palette.background },
       gestureEnabled: !blocking.isBlocked,
     }),
     [blocking.isBlocked],
-  )
+  );
 
   useEffect(() => {
-    if (!blocking.isBlocked) return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => true)
-    return () => sub.remove()
-  }, [blocking.isBlocked])
+    if (!blocking.isBlocked) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => subscription.remove();
+  }, [blocking.isBlocked]);
 
   useEffect(() => {
-    if (blocking.isBlocked) return
-    const queued = blocking.consumeQueuedDeepLink()
-    if (!queued) return
-    const normalized = normalizeDeepLink(queued)
-    router.push((normalized ?? '/notifications') as never)
-  }, [blocking.isBlocked, blocking.consumeQueuedDeepLink, router])
+    if (blocking.isBlocked) return;
+    const queued = blocking.consumeQueuedDeepLink();
+    if (!queued) return;
+    router.push((normalizeDeepLink(queued) ?? '/notifications') as never);
+  }, [blocking.isBlocked, blocking.consumeQueuedDeepLink, router]);
 
   useEffect(() => {
     if (updateState.kind !== 'update_available') return;
-    if (updateState.isMandatory) return;
-    if (shownOptionalRef.current) return;
+    if (updateState.isMandatory || shownOptionalRef.current) return;
     shownOptionalRef.current = true;
-
-    const title = 'Dostupna je nadogradnja';
-    const msg =
+    Alert.alert(
+      'Dostupna je nadogradnja',
       `Nova verzija aplikacije je dostupna (${updateState.latest.versionName}).\n\n` +
-      'Možete je instalirati odmah ili odgoditi (dok ne postane obavezna).';
+        'Možete je instalirati odmah ili odgoditi dok ne postane obavezna.',
+      [
+        {
+          text: 'Kasnije',
+          style: 'cancel',
+          onPress: () => void actions.postpone(updateState.latest),
+        },
+        {
+          text: 'Nadogradi',
+          onPress: () => void actions.openInBrowser(updateState.latest),
+        },
+      ],
+    );
+  }, [updateState, actions]);
 
-    Alert.alert(title, msg, [
-      {
-        text: 'Kasnije',
-        style: 'cancel',
-        onPress: () => void actions.postpone(updateState.latest),
-      },
-      {
-        text: 'Nadogradi',
-        onPress: () => void actions.openInBrowser(updateState.latest),
-      },
-    ]);
-  }, [updateState]);
-
-  if (!isAuthenticated) {
-    return <Redirect href="/(auth)/login" />;
-  }
+  if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
 
   if (updateState.kind === 'update_available' && updateState.isMandatory) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-        <View style={{ flex: 1, padding: 20, justifyContent: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 10 }}>
-            Potrebna je nadogradnja
-          </Text>
-          <Text style={{ color: '#334155', marginBottom: 16 }}>
-            Dostupna je nova verzija aplikacije ({updateState.latest.versionName}). Da biste nastavili
-            koristiti aplikaciju, instalirajte nadogradnju.
-          </Text>
-          {updateState.latest.releaseNotes ? (
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontWeight: '600', marginBottom: 6 }}>Release notes</Text>
-              <Text style={{ color: '#334155' }}>{updateState.latest.releaseNotes}</Text>
-            </View>
-          ) : null}
-          <Button
-            title="Preuzmi i instaliraj"
-            onPress={() => void actions.openInBrowser(updateState.latest)}
-          />
-        </View>
-      </SafeAreaView>
+      <UpdateGateScreen
+        title="Potrebna je nadogradnja"
+        description={`Dostupna je nova verzija aplikacije (${updateState.latest.versionName}). Da biste nastavili koristiti aplikaciju, instalirajte nadogradnju.`}
+        releaseNotes={updateState.latest.releaseNotes}
+        actionLabel="Preuzmi i instaliraj"
+        onAction={() => void actions.openInBrowser(updateState.latest)}
+      />
     );
   }
 
   if (updateState.kind === 'opening_browser') {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-        <View style={{ flex: 1, padding: 20, justifyContent: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 10 }}>
-            Preuzimanje u browseru
-          </Text>
-          <Text style={{ color: '#334155', marginBottom: 16 }}>
-            Otvorili smo browser za download verzije {updateState.latest.versionName}. Nakon što se
-            download završi, Android će ponuditi instalaciju.
-          </Text>
-          <Button title="Otvori ponovo" onPress={() => void actions.openInBrowser(updateState.latest)} />
-          <Text style={{ marginTop: 10, color: '#64748b' }}>
-            Ako se instalacija ne pojavi, otvorite Downloads u Chrome-u i tapnite na preuzeti .apk.
-          </Text>
-        </View>
-      </SafeAreaView>
+      <UpdateGateScreen
+        title="Preuzimanje u browseru"
+        description={`Otvorili smo browser za download verzije ${updateState.latest.versionName}. Nakon završetka Android će ponuditi instalaciju.`}
+        footnote="Ako se instalacija ne pojavi, otvorite Downloads u Chrome-u i tapnite na preuzeti .apk."
+        actionLabel="Otvori ponovo"
+        onAction={() => void actions.openInBrowser(updateState.latest)}
+      />
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={styles.root}>
       <OfflineBanner onHeight={setOfflineBannerHeight} />
-      <View style={{ flex: 1, paddingTop: isOnline ? 0 : 24 }}>
-        <Stack
-          screenOptions={stackScreenOptions}
-        >
+      <View style={[styles.stackWrap, !isOnline && styles.offlineInset]}>
+        <Stack screenOptions={stackScreenOptions}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="record-details" options={{ title: 'Detalji zapisnika' }} />
-          <Stack.Screen name="scan-result" options={{ title: 'Rezultat skena' }} />
-          <Stack.Screen name="create-record" options={{ title: 'Novi zapisnik' }} />
-          <Stack.Screen name="create-record-replacement" options={{ title: 'Zamjena brojila' }} />
-          <Stack.Screen name="offline-inventory" options={{ title: 'Offline inventar' }} />
-          <Stack.Screen name="outbox" options={{ title: 'Neposlato' }} />
-          <Stack.Screen name="notifications" options={{ title: 'Notifikacije' }} />
+          <Stack.Screen name="record-details" options={{ headerShown: false }} />
+          <Stack.Screen name="scan-result" options={{ headerShown: false }} />
+          <Stack.Screen name="create-record" options={{ headerShown: false }} />
+          <Stack.Screen name="create-record-replacement" options={{ headerShown: false }} />
+          <Stack.Screen name="offline-inventory" options={{ headerShown: false }} />
+          <Stack.Screen name="outbox" options={{ headerShown: false }} />
+          <Stack.Screen name="notifications" options={{ headerShown: false }} />
         </Stack>
       </View>
 
       {blocking.isBlocked ? (
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            top: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.45)',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 20,
-          }}
-        >
-          <View
-            style={{
-              width: '100%',
-              maxWidth: 360,
-              backgroundColor: colors.surface,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: 16,
-              alignItems: 'center',
-            }}
-          >
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text
-              style={{
-                marginTop: 12,
-                fontSize: 16,
-                fontWeight: '800',
-                color: colors.text,
-                textAlign: 'center',
-              }}
-            >
+        <View style={styles.blockingOverlay}>
+          <View style={styles.blockingPanel}>
+            <ActivityIndicator size="large" color={palette.brand} />
+            <Text style={[type.bodyStrong, styles.blockingTitle]}>
               {blocking.title ?? 'Obrada u toku'}
             </Text>
             {blocking.subtitle ? (
-              <Text
-                style={{
-                  marginTop: 6,
-                  fontSize: 13,
-                  color: colors.textMuted,
-                  textAlign: 'center',
-                }}
-              >
-                {blocking.subtitle}
-              </Text>
+              <Text style={[type.caption, styles.blockingSubtitle]}>{blocking.subtitle}</Text>
             ) : null}
           </View>
         </View>
@@ -216,5 +139,92 @@ const PrivateLayout = () => {
     </View>
   );
 };
+
+function UpdateGateScreen({
+  title,
+  description,
+  releaseNotes,
+  footnote,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  releaseNotes?: string | null;
+  footnote?: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <SafeAreaView style={styles.gateSafe}>
+      <View style={styles.gateContent}>
+        <View style={styles.updateIcon}>
+          <Text style={styles.updateIconText}>↑</Text>
+        </View>
+        <Text style={styles.gateTitle}>{title}</Text>
+        <Text style={styles.gateDescription}>{description}</Text>
+        {releaseNotes ? (
+          <View style={styles.releaseNotes}>
+            <Text style={type.sectionLabel}>Šta je novo</Text>
+            <Text style={[type.caption, styles.releaseText]}>{releaseNotes}</Text>
+          </View>
+        ) : null}
+        <ActionButton title={actionLabel} icon="download-outline" size="lg" onPress={onAction} />
+        {footnote ? <Text style={styles.footnote}>{footnote}</Text> : null}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: palette.background },
+  stackWrap: { flex: 1 },
+  offlineInset: { paddingTop: 24 },
+  blockingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: palette.overlayScrim,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  blockingPanel: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: palette.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  blockingTitle: { marginTop: spacing.md, textAlign: 'center' },
+  blockingSubtitle: { marginTop: spacing.sm, textAlign: 'center' },
+  gateSafe: { flex: 1, backgroundColor: palette.background },
+  gateContent: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: spacing.xl,
+    maxWidth: 520,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  updateIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.brandSoft,
+    borderWidth: 1,
+    borderColor: palette.infoBorder,
+    marginBottom: spacing.xl,
+  },
+  updateIconText: { color: palette.brand, fontSize: 28, fontWeight: '700' },
+  gateTitle: { ...type.screenTitle, fontSize: 24 },
+  gateDescription: { ...type.body, color: palette.textSecondary, lineHeight: 22, marginTop: spacing.sm, marginBottom: spacing.xl },
+  releaseNotes: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radii.md, padding: spacing.lg, marginBottom: spacing.xl },
+  releaseText: { marginTop: spacing.sm, lineHeight: 19 },
+  footnote: { color: palette.textMuted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: spacing.lg },
+});
 
 export default PrivateLayout;

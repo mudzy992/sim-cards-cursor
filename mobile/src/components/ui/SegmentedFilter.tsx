@@ -4,7 +4,7 @@
  * traka je niska (~38pt), a brojaci su male oznake uz labelu.
  */
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { palette, radii, shadows, spacing } from '@/theme/tokens';
+import { palette, radii, spacing } from '@/theme/tokens';
 
 export interface SegmentOption<T extends string> {
   key: T;
@@ -81,7 +81,8 @@ const styles = StyleSheet.create({
   },
   segmentActive: {
     backgroundColor: palette.surface,
-    ...(shadows.card as object),
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
   },
   pressed: { opacity: 0.6 },
   label: {
@@ -101,6 +102,6 @@ const styles = StyleSheet.create({
     backgroundColor: palette.borderStrong,
   },
   badgeActive: { backgroundColor: palette.brand },
-  badgeText: { fontSize: 10, fontWeight: '700', color: palette.surface },
+  badgeText: { fontSize: 10, fontWeight: '700', color: palette.textSecondary },
   badgeTextActive: { color: palette.inverse },
 });

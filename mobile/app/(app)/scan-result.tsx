@@ -46,7 +46,7 @@ export default function ScanResultScreen() {
   }, [result]);
 
   return <SafeAreaView style={styles.root} edges={['top']}>
-    <ScreenTitleBar title="Rezultat skena" subtitle={iccid || 'ICCID nije dostupan'} />
+    <ScreenTitleBar title="Rezultat skena" subtitle={iccid || 'ICCID nije dostupan'} onBack={() => router.back()} />
     {!iccid ? <EmptyState icon="alert-circle-outline" title="Nedostaje ICCID" actionLabel="Novi sken" onAction={() => router.replace('/(app)/(tabs)/scan')} />
     : query.isLoading ? <View style={styles.loading}><SkeletonRows count={5} /></View>
     : query.isError || !result ? <View style={styles.state}><EmptyState icon="search-outline"

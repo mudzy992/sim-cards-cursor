@@ -151,7 +151,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
 
       {/* ------------------------------- header ------------------------------- */}
       <View style={styles.header}>
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: palette.graphite,
+    backgroundColor: palette.brand,
     alignItems: 'center',
     justifyContent: 'center',
   },

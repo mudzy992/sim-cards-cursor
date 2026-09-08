@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/auth.store';
 import { clearOutbox, listOutbox, syncOutbox, type OutboxItem } from '@/offline/outbox';
 import { palette, spacing, type } from '@/theme/tokens';
@@ -22,6 +23,7 @@ const statusMeta: Record<OutboxItem['status'], { label: string; tone: StatusTone
 };
 
 export default function OutboxScreen() {
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,7 +47,8 @@ export default function OutboxScreen() {
 
   if (!user) return <SafeAreaView style={styles.root}><EmptyState icon="person-outline" title="Niste prijavljeni" /></SafeAreaView>;
   return <SafeAreaView style={styles.root} edges={['top']}>
-    <ScreenTitleBar title="Neposlato" subtitle="Offline akcije i zahtjevi" actionIcon="sync" actionLabel="Pošalji" onAction={() => void sync()} />
+    <ScreenTitleBar title="Neposlato" subtitle="Offline akcije i zahtjevi" onBack={() => router.back()}
+      actionIcon="sync" actionLabel="Pošalji" onAction={() => void sync()} />
     <View style={styles.summary}><Panel tone={counts.failed ? 'danger' : counts.pending ? 'warning' : 'success'}>
       <Text style={type.bodyStrong}>{counts.failed ? `${counts.failed} zahtjeva traži pažnju` : counts.pending ? `${counts.pending} zahtjeva čeka slanje` : 'Sve je sinhronizovano'}</Text>
       <ActionButton title="Pošalji sada" icon="cloud-upload-outline" onPress={() => void sync()} loading={syncing}

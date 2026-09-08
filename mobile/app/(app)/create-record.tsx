@@ -140,7 +140,7 @@ export default function CreateRecordScreen() {
 
   if (!simCardId) {
     return <SafeAreaView style={styles.root} edges={['top']}>
-      <ScreenTitleBar title="Novi priključak" />
+      <ScreenTitleBar title="Novi priključak" onBack={() => router.back()} />
       <EmptyState icon="alert-circle-outline" title="Nedostaje SIM kartica"
         description="Vratite se na skeniranje, zadužite karticu i odaberite kreiranje zapisnika."
         actionLabel="Nazad" onAction={() => router.back()} />
@@ -149,7 +149,7 @@ export default function CreateRecordScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScreenTitleBar title="Novi priključak" subtitle="Zapisnik ugradnje SIM kartice" />
+      <ScreenTitleBar title="Novi priključak" subtitle="Zapisnik ugradnje SIM kartice" onBack={() => router.back()} />
       <KeyboardAwareScrollView contentContainerStyle={styles.content} bottomOffset={24} keyboardShouldPersistTaps="handled">
         <WorkflowSteps header="NOVI PRIKLJUČAK · PODACI" steps={[
           { key: 'sim', label: 'SIM kartica', state: 'done', detail: simCardId },

@@ -5,19 +5,28 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "simtracker",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0F17",
+    "androidStatusBar": {
+      "backgroundColor": "#0B0F17",
+      "barStyle": "light-content"
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#0B0F17",
+      "barStyle": "light-content"
+    },
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#16489B"
+      "backgroundColor": "#0B0F17"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ba.epbih.simtracker",
+      "userInterfaceStyle": "dark",
+      "backgroundColor": "#0B0F17",
       "infoPlist": {
         "NSCameraUsageDescription": "SIM Tracker koristi kameru za skeniranje ICCID barkoda.",
         "NSLocationWhenInUseUsageDescription": "SIM Tracker koristi lokaciju za automatski unos GPS koordinata pri kreiranju zapisnika ugradnje.",
@@ -26,56 +35,37 @@
     },
     "android": {
       "package": "ba.epbih.simtracker",
+      "userInterfaceStyle": "dark",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundImage": "./assets/ic_launcher_background.png"
       },
-      "permissions": [
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS"
-      ]
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "POST_NOTIFICATIONS"]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
+    "web": { "favicon": "./assets/favicon.png" },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      [
-        "expo-dev-client",
-        {
-          "launchMode": "most-recent"
-        }
-      ],
+      "expo-system-ui",
+      ["expo-dev-client", { "launchMode": "most-recent" }],
       [
         "expo-build-properties",
         {
-            "android": {
+          "android": {
             "usesCleartextTraffic": true,
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
             "buildToolsVersion": "36.0.0",
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "buildArchs": ["arm64-v8a"] 
-            }
+            "buildArchs": ["arm64-v8a"]
+          }
         }
       ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "SIM Tracker koristi kameru za skeniranje ICCID barkoda."
-        }
-      ],
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "SIM Tracker koristi lokaciju za automatski unos GPS koordinata pri kreiranju zapisnika ugradnje."
-        }
-      ],
+      ["expo-camera", { "cameraPermission": "SIM Tracker koristi kameru za skeniranje ICCID barkoda." }],
+      ["expo-location", { "locationWhenInUsePermission": "SIM Tracker koristi lokaciju za automatski unos GPS koordinata pri kreiranju zapisnika ugradnje." }],
       [
         "expo-image-picker",
         {
@@ -87,7 +77,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#16489B",
+          "color": "#4D82E6",
           "androidMode": "default",
           "androidCollapsedTitle": "SIM Tracker"
         }
@@ -96,16 +86,8 @@
       "expo-font",
       "expo-audio"
     ],
-    "updates": {
-      "fallbackToCacheTimeout": 0
-    },
-    "experiments": {
-      "typedRoutes": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "11f0eb09-c999-4daa-a0d6-4fc72e83c57e"
-      }
-    }
+    "updates": { "fallbackToCacheTimeout": 0 },
+    "experiments": { "typedRoutes": true },
+    "extra": { "eas": { "projectId": "11f0eb09-c999-4daa-a0d6-4fc72e83c57e" } }
   }
 }
