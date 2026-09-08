@@ -35,7 +35,7 @@ import { Panel } from '@/components/ui/Panel';
 import { ListRow } from '@/components/ui/ListRow';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ActionButton } from '@/components/ui/ActionButton';
-import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton';
+import { SkeletonRow, SkeletonRows } from '@/components/ui/Skeleton';
 
 export default function HomeScreen() {
   const router = useRouter();
