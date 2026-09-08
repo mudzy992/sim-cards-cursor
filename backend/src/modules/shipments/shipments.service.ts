@@ -12,7 +12,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { ImportExcelDto } from './dto/import-excel.dto';
-import { ColumnMapperService, ImportDomainKey } from './import/column-mapper.service';
+import {
+  ColumnMapperService,
+  ImportDomainKey,
+} from './import/column-mapper.service';
 import { ExcelImportService } from './import/excel-import.service';
 import { ShipmentFilterDto } from './dto/shipment-filter.dto';
 import { UpdateShipmentDto } from './dto/update-shipment.dto';
@@ -26,28 +29,40 @@ export class ShipmentsService {
     private readonly excelImportService: ExcelImportService,
   ) {}
 
-  async create(dto: CreateShipmentDto, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
+  async create(
+    dto: CreateShipmentDto,
+    actorId: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
     if (scope?.role === 'DIST_ADMIN' && !scope.distributionId) {
       throw new BadRequestException('Distribution admin scope is missing.');
     }
+
     const distributionId =
       scope?.role === 'DIST_ADMIN' && scope.distributionId
         ? scope.distributionId
         : dto.distributionId;
+
     if (scope?.role === 'SYSTEM_ADMIN') {
       if (!distributionId) {
-        throw new BadRequestException('Distribucija je obavezna pri kreiranju isporuke.');
+        throw new BadRequestException(
+          'Distribucija je obavezna pri kreiranju isporuke.',
+        );
       }
+
       const distribution = await this.prisma.distribution.findUnique({
         where: { id: distributionId },
         select: { id: true },
       });
+
       if (!distribution) {
         throw new BadRequestException(
           'Odabrana distribucija ne postoji u bazi. Osvježite stranicu i odaberite ponovo.',
         );
       }
     }
+
     const shipment = await this.prisma.shipment.create({
       data: {
         name: dto.name,
@@ -76,27 +91,50 @@ export class ShipmentsService {
       action: 'CREATE',
       entity: 'shipment',
       entityId: shipment.id,
-      details: { name: shipment.name, provider: shipment.provider },
+      details: {
+        name: shipment.name,
+        provider: shipment.provider,
+      },
       ipAddress,
     });
 
     return shipment;
   }
 
-  async findAll(filter: ShipmentFilterDto, scope?: ScopeContext | null): Promise<PaginatedResult<unknown>> {
+  async findAll(
+    filter: ShipmentFilterDto,
+    scope?: ScopeContext | null,
+  ): Promise<PaginatedResult<unknown>> {
     const page = filter.page ?? 1;
     const limit = filter.limit ?? 20;
 
-    const scopeClause = scopeWhere(scope, { distributionIdField: 'distributionId' });
+    const scopeClause = scopeWhere(scope, {
+      distributionIdField: 'distributionId',
+    });
+
     const where: Prisma.ShipmentWhereInput = {
       ...(scopeClause ? { AND: [scopeClause] } : {}),
       ...(filter.status ? { status: filter.status } : {}),
-      ...(filter.provider ? { provider: { contains: filter.provider } } : {}),
+      ...(filter.provider
+        ? {
+            provider: {
+              contains: filter.provider,
+            },
+          }
+        : {}),
       ...(filter.search
         ? {
             OR: [
-              { name: { contains: filter.search} },
-              { provider: { contains: filter.search } },
+              {
+                name: {
+                  contains: filter.search,
+                },
+              },
+              {
+                provider: {
+                  contains: filter.search,
+                },
+              },
             ],
           }
         : {}),
@@ -115,18 +153,67 @@ export class ShipmentsService {
             },
           },
           _count: {
-            select: { simCards: true },
+            select: {
+              simCards: true,
+            },
           },
         },
-        orderBy: { receivedDate: 'desc' },
+        orderBy: {
+          receivedDate: 'desc',
+        },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.shipment.count({ where }),
+      this.prisma.shipment.count({
+        where,
+      }),
     ]);
 
+    const shipmentIds = items.map((shipment) => shipment.id);
+
+    const statusCounts =
+      shipmentIds.length > 0
+        ? await this.prisma.simCard.groupBy({
+            by: ['shipmentId', 'status'],
+            where: {
+              shipmentId: {
+                in: shipmentIds,
+              },
+            },
+            _count: {
+              _all: true,
+            },
+          })
+        : [];
+
+    const statusMap = new Map<
+      string,
+      Partial<Record<SimCardStatus, number>>
+    >();
+
+    for (const row of statusCounts) {
+      const existing = statusMap.get(row.shipmentId) ?? {};
+
+      existing[row.status] = row._count._all;
+
+      statusMap.set(row.shipmentId, existing);
+    }
+
+    const enrichedItems = items.map((shipment) => ({
+      ...shipment,
+      cardStatusCounts: {
+        AVAILABLE: statusMap.get(shipment.id)?.AVAILABLE ?? 0,
+        ASSIGNED: statusMap.get(shipment.id)?.ASSIGNED ?? 0,
+        INSTALLED: statusMap.get(shipment.id)?.INSTALLED ?? 0,
+        DEMOUNTED: statusMap.get(shipment.id)?.DEMOUNTED ?? 0,
+        DEFECTIVE: statusMap.get(shipment.id)?.DEFECTIVE ?? 0,
+        RETURNED: statusMap.get(shipment.id)?.RETURNED ?? 0,
+        DEACTIVATED: statusMap.get(shipment.id)?.DEACTIVATED ?? 0,
+      },
+    }));
+
     return {
-      items,
+      items: enrichedItems,
       page,
       limit,
       total,
@@ -135,7 +222,10 @@ export class ShipmentsService {
   }
 
   async findOne(id: string, scope?: ScopeContext | null) {
-    const scopeClause = scopeWhere(scope, { distributionIdField: 'distributionId' });
+    const scopeClause = scopeWhere(scope, {
+      distributionIdField: 'distributionId',
+    });
+
     const shipment = await this.prisma.shipment.findFirst({
       where: {
         id,
@@ -151,7 +241,9 @@ export class ShipmentsService {
           },
         },
         _count: {
-          select: { simCards: true },
+          select: {
+            simCards: true,
+          },
         },
       },
     });
@@ -163,7 +255,13 @@ export class ShipmentsService {
     return shipment;
   }
 
-  async update(id: string, dto: UpdateShipmentDto, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
+  async update(
+    id: string,
+    dto: UpdateShipmentDto,
+    actorId: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
     await this.ensureShipmentExists(id, scope);
 
     const updated = await this.prisma.shipment.update({
@@ -171,11 +269,15 @@ export class ShipmentsService {
       data: {
         name: dto.name,
         provider: dto.provider,
-        receivedDate: dto.receivedDate ? new Date(dto.receivedDate) : undefined,
+        receivedDate: dto.receivedDate
+          ? new Date(dto.receivedDate)
+          : undefined,
         totalCards: dto.totalCards,
         notes: dto.notes,
         originalFileName: dto.originalFileName,
-        ...(dto.distributionId !== undefined ? { distributionId: dto.distributionId } : {}),
+        ...(dto.distributionId !== undefined
+          ? { distributionId: dto.distributionId }
+          : {}),
       },
       include: {
         importedBy: {
@@ -194,22 +296,45 @@ export class ShipmentsService {
       action: 'UPDATE',
       entity: 'shipment',
       entityId: id,
-      details: { fields: Object.keys(dto) },
+      details: {
+        fields: Object.keys(dto),
+      },
       ipAddress,
     });
 
     return updated;
   }
 
-  async remove(id: string, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
+  async remove(
+    id: string,
+    actorId: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
     const isSystemAdmin = scope?.role === 'SYSTEM_ADMIN';
-    const scopeClause = scopeWhere(scope, { distributionIdField: 'distributionId' });
+
+    const scopeClause = scopeWhere(scope, {
+      distributionIdField: 'distributionId',
+    });
 
     const shipment = await this.prisma.shipment.findFirst({
-      where: { id, ...(scopeClause ? { AND: [scopeClause] } : {}) },
+      where: {
+        id,
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+      },
       include: {
-        _count: { select: { simCards: true } },
-        simCards: { select: { id: true, iccid: true, status: true } },
+        _count: {
+          select: {
+            simCards: true,
+          },
+        },
+        simCards: {
+          select: {
+            id: true,
+            iccid: true,
+            status: true,
+          },
+        },
       },
     });
 
@@ -219,39 +344,68 @@ export class ShipmentsService {
 
     const simCount = shipment._count.simCards;
 
-    // ── Prazna isporuka: postojeće ponašanje (SYSTEM_ADMIN i DIST_ADMIN) ──
     if (simCount === 0) {
-      await this.prisma.shipment.delete({ where: { id } });
+      await this.prisma.shipment.delete({
+        where: { id },
+      });
+
       await this.activityLogService.log({
         userId: actorId,
         action: 'DELETE',
         entity: 'shipment',
         entityId: id,
-        details: { name: shipment.name, provider: shipment.provider, deletedSimCards: 0 },
+        details: {
+          name: shipment.name,
+          provider: shipment.provider,
+          deletedSimCards: 0,
+        },
         ipAddress,
       });
-      return { deleted: true, deletedSimCards: 0, deletedSimEvents: 0 };
+
+      return {
+        deleted: true,
+        deletedSimCards: 0,
+        deletedSimEvents: 0,
+      };
     }
 
-    // ── Kompletna isporuka: isključivo SYSTEM_ADMIN ──
     if (!isSystemAdmin) {
       throw new BadRequestException(
         'Kompletnu isporuku sa SIM karticama može obrisati samo sistem administrator.',
       );
     }
 
-    // ── Sigurnosna pravila: kartice u operativnoj upotrebi ne smiju nestati ──
     const simCardIds = shipment.simCards.map((c) => c.id);
+
     const operationalCount = shipment.simCards.filter(
-      (c) => c.status === SimCardStatus.ASSIGNED || c.status === SimCardStatus.INSTALLED,
+      (c) =>
+        c.status === SimCardStatus.ASSIGNED ||
+        c.status === SimCardStatus.INSTALLED,
     ).length;
 
-    const [metersCount, installationRecordsCount] = await this.prisma.$transaction([
-      this.prisma.meter.count({ where: { simCardId: { in: simCardIds } } }),
-      this.prisma.installationRecord.count({ where: { simCardId: { in: simCardIds } } }),
-    ]);
+    const [metersCount, installationRecordsCount] =
+      await this.prisma.$transaction([
+        this.prisma.meter.count({
+          where: {
+            simCardId: {
+              in: simCardIds,
+            },
+          },
+        }),
+        this.prisma.installationRecord.count({
+          where: {
+            simCardId: {
+              in: simCardIds,
+            },
+          },
+        }),
+      ]);
 
-    if (operationalCount > 0 || metersCount > 0 || installationRecordsCount > 0) {
+    if (
+      operationalCount > 0 ||
+      metersCount > 0 ||
+      installationRecordsCount > 0
+    ) {
       throw new BadRequestException(
         `Isporuku nije moguće obrisati: ${operationalCount} kartica je dodijeljeno/ugrađeno, ` +
           `${metersCount} je povezano na brojila, ${installationRecordsCount} ima evidencije ugradnje. ` +
@@ -259,13 +413,31 @@ export class ShipmentsService {
       );
     }
 
-    // ── Transakcijsko brisanje (FK su RESTRICT → redoslijed je bitan) ──
-    const { deletedSimCards, deletedSimEvents } = await this.prisma.$transaction(async (tx) => {
-      const events = await tx.simEvent.deleteMany({ where: { simCardId: { in: simCardIds } } });
-      const cards = await tx.simCard.deleteMany({ where: { shipmentId: id } });
-      await tx.shipment.delete({ where: { id } });
-      return { deletedSimCards: cards.count, deletedSimEvents: events.count };
-    });
+    const { deletedSimCards, deletedSimEvents } =
+      await this.prisma.$transaction(async (tx) => {
+        const events = await tx.simEvent.deleteMany({
+          where: {
+            simCardId: {
+              in: simCardIds,
+            },
+          },
+        });
+
+        const cards = await tx.simCard.deleteMany({
+          where: {
+            shipmentId: id,
+          },
+        });
+
+        await tx.shipment.delete({
+          where: { id },
+        });
+
+        return {
+          deletedSimCards: cards.count,
+          deletedSimEvents: events.count,
+        };
+      });
 
     await this.activityLogService.log({
       userId: actorId,
@@ -281,7 +453,11 @@ export class ShipmentsService {
       ipAddress,
     });
 
-    return { deleted: true, deletedSimCards, deletedSimEvents };
+    return {
+      deleted: true,
+      deletedSimCards,
+      deletedSimEvents,
+    };
   }
 
   async findShipmentSimCards(
@@ -296,7 +472,9 @@ export class ShipmentsService {
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.simCard.findMany({
-        where: { shipmentId: id },
+        where: {
+          shipmentId: id,
+        },
         include: {
           assignedTo: {
             select: {
@@ -314,11 +492,17 @@ export class ShipmentsService {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: {
+          createdAt: 'desc',
+        },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.simCard.count({ where: { shipmentId: id } }),
+      this.prisma.simCard.count({
+        where: {
+          shipmentId: id,
+        },
+      }),
     ]);
 
     return {
@@ -333,7 +517,14 @@ export class ShipmentsService {
   async importExcel(
     shipmentId: string,
     dto: ImportExcelDto,
-    file: { buffer: Buffer; originalname: string; mimetype: string; size: number } | undefined,
+    file:
+      | {
+          buffer: Buffer;
+          originalname: string;
+          mimetype: string;
+          size: number;
+        }
+      | undefined,
     actorId: string,
     ipAddress?: string,
     scope?: ScopeContext | null,
@@ -345,18 +536,27 @@ export class ShipmentsService {
     }
 
     if (!this.isSupportedFile(file.originalname, file.mimetype)) {
-      throw new BadRequestException('Nepodržan format fajla. Dozvoljeno: .xlsx, .xls, .csv');
+      throw new BadRequestException(
+        'Nepodržan format fajla. Dozvoljeno: .xlsx, .xls, .csv',
+      );
     }
 
     const parsed = this.excelImportService.parse(file.buffer);
+
     const resolvedMapping = this.columnMapperService.merge(
       this.columnMapperService.suggest(parsed.headers),
       this.parseMappingInput(dto.columnMapping),
     );
+
     const existing = await this.fetchExistingIccidMap();
 
     if (dto.applyImport !== 'true') {
-      const preview = this.excelImportService.preview(parsed, resolvedMapping, existing);
+      const preview = this.excelImportService.preview(
+        parsed,
+        resolvedMapping,
+        existing,
+      );
+
       return {
         mode: 'preview' as const,
         fileName: file.originalname,
@@ -364,18 +564,30 @@ export class ShipmentsService {
       };
     }
 
-    const validation = this.excelImportService.validate(parsed, resolvedMapping, existing);
+    const validation = this.excelImportService.validate(
+      parsed,
+      resolvedMapping,
+      existing,
+    );
 
     let selectedRowNumbers: number[] | undefined;
+
     if (dto.selectedRowNumbers) {
       try {
         const raw = JSON.parse(dto.selectedRowNumbers) as unknown;
-        if (!Array.isArray(raw) || raw.some((n) => typeof n !== 'number')) {
+
+        if (
+          !Array.isArray(raw) ||
+          raw.some((n) => typeof n !== 'number')
+        ) {
           throw new Error('invalid');
         }
+
         selectedRowNumbers = raw as number[];
       } catch {
-        throw new BadRequestException('selectedRowNumbers must be a JSON array of numbers');
+        throw new BadRequestException(
+          'selectedRowNumbers must be a JSON array of numbers',
+        );
       }
     }
 
@@ -386,29 +598,43 @@ export class ShipmentsService {
     );
 
     if (data.length === 0) {
-      throw new BadRequestException('Nije odabran nijedan ispravan red za import.');
+      throw new BadRequestException(
+        'Nije odabran nijedan ispravan red za import.',
+      );
     }
 
     let inserted: { count: number };
+
     try {
       inserted = await this.prisma.simCard.createMany({
-        data: data.map((item) => ({ ...item, status: SimCardStatus.AVAILABLE })),
+        data: data.map((item) => ({
+          ...item,
+          status: SimCardStatus.AVAILABLE,
+        })),
       });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('Import sadrži ICCID koji već postoji u bazi (globalno).');
+        throw new ConflictException(
+          'Import sadrži ICCID koji već postoji u bazi (globalno).',
+        );
       }
+
       throw error;
     }
 
     const shipmentSimTotal = await this.prisma.simCard.count({
-      where: { shipmentId },
+      where: {
+        shipmentId,
+      },
     });
+
     await this.prisma.shipment.update({
-      where: { id: shipmentId },
+      where: {
+        id: shipmentId,
+      },
       data: {
         totalCards: shipmentSimTotal,
         status: ShipmentStatus.COMPLETED,
@@ -426,7 +652,8 @@ export class ShipmentsService {
         inserted: inserted.count,
         skipped: validation.summary.totalRows - inserted.count,
         totalRows: validation.summary.totalRows,
-        selectedRows: selectedRowNumbers?.length ?? validation.summary.validRows,
+        selectedRows:
+          selectedRowNumbers?.length ?? validation.summary.validRows,
         duplicatesInFile: validation.summary.duplicatesInFile,
         duplicatesInDatabase: validation.summary.duplicatesInDatabase,
       },
@@ -437,21 +664,30 @@ export class ShipmentsService {
       mode: 'import' as const,
       fileName: file.originalname,
       insertedRows: inserted.count,
-      skippedRows: validation.summary.totalRows - inserted.count,
+      skippedRows:
+        validation.summary.totalRows - inserted.count,
       totalRows: validation.summary.totalRows,
       summary: validation.summary,
       resolvedMapping,
     };
   }
 
-  private async ensureShipmentExists(id: string, scope?: ScopeContext | null): Promise<void> {
-    const scopeClause = scopeWhere(scope, { distributionIdField: 'distributionId' });
+  private async ensureShipmentExists(
+    id: string,
+    scope?: ScopeContext | null,
+  ): Promise<void> {
+    const scopeClause = scopeWhere(scope, {
+      distributionIdField: 'distributionId',
+    });
+
     const shipment = await this.prisma.shipment.findFirst({
       where: {
         id,
         ...(scopeClause ? { AND: [scopeClause] } : {}),
       },
-      select: { id: true },
+      select: {
+        id: true,
+      },
     });
 
     if (!shipment) {
@@ -467,32 +703,63 @@ export class ShipmentsService {
     }
 
     try {
-      const parsed = JSON.parse(raw) as Partial<Record<ImportDomainKey, string>>;
+      const parsed = JSON.parse(raw) as Partial<
+        Record<ImportDomainKey, string>
+      >;
+
       return parsed;
     } catch {
-      throw new BadRequestException('columnMapping must be valid JSON');
+      throw new BadRequestException(
+        'columnMapping must be valid JSON',
+      );
     }
   }
 
-  private async fetchExistingIccidMap(): Promise<Map<string, { shipmentId: string; shipmentName: string; receivedDate: Date }>> {
+  private async fetchExistingIccidMap(): Promise<
+    Map<
+      string,
+      {
+        shipmentId: string;
+        shipmentName: string;
+        receivedDate: Date;
+      }
+    >
+  > {
     const existing = await this.prisma.simCard.findMany({
       select: {
         iccid: true,
-        shipment: { select: { id: true, name: true, receivedDate: true } },
+        shipment: {
+          select: {
+            id: true,
+            name: true,
+            receivedDate: true,
+          },
+        },
       },
     });
+
     return new Map(
       existing.map((item) => [
         item.iccid,
-        { shipmentId: item.shipment.id, shipmentName: item.shipment.name, receivedDate: item.shipment.receivedDate },
+        {
+          shipmentId: item.shipment.id,
+          shipmentName: item.shipment.name,
+          receivedDate: item.shipment.receivedDate,
+        },
       ]),
     );
   }
 
-  private isSupportedFile(fileName: string, mimeType: string): boolean {
+  private isSupportedFile(
+    fileName: string,
+    mimeType: string,
+  ): boolean {
     const lowered = fileName.toLowerCase();
+
     const byExtension =
-      lowered.endsWith('.xlsx') || lowered.endsWith('.xls') || lowered.endsWith('.csv');
+      lowered.endsWith('.xlsx') ||
+      lowered.endsWith('.xls') ||
+      lowered.endsWith('.csv');
 
     const byMime = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -504,5 +771,4 @@ export class ShipmentsService {
 
     return byExtension || byMime;
   }
-
 }

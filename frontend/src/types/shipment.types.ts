@@ -1,4 +1,7 @@
-export type ShipmentStatus = 'RECEIVED' | 'PROCESSING' | 'COMPLETED';
+export type ShipmentStatus =
+  | 'RECEIVED'
+  | 'PROCESSING'
+  | 'COMPLETED';
 
 export type SimCardStatus =
   | 'AVAILABLE'
@@ -15,6 +18,11 @@ export type SimCardAssignee = {
   firstName: string;
   lastName: string;
 } | null;
+
+export type ShipmentCardStatusCounts = Record<
+  SimCardStatus,
+  number
+>;
 
 export type ShipmentSimCard = {
   id: string;
@@ -41,8 +49,20 @@ export type ShipmentItem = {
   notes?: string | null;
   originalFileName?: string | null;
   distributionId?: string | null;
-  importedBy: { id: string; email: string; firstName: string; lastName: string };
-  _count: { simCards: number };
+
+  importedBy: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+
+  _count: {
+    simCards: number;
+  };
+
+  cardStatusCounts: ShipmentCardStatusCounts;
+
   createdAt: string;
   updatedAt: string;
 };
@@ -67,7 +87,6 @@ export type CreateShipmentInput = {
   name: string;
   provider: string;
   receivedDate: string;
-  /** Pri kreiranju se ne šalje; postavlja se pri Excel importu na broj uvezenih kartica */
   totalCards?: number;
   notes?: string;
   distributionId: string;
