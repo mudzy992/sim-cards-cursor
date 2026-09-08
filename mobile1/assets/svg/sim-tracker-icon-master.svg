@@ -1,0 +1,177 @@
+<!-- sim-tracker-icon-master.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2196F3"/>
+      <stop offset="100%" style="stop-color:#1976D2"/>
+    </linearGradient>
+    <linearGradient id="simGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#E3F2FD"/>
+    </linearGradient>
+    <linearGradient id="chipGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700"/>
+      <stop offset="50%" style="stop-color:#FFC107"/>
+      <stop offset="100%" style="stop-color:#FF9800"/>
+    </linearGradient>
+    <linearGradient id="pinGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00E5FF"/>
+      <stop offset="100%" style="stop-color:#00BCD4"/>
+    </linearGradient>
+    <filter id="cardShadow">
+      <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+    <filter id="pinGlow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="innerShadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bgGradient)"/>
+
+  <!-- Subtle grid pattern background -->
+  <g opacity="0.08">
+    <path d="M0 0 L1024 0 L1024 1024 L0 1024 Z" fill="none" stroke="white" stroke-width="2" stroke-dasharray="40,40"/>
+    <line x1="512" y1="0" x2="512" y2="1024" stroke="white" stroke-width="2"/>
+    <line x1="0" y1="512" x2="1024" y2="512" stroke="white" stroke-width="2"/>
+  </g>
+
+  <!-- Circular tracking pulse rings -->
+  <g opacity="0.15">
+    <circle cx="512" cy="512" r="400" fill="none" stroke="#00E5FF" stroke-width="2" stroke-dasharray="20,15"/>
+    <circle cx="512" cy="512" r="320" fill="none" stroke="#00E5FF" stroke-width="2" stroke-dasharray="15,10"/>
+    <circle cx="512" cy="512" r="240" fill="none" stroke="#00E5FF" stroke-width="2" stroke-dasharray="10,8"/>
+  </g>
+
+  <!-- Main SIM Card -->
+  <g filter="cardShadow">
+    <!-- SIM card body with corner cut -->
+    <path d="
+      M 280 320
+      L 280 720
+      Q 280 740, 300 740
+      L 724 740
+      Q 744 740, 744 720
+      L 744 380
+      L 684 320
+      Z"
+      fill="url(#simGradient)"
+      stroke="rgba(255,255,255,0.5)"
+      stroke-width="4"/>
+
+    <!-- Corner cut detail -->
+    <path d="M 684 320 L 684 380 L 744 380 Z" fill="rgba(33,150,243,0.2)"/>
+    <path d="M 684 320 L 684 380 L 744 380 Z" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="3"/>
+  </g>
+
+  <!-- SIM chip (golden contacts) -->
+  <g filter="innerShadow">
+    <!-- Chip background -->
+    <rect x="360" y="420" width="304" height="240" rx="12" fill="url(#chipGradient)"/>
+
+    <!-- Contact lines grid (3x3) -->
+    <g stroke="#C17900" stroke-width="3" opacity="0.6">
+      <!-- Vertical lines -->
+      <line x1="436" y1="440" x2="436" y2="640"/>
+      <line x1="512" y1="440" x2="512" y2="640"/>
+      <line x1="588" y1="440" x2="588" y2="640"/>
+
+      <!-- Horizontal lines -->
+      <line x1="380" y1="500" x2="644" y2="500"/>
+      <line x1="380" y1="580" x2="644" y2="580"/>
+    </g>
+
+    <!-- Contact pads (3x3 grid) -->
+    <g fill="rgba(193,121,0,0.4)">
+      <!-- Row 1 -->
+      <rect x="385" y="445" width="46" height="50" rx="4"/>
+      <rect x="441" y="445" width="66" height="50" rx="4"/>
+      <rect x="593" y="445" width="46" height="50" rx="4"/>
+
+      <!-- Row 2 -->
+      <rect x="385" y="505" width="46" height="70" rx="4"/>
+      <rect x="441" y="505" width="66" height="70" rx="4"/>
+      <rect x="593" y="505" width="46" height="70" rx="4"/>
+
+      <!-- Row 3 -->
+      <rect x="385" y="585" width="46" height="50" rx="4"/>
+      <rect x="441" y="585" width="66" height="50" rx="4"/>
+      <rect x="593" y="585" width="46" height="50" rx="4"/>
+    </g>
+  </g>
+
+  <!-- Location Pin Icon (overlaying top-right) -->
+  <g transform="translate(650, 200)" filter="pinGlow">
+    <!-- Pin shadow base -->
+    <ellipse cx="0" cy="140" rx="35" ry="8" fill="rgba(0,0,0,0.2)"/>
+
+    <!-- Pin body -->
+    <path d="
+      M 0 0
+      C -50 0, -70 25, -70 60
+      C -70 100, 0 140, 0 140
+      C 0 140, 70 100, 70 60
+      C 70 25, 50 0, 0 0 Z"
+      fill="url(#pinGradient)"
+      stroke="white"
+      stroke-width="6"/>
+
+    <!-- Inner circle -->
+    <circle cx="0" cy="55" r="25" fill="white" opacity="0.9"/>
+    <circle cx="0" cy="55" r="15" fill="#2196F3"/>
+
+    <!-- Pulse ring animation hint -->
+    <circle cx="0" cy="55" r="35" fill="none" stroke="#00E5FF" stroke-width="3" opacity="0.4" stroke-dasharray="5,5"/>
+  </g>
+
+  <!-- Signal waves emanating from pin -->
+  <g opacity="0.3" stroke="#00E5FF" stroke-width="3" fill="none">
+    <path d="M 580 300 Q 520 280, 500 220" stroke-linecap="round"/>
+    <path d="M 720 300 Q 780 280, 800 220" stroke-linecap="round"/>
+    <path d="M 650 380 Q 650 420, 680 450" stroke-linecap="round"/>
+  </g>
+
+  <!-- Satellite signal icon (top-left corner) -->
+  <g transform="translate(180, 180)" opacity="0.4">
+    <circle cx="0" cy="0" r="8" fill="#00E5FF"/>
+    <path d="M -15 -15 Q -5 -5, 0 0" stroke="#00E5FF" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M 15 -15 Q 5 -5, 0 0" stroke="#00E5FF" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M -25 -25 Q -10 -10, 0 0" stroke="#00E5FF" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M 25 -25 Q 10 -10, 0 0" stroke="#00E5FF" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+  </g>
+
+  <!-- Bottom text -->
+  <text x="512" y="850"
+        font-family="-apple-system, 'SF Pro Display', Arial, sans-serif"
+        font-weight="700"
+        font-size="68"
+        fill="white"
+        text-anchor="middle"
+        letter-spacing="6">
+    SIM CARD
+  </text>
+  <text x="512" y="920"
+        font-family="-apple-system, 'SF Pro Display', Arial, sans-serif"
+        font-weight="500"
+        font-size="56"
+        fill="rgba(255,255,255,0.85)"
+        text-anchor="middle"
+        letter-spacing="10">
+    TRACKER
+  </text>
+</svg>

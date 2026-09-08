@@ -1,3 +1,13 @@
+/**
+ * LoginScreen — REDIZAJN (Faza 2)
+ * Logika identična prethodnoj verziji:
+ *  - useAuth().login({ emailOrUsername, password })
+ *  - 401 → "Pogrešan email/korisničko ime ili lozinka."
+ *  - ostale greške → getApiErrorMessage
+ *  - useServerHealth + ručna provjera servera
+ *  - uspjeh → router.replace('/(app)/(tabs)/home')
+ * Prezentacija: brand header + neutral form (instrukcije: plava selektivno).
+ */
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { useState } from 'react';
@@ -6,178 +16,267 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar'
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { getApiErrorMessage } from '@/utils/error.utils';
-import { colors } from '@/theme/colors';
-import { LogoWatermark } from '@/components/LogoWatermark'
-import { useServerHealth } from '@/hooks/useServerHealth'
+import { LogoWatermark } from '@/components/LogoWatermark';
+import { useServerHealth } from '@/hooks/useServerHealth';
+import { palette, radii, spacing, type } from '@/theme/tokens';
+import { ActionButton } from '@/components/ui/ActionButton';
+import { StatusBadge, type StatusTone } from '@/components/ui/StatusBadge';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
   const { status: serverStatus, check: checkServer } = useServerHealth({ timeoutMs: 2500 });
-
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<'user' | 'pass' | null>(null);
 
   const submit = async () => {
     setIsLoading(true);
     setError(null);
-
     try {
       await login({ emailOrUsername, password });
       router.replace('/(app)/(tabs)/home');
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
         setError('Pogrešan email/korisničko ime ili lozinka.');
         return;
       }
-
-      setError(getApiErrorMessage(error, 'Prijava nije uspjela.'));
+      setError(getApiErrorMessage(err, 'Prijava nije uspjela.'));
     } finally {
       setIsLoading(false);
     }
   };
 
+  const canSubmit = !isLoading && emailOrUsername.trim().length > 0 && password.length > 0;
+
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        padding: 20,
-        backgroundColor: colors.primaryDark,
-      }}
-    >
+    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <StatusBar style="light" />
-      <LogoWatermark opacity={0.1} />
-
       <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'center' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        keyboardVerticalOffset={0}
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Text style={{ fontSize: 28, fontWeight: '700', marginBottom: 8, color: colors.onPrimary }}>
-          SIM Tracker
-        </Text>
-        <Text style={{ color: 'rgba(255,255,255,0.75)', marginBottom: 20 }}>
-          Prijava na mobilnu aplikaciju
-        </Text>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-          <View
-            style={{
-              paddingVertical: 6,
-              paddingHorizontal: 10,
-              borderRadius: 999,
-              backgroundColor:
-                serverStatus === 'online'
-                  ? 'rgba(34,197,94,0.16)'
-                  : serverStatus === 'offline'
-                    ? 'rgba(239,68,68,0.16)'
-                    : 'rgba(255,255,255,0.10)',
-              borderWidth: 1,
-              borderColor:
-                serverStatus === 'online'
-                  ? 'rgba(34,197,94,0.40)'
-                  : serverStatus === 'offline'
-                    ? 'rgba(239,68,68,0.40)'
-                    : 'rgba(255,255,255,0.20)',
-            }}
-          >
-            <Text style={{ color: colors.onPrimary, fontWeight: '700' }}>
-              Server:{' '}
-              {serverStatus === 'online'
-                ? 'Online'
-                : serverStatus === 'offline'
-                  ? 'Offline'
-                  : 'Provjera...'}
-            </Text>
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ------------------------------ brand header ------------------------------ */}
+          <View style={styles.brandBlock}>
+            <ServerStatusChip status={serverStatus} onRetry={() => void checkServer()} />
+            <View style={styles.logoRow}>
+              <LogoWatermark />
+              <Text style={styles.appName}>SIM Tracker</Text>
+              <Text style={styles.appNameSub}>Terenska aplikacija za upravljanje SIM karticama</Text>
+            </View>
           </View>
 
-          <Pressable
-            onPress={() => void checkServer()}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.85 : 1,
-              paddingVertical: 6,
-              paddingHorizontal: 10,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.20)',
-              backgroundColor: 'rgba(255,255,255,0.08)',
-            })}
-          >
-            <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600' }}>Provjeri</Text>
-          </Pressable>
-        </View>
+          {/* --------------------------------- forma --------------------------------- */}
+          <View style={styles.formBlock}>
+            <Text style={type.screenTitle}>Prijava</Text>
+            <Text style={[type.caption, styles.formIntro]}>
+              Prijavite se da nastavite sa operacijama ugradnje i demontaže.
+            </Text>
 
-        <TextInput
-          placeholder="Email"
-          placeholderTextColor="rgba(255,255,255,0.65)"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={emailOrUsername}
-          onChangeText={setEmailOrUsername}
-          style={{
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.20)',
-            borderRadius: 10,
-            padding: 12,
-            marginBottom: 12,
-            backgroundColor: 'rgba(255,255,255,0.10)',
-            color: colors.onPrimary,
-          }}
-        />
+            {error ? (
+              <View style={styles.errorBox}>
+                <Ionicons name="alert-circle" size={18} color={palette.danger} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
 
-        <TextInput
-          placeholder="Lozinka"
-          placeholderTextColor="rgba(255,255,255,0.65)"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          style={{
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.20)',
-            borderRadius: 10,
-            padding: 12,
-            marginBottom: 12,
-            backgroundColor: 'rgba(255,255,255,0.10)',
-            color: colors.onPrimary,
-          }}
-        />
+            <View style={styles.fieldGroup}>
+              <Text style={type.sectionLabel}>EMAIL ILI KORISNIČKO IME</Text>
+              <TextInput
+                value={emailOrUsername}
+                onChangeText={(t) => {
+                  setEmailOrUsername(t);
+                  if (error) setError(null);
+                }}
+                placeholder="ime.prezime ili ime@epbih.ba"
+                placeholderTextColor={palette.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                returnKeyType="next"
+                onFocus={() => setFocusedField('user')}
+                onBlur={() => setFocusedField(null)}
+                style={[styles.input, focusedField === 'user' && styles.inputFocused]}
+              />
+            </View>
 
-        {error ? <Text style={{ color: '#fecaca', marginBottom: 12 }}>{error}</Text> : null}
+            <View style={styles.fieldGroup}>
+              <Text style={type.sectionLabel}>LOZINKA</Text>
+              <TextInput
+                value={password}
+                onChangeText={(t) => {
+                  setPassword(t);
+                  if (error) setError(null);
+                }}
+                placeholder="••••••••••"
+                placeholderTextColor={palette.textMuted}
+                secureTextEntry
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  if (canSubmit) void submit();
+                }}
+                onFocus={() => setFocusedField('pass')}
+                onBlur={() => setFocusedField(null)}
+                style={[styles.input, focusedField === 'pass' && styles.inputFocused]}
+              />
+            </View>
 
-        <Pressable
-          onPress={() => void submit()}
-          disabled={isLoading}
-          style={({ pressed }) => ({
-            backgroundColor: pressed ? colors.primaryPressed : colors.primary,
-            padding: 14,
-            borderRadius: 10,
-            alignItems: 'center',
-            opacity: isLoading ? 0.7 : 1,
-          })}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={{ color: colors.onPrimary, fontWeight: '600' }}>Prijavi se</Text>
-          )}
-        </Pressable>
+            <ActionButton
+              title="Prijavi se"
+              onPress={() => void submit()}
+              loading={isLoading}
+              disabled={!canSubmit}
+              variant="primary"
+              size="lg"
+              style={styles.submit}
+            />
 
-        <View style={{ marginTop: 16 }}>
-          <Text style={{ color: 'rgba(255,255,255,0.75)' }}>
-            Prijava putem emaila ili korisničkog imena (ime.prezime)
-          </Text>
-        </View>
+            <Text style={[type.caption, styles.footerHint]}>
+              Prijava putem emaila ili korisničkog imena (ime.prezime)
+            </Text>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+/* ---------------------------- statusni chip ----------------------------- */
+
+function ServerStatusChip({
+  status,
+  onRetry,
+}: {
+  status: 'online' | 'offline' | 'checking' | string;
+  onRetry: () => void;
+}) {
+  const tone: StatusTone =
+    status === 'online' ? 'success' : status === 'offline' ? 'danger' : 'neutral';
+  const label =
+    status === 'online' ? 'Server online' : status === 'offline' ? 'Server offline' : 'Provjera…';
+
+  return (
+    <View style={styles.chipRow}>
+      {status === 'checking' ? (
+        <ActivityIndicator size="small" color="rgba(255,255,255,0.8)" style={styles.chipSpinner} />
+      ) : null}
+      <StatusBadge tone={tone} label={label} showDot={status !== 'checking'} />
+      <Pressable onPress={onRetry} hitSlop={8} accessibilityRole="button" style={styles.retry}>
+        <Text style={styles.retryText}>Provjeri</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/* -------------------------------- stilovi -------------------------------- */
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: palette.graphite },
+  flex: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+
+  brandBlock: {
+    backgroundColor: palette.graphite,
+    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl + spacing.lg,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  chipSpinner: { marginRight: 2 },
+  retry: {
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: palette.graphite0050,
+  },
+  retryText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
+  logoRow: { alignItems: 'flex-start' },
+  appName: {
+    marginTop: spacing.lg,
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    color: '#FFFFFF',
+  },
+  appNameSub: {
+    marginTop: spacing.xs,
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 0.2,
+  },
+
+  formBlock: {
+    flex: 1,
+    backgroundColor: palette.background,
+    marginTop: -spacing.xl,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxl,
+  },
+  formIntro: { marginTop: spacing.xs, marginBottom: spacing.xl, lineHeight: 19 },
+
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: palette.dangerSoft,
+    borderWidth: 1,
+    borderColor: palette.dangerBorder,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  errorText: { flex: 1, color: palette.danger, fontSize: 13, fontWeight: '600' },
+
+  fieldGroup: { marginBottom: spacing.lg },
+  input: {
+    marginTop: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: palette.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: palette.surface,
+    color: palette.textPrimary,
+    fontSize: 15,
+  },
+  inputFocused: { borderColor: palette.brand },
+
+  submit: { marginTop: spacing.sm },
+  footerHint: {
+    marginTop: spacing.xl,
+    textAlign: 'center',
+    color: palette.textMuted,
+  },
+});

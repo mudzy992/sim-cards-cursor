@@ -1,0 +1,23 @@
+<!-- favicon-16.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <defs>
+    <linearGradient id="bg16" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2196F3"/>
+      <stop offset="100%" style="stop-color:#1976D2"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="16" height="16" rx="3" fill="url(#bg16)"/>
+
+  <!-- Ultra simplified SIM -->
+  <path d="M 3 3 L 3 13 L 11 13 L 11 6 L 9 3 Z" fill="white" opacity="0.95"/>
+  <path d="M 9 3 L 9 6 L 11 6 Z" fill="rgba(33,150,243,0.3)"/>
+
+  <!-- Chip -->
+  <rect x="4.5" y="7" width="4" height="4" rx="0.5" fill="#FFA726"/>
+  <line x1="6" y1="7.5" x2="6" y2="10.5" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>
+
+  <!-- Pin indicator -->
+  <circle cx="12" cy="4" r="2.5" fill="#00E5FF" stroke="white" stroke-width="0.5"/>
+  <circle cx="12" cy="4" r="1" fill="white"/>
+</svg>

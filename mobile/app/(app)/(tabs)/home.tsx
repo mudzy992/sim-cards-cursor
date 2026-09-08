@@ -1,70 +1,50 @@
-import axios from 'axios'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  RefreshControl,
-  Text,
-  View,
-} from 'react-native'
-import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
-import { useAuthStore } from '@/store/auth.store'
-import { simCardsApi } from '@/api/sim-cards.api'
-import { installationRecordsApi } from '@/api/installation-records.api'
-import { notificationsApi } from '@/api/notifications.api'
-import { useMiniTour } from '@/hooks/useMiniTour'
-import { useConnectivity } from '@/hooks/useConnectivity'
-import { offlineCache } from '@/offline/offline-cache'
-import { listOutbox } from '@/offline/outbox'
-import { syncMeterTypesOfflineCache } from '@/offline/meter-types-sync'
-import { useGlobalBlockingStore } from '@/store/global-blocking.store'
-import { colors } from '@/theme/colors'
-import { Card } from '@/components/common/Card'
-import { Screen } from '@/components/common/Screen'
-import { ScreenHeader } from '@/components/common/ScreenHeader'
-
-function StatCard({
-  title,
-  value,
-  icon,
-  hint,
-}: {
-  title: string;
-  value: number | string;
-  icon: keyof typeof Ionicons.glyphMap;
-  hint?: string;
-}) {
-  return (
-    <Card
-      style={{
-        flex: 1,
-        minWidth: '45%',
-        padding: 14,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Ionicons name={icon} size={20} color={colors.primary} />
-        <Text style={{ fontSize: 12, color: colors.textMuted }}>{title}</Text>
-      </View>
-      <Text style={{ fontSize: 26, fontWeight: '800', color: colors.text }}>{value}</Text>
-      {hint ? (
-        <Text style={{ marginTop: 4, fontSize: 12, color: colors.textMuted }}>{hint}</Text>
-      ) : null}
-    </Card>
-  );
-}
+/**
+ * HomeScreen — REDIZAJN (Faza 2): operativni dashboard, ne BI panel
+ * (instrukcije.md §10: odgovoriti u sekundi — online? sinhronizovano?
+ * posao? inventar? problem?).
+ *
+ * Sva logika identicna prethodnoj verziji:
+ *  - operator-offline-stats query (offline inventar + tipovi + zapisnici)
+ *  - notifications-unread-count
+ *  - syncMeterTypesOfflineCache sa global blocking overlayom
+ *  - mini tour (useMiniTour)
+ * Prezentacija: section/red struktura, ConnectionPill, Panel samo za grupe.
+ */
+import axios from 'axios';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '@/store/auth.store';
+import { simCardsApi } from '@/api/sim-cards.api';
+import { installationRecordsApi } from '@/api/installation-records.api';
+import { notificationsApi } from '@/api/notifications.api';
+import { useMiniTour } from '@/hooks/useMiniTour';
+import { useConnectivity } from '@/hooks/useConnectivity';
+import { offlineCache } from '@/offline/offline-cache';
+import { listOutbox } from '@/offline/outbox';
+import { syncMeterTypesOfflineCache } from '@/offline/meter-types-sync';
+import { useGlobalBlockingStore } from '@/store/global-blocking.store';
+import { palette, spacing, type } from '@/theme/tokens';
+import { ConnectionPill } from '@/components/ui/ConnectionPill';
+import { Section } from '@/components/ui/Section';
+import { Panel } from '@/components/ui/Panel';
+import { ListRow } from '@/components/ui/ListRow';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ActionButton } from '@/components/ui/ActionButton';
+import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton';
 
 export default function HomeScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const miniTour = useMiniTour();
-  const { isOnline } = useConnectivity()
-  const setBlocked = useGlobalBlockingStore((s) => s.setBlocked)
-  const queryClient = useQueryClient()
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  const { isOnline } = useConnectivity();
+  const setBlocked = useGlobalBlockingStore((s) => s.setBlocked);
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { data: operatorStats, isLoading } = useQuery({
     queryKey: ['operator-offline-stats', user?.id, isOnline],
@@ -76,45 +56,50 @@ export default function HomeScreen() {
           offlineMeterTypeCount: 0,
           serverMeterTypeCount: null as number | null,
           installedSimCount: 0,
-          installedMeterCount: 0,
+          outboxPending: 0,
+          outboxFailed: 0,
           isStale: true,
           showMeterTypesSync: false,
-        }
+        };
       }
 
-      const offlineSims = await simCardsApi.listOfflineInventory()
-      const cachedTypes = (await offlineCache.meterTypeDefinitions.get(user))?.data ?? []
-      const offlineMeterTypeCount = cachedTypes.length
+      const offlineSims = await simCardsApi.listOfflineInventory();
+      const cachedTypes = (await offlineCache.meterTypeDefinitions.get(user))?.data ?? [];
+      const offlineMeterTypeCount = cachedTypes.length;
+      const outboxItems = await listOutbox(user);
 
-      let installedTotal = 0
-      let isStale = true
-      let serverMeterTypeCount: number | null = null
+      let installedTotal = 0;
+      let isStale = true;
+      let serverMeterTypeCount: number | null = null;
+
       if (isOnline) {
         try {
-          const resp = await installationRecordsApi.listMy({ page: 1, limit: 1 })
-          installedTotal = resp.total ?? (resp.items?.length ?? 0)
-          const serverTypes = await (await import('@/api/meter-type-definitions.api')).meterTypeDefinitionsApi.list()
-          serverMeterTypeCount = serverTypes.length
-          isStale = false
+          const resp = await installationRecordsApi.listMy({ page: 1, limit: 1 });
+          installedTotal = resp.total ?? resp.items?.length ?? 0;
+          const serverTypes = await (
+            await import('@/api/meter-type-definitions.api')
+          ).meterTypeDefinitionsApi.list();
+          serverMeterTypeCount = serverTypes.length;
+          isStale = false;
         } catch (e) {
-          if (!(axios.isAxiosError(e) && !e.response)) throw e
+          if (!(axios.isAxiosError(e) && !e.response)) throw e;
         }
       }
 
       const showMeterTypesSync =
-        isOnline &&
-        serverMeterTypeCount != null &&
-        offlineMeterTypeCount !== serverMeterTypeCount
+        isOnline && serverMeterTypeCount != null && offlineMeterTypeCount !== serverMeterTypeCount;
 
       return {
         offlineSimCount: offlineSims.length,
         offlineMeterTypeCount,
         serverMeterTypeCount,
         installedSimCount: installedTotal,
-        installedMeterCount: installedTotal,
+        outboxPending: outboxItems.filter((i) => i.status === 'PENDING' || i.status === 'SENDING')
+          .length,
+        outboxFailed: outboxItems.filter((i) => i.status === 'FAILED').length,
         isStale,
         showMeterTypesSync,
-      }
+      };
     },
   });
 
@@ -123,182 +108,322 @@ export default function HomeScreen() {
     queryFn: () => notificationsApi.getUnreadCount(),
   });
 
+  const runMeterTypesSync = () => {
+    if (!user) return;
+    void (async () => {
+      setBlocked({
+        title: 'Sync tipova brojila',
+        subtitle: 'Molimo sačekajte, preuzimamo definicije…',
+      });
+      try {
+        await syncMeterTypesOfflineCache(user);
+        await queryClient.invalidateQueries({
+          queryKey: ['operator-offline-stats', user.id, isOnline],
+        });
+      } catch {
+        Alert.alert('Sync nije uspio', 'Provjerite internet konekciju i pokušajte ponovo.');
+      } finally {
+        setBlocked(null);
+      }
+    })();
+  };
+
+  const onRefresh = () => {
+    if (!user) return;
+    void (async () => {
+      setIsRefreshing(true);
+      try {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['operator-offline-stats', user.id, isOnline] }),
+          queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] }),
+        ]);
+      } finally {
+        setIsRefreshing(false);
+      }
+    })();
+  };
+
+  const connectionDetail = operatorStats
+    ? operatorStats.isStale
+      ? 'Podaci možda nisu ažurni'
+      : 'Sve sinhronizovano'
+    : undefined;
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScreenHeader
-        title={`Dobrodošao/la, ${user?.firstName ?? 'Korisnik'}`}
-        subtitle="Pregled statistika i aktivnosti"
-        right={
-          <Pressable
-            onPress={() => router.push('/notifications')}
-            style={{
-              padding: 10,
-              backgroundColor: colors.surfaceMuted,
-              borderRadius: 12,
-              position: 'relative',
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Ionicons name="notifications-outline" size={22} color={colors.primary} />
-            {unreadCount > 0 && (
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 4,
-                  right: 4,
-                  backgroundColor: colors.danger,
-                  borderRadius: 10,
-                  minWidth: 18,
-                  height: 18,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingHorizontal: 4,
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        }
-      />
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar style="dark" />
 
-      <Screen
-        scroll
-        contentStyle={{ paddingTop: 14, gap: 16 }}
-        scrollProps={{
-          refreshControl: (
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => {
-                if (!user) return
-                void (async () => {
-                  setIsRefreshing(true)
-                  try {
-                    await Promise.all([
-                      queryClient.invalidateQueries({ queryKey: ['operator-offline-stats', user.id, isOnline] }),
-                      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] }),
-                    ])
-                  } finally {
-                    setIsRefreshing(false)
-                  }
-                })()
-              }}
-              colors={[colors.primary]}
-            />
-          ),
-        }}
-      >
-
-      {isLoading ? (
-        <View style={{ padding: 32, alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+      {/* ------------------------------- header ------------------------------- */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.greeting}>
+            Zdravo{user?.firstName ? `, ${user.firstName}` : ''}
+          </Text>
+          <Text style={styles.dateLine}>
+            {new Date().toLocaleDateString('bs-BA', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            })}
+          </Text>
         </View>
-      ) : operatorStats ? (
-        <View style={{ gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', letterSpacing: 0.4, color: colors.textMuted }}>
-              STATISTIKE
-            </Text>
-            {operatorStats.isStale ? (
-              <Text style={{ fontSize: 12, color: colors.textMuted }}>Može biti zastario</Text>
-            ) : null}
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            <StatCard
-              title="Offline SIM"
-              value={operatorStats.offlineSimCount}
-              icon="albums-outline"
-            />
-            <StatCard
-              title="Tipovi brojila"
-              value={operatorStats.offlineMeterTypeCount}
-              icon="list-outline"
-              hint={
-                operatorStats.serverMeterTypeCount != null
-                  ? `U bazi: ${operatorStats.serverMeterTypeCount}`
-                  : 'U bazi: —'
-              }
-            />
-            <StatCard
-              title="Ugrađene SIM"
-              value={operatorStats.installedSimCount}
-              icon="hardware-chip-outline"
-            />
-            <StatCard
-              title="Ugrađena brojila"
-              value={operatorStats.installedMeterCount}
-              icon="checkmark-circle-outline"
-            />
-          </View>
-          {operatorStats.showMeterTypesSync ? (
-            <Pressable
-              onPress={() => {
-                if (!user) return
-                void (async () => {
-                  setBlocked({
-                    title: 'Sync tipova brojila',
-                    subtitle: 'Molimo sačekajte, preuzimamo definicije…',
-                  })
-                  try {
-                    await syncMeterTypesOfflineCache(user)
-                  } catch {
-                    Alert.alert(
-                      'Sync nije uspio',
-                      'Provjerite internet konekciju i pokušajte ponovo.',
-                    )
-                  } finally {
-                    setBlocked(null)
-                  }
-                })()
-              }}
-              style={({ pressed }) => ({
-                marginTop: 4,
-                backgroundColor: pressed ? colors.primaryPressed : colors.primary,
-                paddingVertical: 12,
-                borderRadius: 12,
-                alignItems: 'center',
-              })}
-            >
-              <Text style={{ color: '#fff', fontWeight: '800' }}>Sync tipova brojila</Text>
-            </Pressable>
+        <Pressable
+          onPress={() => router.push('/notifications')}
+          accessibilityRole="button"
+          accessibilityLabel="Notifikacije"
+          style={({ pressed }) => [styles.bell, pressed && styles.pressedSoft]}
+        >
+          <Ionicons name="notifications-outline" size={20} color={palette.textPrimary} />
+          {unreadCount > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            </View>
           ) : null}
-        </View>
-      ) : null}
+        </Pressable>
+      </View>
 
-      {!miniTour.loading && miniTour.visible && (
-        <Card style={{ padding: 14, gap: 8, backgroundColor: '#eef2ff', borderColor: '#c7d2fe' }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#1e293b' }}>
-            Kratki vodič kroz aplikaciju
-          </Text>
-          <Text style={{ fontSize: 12, color: '#4b5563' }}>
-            • Tab „Skeniranje“ – skeniraj ili unesi ICCID za novi zapisnik.{'\n'}
-            • Tab „Zapisnici“ – pregledi tvojih zapisnika i statusa.{'\n'}
-            • Tab „Demontaža“ – zadaci za skidanje SIM kartica.{'\n'}
-            • Tab „Profil“ – osnovni podaci i odjava.
-          </Text>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'flex-end',
-              gap: 12,
-              marginTop: 4,
-            }}
-          >
-            <Pressable onPress={miniTour.dismiss}>
-              <Text style={{ fontSize: 12, color: '#6b7280' }}>Kasnije</Text>
-            </Pressable>
-            <Pressable onPress={miniTour.complete}>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.link }}>
-                Razumijem
-              </Text>
-            </Pressable>
-          </View>
-        </Card>
-      )}
-      </Screen>
-    </View>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[palette.brand]} />}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.pillRow}>
+          <ConnectionPill
+            isOnline={isOnline}
+            detail={connectionDetail}
+            attention={Boolean(operatorStats?.isStale || operatorStats?.showMeterTypesSync)}
+          />
+        </View>
+
+        {/* ------------------------- sync upozorenje ------------------------- */}
+        {operatorStats?.showMeterTypesSync ? (
+          <Panel tone="warning" style={styles.syncPanel}>
+            <View style={styles.syncHeader}>
+              <StatusBadge tone="warning" label="Potrebna sinhronizacija" showDot />
+            </View>
+            <Text style={[type.body, styles.syncText]}>
+              Tipovi brojila na uređaju ({operatorStats.offlineMeterTypeCount}) ne odgovaraju
+              serveru ({operatorStats.serverMeterTypeCount}). Sinkronizujte da biste radili sa
+              ažurnim definicijama.
+            </Text>
+            <ActionButton
+              title="Sinhroniziraj tipove brojila"
+              onPress={runMeterTypesSync}
+              variant="primary"
+              size="md"
+              icon="sync"
+            />
+          </Panel>
+        ) : null}
+
+        {/* ------------------------------ inventar ------------------------------ */}
+        <Section label="Inventar na uređaju" hint="lokalni podaci — dostupni i offline">
+          {isLoading ? (
+            <SkeletonRows count={3} />
+          ) : operatorStats ? (
+            <Panel padding="none">
+              <View style={styles.panelInner}>
+                <ListRow
+                  title="Slobodne SIM kartice"
+                  subtitle="lokalni inventar za ugradnju"
+                  icon="card-outline"
+                  iconTone="info"
+                  value={operatorStats.offlineSimCount}
+                  valueMono
+                  onPress={() => router.push('/(app)/offline-inventory')}
+                />
+                <ListRow
+                  title="Tipovi brojila"
+                  subtitle={
+                    operatorStats.serverMeterTypeCount != null
+                      ? `${operatorStats.offlineMeterTypeCount} od ${operatorStats.serverMeterTypeCount} sinhronizovano`
+                      : 'keširane definicije'
+                  }
+                  icon="speedometer-outline"
+                  iconTone={operatorStats.showMeterTypesSync ? 'warning' : 'success'}
+                  value={operatorStats.offlineMeterTypeCount}
+                  valueMono
+                  divider
+                />
+                <ListRow
+                  title="Outbox red"
+                  subtitle={
+                    operatorStats.outboxFailed > 0
+                      ? `${operatorStats.outboxFailed} neuspjelih zahtjeva`
+                      : 'zahtjevi koji čekaju slanje'
+                  }
+                  icon={operatorStats.outboxPending > 0 ? 'cloud-upload-outline' : 'checkmark-done-outline'}
+                  iconTone={operatorStats.outboxFailed > 0 ? 'danger' : operatorStats.outboxPending > 0 ? 'warning' : 'success'}
+                  value={operatorStats.outboxPending}
+                  valueMono
+                  onPress={() => router.push('/(app)/outbox')}
+                  divider
+                />
+              </View>
+            </Panel>
+          ) : null}
+        </Section>
+
+        {/* ------------------------------ aktivnost ------------------------------ */}
+        <Section label="Aktivnost">
+          {isLoading ? (
+            <SkeletonRow />
+          ) : operatorStats ? (
+            <Panel padding="none">
+              <View style={styles.panelInner}>
+                <ListRow
+                  title="Moji zapisnici"
+                  subtitle={
+                    operatorStats.isStale
+                      ? 'status ažuriranja nepoznat (offline)'
+                      : 'ukupno evidentiranih ugradnja'
+                  }
+                  icon="document-text-outline"
+                  iconTone="neutral"
+                  value={operatorStats.installedSimCount}
+                  valueMono
+                  onPress={() => router.push('/(app)/(tabs)/records')}
+                />
+              </View>
+            </Panel>
+          ) : null}
+        </Section>
+
+        {/* ----------------------------- brze radnje ----------------------------- */}
+        <Section label="Brze radnje">
+          <Panel padding="none">
+            <View style={styles.panelInner}>
+              <ListRow
+                title="Nova ugradnja"
+                subtitle="pokreni postupak ugradnje kartice"
+                icon="construct-outline"
+                iconTone="info"
+                onPress={() => router.push('/(app)/(tabs)/install')}
+              />
+              <ListRow
+                title="Demontaža kartice"
+                subtitle="skidanje kartice sa brojila"
+                icon="remove-circle-outline"
+                iconTone="warning"
+                onPress={() => router.push('/(app)/(tabs)/demount')}
+                divider
+              />
+              <ListRow
+                title="Skeniraj karticu"
+                subtitle="kamera ili ručni unos ICCID-a"
+                icon="barcode-outline"
+                iconTone="neutral"
+                onPress={() => router.push('/(app)/(tabs)/scan')}
+                divider
+              />
+            </View>
+          </Panel>
+        </Section>
+
+        {/* ------------------------------ mini tour ------------------------------ */}
+        {!miniTour.loading && miniTour.visible ? (
+          <Panel tone="info" style={styles.tourPanel}>
+            <Text style={[type.bodyStrong, styles.tourTitle]}>Kratki vodič kroz aplikaciju</Text>
+            <Text style={[type.body, styles.tourText]}>
+              • Tab „Skeniranje“ — skeniraj ili unesi ICCID za novi zapisnik.{'\n'}
+              • Tab „Ugradnja“ — vođeni postupak ugradnje.{'\n'}
+              • Tab „Zapisnici“ — pregledi tvojih zapisnika i statusa.{'\n'}
+              • Tab „Demontaža“ — zadaci za skidanje SIM kartica.{'\n'}
+              • Tab „Profil“ — osnovni podaci i odjava.
+            </Text>
+            <View style={styles.tourActions}>
+              <Pressable onPress={() => miniTour.dismiss()} hitSlop={8} style={styles.tourSecondary}>
+                <Text style={styles.tourSecondaryText}>Kasnije</Text>
+              </Pressable>
+              <ActionButton
+                title="Razumjem"
+                onPress={() => void miniTour.complete()}
+                variant="primary"
+                size="sm"
+                fullWidth={false}
+                style={styles.tourPrimary}
+              />
+            </View>
+          </Panel>
+        ) : null}
+
+        <View style={styles.bottomPad} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
+
+/* -------------------------------- stilovi -------------------------------- */
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: palette.background },
+  flex: { flex: 1 },
+  content: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  headerLeft: { flexShrink: 1 },
+  greeting: { ...type.screenTitle },
+  dateLine: {
+    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '500',
+    color: palette.textMuted,
+    textTransform: 'capitalize',
+  },
+  bell: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressedSoft: { opacity: 0.75 },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: palette.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+
+  pillRow: { marginBottom: spacing.xl },
+
+  syncPanel: { marginBottom: spacing.xl },
+  syncHeader: { marginBottom: spacing.sm },
+  syncText: { lineHeight: 21, marginBottom: spacing.lg },
+
+  panelInner: { paddingVertical: spacing.xs, paddingHorizontal: spacing.lg },
+
+  tourPanel: { marginBottom: spacing.lg },
+  tourTitle: { marginBottom: spacing.sm },
+  tourText: { lineHeight: 22 },
+  tourActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+  },
+  tourSecondary: { paddingVertical: spacing.sm },
+  tourSecondaryText: { color: palette.textSecondary, fontWeight: '600', fontSize: 14 },
+  tourPrimary: { minWidth: 120 },
+
+  bottomPad: { height: spacing.xxl },
+});

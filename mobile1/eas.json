@@ -1,0 +1,45 @@
+{
+  "cli": {
+    "version": ">= 1.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://10.50.255.189/api",
+        "NODE_ENV": "development"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+
+    "production-lan": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://10.50.255.189/api",
+        "NODE_ENV": "production"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+
+    "production-cloud": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.simtracker.ba101.top",
+        "NODE_ENV": "production"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  },
+
+  "submit": {
+    "production-cloud": {}
+  }
+}
