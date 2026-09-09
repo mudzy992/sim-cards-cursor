@@ -19,6 +19,7 @@ export type LabelFormatId =
   | 'a4-35.6x16.9'
   | 'a4-37x14'
   | 'a4-52.5x21.2' /* F20 */
+  | 'a4-45.72x21.41' /* F15 */
   | 'a4-37.6x23.5' /* F14 */
   | 'a4-48.5x16.9' /* F10 */
   | 'a4-38x21.2'; /* F01 */
@@ -73,6 +74,19 @@ export const LABEL_FORMAT_PRESETS: LabelFormatPreset[] = [
     marginTopMm: 1.5,
     marginLeftMm: 12.5,
     gapXMm: 0,
+    gapYMm: 0,
+  },
+  {
+    id: 'a4-45.72x21.41',
+    name: '45,72 × 21,41 mm',
+    description: '4 kolone × 12 redova · 48 etiketa/list',
+    labelWidthMm: 45.72,
+    labelHeightMm: 21.41,
+    columns: 4,
+    rows: 12,
+    marginTopMm: 21.41,
+    marginLeftMm: 9.75,
+    gapXMm: 2.54,
     gapYMm: 0,
   },
   {
