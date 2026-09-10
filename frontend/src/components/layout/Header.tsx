@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { NotificationBell } from './NotificationBell';
 import { branchModeratorsApi } from '@/api/branch-moderators.api'
 import { getUserRoleLabel } from '@/utils/labels.utils'
+import { useTranslation } from '@/i18n';
+import LanguageSwitcher from '@/components/common/LanguageSwitcher';
 
 const { Header: AntHeader } = Layout;
 
@@ -22,6 +24,7 @@ type HeaderProps = {
 export function Header({ onMobileMenuClick }: HeaderProps) {
   const screens = Grid.useBreakpoint()
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const moderatorsQuery = useQuery({
     queryKey: ['branch-moderators', 'list', 'me', user?.id],
     queryFn: () => branchModeratorsApi.list({ userId: user!.id }),
@@ -35,7 +38,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       .join(', ') || ''
 
   const isBranchModerator = (moderatorsQuery.data ?? []).length > 0
-  const roleLabel = user?.role ? getUserRoleLabel(user.role) : ''
+  const roleLabel = user?.role ? getUserRoleLabel(user.role, t) : ''
 
   const hasMultipleRoles = user?.role === 'USER' && isBranchModerator
 
@@ -44,29 +47,35 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     if (user.role === 'SYSTEM_ADMIN') {
       return (
         <Tag color="gold" icon={<CrownOutlined />} className="!m-0">
-          Admin
+          {t('layout.header.roleTagAdmin')}
         </Tag>
       )
     }
     if (user.role === 'DIST_ADMIN') {
       return (
         <Tag color="blue" icon={<TeamOutlined />} className="!m-0">
-          Dist
+          {t('layout.header.roleTagDist')}
         </Tag>
       )
     }
     return (
       <Tag color="default" icon={<UserOutlined />} className="!m-0">
-        {hasMultipleRoles ? null : 'Operator'}
+        {hasMultipleRoles ? null : t('layout.header.roleTagOperator')}
       </Tag>
     )
   })()
 
   const moderatorTag =
     user?.role === 'USER' && isBranchModerator ? (
-      <Tooltip title={moderatorBranchesLabel ? `Moderira: ${moderatorBranchesLabel}` : undefined}>
+      <Tooltip
+        title={
+          moderatorBranchesLabel
+            ? t('layout.header.moderatesBranches', { branches: moderatorBranchesLabel })
+            : undefined
+        }
+      >
         <Tag color="geekblue" icon={<SafetyCertificateOutlined />} className="!m-0">
-          {hasMultipleRoles ? null : 'Moderator'}
+          {hasMultipleRoles ? null : t('layout.header.roleTagModerator')}
         </Tag>
       </Tooltip>
     ) : null
@@ -83,15 +92,15 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
               type="text"
               icon={<MenuOutlined />}
               onClick={onMobileMenuClick}
-              aria-label="Otvori meni"
+              aria-label={t('layout.header.openMenu')}
               className="-ml-2"
             />
           )}
           <div className="flex min-w-0 items-center gap-2">
             <Typography.Text className="min-w-0 truncate text-slate-500">
-              Dobrodošli,{' '}
+              {t('layout.header.welcome')}{' '}
               <span className="font-semibold text-slate-900">
-                {user?.firstName ?? 'Korisnik'}
+                {user?.firstName ?? t('layout.header.defaultUserName')}
               </span>
             </Typography.Text>
             <div className="flex shrink-0 items-center gap-2">
@@ -113,12 +122,13 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           >
             <NotificationBell />
           </div>
+          <LanguageSwitcher />
           <Button
             icon={<LogoutOutlined />}
             onClick={() => void logout()}
-            aria-label="Odjava"
+            aria-label={t('layout.header.logout')}
           >
-            <span className="hidden sm:inline">Odjava</span>
+            <span className="hidden sm:inline">{t('layout.header.logout')}</span>
           </Button>
         </Space>
       </div>

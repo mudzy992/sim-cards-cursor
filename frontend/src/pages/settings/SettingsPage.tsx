@@ -17,6 +17,7 @@ import {
 import { settingsApi } from '@/api/settings.api';
 import { useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
+import { useTranslation } from '@/i18n';
 import {
   APP_SETTINGS_MANIFEST,
   MANIFEST_GROUP_ORDER,
@@ -32,6 +33,7 @@ type SettingRow = {
 };
 
 function SettingsNotificationsSection() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -49,12 +51,12 @@ function SettingsNotificationsSection() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['settings', 'notifications'] });
       void queryClient.invalidateQueries({ queryKey: ['settings', 'features'] });
-      messageApi.success('Postavke su sačuvane.');
+      messageApi.success(t('settings.notifications.saved'));
     },
     onError: (e: unknown) => {
       messageApi.error(
         (e as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Greška pri spremanju postavke.',
+          ?.message ?? t('settings.notifications.saveFailed'),
       );
     },
   });
@@ -68,20 +70,19 @@ function SettingsNotificationsSection() {
       {contextHolder}
       <Space direction="vertical" size="large" className="w-full">
         <Typography.Paragraph type="secondary" className="!mb-0 max-w-3xl">
-          Ove postavke su globalne (za sve korisnike). U offline/lokalnom režimu, push i email
-          ne mogu raditi bez izlaza na internet — zato ih ovdje možeš sigurno isključiti.
+          {t('settings.notifications.intro')}
         </Typography.Paragraph>
 
         <Space align="start" className="w-full justify-between">
           <div className="space-y-1 max-w-xl">
-            <Typography.Text strong>Push notifikacije (mobile)</Typography.Text>
+            <Typography.Text strong>{t('settings.notifications.pushTitle')}</Typography.Text>
             <Typography.Paragraph type="secondary" className="!mb-0">
-              Kada je isključeno, mobilne aplikacije neće tražiti odobrenje niti slati push tokene.
+              {t('settings.notifications.pushDescription')}
             </Typography.Paragraph>
           </div>
           <Switch
-            checkedChildren="Uključeno"
-            unCheckedChildren="Isključeno"
+            checkedChildren={t('settings.enabled')}
+            unCheckedChildren={t('settings.disabled')}
             loading={isLoading || mutation.isPending}
             checked={pushEnabled}
             onChange={(next) => {
@@ -94,14 +95,14 @@ function SettingsNotificationsSection() {
 
         <Space align="start" className="w-full justify-between">
           <div className="space-y-1 max-w-xl">
-            <Typography.Text strong>Email notifikacije</Typography.Text>
+            <Typography.Text strong>{t('settings.notifications.emailTitle')}</Typography.Text>
             <Typography.Paragraph type="secondary" className="!mb-0">
-              Kontroliše slanje email notifikacija iz sistema (ne mijenja SMTP konfiguraciju).
+              {t('settings.notifications.emailDescription')}
             </Typography.Paragraph>
           </div>
           <Switch
-            checkedChildren="Uključeno"
-            unCheckedChildren="Isključeno"
+            checkedChildren={t('settings.enabled')}
+            unCheckedChildren={t('settings.disabled')}
             loading={isLoading || mutation.isPending}
             checked={emailEnabled}
             onChange={(next) => {
@@ -114,14 +115,14 @@ function SettingsNotificationsSection() {
 
         <Space align="start" className="w-full justify-between">
           <div className="space-y-1 max-w-xl">
-            <Typography.Text strong>In-app notifikacije</Typography.Text>
+            <Typography.Text strong>{t('settings.notifications.inAppTitle')}</Typography.Text>
             <Typography.Paragraph type="secondary" className="!mb-0">
-              Kontroliše kreiranje i emitovanje in-app notifikacija (web zvono i mobile inbox).
+              {t('settings.notifications.inAppDescription')}
             </Typography.Paragraph>
           </div>
           <Switch
-            checkedChildren="Uključeno"
-            unCheckedChildren="Isključeno"
+            checkedChildren={t('settings.enabled')}
+            unCheckedChildren={t('settings.disabled')}
             loading={isLoading || mutation.isPending}
             checked={inAppEnabled}
             onChange={(next) => {
@@ -153,6 +154,7 @@ type ManifestGroupCardProps = {
 };
 
 function ManifestGroupCard(props: ManifestGroupCardProps) {
+  const { t } = useTranslation();
   const {
     title,
     description,
@@ -189,7 +191,7 @@ function ManifestGroupCard(props: ManifestGroupCardProps) {
           size="small"
           columns={[
             {
-              title: 'Postavka',
+              title: t('settings.settingColumn'),
               render: (_, r) => (
                 <div>
                   <Typography.Text strong>{r.entry.label}</Typography.Text>
@@ -203,15 +205,15 @@ function ManifestGroupCard(props: ManifestGroupCardProps) {
               ),
             },
             {
-              title: 'Vrijednost',
+              title: t('settings.valueColumn'),
               width: 200,
               align: 'right',
               render: (_, r) => {
                 if (r.entry.valueType === 'boolean') {
                   return (
                     <Switch
-                      checkedChildren="Da"
-                      unCheckedChildren="Ne"
+                      checkedChildren={t('common.actions.yes')}
+                      unCheckedChildren={t('common.actions.no')}
                       checked={r.row.value === 'true'}
                       loading={pendingKey === r.entry.key}
                       onChange={(checked) => onBooleanChange(r.row, r.entry, checked)}
@@ -236,7 +238,7 @@ function ManifestGroupCard(props: ManifestGroupCardProps) {
               render: (_, r) =>
                 r.entry.valueType === 'boolean' ? null : (
                   <Button size="small" type="link" onClick={() => onOpenEdit(r.row, r.entry)}>
-                    Uredi
+                    {t('common.actions.edit')}
                   </Button>
                 ),
             },
@@ -248,6 +250,7 @@ function ManifestGroupCard(props: ManifestGroupCardProps) {
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const [manifestForm] = Form.useForm();
   const [legacyForm] = Form.useForm();
   const queryClient = useQueryClient();
@@ -273,7 +276,7 @@ export default function SettingsPage() {
       settingsApi.update(args.key, args.data),
     onMutate: ({ key }) => setPendingKey(key),
     onSuccess: () => {
-      messageApi.success('Postavka je ažurirana.');
+      messageApi.success(t('settings.updated'));
       void queryClient.invalidateQueries({ queryKey: ['settings'] });
       void queryClient.invalidateQueries({ queryKey: ['settings', 'features'] });
       setModalOpen(false);
@@ -287,7 +290,7 @@ export default function SettingsPage() {
     onError: (e: unknown) => {
       messageApi.error(
         (e as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Greška',
+          ?.message ?? t('common.states.error'),
       );
     },
     onSettled: () => setPendingKey(null),
@@ -334,9 +337,9 @@ export default function SettingsPage() {
       Modal.confirm({
         title: entry.confirmDangerousChange.title,
         content: entry.confirmDangerousChange.content,
-        okText: 'Isključi',
+        okText: t('settings.disabled'),
         okButtonProps: { danger: true },
-        cancelText: 'Odustani',
+        cancelText: t('common.actions.cancel'),
         onOk: apply,
       });
       return;
@@ -398,13 +401,13 @@ export default function SettingsPage() {
 
   const openLegacyModal = (row: SettingRow) => {
     setLegacyRow(row);
-    const t = guessLegacyValueType(row);
-    if (t === 'boolean') {
+    const valueType = guessLegacyValueType(row);
+    if (valueType === 'boolean') {
       legacyForm.setFieldsValue({
         value: row.value === 'true',
         description: row.description,
       });
-    } else if (t === 'number') {
+    } else if (valueType === 'number') {
       legacyForm.setFieldsValue({
         value: Number(row.value),
         description: row.description,
@@ -421,11 +424,11 @@ export default function SettingsPage() {
   const handleLegacySubmit = () => {
     void legacyForm.validateFields().then((values) => {
       if (!legacyRow) return;
-      const t = guessLegacyValueType(legacyRow);
+      const valueType = guessLegacyValueType(legacyRow);
       let out = '';
-      if (t === 'boolean') {
+      if (valueType === 'boolean') {
         out = values.value ? 'true' : 'false';
-      } else if (t === 'number') {
+      } else if (valueType === 'number') {
         out = String(values.value ?? '');
       } else {
         out = String(values.value ?? '');
@@ -490,23 +493,23 @@ export default function SettingsPage() {
 
   const renderLegacyModalFields = () => {
     if (!legacyRow) return null;
-    const t = guessLegacyValueType(legacyRow);
-    if (t === 'boolean') {
+    const valueType = guessLegacyValueType(legacyRow);
+    if (valueType === 'boolean') {
       return (
-        <Form.Item name="value" label="Vrijednost" valuePropName="checked">
-          <Switch checkedChildren="Uključeno" unCheckedChildren="Isključeno" />
+        <Form.Item name="value" label={t('settings.valueLabel')} valuePropName="checked">
+          <Switch checkedChildren={t('settings.enabled')} unCheckedChildren={t('settings.disabled')} />
         </Form.Item>
       );
     }
-    if (t === 'number') {
+    if (valueType === 'number') {
       return (
-        <Form.Item name="value" label="Vrijednost" rules={[{ required: true, type: 'number' }]}>
+        <Form.Item name="value" label={t('settings.valueLabel')} rules={[{ required: true, type: 'number' }]}>
           <InputNumber className="w-full max-w-md" />
         </Form.Item>
       );
     }
     return (
-      <Form.Item name="value" label="Vrijednost" rules={[{ required: true }]}>
+      <Form.Item name="value" label={t('settings.valueLabel')} rules={[{ required: true }]}>
         <Input.TextArea rows={4} />
       </Form.Item>
     );
@@ -520,19 +523,19 @@ export default function SettingsPage() {
     >
       {contextHolder}
       <Typography.Title level={3} className="!mb-0">
-        Postavke aplikacije
+        {t('settings.title')}
       </Typography.Title>
-      <Card title="Notifikacije" className="mb-4">
+      <Card title={t('settings.notificationsCardTitle')} className="mb-4">
         <SettingsNotificationsSection />
       </Card>
 
-      <Card title="Email / SMTP" className="mb-4">
+      <Card title={t('layout.sidebar.emailSmtp')} className="mb-4">
         <Space align="start" className="w-full justify-between" wrap>
           <Typography.Paragraph type="secondary" className="!mb-0 max-w-2xl">
-            Email (SMTP) postavke i template-i su na posebnoj stranici radi lakšeg podešavanja.
+            {t('settings.emailCardIntro')}
           </Typography.Paragraph>
           <Button type="primary" href="/settings/email">
-            Otvori Email postavke
+            {t('settings.openEmailSettings')}
           </Button>
         </Space>
       </Card>
@@ -551,14 +554,14 @@ export default function SettingsPage() {
         />
       ))}
 
-      <Card title="Ostalo (ključevi izvan manifesta)" className="mb-4">
+      <Card title={t('settings.otherCardTitle')} className="mb-4">
         <Space direction="vertical" className="w-full" size="middle">
           <Typography.Paragraph type="secondary" className="!mb-0 max-w-3xl">
-            Prikaz su korisnički i sistemski ključevi koji nisu u manifestu (npr.{' '}
-            <code className="text-xs">user:tour-state:*</code>, budući ključevi). Uredi otvara modal.
+            {t('settings.otherCardIntro')}{' '}
+            <code className="text-xs">user:tour-state:*</code>{t('settings.otherCardIntroSuffix')}
           </Typography.Paragraph>
           <Input
-            placeholder="Pretraga po ključu ili opisu…"
+            placeholder={t('settings.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             allowClear
@@ -567,17 +570,17 @@ export default function SettingsPage() {
             items={[
               {
                 key: 'legacy',
-                label: `Lista (${advancedRows.length})`,
+                label: t('settings.listLabel', { count: advancedRows.length }),
                 children: (
                   <Table<SettingRow>
                     dataSource={advancedRows}
                     rowKey="key"
                     loading={isLoading}
                     pagination={{ pageSize: 15, showSizeChanger: true }}
-                    locale={{ emptyText: 'Nema ključeva izvan manifesta' }}
+                    locale={{ emptyText: t('settings.noOtherKeys') }}
                     columns={[
                       {
-                        title: 'Postavka',
+                        title: t('settings.settingColumn'),
                         render: (_: unknown, record: SettingRow) => (
                           <div>
                             <Typography.Text strong>
@@ -593,13 +596,13 @@ export default function SettingsPage() {
                         ),
                       },
                       {
-                        title: 'Vrijednost',
+                        title: t('settings.valueColumn'),
                         width: 220,
                         render: (_: unknown, record: SettingRow) => {
                           if (record.value === 'true' || record.value === 'false') {
                             return (
                               <Typography.Text className="text-sm">
-                                {record.value === 'true' ? 'Uključeno' : 'Isključeno'}
+                                {record.value === 'true' ? t('settings.enabled') : t('settings.disabled')}
                               </Typography.Text>
                             );
                           }
@@ -618,7 +621,7 @@ export default function SettingsPage() {
                         align: 'right',
                         render: (_: unknown, record: SettingRow) => (
                           <Button size="small" type="link" onClick={() => openLegacyModal(record)}>
-                            Uredi
+                            {t('common.actions.edit')}
                           </Button>
                         ),
                       },
@@ -632,7 +635,7 @@ export default function SettingsPage() {
       </Card>
 
       <Modal
-        title={modalEntry ? `Uredi: ${modalEntry.label}` : 'Uredi postavku'}
+        title={modalEntry ? t('settings.editEntryTitle', { label: modalEntry.label }) : t('settings.editSettingTitle')}
         open={modalOpen}
         onCancel={() => {
           setModalOpen(false);
@@ -640,7 +643,7 @@ export default function SettingsPage() {
           setModalRow(null);
           manifestForm.resetFields();
         }}
-        okText="Sačuvaj"
+        okText={t('common.actions.save')}
         confirmLoading={updateMutation.isPending}
         onOk={() => handleModalSubmit()}
         destroyOnClose
@@ -658,14 +661,14 @@ export default function SettingsPage() {
       </Modal>
 
       <Modal
-        title={legacyRow ? `Uredi: ${legacyRow.key}` : 'Uredi'}
+        title={legacyRow ? t('settings.editEntryTitle', { label: legacyRow.key }) : t('common.actions.edit')}
         open={legacyModalOpen}
         onCancel={() => {
           setLegacyModalOpen(false);
           setLegacyRow(null);
           legacyForm.resetFields();
         }}
-        okText="Sačuvaj"
+        okText={t('common.actions.save')}
         confirmLoading={updateMutation.isPending}
         onOk={() => handleLegacySubmit()}
         destroyOnClose

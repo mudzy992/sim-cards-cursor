@@ -3,6 +3,7 @@ import { Alert, Button, Card, Form, Input, Select, Space, Switch, Tabs, Typograp
 import { useEffect, useMemo, useState } from 'react';
 import { settingsApi } from '@/api/settings.api';
 import { mailApi, type MailTemplate } from '@/api/mail.api';
+import { useTranslation } from '@/i18n';
 
 type SettingRow = { key: string; value: string; description?: string };
 
@@ -23,6 +24,7 @@ const SMTP_PRESETS: Record<
 
 function SmtpWizardCard(props: { settings: SettingRow[] }) {
   const { settings } = props;
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [messageApi, contextHolder] = message.useMessage();
   const [form] = Form.useForm();
@@ -59,12 +61,12 @@ function SmtpWizardCard(props: { settings: SettingRow[] }) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['settings'] });
-      messageApi.success('SMTP postavke su sačuvane.');
+      messageApi.success(t('emailSettings.smtp.saved'));
     },
     onError: (e: unknown) => {
       messageApi.error(
         (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Greška pri spremanju SMTP postavki.',
+          t('emailSettings.smtp.saveFailed'),
       );
     },
   });
@@ -102,10 +104,10 @@ function SmtpWizardCard(props: { settings: SettingRow[] }) {
       <Space direction="vertical" className="w-full" size="large">
         <div>
           <Typography.Title level={4} className="!mb-1">
-            SMTP / Email transport
+            {t('emailSettings.smtp.title')}
           </Typography.Title>
           <Typography.Paragraph type="secondary" className="!mb-0">
-            Odaberi provider, primijeni preset i unesi kredencijale. Za Google koristi App Password. Za Office365 STARTTLS (587).
+            {t('emailSettings.smtp.intro')}
           </Typography.Paragraph>
         </div>
 
@@ -113,21 +115,21 @@ function SmtpWizardCard(props: { settings: SettingRow[] }) {
           <Space align="start" className="w-full justify-between" wrap>
             <Form.Item
               name="emailEnabled"
-              label="Email enabled"
+              label={t('emailSettings.smtp.emailEnabledLabel')}
               valuePropName="checked"
               className="min-w-[220px]"
             >
-              <Switch checkedChildren="Uključeno" unCheckedChildren="Isključeno" />
+              <Switch checkedChildren={t('settings.enabled')} unCheckedChildren={t('settings.disabled')} />
             </Form.Item>
 
-            <Form.Item name="provider" label="Provider" rules={[{ required: true }]} className="min-w-[260px]">
+            <Form.Item name="provider" label={t('emailSettings.smtp.providerLabel')} rules={[{ required: true }]} className="min-w-[260px]">
               <Select
                 options={[
                   { value: 'google', label: 'Google (Gmail)' },
                   { value: 'office365', label: 'Office 365' },
-                  { value: 'exchange', label: 'Exchange (custom host)' },
-                  { value: 'custom', label: 'Custom SMTP' },
-                  { value: 'disabled', label: 'Disabled (no email)' },
+                  { value: 'exchange', label: t('emailSettings.smtp.providerExchange') },
+                  { value: 'custom', label: t('emailSettings.smtp.providerCustom') },
+                  { value: 'disabled', label: t('emailSettings.smtp.providerDisabled') },
                 ]}
                 onChange={(v) => applyPreset(String(v))}
               />
@@ -141,37 +143,37 @@ function SmtpWizardCard(props: { settings: SettingRow[] }) {
             <Form.Item name="port" label="Port" className="min-w-[140px]">
               <Input placeholder="587" />
             </Form.Item>
-            <Form.Item name="secure" label="Secure (SMTPS)" valuePropName="checked">
+            <Form.Item name="secure" label={t('emailSettings.smtp.secureLabel')} valuePropName="checked">
               <Switch />
             </Form.Item>
-            <Form.Item name="requireTLS" label="Require TLS (STARTTLS)" valuePropName="checked">
+            <Form.Item name="requireTLS" label={t('emailSettings.smtp.requireTlsLabel')} valuePropName="checked">
               <Switch />
             </Form.Item>
           </Space>
 
           <Space className="w-full" size="large" wrap>
-            <Form.Item name="user" label="Username" className="min-w-[280px]">
+            <Form.Item name="user" label={t('common.labels.username')} className="min-w-[280px]">
               <Input placeholder="email@domain.com" />
             </Form.Item>
-            <Form.Item name="pass" label="Password / App password" className="min-w-[280px]">
+            <Form.Item name="pass" label={t('emailSettings.smtp.passwordLabel')} className="min-w-[280px]">
               <Input.Password placeholder="••••••••" />
             </Form.Item>
           </Space>
 
           <Space className="w-full" size="large" wrap>
-            <Form.Item name="fromName" label="From name" className="min-w-[240px]">
+            <Form.Item name="fromName" label={t('emailSettings.smtp.fromNameLabel')} className="min-w-[240px]">
               <Input placeholder="SIM Tracker" />
             </Form.Item>
-            <Form.Item name="fromAddress" label="From address" className="min-w-[280px]">
+            <Form.Item name="fromAddress" label={t('emailSettings.smtp.fromAddressLabel')} className="min-w-[280px]">
               <Input placeholder="no-reply@domain.com" />
             </Form.Item>
-            <Form.Item name="replyTo" label="Reply-To (optional)" className="min-w-[280px]">
+            <Form.Item name="replyTo" label={t('emailSettings.smtp.replyToLabel')} className="min-w-[280px]">
               <Input placeholder="" />
             </Form.Item>
           </Space>
 
           <Button type="primary" htmlType="submit" loading={saveMutation.isPending}>
-            Sačuvaj
+            {t('common.actions.save')}
           </Button>
         </Form>
       </Space>
@@ -180,6 +182,7 @@ function SmtpWizardCard(props: { settings: SettingRow[] }) {
 }
 
 function TemplatesCard() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [messageApi, contextHolder] = message.useMessage();
   const [selected, setSelected] = useState<string>('installation-record-notification');
@@ -212,8 +215,8 @@ function TemplatesCard() {
 
   const availableFields = useMemo(
     () => [
-      { key: 'recordNumber', description: 'Broj zapisnika (npr. IR-0001)', example: 'TEST-001' },
-      { key: 'recordId', description: 'ID zapisnika (UUID)', example: 'test' },
+      { key: 'recordNumber', description: t('emailSettings.templates.fieldRecordNumber'), example: 'TEST-001' },
+      { key: 'recordId', description: t('emailSettings.templates.fieldRecordId'), example: 'test' },
     ],
     [],
   );
@@ -225,7 +228,7 @@ function TemplatesCard() {
     onError: (e: unknown) => {
       messageApi.error(
         (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Greška pri renderovanju preview-a.',
+          t('emailSettings.templates.previewFailed'),
       );
     },
   });
@@ -234,12 +237,12 @@ function TemplatesCard() {
     mutationFn: async () => mailApi.updateTemplate(selected, content),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['mail', 'templates'] });
-      messageApi.success('Template je sačuvan (DB override).');
+      messageApi.success(t('emailSettings.templates.saved'));
     },
     onError: (e: unknown) => {
       messageApi.error(
         (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Greška pri spremanju template-a.',
+          t('emailSettings.templates.saveFailed'),
       );
     },
   });
@@ -252,11 +255,11 @@ function TemplatesCard() {
         subject: `Test email (${selected})`,
         context: sampleContext,
       }),
-    onSuccess: () => messageApi.success('Test email poslan (ako je SMTP ispravno podešen).'),
+    onSuccess: () => messageApi.success(t('emailSettings.templates.testSent')),
     onError: (e: unknown) => {
       messageApi.error(
         (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Greška pri slanju test emaila.',
+          t('emailSettings.templates.testFailed'),
       );
     },
   });
@@ -269,10 +272,10 @@ function TemplatesCard() {
       <Space direction="vertical" className="w-full" size="large">
         <div>
           <Typography.Title level={4} className="!mb-1">
-            Email template-i
+            {t('emailSettings.templates.title')}
           </Typography.Title>
           <Typography.Paragraph type="secondary" className="!mb-0">
-            Template-i su Handlebars (.hbs). Ako sačuvaš ovdje, sadržaj se čuva u bazi kao override; ako nije sačuvano, koristi se default iz fajla.
+            {t('emailSettings.templates.intro')}
           </Typography.Paragraph>
         </div>
 
@@ -292,7 +295,7 @@ function TemplatesCard() {
               loading={templatesQuery.isLoading}
             />
             <Button onClick={() => previewMutation.mutate()} loading={previewMutation.isPending}>
-              Preview
+              {t('emailSettings.templates.preview')}
             </Button>
           </Space>
         </Space>
@@ -300,22 +303,22 @@ function TemplatesCard() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
             <Typography.Text type="secondary" className="block mb-2">
-              Editor (Handlebars .hbs)
+              {t('emailSettings.templates.editorLabel')}
             </Typography.Text>
             <Alert
               type="info"
-              message="Dostupna polja (placeholders)"
+              message={t('emailSettings.templates.availableFieldsTitle')}
               description={
                 <div>
                   <div className="mb-2">
-                    Možeš koristiti <code>{'{{field}}'}</code> u template-u.
+                    {t('emailSettings.templates.placeholderHint')} <code>{'{{field}}'}</code>
                   </div>
                   <ul className="list-disc ml-5">
                     {availableFields.map((f) => (
                       <li key={f.key}>
                         <code>{`{{${f.key}}}`}</code> — {f.description}{' '}
                         <Typography.Text type="secondary" className="font-mono">
-                          (npr. {String(f.example)})
+                          ({t('emailSettings.templates.exampleLabel')} {String(f.example)})
                         </Typography.Text>
                       </li>
                     ))}
@@ -329,11 +332,11 @@ function TemplatesCard() {
               rows={18}
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="(Handlebars template)"
+              placeholder={t('emailSettings.templates.editorPlaceholder')}
             />
             <div className="mt-3 flex flex-wrap gap-2">
               <Button type="primary" onClick={() => saveTemplate.mutate()} loading={saveTemplate.isPending}>
-                Sačuvaj template
+                {t('emailSettings.templates.saveTemplate')}
               </Button>
               <Input
                 placeholder="test@email.com"
@@ -346,13 +349,13 @@ function TemplatesCard() {
                 loading={testEmail.isPending}
                 disabled={!testTo.trim()}
               >
-                Pošalji test email
+                {t('emailSettings.templates.sendTestEmail')}
               </Button>
             </div>
           </div>
           <div>
             <Typography.Text type="secondary" className="block mb-2">
-              HTML preview
+              {t('emailSettings.templates.htmlPreview')}
             </Typography.Text>
             {previewHtml ? (
               <iframe
@@ -363,7 +366,7 @@ function TemplatesCard() {
             ) : (
               <Alert
                 type="info"
-                message="Klikni Preview da renderujemo template sa test podacima."
+                message={t('emailSettings.templates.previewHint')}
               />
             )}
           </div>
@@ -374,6 +377,7 @@ function TemplatesCard() {
 }
 
 export default function EmailSettingsPage() {
+  const { t } = useTranslation();
   const { data: settings = [], isLoading } = useQuery<SettingRow[]>({
     queryKey: ['settings'],
     queryFn: () => settingsApi.list(),
@@ -395,16 +399,15 @@ export default function EmailSettingsPage() {
   return (
     <div className="space-y-4">
       <Typography.Title level={3} className="!mb-0">
-        Email postavke
+        {t('emailSettings.title')}
       </Typography.Title>
 
       <Card className="mb-4">
         <Space align="start" className="w-full justify-between flex-wrap" size="middle">
           <Typography.Paragraph type="secondary" className="!mb-0 max-w-2xl">
-            SMTP kredencijali i template-i su odvojeni od općih postavki. Za globalne notifikacijske
-            kanale koristi stranicu Postavke.
+            {t('emailSettings.pageIntro')}
           </Typography.Paragraph>
-          <Button href="/settings">Nazad na postavke</Button>
+          <Button href="/settings">{t('emailSettings.backToSettings')}</Button>
         </Space>
       </Card>
 
@@ -417,7 +420,7 @@ export default function EmailSettingsPage() {
           },
           {
             key: 'templates',
-            label: 'Template-i',
+            label: t('emailSettings.templatesTab'),
             children: <TemplatesCard />,
           },
         ]}
@@ -426,10 +429,10 @@ export default function EmailSettingsPage() {
       {missing.length ? (
         <Alert
           type="warning"
-          message="Neke email postavke nisu podešene"
+          message={t('emailSettings.missingWarningTitle')}
           description={
             <div>
-              <div>Provjeri sljedeće:</div>
+              <div>{t('emailSettings.checkFollowing')}</div>
               <ul className="list-disc ml-5">
                 {missing.map((m) => (
                   <li key={m}>
@@ -443,7 +446,7 @@ export default function EmailSettingsPage() {
       ) : null}
 
       {isLoading ? (
-        <Typography.Text type="secondary">Učitavanje postavki…</Typography.Text>
+        <Typography.Text type="secondary">{t('emailSettings.loadingSettings')}</Typography.Text>
       ) : null}
     </div>
   );

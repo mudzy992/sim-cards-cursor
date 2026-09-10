@@ -6,9 +6,11 @@ import { branchesApi } from '@/api/branches.api'
 import { usersApi } from '@/api/users.api'
 import { useAuthStore } from '@/store/auth.store'
 import type { BranchModeratorItem } from '@/types/branch-moderator.types'
+import { useTranslation } from '@/i18n'
 
 export default function BranchModeratorsPage() {
   const queryClient = useQueryClient()
+  const { t } = useTranslation();
   const [messageApi, messageContextHolder] = message.useMessage()
   const userDistributionId = useAuthStore((s) => s.user?.distributionId)
 
@@ -35,14 +37,14 @@ export default function BranchModeratorsPage() {
   const assignMutation = useMutation({
     mutationFn: (values: { branchId: string; userId: string }) => branchModeratorsApi.assign(values),
     onSuccess: async () => {
-      messageApi.success('Moderator je dodijeljen podružnici.')
+      messageApi.success(t('branchModerators.assignSuccess'))
       setDrawerOpen(false)
       form.resetFields()
       await queryClient.invalidateQueries({ queryKey: ['branch-moderators'] })
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -50,12 +52,12 @@ export default function BranchModeratorsPage() {
   const removeMutation = useMutation({
     mutationFn: (id: string) => branchModeratorsApi.remove(id),
     onSuccess: async () => {
-      messageApi.success('Dodjela je uklonjena.')
+      messageApi.success(t('branchModerators.removeSuccess'))
       await queryClient.invalidateQueries({ queryKey: ['branch-moderators'] })
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -86,14 +88,14 @@ export default function BranchModeratorsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Typography.Title level={3} className="!mb-0">
-            Moderatori podružnica
+            {t('branchModerators.title')}
           </Typography.Title>
           <Typography.Text type="secondary">
-            Dodjeljuj operatere (USER) kao moderatore podružnica za akciju “SEP aktiviran”.
+            {t('branchModerators.subtitle')}
           </Typography.Text>
         </div>
         <Button type="primary" onClick={() => setDrawerOpen(true)}>
-          Dodijeli moderatora
+          {t('branchModerators.assignButton')}
         </Button>
       </div>
 
@@ -101,12 +103,12 @@ export default function BranchModeratorsPage() {
         <Select
           allowClear
           style={{ width: 260 }}
-          placeholder="Filter po podružnici"
+          placeholder={t('branchModerators.filterPlaceholder')}
           options={branchOptions}
           value={branchIdFilter}
           onChange={(v) => setBranchIdFilter(v || undefined)}
         />
-        <Button onClick={() => setBranchIdFilter(undefined)}>Reset</Button>
+        <Button onClick={() => setBranchIdFilter(undefined)}>{t('common.actions.reset')}</Button>
       </Space>
 
       <Table<BranchModeratorItem>
@@ -116,25 +118,25 @@ export default function BranchModeratorsPage() {
         pagination={false}
         columns={[
           {
-            title: 'Podružnica',
+            title: t('common.labels.branch'),
             render: (_, row) =>
               row.branch ? `${row.branch.name} (${row.branch.code})` : row.branchId,
           },
           {
-            title: 'Korisnik',
+            title: t('common.labels.username'),
             render: (_, row) =>
               row.user ? `${row.user.firstName} ${row.user.lastName}` : row.userId,
           },
           {
-            title: 'Email',
+            title: t('common.labels.email'),
             render: (_, row) => row.user?.email ?? '–',
           },
           {
-            title: 'Akcije',
+            title: t('common.actions.actions'),
             width: 140,
             render: (_, row) => (
               <Button danger size="small" loading={removeMutation.isPending} onClick={() => removeMutation.mutate(row.id)}>
-                Ukloni
+                {t('common.actions.remove')}
               </Button>
             ),
           },
@@ -142,7 +144,7 @@ export default function BranchModeratorsPage() {
       />
 
       <Drawer
-        title="Dodijeli moderatora podružnici"
+        title={t('branchModerators.drawerTitle')}
         open={drawerOpen}
         width={520}
         onClose={() => {
@@ -158,27 +160,27 @@ export default function BranchModeratorsPage() {
                 form.resetFields()
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button type="primary" loading={assignMutation.isPending} onClick={() => form.submit()}>
-              Dodijeli
+              {t('common.actions.add')}
             </Button>
           </div>
         }
       >
         <Form form={form} layout="vertical" onFinish={(values) => assignMutation.mutate(values)}>
-          <Form.Item name="branchId" label="Podružnica" rules={[{ required: true }]}>
+          <Form.Item name="branchId" label={t('common.labels.branch')} rules={[{ required: true }]}>
             <Select
-              placeholder="Odaberi podružnicu"
+              placeholder={t('branchModerators.selectBranchPlaceholder')}
               options={branchOptions}
               loading={branchesQuery.isLoading}
               showSearch
               optionFilterProp="label"
             />
           </Form.Item>
-          <Form.Item name="userId" label="Korisnik (USER)" rules={[{ required: true }]}>
+          <Form.Item name="userId" label={t('branchModerators.userFieldLabel')} rules={[{ required: true }]}>
             <Select
-              placeholder="Odaberi korisnika"
+              placeholder={t('shipments.list.selectUserPlaceholder')}
               options={userOptions}
               loading={usersQuery.isLoading}
               showSearch

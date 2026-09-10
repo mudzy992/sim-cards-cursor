@@ -8,6 +8,7 @@ import { Sidebar } from './Sidebar';
 import { useAuthStore } from '@/store/auth.store';
 import { useState } from 'react';
 import { useAppFeatures } from '@/hooks/useAppFeatures';
+import { useTranslation } from '@/i18n';
 
 const { Content } = Layout;
 
@@ -17,6 +18,7 @@ export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const featuresQuery = useAppFeatures();
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const { t } = useTranslation();
 
   return (
     <Layout className="min-h-screen bg-slate-50">
@@ -30,10 +32,10 @@ export function AppLayout() {
               <Alert
                 type="warning"
                 className="mb-4"
-                message="Sistem nije potpuno podešen"
+                message={t('layout.appLayout.notFullyConfigured')}
                 description={
                   <div>
-                    <div>Nedostaju ili nisu podešene ključne postavke:</div>
+                    <div>{t('layout.appLayout.missingKeysIntro')}</div>
                     <ul className="list-disc ml-5">
                       {featuresQuery.data.missingKeys.map((k) => (
                         <li key={k}>

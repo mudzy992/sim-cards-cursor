@@ -10,6 +10,7 @@ import {
   getSimCardStatusLabel,
   getSimEventTypeLabel,
 } from '@/utils/labels.utils';
+import { useTranslation } from '@/i18n';
 
 const statusColor: Record<string, string> = {
   AVAILABLE: 'green',
@@ -27,6 +28,8 @@ export default function SimCardDetailsPage() {
   const user = useAuthStore((s) => s.user)
   const role = user?.role
   const isModerator = role === 'USER' && (user?.branchModeratorBranchIds?.length ?? 0) > 0
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
 
   const simCardQuery = useQuery({
     queryKey: ['sim-cards', 'details', id],
@@ -59,19 +62,19 @@ export default function SimCardDetailsPage() {
       tags.push({
         key: 'resolution',
         color: 'blue',
-        label: getDemountResolutionLabel(resolution),
+        label: getDemountResolutionLabel(resolution, t),
       })
     if (removedSimDisposition)
       tags.push({
         key: 'removedSimDisposition',
         color: 'geekblue',
-        label: getRemovedSimDispositionLabel(removedSimDisposition),
+        label: getRemovedSimDispositionLabel(removedSimDisposition, t),
       })
     if (meterDemountCategory)
       tags.push({
         key: 'meterDemountCategory',
         color: 'gold',
-        label: getMeterDemountCategoryLabel(meterDemountCategory),
+        label: getMeterDemountCategoryLabel(meterDemountCategory, t),
       })
 
     const hasAny = Boolean(meterId) || Boolean(recordId) || Boolean(demountTaskId) || tags.length > 0
@@ -81,9 +84,9 @@ export default function SimCardDetailsPage() {
       <div className="mt-2 flex flex-col gap-2">
         {tags.length > 0 ? (
           <Space size={[6, 6]} wrap>
-            {tags.map((t) => (
-              <Tag key={t.key} color={t.color}>
-                {t.label}
+            {tags.map((tag) => (
+              <Tag key={tag.key} color={tag.color}>
+                {tag.label}
               </Tag>
             ))}
           </Space>
@@ -91,17 +94,17 @@ export default function SimCardDetailsPage() {
         <Space size={[10, 8]} wrap>
           {meterId ? (
             <Typography.Text type="secondary" className="text-xs">
-              Brojilo: <Link to={`/meters/${meterId}`}>Otvori</Link>
+              {t('simCards.details.meter')}: <Link to={`/meters/${meterId}`}>{t('common.actions.view')}</Link>
             </Typography.Text>
           ) : null}
           {recordId ? (
             <Typography.Text type="secondary" className="text-xs">
-              Zapisnik: <Link to={`/installation-records/${recordId}`}>{recordId.slice(0, 8)}…</Link>
+              {t('simCards.details.record')}: <Link to={`/installation-records/${recordId}`}>{recordId.slice(0, 8)}…</Link>
             </Typography.Text>
           ) : null}
           {demountTaskId ? (
             <Typography.Text type="secondary" className="text-xs">
-              Task: <Typography.Text code copyable={{ text: demountTaskId }}>{demountTaskId.slice(0, 8)}…</Typography.Text>
+              {t('simCards.details.task')}: <Typography.Text code copyable={{ text: demountTaskId }}>{demountTaskId.slice(0, 8)}…</Typography.Text>
             </Typography.Text>
           ) : null}
         </Space>
@@ -112,9 +115,9 @@ export default function SimCardDetailsPage() {
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Space>
-        <Button onClick={() => navigate(isModerator ? '/sim-cards' : '/shipments')}>Nazad</Button>
+        <Button onClick={() => navigate(isModerator ? '/sim-cards' : '/shipments')}>{t('common.actions.back')}</Button>
         <Typography.Title level={3} className="!mb-0">
-          Detalji SIM kartice
+          {t('simCards.details.title')}
         </Typography.Title>
       </Space>
 
@@ -122,41 +125,41 @@ export default function SimCardDetailsPage() {
         {simCard ? (
           <Descriptions column={2} bordered>
             <Descriptions.Item label="ICCID">{simCard.iccid}</Descriptions.Item>
-            <Descriptions.Item label="Status">
+            <Descriptions.Item label={t('common.labels.status')}>
               <Tag color={statusColor[simCard.status] ?? 'default'}>
-                {getSimCardStatusLabel(simCard.status)}
+                {getSimCardStatusLabel(simCard.status, t)}
               </Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="IP adresa">{simCard.ipAddress}</Descriptions.Item>
-            <Descriptions.Item label="Javna IP">
+            <Descriptions.Item label={t('simCards.details.ipAddress')}>{simCard.ipAddress}</Descriptions.Item>
+            <Descriptions.Item label={t('simCards.details.publicIp')}>
               {simCard.publicIpAddress ?? '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Telefon">{simCard.phoneNumber ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('common.labels.phone')}>{simCard.phoneNumber ?? '-'}</Descriptions.Item>
             <Descriptions.Item label="APN">{simCard.apn ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Isporuka">
+            <Descriptions.Item label={t('simCards.details.shipment')}>
               {simCard.shipment.name} ({simCard.shipment.provider})
             </Descriptions.Item>
-            <Descriptions.Item label="Dodijeljena korisniku">
+            <Descriptions.Item label={t('simCards.details.assignedTo')}>
               {simCard.assignedTo
                 ? `${simCard.assignedTo.firstName} ${simCard.assignedTo.lastName}`
                 : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Dodijeljena u">
+            <Descriptions.Item label={t('simCards.details.assignedAt')}>
               {simCard.assignedAt ? new Date(simCard.assignedAt).toLocaleString() : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Kreirano">
+            <Descriptions.Item label={t('common.labels.createdAt')}>
               {new Date(simCard.createdAt).toLocaleString()}
             </Descriptions.Item>
-            <Descriptions.Item label="Ažurirano">
+            <Descriptions.Item label={t('common.labels.updatedAt')}>
               {new Date(simCard.updatedAt).toLocaleString()}
             </Descriptions.Item>
           </Descriptions>
         ) : null}
       </Card>
 
-      <Card title="Kretanje / historija događaja" loading={eventsQuery.isLoading}>
+      <Card title={t('simCards.details.historyTitle')} loading={eventsQuery.isLoading}>
         {eventsQuery.data && eventsQuery.data.length === 0 ? (
-          <Typography.Text type="secondary">Nema zabilježenih događaja.</Typography.Text>
+          <Typography.Text type="secondary">{t('simCards.details.noEvents')}</Typography.Text>
         ) : null}
         {eventsQuery.data && eventsQuery.data.length > 0 ? (
           <Timeline
@@ -164,16 +167,16 @@ export default function SimCardDetailsPage() {
               key: ev.id,
               children: (
                 <div>
-                  <Typography.Text strong>{getSimEventTypeLabel(ev.type)}</Typography.Text>
+                  <Typography.Text strong>{getSimEventTypeLabel(ev.type, t)}</Typography.Text>
                   <div className="text-slate-500 text-sm">
-                    {new Date(ev.createdAt).toLocaleString('bs-BA')}
+                    {new Date(ev.createdAt).toLocaleString(dateLocale)}
                     {ev.user
                       ? ` · ${ev.user.firstName} ${ev.user.lastName}`
                       : ''}
                   </div>
                   {renderMetadata(ev.metadata) ?? (
                     <Typography.Text type="secondary" className="text-xs">
-                      Nema dodatnih detalja.
+                      {t('simCards.details.noExtraDetails')}
                     </Typography.Text>
                   )}
                 </div>

@@ -4,9 +4,11 @@ import { BellOutlined } from '@ant-design/icons';
 import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { notificationsApi } from '@/api/notifications.api';
+import { useTranslation } from '@/i18n';
 
 export function NotificationBell() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notifications-unread-count'],
@@ -38,17 +40,17 @@ export function NotificationBell() {
   const dropdownContent = (
     <div className="w-80 max-h-96 overflow-auto">
       <div className="p-2 border-b flex justify-between items-center">
-        <Typography.Text strong>Notifikacije</Typography.Text>
+        <Typography.Text strong>{t('layout.notifications.title')}</Typography.Text>
         {unreadCount > 0 && (
           <Button type="link" size="small" onClick={() => void markAllAsReadMutation()}>
-            Označi sve kao pročitano
+            {t('layout.notifications.markAllRead')}
           </Button>
         )}
       </div>
       <List
         size="small"
         dataSource={notifications}
-        locale={{ emptyText: 'Nema notifikacija' }}
+        locale={{ emptyText: t('layout.notifications.empty') }}
         renderItem={(item) => (
           <List.Item
             className={item.isRead ? 'opacity-70' : ''}
@@ -75,7 +77,7 @@ export function NotificationBell() {
                       className="text-xs text-blue-600"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      Pogledaj
+                      {t('layout.notifications.view')}
                     </Link>
                   )}
                 </>

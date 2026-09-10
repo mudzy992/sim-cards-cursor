@@ -9,15 +9,7 @@ import type {
   InstallationRecordsListParams,
   RecordStatus,
 } from '@/types/installation-record.types';
-
-const statusFilterOptions = [
-  { label: 'Svi statusi', value: '' },
-  { label: 'Nacrt', value: 'DRAFT' },
-  { label: 'Poslano', value: 'SENT' },
-  { label: 'Greška slanja', value: 'SEND_FAILED' },
-  { label: 'SEP aktiviran', value: 'SEP_ACTIVATED' },
-  { label: 'Legacy završeno', value: 'LEGACY_COMPLETED' },
-];
+import { useTranslation } from '@/i18n';
 
 const statusColor: Record<string, string> = {
   DRAFT: 'default',
@@ -27,12 +19,12 @@ const statusColor: Record<string, string> = {
   LEGACY_COMPLETED: 'default',
 };
 
-const statusLabel: Record<string, string> = {
-  DRAFT: 'Nacrt',
-  SENT: 'Poslano',
-  SEND_FAILED: 'Greška slanja',
-  SEP_ACTIVATED: 'SEP aktiviran',
-  LEGACY_COMPLETED: 'Legacy završeno',
+const statusLabelKey: Record<string, string> = {
+  DRAFT: 'installationRecords.status.draft',
+  SENT: 'installationRecords.status.sent',
+  SEND_FAILED: 'installationRecords.status.sendFailed',
+  SEP_ACTIVATED: 'installationRecords.status.sepActivated',
+  LEGACY_COMPLETED: 'installationRecords.status.legacyCompleted',
 };
 
 const defaultFilters: InstallationRecordsListParams = {
@@ -42,8 +34,18 @@ const defaultFilters: InstallationRecordsListParams = {
 
 export default function InstallationRecordsListPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [filters, setFilters] =
     useState<InstallationRecordsListParams>(defaultFilters);
+
+  const statusFilterOptions = [
+    { label: t('common.labels.all'), value: '' },
+    { label: t('installationRecords.status.draft'), value: 'DRAFT' },
+    { label: t('installationRecords.status.sent'), value: 'SENT' },
+    { label: t('installationRecords.status.sendFailed'), value: 'SEND_FAILED' },
+    { label: t('installationRecords.status.sepActivated'), value: 'SEP_ACTIVATED' },
+    { label: t('installationRecords.status.legacyCompleted'), value: 'LEGACY_COMPLETED' },
+  ];
 
   const listQuery = useQuery({
     queryKey: ['installation-records', 'list', filters],
@@ -68,10 +70,10 @@ export default function InstallationRecordsListPage() {
         data-tour-id="records-header"
       >
         <Typography.Title level={3} className="!mb-0">
-          Zapisnici ugradnje
+          {t('installationRecords.list.title')}
         </Typography.Title>
         <Button type="primary" onClick={() => navigate('/installation-records/new')}>
-          Novi zapisnik
+          {t('installationRecords.list.newRecord')}
         </Button>
       </div>
 
@@ -80,7 +82,7 @@ export default function InstallationRecordsListPage() {
         data-tour-id="records-filters"
       >
         <Select
-          placeholder="Status"
+          placeholder={t('common.labels.status')}
           allowClear
           style={{ width: 180 }}
           value={filters.status ?? ''}
@@ -96,13 +98,13 @@ export default function InstallationRecordsListPage() {
         <Button
           onClick={() => setFilters(defaultFilters)}
         >
-          Reset filtera
+          {t('common.actions.clearFilters')}
         </Button>
       </Space>
 
       {listQuery.isError && (
         <Typography.Text type="danger">
-          {getApiErrorMessage(listQuery.error, 'Učitavanje liste nije uspjelo.')}
+          {getApiErrorMessage(listQuery.error, t('installationRecords.list.loadFailed'))}
         </Typography.Text>
       )}
 
@@ -115,13 +117,13 @@ export default function InstallationRecordsListPage() {
           pageSize: listQuery.data?.limit,
           total: listQuery.data?.total,
           showSizeChanger: true,
-          showTotal: (total) => `Ukupno: ${total}`,
+          showTotal: (total) => t('common.pagination.totalItems', { count: total }),
           onChange: (page, pageSize) =>
             setFilters((prev) => ({ ...prev, page, limit: pageSize ?? 20 })),
         }}
         columns={[
           {
-            title: 'Broj zapisnika',
+            title: t('installationRecords.list.columns.recordNumber'),
             dataIndex: 'recordNumber',
             key: 'recordNumber',
             render: (_, row) => (
@@ -140,7 +142,7 @@ export default function InstallationRecordsListPage() {
             render: (_, row) => row.meter?.simCard?.iccid ?? '–',
           },
           {
-            title: 'Brojilo',
+            title: t('layout.sidebar.meters'),
             key: 'meter',
             render: (_, row) =>
               row.meter
@@ -148,7 +150,7 @@ export default function InstallationRecordsListPage() {
                 : '–',
           },
           {
-            title: 'Adresa / Lokacija',
+            title: t('installationRecords.list.columns.address'),
             key: 'address',
             ellipsis: true,
             render: (_, row) =>
@@ -157,7 +159,7 @@ export default function InstallationRecordsListPage() {
               '–',
           },
           {
-            title: 'Datum ugradnje',
+            title: t('installationRecords.list.columns.installationDate'),
             key: 'installationDate',
             render: (_, row) =>
               row.meter?.installationDate
@@ -165,7 +167,7 @@ export default function InstallationRecordsListPage() {
                 : '–',
           },
           {
-            title: 'Instalirao',
+            title: t('installationRecords.list.columns.installedBy'),
             key: 'installedBy',
             render: (_, row) =>
               row.installedBy
@@ -173,12 +175,12 @@ export default function InstallationRecordsListPage() {
                 : '–',
           },
           {
-            title: 'Status',
+            title: t('common.labels.status'),
             dataIndex: 'status',
             key: 'status',
             render: (status: RecordStatus) => (
               <Tag color={statusColor[status] ?? 'default'}>
-                {statusLabel[status] ?? status}
+                {statusLabelKey[status] ? t(statusLabelKey[status]) : status}
               </Tag>
             ),
           },

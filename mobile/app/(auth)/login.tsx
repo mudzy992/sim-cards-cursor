@@ -32,10 +32,12 @@ import { useServerHealth } from '@/hooks/useServerHealth';
 import { palette, radii, spacing, type } from '@/theme/tokens';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { StatusBadge, type StatusTone } from '@/components/ui/StatusBadge';
+import { useTranslation } from '@/i18n/i18n.store';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
+  const { t } = useTranslation();
   const { status: serverStatus, check: checkServer } = useServerHealth({ timeoutMs: 2500 });
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -51,10 +53,10 @@ export default function LoginScreen() {
       router.replace('/(app)/(tabs)/home');
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
-        setError('Pogrešan email/korisničko ime ili lozinka.');
+        setError(t('mobile.auth.login.invalidCredentials'));
         return;
       }
-      setError(getApiErrorMessage(err, 'Prijava nije uspjela.'));
+      setError(getApiErrorMessage(err, t('mobile.auth.login.failed')));
     } finally {
       setIsLoading(false);
     }
@@ -77,19 +79,19 @@ export default function LoginScreen() {
         >
           {/* ------------------------------ brand header ------------------------------ */}
           <View style={styles.brandBlock}>
-            <ServerStatusChip status={serverStatus} onRetry={() => void checkServer()} />
+            <ServerStatusChip status={serverStatus} onRetry={() => void checkServer()} t={t} />
             <View style={styles.logoRow}>
               <LogoWatermark />
-              <Text style={styles.appName}>SIM Tracker</Text>
-              <Text style={styles.appNameSub}>Terenska aplikacija za upravljanje SIM karticama</Text>
+              <Text style={styles.appName}>{t('mobile.auth.login.appName')}</Text>
+              <Text style={styles.appNameSub}>{t('mobile.auth.login.appTagline')}</Text>
             </View>
           </View>
 
           {/* --------------------------------- forma --------------------------------- */}
           <View style={styles.formBlock}>
-            <Text style={type.screenTitle}>Prijava</Text>
+            <Text style={type.screenTitle}>{t('mobile.auth.login.title')}</Text>
             <Text style={[type.caption, styles.formIntro]}>
-              Prijavite se da nastavite sa operacijama ugradnje i demontaže.
+              {t('mobile.auth.login.intro')}
             </Text>
 
             {error ? (
@@ -100,14 +102,14 @@ export default function LoginScreen() {
             ) : null}
 
             <View style={styles.fieldGroup}>
-              <Text style={type.sectionLabel}>EMAIL ILI KORISNIČKO IME</Text>
+              <Text style={type.sectionLabel}>{t('mobile.auth.login.emailOrUsernameLabel')}</Text>
               <TextInput
                 value={emailOrUsername}
-                onChangeText={(t) => {
-                  setEmailOrUsername(t);
+                onChangeText={(val) => {
+                  setEmailOrUsername(val);
                   if (error) setError(null);
                 }}
-                placeholder="ime.prezime ili ime@epbih.ba"
+                placeholder={t('mobile.auth.login.emailOrUsernamePlaceholder')}
                 placeholderTextColor={palette.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -120,11 +122,11 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={type.sectionLabel}>LOZINKA</Text>
+              <Text style={type.sectionLabel}>{t('mobile.auth.login.passwordLabel')}</Text>
               <TextInput
                 value={password}
-                onChangeText={(t) => {
-                  setPassword(t);
+                onChangeText={(val) => {
+                  setPassword(val);
                   if (error) setError(null);
                 }}
                 placeholder="••••••••••"
@@ -141,7 +143,7 @@ export default function LoginScreen() {
             </View>
 
             <ActionButton
-              title="Prijavi se"
+              title={t('mobile.auth.login.submitButton')}
               onPress={() => void submit()}
               loading={isLoading}
               disabled={!canSubmit}
@@ -151,7 +153,7 @@ export default function LoginScreen() {
             />
 
             <Text style={[type.caption, styles.footerHint]}>
-              Prijava putem emaila ili korisničkog imena (ime.prezime)
+              {t('mobile.auth.login.footerHint')}
             </Text>
           </View>
         </ScrollView>
@@ -165,14 +167,20 @@ export default function LoginScreen() {
 function ServerStatusChip({
   status,
   onRetry,
+  t,
 }: {
   status: 'online' | 'offline' | 'checking' | string;
   onRetry: () => void;
+  t: (key: string) => string;
 }) {
   const tone: StatusTone =
     status === 'online' ? 'success' : status === 'offline' ? 'danger' : 'neutral';
   const label =
-    status === 'online' ? 'Server online' : status === 'offline' ? 'Server offline' : 'Provjera…';
+    status === 'online'
+      ? t('mobile.auth.login.serverOnline')
+      : status === 'offline'
+        ? t('mobile.auth.login.serverOffline')
+        : t('mobile.auth.login.serverChecking');
 
   return (
     <View style={styles.chipRow}>
@@ -181,7 +189,7 @@ function ServerStatusChip({
       ) : null}
       <StatusBadge tone={tone} label={label} showDot={status !== 'checking'} />
       <Pressable onPress={onRetry} hitSlop={8} accessibilityRole="button" style={styles.retry}>
-        <Text style={styles.retryText}>Provjeri</Text>
+        <Text style={styles.retryText}>{t('mobile.auth.login.retryCheck')}</Text>
       </Pressable>
     </View>
   );

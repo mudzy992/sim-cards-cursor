@@ -5,9 +5,11 @@ import { UploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { appReleasesApi, type MobileAppRelease } from '@/api/app-releases.api';
 import { API_BASE_URL } from '@/api/axios.instance';
+import { useTranslation } from '@/i18n';
 
 export default function AppReleasesPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [form] = Form.useForm<{
     versionName: string;
     versionCode: number;
@@ -28,7 +30,7 @@ export default function AppReleasesPage() {
       file: File;
     }) => appReleasesApi.uploadAndroid(values),
     onSuccess: async () => {
-      message.success('Nova verzija je uploadovana.');
+      message.success(t('appReleases.messages.uploaded'));
       await queryClient.invalidateQueries({ queryKey: ['app-releases', 'android'] });
       form.resetFields();
     },
@@ -36,33 +38,33 @@ export default function AppReleasesPage() {
       const msg =
         (e as any)?.response?.data?.message ??
         (e as Error).message ??
-        'Greška pri uploadu verzije.';
+        t('appReleases.messages.uploadFailed');
       message.error(msg);
     },
   });
 
   const columns: ColumnsType<MobileAppRelease> = [
     {
-      title: 'Verzija',
+      title: t('appReleases.columns.version'),
       dataIndex: 'versionName',
       key: 'versionName',
       render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
     },
     {
-      title: 'Verzijski kod (Android)',
+      title: t('appReleases.columns.versionCode'),
       dataIndex: 'versionCode',
       key: 'versionCode',
       width: 120,
     },
     {
-      title: 'Objavljeno',
+      title: t('appReleases.columns.published'),
       dataIndex: 'publishedAt',
       key: 'publishedAt',
       width: 200,
       render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm'),
     },
     {
-      title: 'Obavezno nakon',
+      title: t('appReleases.columns.mandatoryAfter'),
       dataIndex: 'mandatoryAfterAt',
       key: 'mandatoryAfterAt',
       width: 200,
@@ -79,7 +81,7 @@ export default function AppReleasesPage() {
       ),
     },
     {
-      title: 'Download',
+      title: t('common.actions.download'),
       key: 'download',
       width: 140,
       render: (_, record) => (
@@ -88,7 +90,7 @@ export default function AppReleasesPage() {
           target="_blank"
           rel="noreferrer"
         >
-          Preuzmi .apk
+          {t('auth.login.downloadApk')}
         </a>
       ),
     },
@@ -101,20 +103,19 @@ export default function AppReleasesPage() {
       <div className="flex items-center justify-between">
         <div>
           <Typography.Title level={3} className="!mb-1">
-            App verzije (Android)
+            {t('appReleases.title')}
           </Typography.Title>
           <Typography.Text type="secondary">
-            Upravljanje verzijama mobilne aplikacije (.apk). Nova verzija će biti ponuđena
-            korisnicima nakon upload-a (sa 7 dana grace periodom prije force update-a).
+            {t('appReleases.subtitle')}
           </Typography.Text>
         </div>
       </div>
 
       {latest && (
         <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <Typography.Text strong>Aktivna (zadnja) verzija:</Typography.Text>{' '}
+          <Typography.Text strong>{t('appReleases.activeVersion')}</Typography.Text>{' '}
           <Typography.Text>
-            {latest.versionName} (code: {latest.versionCode}) – objavljena{' '}
+            {latest.versionName} ({t('appReleases.codeLabel')}: {latest.versionCode}) – {t('appReleases.publishedOn')}{' '}
             {dayjs(latest.publishedAt).format('YYYY-MM-DD HH:mm')}
           </Typography.Text>
         </div>
@@ -132,7 +133,7 @@ export default function AppReleasesPage() {
 
       <div className="mt-8 max-w-xl">
         <Typography.Title level={4} className="!mb-3">
-          Upload nove verzije (.apk)
+          {t('appReleases.uploadTitle')}
         </Typography.Title>
         <Form
           form={form}
@@ -141,7 +142,7 @@ export default function AppReleasesPage() {
             const fileList = (values as any).file as { originFileObj?: File }[] | undefined;
             const first = fileList && fileList[0]?.originFileObj;
             if (!first) {
-              message.error('Odaberite .apk fajl.');
+              message.error(t('appReleases.messages.selectFile'));
               return;
             }
             uploadMutation.mutate({
@@ -154,26 +155,26 @@ export default function AppReleasesPage() {
         >
           <Form.Item
             name="versionName"
-            label="Verzija (npr. 1.2.3)"
+            label={t('appReleases.form.versionLabel')}
             rules={[{ required: true }]}
           >
             <Input placeholder="1.2.3" />
           </Form.Item>
           <Form.Item
             name="versionCode"
-            label="Verzijski kod (cijeli broj)"
+            label={t('appReleases.form.versionCodeLabel')}
             rules={[{ required: true }]}
           >
             <InputNumber className="w-full" min={1} />
           </Form.Item>
-          <Form.Item name="releaseNotes" label="Napomene uz verziju (opciono)">
+          <Form.Item name="releaseNotes" label={t('appReleases.form.releaseNotesLabel')}>
             <Input.TextArea rows={3} />
           </Form.Item>
           <Form.Item
             name="file"
-            label="APK fajl"
+            label={t('appReleases.form.fileLabel')}
             valuePropName="fileList"
-            rules={[{ required: true, message: 'Potrebno je uploadovati .apk fajl.' }]}
+            rules={[{ required: true, message: t('appReleases.messages.fileRequired') }]}
             getValueFromEvent={(e) => {
               // AntD Upload šalje event koji sadrži fileList; ovdje ga normalizujemo u niz.
               if (Array.isArray(e)) return e;
@@ -183,7 +184,7 @@ export default function AppReleasesPage() {
             <Upload
               beforeUpload={(file) => {
                 if (!file.name.toLowerCase().endsWith('.apk')) {
-                  message.error('Dozvoljeni su samo .apk fajlovi.');
+                  message.error(t('appReleases.messages.onlyApk'));
                   return Upload.LIST_IGNORE;
                 }
                 // Vrati false da spriječimo automatski upload; fajl ide kroz FormData u onFinish.
@@ -192,7 +193,7 @@ export default function AppReleasesPage() {
               maxCount={1}
               showUploadList={{ showRemoveIcon: true }}
             >
-              <Button icon={<UploadOutlined />}>Odaberi .apk fajl</Button>
+              <Button icon={<UploadOutlined />}>{t('appReleases.form.chooseFile')}</Button>
             </Upload>
           </Form.Item>
           <Form.Item>
@@ -202,14 +203,14 @@ export default function AppReleasesPage() {
                 htmlType="submit"
                 loading={uploadMutation.isPending}
               >
-                Snimi verziju
+                {t('appReleases.form.saveVersion')}
               </Button>
               <Button
                 onClick={() => {
                   form.resetFields();
                 }}
               >
-                Očisti formu
+                {t('appReleases.form.clearForm')}
               </Button>
             </Space>
           </Form.Item>

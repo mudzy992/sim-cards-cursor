@@ -6,6 +6,7 @@ import { shipmentsApi } from '@/api/shipments.api';
 import { getSimCardStatusLabel } from '@/utils/labels.utils'
 import type { ShipmentSimCardsResponse } from '@/types/shipment.types';
 import { PrinterOutlined } from '@ant-design/icons';
+import { useTranslation } from '@/i18n';
 type ShipmentSimCard = ShipmentSimCardsResponse['items'][number];
 
 const statusColor: Record<string, string> = {
@@ -26,6 +27,7 @@ const simStatusColor: Record<string, string> = {
 export default function ShipmentDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
   const [pagination, setPagination] = useState({ page: 1, limit: 100 });
 
   const shipmentQuery = useQuery({
@@ -47,41 +49,41 @@ export default function ShipmentDetailsPage() {
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Space>
-        <Button onClick={() => navigate('/shipments')}>Nazad</Button>
+        <Button onClick={() => navigate('/shipments')}>{t('common.actions.back')}</Button>
         <Button
         icon={<PrinterOutlined />}
         onClick={() => navigate(`/shipments/${id}/print`)}
         >
-        Etikete za print
+        {t('shipments.details.printLabels')}
         </Button>
         <Typography.Title level={3} className="!mb-0">
-          Detalji isporuke
+          {t('shipments.details.title')}
         </Typography.Title>
       </Space>
 
       <Card loading={shipmentQuery.isLoading}>
         {shipment ? (
           <Descriptions column={2} bordered>
-            <Descriptions.Item label="Naziv">{shipment.name}</Descriptions.Item>
-            <Descriptions.Item label="Status">
+            <Descriptions.Item label={t('common.labels.name')}>{shipment.name}</Descriptions.Item>
+            <Descriptions.Item label={t('common.labels.status')}>
               <Tag color={statusColor[shipment.status] ?? 'default'}>{shipment.status}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Provajder">{shipment.provider}</Descriptions.Item>
-            <Descriptions.Item label="Datum prijema">
+            <Descriptions.Item label={t('shipments.details.provider')}>{shipment.provider}</Descriptions.Item>
+            <Descriptions.Item label={t('shipments.details.receivedDate')}>
               {new Date(shipment.receivedDate).toLocaleDateString()}
             </Descriptions.Item>
-            <Descriptions.Item label="Ukupno kartica">{shipment.totalCards}</Descriptions.Item>
-            <Descriptions.Item label="Importovao">
+            <Descriptions.Item label={t('shipments.details.totalCards')}>{shipment.totalCards}</Descriptions.Item>
+            <Descriptions.Item label={t('shipments.details.importedBy')}>
               {shipment.importedBy.firstName} {shipment.importedBy.lastName}
             </Descriptions.Item>
-            <Descriptions.Item label="Napomena" span={2}>
+            <Descriptions.Item label={t('common.labels.notes')} span={2}>
               {shipment.notes ?? '-'}
             </Descriptions.Item>
           </Descriptions>
         ) : null}
       </Card>
 
-      <Card title="SIM kartice iz ove isporuke" loading={shipmentCardsQuery.isLoading}>
+      <Card title={t('shipments.details.cardsInShipment')} loading={shipmentCardsQuery.isLoading}>
         <Table<ShipmentSimCard>
           rowKey="id"
           dataSource={cards}
@@ -106,19 +108,19 @@ export default function ShipmentDetailsPage() {
             },
             { title: 'IP', dataIndex: 'ipAddress' },
             {
-              title: 'Javna IP',
+              title: t('simCards.details.publicIp'),
               render: (_, row) => row.publicIpAddress ?? '-',
             },
             {
-              title: 'Status',
+              title: t('common.labels.status'),
               render: (_, row) => (
                 <Tag color={simStatusColor[row.status] ?? 'default'}>
-                  {getSimCardStatusLabel(row.status as any)}
+                  {getSimCardStatusLabel(row.status as any, t)}
                 </Tag>
               ),
             },
             {
-              title: 'Dodijeljena',
+              title: t('simCards.details.assignedTo'),
               render: (_, row) =>
                 row.assignedTo
                   ? `${row.assignedTo.firstName} ${row.assignedTo.lastName}`

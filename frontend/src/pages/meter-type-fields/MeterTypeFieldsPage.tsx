@@ -4,17 +4,19 @@ import { useMemo, useState } from 'react'
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import type { MeterTypeDefinitionItem } from '@/types/meter-type-definition.types'
 import type { MeterFieldType, MeterTypeFieldItem } from '@/types/meter-type-field.types'
-
-const FIELD_TYPE_OPTIONS: { label: string; value: MeterFieldType }[] = [
-  { label: 'String', value: 'STRING' },
-  { label: 'Number', value: 'NUMBER' },
-  { label: 'Boolean', value: 'BOOLEAN' },
-  { label: 'Date', value: 'DATE' },
-]
+import { useTranslation } from '@/i18n'
 
 export default function MeterTypeFieldsPage() {
   const queryClient = useQueryClient()
+  const { t } = useTranslation();
   const [messageApi, messageContextHolder] = message.useMessage()
+
+  const FIELD_TYPE_OPTIONS: { label: string; value: MeterFieldType }[] = [
+    { label: t('meterTypeFields.fieldTypes.string'), value: 'STRING' },
+    { label: t('meterTypeFields.fieldTypes.number'), value: 'NUMBER' },
+    { label: t('meterTypeFields.fieldTypes.boolean'), value: 'BOOLEAN' },
+    { label: t('meterTypeFields.fieldTypes.date'), value: 'DATE' },
+  ]
 
   const [selectedTypeId, setSelectedTypeId] = useState<string | undefined>(undefined)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -44,7 +46,7 @@ export default function MeterTypeFieldsPage() {
     mutationFn: (values: Parameters<typeof meterTypeDefinitionsApi.createField>[1]) =>
       meterTypeDefinitionsApi.createField(selectedTypeId!, values),
     onSuccess: async () => {
-      messageApi.success('Polje je dodano.')
+      messageApi.success(t('meterTypeFields.messages.created'))
       setDrawerOpen(false)
       setEditing(null)
       form.resetFields()
@@ -52,7 +54,7 @@ export default function MeterTypeFieldsPage() {
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -61,7 +63,7 @@ export default function MeterTypeFieldsPage() {
     mutationFn: (payload: { id: string; data: Record<string, unknown> }) =>
       meterTypeDefinitionsApi.updateField(selectedTypeId!, payload.id, payload.data as any),
     onSuccess: async () => {
-      messageApi.success('Polje je ažurirano.')
+      messageApi.success(t('meterTypeFields.messages.updated'))
       setDrawerOpen(false)
       setEditing(null)
       form.resetFields()
@@ -69,7 +71,7 @@ export default function MeterTypeFieldsPage() {
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -77,12 +79,12 @@ export default function MeterTypeFieldsPage() {
   const removeMutation = useMutation({
     mutationFn: (fieldId: string) => meterTypeDefinitionsApi.removeField(selectedTypeId!, fieldId),
     onSuccess: async () => {
-      messageApi.success('Polje je obrisano.')
+      messageApi.success(t('meterTypeFields.messages.deleted'))
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields'] })
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -90,18 +92,18 @@ export default function MeterTypeFieldsPage() {
   const reorderMutation = useMutation({
     mutationFn: (fieldIds: string[]) => meterTypeDefinitionsApi.reorderFields(selectedTypeId!, fieldIds),
     onSuccess: async () => {
-      messageApi.success('Redoslijed je sačuvan.')
+      messageApi.success(t('meterTypeFields.messages.reordered'))
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields'] })
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
 
   const typeOptions = useMemo(
-    () => (typesQuery.data ?? []).map((t: MeterTypeDefinitionItem) => ({ label: t.name, value: t.id })),
+    () => (typesQuery.data ?? []).map((mtd: MeterTypeDefinitionItem) => ({ label: mtd.name, value: mtd.id })),
     [typesQuery.data],
   )
 
@@ -146,10 +148,10 @@ export default function MeterTypeFieldsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Typography.Title level={3} className="!mb-0">
-            Dinamička polja tipova brojila
+            {t('meterTypeFields.title')}
           </Typography.Title>
           <Typography.Text type="secondary">
-            Definiši dodatna polja po tipu brojila (validacija na kreiranju brojila/zapisnika).
+            {t('meterTypeFields.subtitle')}
           </Typography.Text>
         </div>
       </div>
@@ -157,7 +159,7 @@ export default function MeterTypeFieldsPage() {
       <Space wrap>
         <Select
           style={{ width: 320 }}
-          placeholder="Odaberi tip brojila"
+          placeholder={t('meterTypeFields.selectTypePlaceholder')}
           options={typeOptions}
           value={selectedTypeId}
           onChange={(v) => setSelectedTypeId(v)}
@@ -166,7 +168,7 @@ export default function MeterTypeFieldsPage() {
           optionFilterProp="label"
         />
         <Button type="primary" disabled={!selectedTypeId} onClick={handleOpenCreate}>
-          Dodaj polje
+          {t('meterTypeFields.addField')}
         </Button>
       </Space>
 
@@ -176,40 +178,40 @@ export default function MeterTypeFieldsPage() {
         dataSource={fields}
         pagination={false}
         columns={[
-          { title: 'Name', dataIndex: 'name', width: 180 },
-          { title: 'Label', dataIndex: 'label' },
-          { title: 'Type', dataIndex: 'fieldType', width: 110 },
+          { title: t('meterTypeFields.columns.name'), dataIndex: 'name', width: 180 },
+          { title: t('meterTypeFields.columns.label'), dataIndex: 'label' },
+          { title: t('common.labels.type'), dataIndex: 'fieldType', width: 110 },
           {
-            title: 'Required',
+            title: t('meterTypeFields.columns.required'),
             dataIndex: 'isRequired',
             width: 100,
-            render: (v: boolean) => (v ? 'Da' : 'Ne'),
+            render: (v: boolean) => (v ? t('common.actions.yes') : t('common.actions.no')),
           },
           {
-            title: 'Operator fill',
+            title: t('meterTypeFields.columns.operatorFill'),
             dataIndex: 'isOperatorFillable',
             width: 120,
-            render: (v: boolean) => (v ? 'Da' : 'Ne'),
+            render: (v: boolean) => (v ? t('common.actions.yes') : t('common.actions.no')),
           },
-          { title: 'Default', dataIndex: 'defaultValue', width: 140, render: (v: string | null) => v ?? '–' },
+          { title: t('meterTypeFields.columns.default'), dataIndex: 'defaultValue', width: 140, render: (v: string | null) => v ?? '–' },
           {
-            title: 'Sort',
+            title: t('meterTypeFields.columns.sort'),
             dataIndex: 'sortOrder',
             width: 70,
           },
           {
-            title: 'Akcije',
+            title: t('common.actions.actions'),
             width: 240,
             render: (_: unknown, row) => (
               <Space>
                 <Button size="small" onClick={() => handleMove(row.id, -1)} disabled={reorderMutation.isPending}>
-                  Gore
+                  {t('meterTypeFields.moveUp')}
                 </Button>
                 <Button size="small" onClick={() => handleMove(row.id, 1)} disabled={reorderMutation.isPending}>
-                  Dolje
+                  {t('meterTypeFields.moveDown')}
                 </Button>
                 <Button size="small" onClick={() => handleOpenEdit(row)}>
-                  Uredi
+                  {t('common.actions.edit')}
                 </Button>
                 <Button
                   size="small"
@@ -217,7 +219,7 @@ export default function MeterTypeFieldsPage() {
                   onClick={() => removeMutation.mutate(row.id)}
                   loading={removeMutation.isPending}
                 >
-                  Obriši
+                  {t('common.actions.delete')}
                 </Button>
               </Space>
             ),
@@ -226,7 +228,7 @@ export default function MeterTypeFieldsPage() {
       />
 
       <Drawer
-        title={editing ? 'Uredi polje' : 'Novo polje'}
+        title={editing ? t('meterTypeFields.editFieldTitle') : t('meterTypeFields.newFieldTitle')}
         open={drawerOpen}
         width={520}
         onClose={() => {
@@ -244,14 +246,14 @@ export default function MeterTypeFieldsPage() {
                 form.resetFields()
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button
               type="primary"
               loading={createMutation.isPending || updateMutation.isPending}
               onClick={() => form.submit()}
             >
-              {editing ? 'Snimi' : 'Dodaj'}
+              {editing ? t('common.actions.save') : t('common.actions.add')}
             </Button>
           </div>
         }
@@ -276,27 +278,27 @@ export default function MeterTypeFieldsPage() {
             createMutation.mutate(payload as any)
           }}
         >
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-            <Input placeholder="npr. transformer_ratio" />
+          <Form.Item name="name" label={t('meterTypeFields.columns.name')} rules={[{ required: true }]}>
+            <Input placeholder={t('meterTypeFields.namePlaceholder')} />
           </Form.Item>
-          <Form.Item name="label" label="Label" rules={[{ required: true }]}>
-            <Input placeholder="npr. Prijenosni omjer" />
+          <Form.Item name="label" label={t('meterTypeFields.columns.label')} rules={[{ required: true }]}>
+            <Input placeholder={t('meterTypeFields.labelPlaceholder')} />
           </Form.Item>
-          <Form.Item name="fieldType" label="Type" rules={[{ required: true }]}>
+          <Form.Item name="fieldType" label={t('common.labels.type')} rules={[{ required: true }]}>
             <Select options={FIELD_TYPE_OPTIONS} />
           </Form.Item>
           <Space size="large" wrap>
-            <Form.Item name="isRequired" label="Required" valuePropName="checked">
+            <Form.Item name="isRequired" label={t('meterTypeFields.columns.required')} valuePropName="checked">
               <Switch />
             </Form.Item>
-            <Form.Item name="isOperatorFillable" label="Operator fill" valuePropName="checked">
+            <Form.Item name="isOperatorFillable" label={t('meterTypeFields.columns.operatorFill')} valuePropName="checked">
               <Switch />
             </Form.Item>
           </Space>
-          <Form.Item name="defaultValue" label="Default value">
-            <Input placeholder="Opcionalno" />
+          <Form.Item name="defaultValue" label={t('meterTypeFields.defaultValueLabel')}>
+            <Input placeholder={t('common.labels.optional')} />
           </Form.Item>
-          <Form.Item name="sortOrder" label="Sort order">
+          <Form.Item name="sortOrder" label={t('meterTypeFields.sortOrderLabel')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
@@ -304,4 +306,3 @@ export default function MeterTypeFieldsPage() {
     </div>
   )
 }
-

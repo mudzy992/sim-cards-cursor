@@ -6,9 +6,11 @@ import { branchModeratorsApi } from '@/api/branch-moderators.api'
 import { branchesApi } from '@/api/branches.api'
 import { useAuthStore } from '@/store/auth.store'
 import type { BranchEmailRecipientItem } from '@/types/branch-email-recipient.types'
+import { useTranslation } from '@/i18n'
 
 export default function BranchEmailRecipientsPage() {
   const queryClient = useQueryClient()
+  const { t } = useTranslation();
   const [messageApi, messageContextHolder] = message.useMessage()
   const userDistributionId = useAuthStore((s) => s.user?.distributionId)
 
@@ -36,7 +38,7 @@ export default function BranchEmailRecipientsPage() {
     mutationFn: (values: { branchId: string; email: string; label?: string }) =>
       branchEmailRecipientsApi.create(values),
     onSuccess: async () => {
-      messageApi.success('Primalac je dodan.')
+      messageApi.success(t('branchEmailRecipients.messages.created'))
       setDrawerOpen(false)
       setEditing(null)
       form.resetFields()
@@ -44,7 +46,7 @@ export default function BranchEmailRecipientsPage() {
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -53,7 +55,7 @@ export default function BranchEmailRecipientsPage() {
     mutationFn: (payload: { id: string; data: { email?: string; label?: string; isActive?: boolean } }) =>
       branchEmailRecipientsApi.update(payload.id, payload.data),
     onSuccess: async () => {
-      messageApi.success('Primalac je ažuriran.')
+      messageApi.success(t('branchEmailRecipients.messages.updated'))
       setDrawerOpen(false)
       setEditing(null)
       form.resetFields()
@@ -61,7 +63,7 @@ export default function BranchEmailRecipientsPage() {
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -69,12 +71,12 @@ export default function BranchEmailRecipientsPage() {
   const removeMutation = useMutation({
     mutationFn: (id: string) => branchEmailRecipientsApi.remove(id),
     onSuccess: async () => {
-      messageApi.success('Primalac je obrisan.')
+      messageApi.success(t('branchEmailRecipients.messages.deleted'))
       await queryClient.invalidateQueries({ queryKey: ['branch-email-recipients'] })
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -151,14 +153,14 @@ export default function BranchEmailRecipientsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Typography.Title level={3} className="!mb-0">
-            Email primaoci po podružnicama
+            {t('branchEmailRecipients.title')}
           </Typography.Title>
           <Typography.Text type="secondary">
-            PDF zapisnik se automatski šalje moderatorima podružnice i dodatnim email primaocima.
+            {t('branchEmailRecipients.subtitle')}
           </Typography.Text>
         </div>
         <Button type="primary" onClick={handleOpenCreate}>
-          Dodaj primaoca
+          {t('branchEmailRecipients.addButton')}
         </Button>
       </div>
 
@@ -166,20 +168,20 @@ export default function BranchEmailRecipientsPage() {
         <Select
           allowClear
           style={{ width: 260 }}
-          placeholder="Filter po podružnici"
+          placeholder={t('branchModerators.filterPlaceholder')}
           options={branchOptions}
           value={branchIdFilter}
           onChange={(v) => setBranchIdFilter(v || undefined)}
         />
-        <Button onClick={() => setBranchIdFilter(undefined)}>Reset</Button>
+        <Button onClick={() => setBranchIdFilter(undefined)}>{t('common.actions.reset')}</Button>
       </Space>
 
       <div className="rounded-md border border-slate-200 p-3">
-        <div className="font-medium mb-2">Moderatori podružnice (automatski primaoci)</div>
+        <div className="font-medium mb-2">{t('branchEmailRecipients.moderatorsHeading')}</div>
         {moderatorsQuery.isLoading ? (
-          <div className="text-sm text-slate-500">Učitavanje…</div>
+          <div className="text-sm text-slate-500">{t('common.states.loading')}</div>
         ) : (moderatorsQuery.data ?? []).length === 0 ? (
-          <div className="text-sm text-slate-500">Nema dodijeljenih moderatora.</div>
+          <div className="text-sm text-slate-500">{t('branchEmailRecipients.noModerators')}</div>
         ) : (
           <div className="space-y-2">
             {groupedModerators.map((m) => (
@@ -209,14 +211,14 @@ export default function BranchEmailRecipientsPage() {
         pagination={false}
         columns={[
           {
-            title: 'Podružnica',
+            title: t('common.labels.branch'),
             render: (_, row) =>
               row.branch ? `${row.branch.name} (${row.branch.code})` : row.branchId,
           },
-          { title: 'Email', dataIndex: 'email' },
-          { title: 'Label', dataIndex: 'label', render: (v: string | null) => v ?? '–' },
+          { title: t('common.labels.email'), dataIndex: 'email' },
+          { title: t('branchEmailRecipients.labelColumn'), dataIndex: 'label', render: (v: string | null) => v ?? '–' },
           {
-            title: 'Aktivan',
+            title: t('common.labels.active'),
             dataIndex: 'isActive',
             width: 120,
             render: (_: unknown, row) => (
@@ -228,15 +230,15 @@ export default function BranchEmailRecipientsPage() {
             ),
           },
           {
-            title: 'Akcije',
+            title: t('common.actions.actions'),
             width: 200,
             render: (_: unknown, row) => (
               <Space>
                 <Button size="small" onClick={() => handleOpenEdit(row)}>
-                  Uredi
+                  {t('common.actions.edit')}
                 </Button>
                 <Button danger size="small" onClick={() => removeMutation.mutate(row.id)} loading={removeMutation.isPending}>
-                  Obriši
+                  {t('common.actions.delete')}
                 </Button>
               </Space>
             ),
@@ -245,7 +247,7 @@ export default function BranchEmailRecipientsPage() {
       />
 
       <Drawer
-        title={editing ? 'Uredi primaoca' : 'Novi primalac'}
+        title={editing ? t('branchEmailRecipients.editTitle') : t('branchEmailRecipients.newTitle')}
         open={drawerOpen}
         width={520}
         onClose={() => {
@@ -263,14 +265,14 @@ export default function BranchEmailRecipientsPage() {
                 form.resetFields()
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button
               type="primary"
               loading={createMutation.isPending || updateMutation.isPending}
               onClick={() => form.submit()}
             >
-              {editing ? 'Snimi' : 'Dodaj'}
+              {editing ? t('common.actions.save') : t('common.actions.add')}
             </Button>
           </div>
         }
@@ -292,23 +294,23 @@ export default function BranchEmailRecipientsPage() {
           }}
           initialValues={{ isActive: true }}
         >
-          <Form.Item name="branchId" label="Podružnica" rules={[{ required: true }]}>
+          <Form.Item name="branchId" label={t('common.labels.branch')} rules={[{ required: true }]}>
             <Select
-              placeholder="Odaberi podružnicu"
+              placeholder={t('branchModerators.selectBranchPlaceholder')}
               options={branchOptions}
               loading={branchesQuery.isLoading}
               showSearch
               optionFilterProp="label"
             />
           </Form.Item>
-          <Form.Item name="email" label="Email" rules={[{ required: true }, { type: 'email' }]}>
+          <Form.Item name="email" label={t('common.labels.email')} rules={[{ required: true }, { type: 'email' }]}>
             <Input placeholder="email@example.com" />
           </Form.Item>
-          <Form.Item name="label" label="Label (opciono)">
+          <Form.Item name="label" label={t('branchEmailRecipients.labelFieldLabel')}>
             <Input placeholder="npr. Podrška" />
           </Form.Item>
           {editing && (
-            <Form.Item name="isActive" label="Aktivan" valuePropName="checked">
+            <Form.Item name="isActive" label={t('common.labels.active')} valuePropName="checked">
               <Switch />
             </Form.Item>
           )}

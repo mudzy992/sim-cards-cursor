@@ -35,6 +35,7 @@ import type {
   SimCardStatus,
 } from '@/types/sim-card.types';
 import { ShipmentDeleteButton } from './ShipmentDeleteButton';
+import { useTranslation } from '@/i18n';
 
 const shipmentStatusColor: Record<string, string> = {
   RECEIVED: 'blue',
@@ -83,6 +84,7 @@ const defaultShipmentFilters: ShipmentListParams = {
 
 export default function ShipmentsListPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState<string>('shipments');
@@ -131,7 +133,7 @@ export default function ShipmentsListPage() {
     mutationFn: (payload: { simCardId: string; userId: string }) =>
       simCardsApi.assign(payload.simCardId, payload.userId),
     onSuccess: async () => {
-      messageApi.success('SIM kartica je dodijeljena korisniku.');
+      messageApi.success(t('shipments.list.assignSuccess'));
       setAssignTarget(null);
       setSelectedUserId(null);
 
@@ -144,14 +146,14 @@ export default function ShipmentsListPage() {
       });
     },
     onError: () => {
-      messageApi.error('Dodjela nije uspjela.');
+      messageApi.error(t('shipments.list.assignFailed'));
     },
   });
 
   const unassignMutation = useMutation({
     mutationFn: (simCardId: string) => simCardsApi.unassign(simCardId),
     onSuccess: async () => {
-      messageApi.success('SIM kartica je vraćena na AVAILABLE.');
+      messageApi.success(t('shipments.list.unassignSuccess'));
 
       await queryClient.invalidateQueries({
         queryKey: ['sim-cards', 'list'],
@@ -162,7 +164,7 @@ export default function ShipmentsListPage() {
       });
     },
     onError: () => {
-      messageApi.error('Oduzimanje nije uspjelo.');
+      messageApi.error(t('shipments.list.unassignFailed'));
     },
   });
 
@@ -202,7 +204,7 @@ export default function ShipmentsListPage() {
     if (total === 0) {
       return (
         <Typography.Text type="secondary">
-          Nema kartica
+          {t('shipments.list.noCards')}
         </Typography.Text>
       );
     }
@@ -212,7 +214,7 @@ export default function ShipmentsListPage() {
         <div className="flex items-center gap-2 mb-1">
           <Typography.Text strong>{total}</Typography.Text>
           <Typography.Text type="secondary">
-            kartica
+            {t('shipments.list.cardsUnit')}
           </Typography.Text>
         </div>
 
@@ -223,7 +225,7 @@ export default function ShipmentsListPage() {
               color={simStatusColor[status] ?? 'default'}
               className="m-0"
             >
-              {count} {getSimCardStatusLabel(status)}
+              {count} {getSimCardStatusLabel(status, t)}
             </Tag>
           ))}
         </Space>
@@ -251,7 +253,7 @@ export default function ShipmentsListPage() {
       key: 'shipments',
       label: (
         <span>
-          <InboxOutlined /> Isporuke
+          <InboxOutlined /> {t('layout.sidebar.shipments')}
         </span>
       ),
       children: (
@@ -261,7 +263,7 @@ export default function ShipmentsListPage() {
             data-tour-id="shipments-header"
           >
             <Typography.Text type="secondary">
-              Pregled isporuka SIM kartica. Pretraga i filteri.
+              {t('shipments.list.tabIntro')}
             </Typography.Text>
 
             {canManageShipments && (
@@ -271,7 +273,7 @@ export default function ShipmentsListPage() {
                 onClick={() => navigate('/shipments/new')}
                 data-tour-id="shipments-new-button"
               >
-                Nova isporuka
+                {t('shipments.list.newShipment')}
               </Button>
             )}
           </div>
@@ -282,7 +284,7 @@ export default function ShipmentsListPage() {
             data-tour-id="shipments-filters"
           >
             <Input
-              placeholder="Pretraga naziva"
+              placeholder={t('shipments.list.searchNamePlaceholder')}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onPressEnter={handleShipmentSearch}
@@ -290,7 +292,7 @@ export default function ShipmentsListPage() {
             />
 
             <Input
-              placeholder="Filter po provajderu"
+              placeholder={t('shipments.list.providerPlaceholder')}
               value={providerInput}
               onChange={(e) => setProviderInput(e.target.value)}
               onPressEnter={handleShipmentSearch}
@@ -299,7 +301,7 @@ export default function ShipmentsListPage() {
 
             <Select
               allowClear
-              placeholder="Status"
+              placeholder={t('common.labels.status')}
               style={{ width: 160 }}
               value={shipmentFilters.status}
               onChange={(value) =>
@@ -318,11 +320,11 @@ export default function ShipmentsListPage() {
             />
 
             <Button onClick={handleShipmentSearch}>
-              Pretraži
+              {t('common.actions.search')}
             </Button>
 
             <Button onClick={handleShipmentReset}>
-              Reset
+              {t('common.actions.reset')}
             </Button>
           </Space>
 
@@ -335,7 +337,7 @@ export default function ShipmentsListPage() {
               pageSize: shipmentsQuery.data?.limit,
               total: shipmentsQuery.data?.total,
               showSizeChanger: true,
-              showTotal: (total) => `Ukupno: ${total}`,
+              showTotal: (total) => t('common.pagination.totalItems', { count: total }),
               onChange: (page, pageSize) =>
                 setShipmentFilters(
                   (prev: ShipmentListParams) => ({
@@ -347,7 +349,7 @@ export default function ShipmentsListPage() {
             }}
             columns={[
               {
-                title: 'Naziv',
+                title: t('common.labels.name'),
                 render: (_, row) => (
                   <Button
                     type="link"
@@ -361,11 +363,11 @@ export default function ShipmentsListPage() {
                 ),
               },
               {
-                title: 'Provajder',
+                title: t('shipments.details.provider'),
                 dataIndex: 'provider',
               },
               {
-                title: 'Datum prijema',
+                title: t('shipments.details.receivedDate'),
                 dataIndex: 'receivedDate',
                 render: (val: string) =>
                   val
@@ -373,13 +375,13 @@ export default function ShipmentsListPage() {
                     : '–',
               },
               {
-                title: 'Kartice',
+                title: t('shipments.list.columns.cards'),
                 width: 330,
                 render: (_, row) =>
                   renderCardStatusSummary(row),
               },
               {
-                title: 'Status',
+                title: t('common.labels.status'),
                 dataIndex: 'status',
                 render: (status: string) => (
                   <Tag
@@ -392,7 +394,7 @@ export default function ShipmentsListPage() {
                 ),
               },
               {
-                title: 'Akcije',
+                title: t('common.actions.actions'),
                 width: 240,
                 render: (_: unknown, row) => (
                   <Space size={8}>
@@ -405,7 +407,7 @@ export default function ShipmentsListPage() {
                         )
                       }
                     >
-                      Etikete
+                      {t('shipments.list.labelsShort')}
                     </Button>
 
                     <ShipmentDeleteButton
@@ -427,7 +429,7 @@ export default function ShipmentsListPage() {
                         )
                       }
                     >
-                      Izmijeni
+                      {t('common.actions.edit')}
                     </Button>
                   </Space>
                 ),
@@ -442,14 +444,13 @@ export default function ShipmentsListPage() {
       key: 'sim-cards',
       label: (
         <span>
-          <CreditCardOutlined /> SIM kartice
+          <CreditCardOutlined /> {t('layout.sidebar.simCards')}
         </span>
       ),
       children: (
         <div className="space-y-4">
           <Typography.Text type="secondary">
-            Distribucijski admin vidi samo SIM kartice iz
-            isporuka dodijeljenih njegovoj distribuciji.
+            {t('shipments.list.simTabIntro')}
           </Typography.Text>
 
           <Space
@@ -458,7 +459,7 @@ export default function ShipmentsListPage() {
           >
             <Input.Search
               allowClear
-              placeholder="Pretraga ICCID/IP"
+              placeholder={t('simCards.list.searchPlaceholder')}
               value={simSearchInput}
               onChange={(e) =>
                 setSimSearchInput(e.target.value)
@@ -475,7 +476,7 @@ export default function ShipmentsListPage() {
 
             <Select
               allowClear
-              placeholder="Status"
+              placeholder={t('common.labels.status')}
               style={{ width: 180 }}
               value={simFilters.status}
               onChange={(value) =>
@@ -486,14 +487,14 @@ export default function ShipmentsListPage() {
                 }))
               }
               options={simStatusOptions.map((s) => ({
-                label: getSimCardStatusLabel(s),
+                label: getSimCardStatusLabel(s, t),
                 value: s,
               }))}
             />
 
             <Select
               allowClear
-              placeholder="Isporuka"
+              placeholder={t('shipments.details.title').split(' ')[0]}
               style={{ width: 220 }}
               value={simFilters.shipmentId}
               onChange={(value) =>
@@ -515,7 +516,7 @@ export default function ShipmentsListPage() {
                 });
               }}
             >
-              Reset
+              {t('common.actions.reset')}
             </Button>
           </Space>
 
@@ -554,12 +555,12 @@ export default function ShipmentsListPage() {
                 dataIndex: 'ipAddress',
               },
               {
-                title: 'Javna IP',
+                title: t('simCards.details.publicIp'),
                 render: (_, row) =>
                   row.publicIpAddress ?? '-',
               },
               {
-                title: 'Status',
+                title: t('common.labels.status'),
                 dataIndex: 'status',
                 render: (status: string) => (
                   <Tag
@@ -568,24 +569,24 @@ export default function ShipmentsListPage() {
                     }
                   >
                     {getSimCardStatusLabel(
-                      status as SimCardStatus,
+                      status as SimCardStatus, t,
                     )}
                   </Tag>
                 ),
               },
               {
-                title: 'Isporuka',
+                title: t('shipments.details.title').split(' ')[0],
                 render: (_, row) => row.shipment.name,
               },
               {
-                title: 'Dodijeljena',
+                title: t('simCards.details.assignedTo'),
                 render: (_, row) =>
                   row.assignedTo
                     ? `${row.assignedTo.firstName} ${row.assignedTo.lastName}`
                     : '-',
               },
               {
-                title: 'Akcije',
+                title: t('common.actions.actions'),
                 render: (_, row) => (
                   <Space>
                     <Button
@@ -598,7 +599,7 @@ export default function ShipmentsListPage() {
                       }}
                       disabled={row.status !== 'AVAILABLE'}
                     >
-                      Dodijeli
+                      {t('shipments.list.assign')}
                     </Button>
 
                     <Button
@@ -610,7 +611,7 @@ export default function ShipmentsListPage() {
                       disabled={row.status !== 'ASSIGNED'}
                       loading={unassignMutation.isPending}
                     >
-                      Oduzmi
+                      {t('shipments.list.unassign')}
                     </Button>
                   </Space>
                 ),
@@ -632,18 +633,14 @@ export default function ShipmentsListPage() {
       {messageContextHolder}
 
       <Typography.Title level={3} className="!mb-0">
-        Isporuke
+        {t('layout.sidebar.shipments')}
       </Typography.Title>
 
       <Typography.Paragraph
         type="secondary"
         className="!mb-4"
       >
-        Isporuke SIM kartica i pregled kartica. Sistemski
-        administrator može dodavati isporuke i birati
-        distribuciju. Distribucijski admin može dodavati
-        isporuke i importovati liste samo za svoju
-        distribuciju.
+        {t('shipments.list.pageIntro')}
       </Typography.Paragraph>
 
       <Tabs
@@ -653,7 +650,7 @@ export default function ShipmentsListPage() {
       />
 
       <Drawer
-        title="Dodjela SIM kartice"
+        title={t('shipments.list.assignDrawerTitle')}
         open={Boolean(assignTarget)}
         width={520}
         onClose={() => {
@@ -669,7 +666,7 @@ export default function ShipmentsListPage() {
                 setSelectedUserId(null);
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
 
             <Button
@@ -678,7 +675,7 @@ export default function ShipmentsListPage() {
               onClick={() => {
                 if (!assignTarget || !selectedUserId) {
                   messageApi.warning(
-                    'Odaberi korisnika za dodjelu.',
+                    t('shipments.list.selectUserWarning'),
                   );
                   return;
                 }
@@ -689,7 +686,7 @@ export default function ShipmentsListPage() {
                 });
               }}
             >
-              Dodijeli
+              {t('shipments.list.assign')}
             </Button>
           </div>
         }
@@ -699,13 +696,13 @@ export default function ShipmentsListPage() {
           style={{ width: '100%' }}
         >
           <Typography.Text>
-            SIM: {assignTarget?.iccid}
+            {t('shipments.list.simColon')} {assignTarget?.iccid}
           </Typography.Text>
 
           <Select
             showSearch
             optionFilterProp="label"
-            placeholder="Odaberi korisnika"
+            placeholder={t('shipments.list.selectUserPlaceholder')}
             value={selectedUserId ?? undefined}
             onChange={(value) =>
               setSelectedUserId(value)

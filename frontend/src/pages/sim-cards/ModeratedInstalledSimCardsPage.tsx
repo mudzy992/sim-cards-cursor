@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { simCardsApi } from '@/api/sim-cards.api'
 import type { ModeratedInstalledSimCardItem, SimCardListParams, SimCardStatus } from '@/types/sim-card.types'
 import { getSimCardStatusLabel } from '@/utils/labels.utils'
+import { useTranslation } from '@/i18n'
 
 const simStatusColor: Record<string, string> = {
   AVAILABLE: 'green',
@@ -18,6 +19,8 @@ const simStatusColor: Record<string, string> = {
 
 export default function ModeratedInstalledSimCardsPage() {
   const navigate = useNavigate()
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
   const [filters, setFilters] = useState<SimCardListParams>({ page: 1, limit: 20 })
   const [searchInput, setSearchInput] = useState('')
 
@@ -46,7 +49,7 @@ export default function ModeratedInstalledSimCardsPage() {
       },
       { title: 'IP', dataIndex: 'ipAddress', key: 'ipAddress' },
       {
-        title: 'Podružnica',
+        title: t('simCards.list.columns.branch'),
         key: 'branch',
         render: (_: unknown, row: ModeratedInstalledSimCardItem) => {
           const b = row.meter?.branch
@@ -55,50 +58,50 @@ export default function ModeratedInstalledSimCardsPage() {
         },
       },
       {
-        title: 'Brojilo',
+        title: t('layout.sidebar.meters'),
         key: 'meterSerial',
         render: (_: unknown, row: ModeratedInstalledSimCardItem) => row.meter?.serialNumber ?? '–',
       },
       {
-        title: 'Dodijeljena',
+        title: t('simCards.details.assignedTo'),
         key: 'assignedTo',
         render: (_: unknown, row: ModeratedInstalledSimCardItem) =>
           row.assignedTo ? `${row.assignedTo.firstName} ${row.assignedTo.lastName}` : '–',
       },
       {
-        title: 'Ugrađena',
+        title: t('simCards.list.columns.installedAt'),
         key: 'installedAt',
         width: 180,
         render: (_: unknown, row: ModeratedInstalledSimCardItem) =>
-          row.installedAt ? new Date(row.installedAt).toLocaleString('bs-BA') : '–',
+          row.installedAt ? new Date(row.installedAt).toLocaleString(dateLocale) : '–',
       },
       {
-        title: 'Status',
+        title: t('common.labels.status'),
         key: 'status',
         width: 150,
         render: (_: unknown, row: ModeratedInstalledSimCardItem) => (
           <Tag color={simStatusColor[row.status] ?? 'default'}>
-            {getSimCardStatusLabel(row.status as SimCardStatus)}
+            {getSimCardStatusLabel(row.status as SimCardStatus, t)}
           </Tag>
         ),
       },
     ],
-    [navigate],
+    [navigate, t, dateLocale],
   )
 
   return (
     <div className="space-y-4" data-tour-id="moderator-installed-sims">
       <Typography.Title level={3} className="!mb-0">
-        SIM kartice (ugrađene)
+        {t('simCards.list.titleInstalled')}
       </Typography.Title>
       <Typography.Text type="secondary">
-        Pregled SIM kartica koje su ugrađene u brojila u podružnicama koje moderiraš.
+        {t('simCards.list.subtitleInstalled')}
       </Typography.Text>
 
       <Space wrap>
         <Input.Search
           allowClear
-          placeholder="Pretraga ICCID/IP"
+          placeholder={t('simCards.list.searchPlaceholder')}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onSearch={(value) =>
@@ -111,14 +114,14 @@ export default function ModeratedInstalledSimCardsPage() {
           style={{ width: 280 }}
         />
         <Button onClick={handleReset} disabled={!filters.search}>
-          Reset
+          {t('common.actions.reset')}
         </Button>
       </Space>
 
       {query.isError && (
         <Typography.Text type="danger">
           {(query.error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-            'Učitavanje liste nije uspjelo.'}
+            t('simCards.list.loadFailed')}
         </Typography.Text>
       )}
 
@@ -132,7 +135,7 @@ export default function ModeratedInstalledSimCardsPage() {
             pageSize: query.data?.limit,
             total: query.data?.total,
             showSizeChanger: true,
-            showTotal: (total) => `Ukupno: ${total}`,
+            showTotal: (total) => t('common.pagination.totalItems', { count: total }),
             onChange: (page, pageSize) =>
               setFilters((prev) => ({ ...prev, page, limit: pageSize ?? 20 })),
           }}
@@ -143,4 +146,3 @@ export default function ModeratedInstalledSimCardsPage() {
     </div>
   )
 }
-

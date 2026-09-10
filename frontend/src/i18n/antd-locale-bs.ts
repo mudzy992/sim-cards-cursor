@@ -1,0 +1,218 @@
+import type { Locale } from 'antd/es/locale';
+
+/**
+ * Ant Design ships many locales out of the box (see `antd/locale/*`) but not
+ * Bosnian. This file provides a Bosnian `Locale` object for `ConfigProvider`,
+ * following the same shape as `antd/locale/en_US`.
+ *
+ * NOTE: Ant Design's `Locale` type occasionally gains/renames optional
+ * fields between minor versions. If `tsc` flags a missing/extra field here
+ * after `npm install`, adjust this object to match the installed antd
+ * version's `Locale` interface — the component-level translations below are
+ * still correct, only the wrapper shape may need a small tweak.
+ */
+const bsBA: Locale = {
+  locale: 'bs',
+  Pagination: {
+    items_per_page: '/ stranici',
+    jump_to: 'Idi na',
+    jump_to_confirm: 'potvrdi',
+    page: 'Stranica',
+    prev_page: 'Prethodna stranica',
+    next_page: 'Sljedeća stranica',
+    prev_5: 'Prethodnih 5 stranica',
+    next_5: 'Sljedećih 5 stranica',
+    prev_3: 'Prethodne 3 stranice',
+    next_3: 'Sljedeće 3 stranice',
+    page_size: 'Veličina stranice',
+  },
+  DatePicker: {
+    lang: {
+      placeholder: 'Odaberite datum',
+      yearPlaceholder: 'Odaberite godinu',
+      quarterPlaceholder: 'Odaberite kvartal',
+      monthPlaceholder: 'Odaberite mjesec',
+      weekPlaceholder: 'Odaberite sedmicu',
+      rangePlaceholder: ['Početni datum', 'Krajnji datum'],
+      rangeYearPlaceholder: ['Početna godina', 'Krajnja godina'],
+      rangeMonthPlaceholder: ['Početni mjesec', 'Krajnji mjesec'],
+      rangeWeekPlaceholder: ['Početna sedmica', 'Krajnja sedmica'],
+      locale: 'bs_BA',
+      today: 'Danas',
+      now: 'Sada',
+      backToToday: 'Nazad na danas',
+      ok: 'U redu',
+      clear: 'Očisti',
+      month: 'Mjesec',
+      year: 'Godina',
+      timeSelect: 'Odaberi vrijeme',
+      dateSelect: 'Odaberi datum',
+      monthSelect: 'Odaberi mjesec',
+      yearSelect: 'Odaberi godinu',
+      decadeSelect: 'Odaberi deceniju',
+      yearFormat: 'YYYY',
+      dateFormat: 'D.M.YYYY',
+      dayFormat: 'D',
+      dateTimeFormat: 'D.M.YYYY HH:mm:ss',
+      monthFormat: 'MMMM',
+      monthBeforeYear: true,
+      previousMonth: 'Prethodni mjesec (PageUp)',
+      nextMonth: 'Sljedeći mjesec (PageDown)',
+      previousYear: 'Prethodna godina (Control + left)',
+      nextYear: 'Sljedeća godina (Control + right)',
+      previousDecade: 'Prethodna decenija',
+      nextDecade: 'Sljedeća decenija',
+      previousCentury: 'Prethodni vijek',
+      nextCentury: 'Sljedeći vijek',
+    },
+    timePickerLocale: {
+      placeholder: 'Odaberite vrijeme',
+      rangePlaceholder: ['Početno vrijeme', 'Krajnje vrijeme'],
+    },
+  },
+  TimePicker: {
+    placeholder: 'Odaberite vrijeme',
+    rangePlaceholder: ['Početno vrijeme', 'Krajnje vrijeme'],
+  },
+  Calendar: {
+    lang: {
+      placeholder: 'Odaberite datum',
+      yearPlaceholder: 'Odaberite godinu',
+      quarterPlaceholder: 'Odaberite kvartal',
+      monthPlaceholder: 'Odaberite mjesec',
+      weekPlaceholder: 'Odaberite sedmicu',
+      rangePlaceholder: ['Početni datum', 'Krajnji datum'],
+      locale: 'bs_BA',
+      today: 'Danas',
+      now: 'Sada',
+      backToToday: 'Nazad na danas',
+      ok: 'U redu',
+      clear: 'Očisti',
+      month: 'Mjesec',
+      year: 'Godina',
+      dateFormat: 'D.M.YYYY',
+      dateTimeFormat: 'D.M.YYYY HH:mm:ss',
+      monthBeforeYear: true,
+    },
+    timePickerLocale: {
+      placeholder: 'Odaberite vrijeme',
+    },
+  },
+  Table: {
+    filterTitle: 'Filter meni',
+    filterConfirm: 'Primijeni',
+    filterReset: 'Resetuj',
+    filterEmptyText: 'Nema filtera',
+    filterCheckAll: 'Odaberi sve',
+    filterSearchPlaceholder: 'Pretraga u filterima',
+    emptyText: 'Nema podataka',
+    selectAll: 'Odaberi sve na stranici',
+    selectInvert: 'Obrni izbor na stranici',
+    selectNone: 'Poništi sav izbor',
+    selectionAll: 'Odaberi sve podatke',
+    sortTitle: 'Sortiranje',
+    expand: 'Proširi red',
+    collapse: 'Skupi red',
+    triggerDesc: 'Klikni za silazno sortiranje',
+    triggerAsc: 'Klikni za uzlazno sortiranje',
+    cancelSort: 'Klikni za poništavanje sortiranja',
+  },
+  Modal: {
+    okText: 'U redu',
+    cancelText: 'Otkaži',
+    justOkText: 'U redu',
+  },
+  Popconfirm: {
+    okText: 'U redu',
+    cancelText: 'Otkaži',
+  },
+  Transfer: {
+    titles: ['', ''],
+    searchPlaceholder: 'Pretraga',
+    itemUnit: 'stavka',
+    itemsUnit: 'stavki',
+    remove: 'Ukloni',
+    selectCurrent: 'Odaberi trenutnu stranicu',
+    removeCurrent: 'Ukloni trenutnu stranicu',
+    selectAll: 'Odaberi sve',
+    removeAll: 'Ukloni sve',
+    selectInvert: 'Obrni izbor',
+  },
+  Upload: {
+    uploading: 'Otpremanje...',
+    removeFile: 'Ukloni fajl',
+    uploadError: 'Greška pri otpremanju',
+    previewFile: 'Pregled fajla',
+    downloadFile: 'Preuzmi fajl',
+  },
+  Empty: {
+    description: 'Nema podataka',
+  },
+  Icon: {
+    icon: 'ikona',
+  },
+  Text: {
+    edit: 'Izmijeni',
+    copy: 'Kopiraj',
+    copied: 'Kopirano',
+    expand: 'Proširi',
+  },
+  Form: {
+    optional: '(opciono)',
+    defaultValidateMessages: {
+      default: 'Greška pri validaciji za polje ${label}',
+      required: '${label} je obavezno polje',
+      enum: '${label} mora biti jedno od [${enum}]',
+      whitespace: '${label} ne može biti prazno',
+      date: {
+        format: '${label} format datuma je neispravan',
+        parse: '${label} se ne može pretvoriti u datum',
+        invalid: '${label} je neispravan datum',
+      },
+      types: {
+        string: '${label} mora biti tekst',
+        method: '${label} je neispravnog tipa',
+        array: '${label} mora biti niz',
+        object: '${label} mora biti objekat',
+        number: '${label} mora biti broj',
+        date: '${label} mora biti datum',
+        boolean: '${label} mora biti boolean',
+        integer: '${label} mora biti cijeli broj',
+        float: '${label} mora biti decimalni broj',
+        regexp: '${label} je neispravan regex',
+        email: '${label} nije ispravan email',
+        url: '${label} nije ispravan URL',
+        hex: '${label} nije ispravna heksadecimalna vrijednost',
+      },
+      string: {
+        len: '${label} mora imati tačno ${len} karaktera',
+        min: '${label} mora imati najmanje ${min} karaktera',
+        max: '${label} mora imati najviše ${max} karaktera',
+        range: '${label} mora imati između ${min} i ${max} karaktera',
+      },
+      number: {
+        len: '${label} mora biti jednako ${len}',
+        min: '${label} mora biti najmanje ${min}',
+        max: '${label} mora biti najviše ${max}',
+        range: '${label} mora biti između ${min} i ${max}',
+      },
+      array: {
+        len: '${label} mora imati tačno ${len} stavki',
+        min: '${label} mora imati najmanje ${min} stavki',
+        max: '${label} mora imati najviše ${max} stavki',
+        range: '${label} mora imati između ${min} i ${max} stavki',
+      },
+      pattern: {
+        mismatch: '${label} ne odgovara obrascu ${pattern}',
+      },
+    },
+  },
+  Image: {
+    preview: 'Pregled',
+  },
+  Statistic: {
+    countDown: 'Odbrojavanje',
+  },
+} as unknown as Locale;
+
+export default bsBA;

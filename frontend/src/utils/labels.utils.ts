@@ -3,92 +3,100 @@ import type { UserStatus } from '@/types/user.types'
 import type { SimCardStatus } from '@/types/sim-card.types'
 import type { MeterStatus } from '@/types/meter.types'
 
-export const getUserRoleLabel = (role: UserRole): string => {
-  if (role === 'SYSTEM_ADMIN') return 'Sistemski administrator'
-  if (role === 'DIST_ADMIN') return 'Distribucijski admin'
-  return 'Operator'
+/**
+ * All functions below return a display label for a status/role/action enum
+ * value. They require a `t` translate function (from `useTranslation()`) so
+ * the label is rendered in the currently active language. Each function
+ * resolves to a stable i18n key under `labels.*` in
+ * `frontend/src/i18n/locales/{bs,en}.ts`.
+ */
+type TFn = (key: string, options?: Record<string, unknown>) => string
+
+export const getUserRoleLabel = (role: UserRole, t: TFn): string => {
+  if (role === 'SYSTEM_ADMIN') return t('labels.userRole.systemAdmin')
+  if (role === 'DIST_ADMIN') return t('labels.userRole.distAdmin')
+  return t('labels.userRole.operator')
 }
 
-export const getUserStatusLabel = (status: UserStatus): string => {
-  if (status === 'ACTIVE') return 'Aktivan'
-  if (status === 'INACTIVE') return 'Neaktivan'
-  return 'Suspendovan'
+export const getUserStatusLabel = (status: UserStatus, t: TFn): string => {
+  if (status === 'ACTIVE') return t('labels.userStatus.active')
+  if (status === 'INACTIVE') return t('labels.userStatus.inactive')
+  return t('labels.userStatus.suspended')
 }
 
-export const getSimCardStatusLabel = (status: SimCardStatus): string => {
-  if (status === 'AVAILABLE') return 'Dostupna'
-  if (status === 'ASSIGNED') return 'Dodijeljena'
-  if (status === 'INSTALLED') return 'Instalirana'
-  if (status === 'DEFECTIVE') return 'Neispravna'
-  if (status === 'DEMOUNTED') return 'Demontirana'
-  if (status === 'RETURNED') return 'Vraćena'
-  return 'Deaktivirana'
+export const getSimCardStatusLabel = (status: SimCardStatus, t: TFn): string => {
+  if (status === 'AVAILABLE') return t('labels.simCardStatus.available')
+  if (status === 'ASSIGNED') return t('labels.simCardStatus.assigned')
+  if (status === 'INSTALLED') return t('labels.simCardStatus.installed')
+  if (status === 'DEFECTIVE') return t('labels.simCardStatus.defective')
+  if (status === 'DEMOUNTED') return t('labels.simCardStatus.demounted')
+  if (status === 'RETURNED') return t('labels.simCardStatus.returned')
+  return t('labels.simCardStatus.deactivated')
 }
 
-export const getSimEventTypeLabel = (type: string): string => {
+export const getSimEventTypeLabel = (type: string, t: TFn): string => {
   const map: Record<string, string> = {
-    CREATED: 'Kreirano u sistemu',
-    CLAIMED: 'Zadužena od strane operatera',
-    ASSIGNED: 'Dodijeljena korisniku',
-    UNASSIGNED: 'Uklonjena dodjela',
-    INSTALLED: 'Ugrađena u brojilo',
-    DEMOUNTED: 'Demontirana / uklonjena sa brojila',
-    SENT: 'Zapisnik poslan (e-pošta)',
+    CREATED: 'labels.simEventType.created',
+    CLAIMED: 'labels.simEventType.claimed',
+    ASSIGNED: 'labels.simEventType.assigned',
+    UNASSIGNED: 'labels.simEventType.unassigned',
+    INSTALLED: 'labels.simEventType.installed',
+    DEMOUNTED: 'labels.simEventType.demounted',
+    SENT: 'labels.simEventType.sent',
   }
-  if (map[type]) return map[type]
+  if (map[type]) return t(map[type])
   if (type.startsWith('STATUS_')) {
-    return `Promjena statusa (${type.replace('STATUS_', '')})`
+    return t('labels.simEventType.statusChange', { status: type.replace('STATUS_', '') })
   }
   return type
 }
 
-export const getDemountResolutionLabel = (resolution: string): string => {
+export const getDemountResolutionLabel = (resolution: string, t: TFn): string => {
   const map: Record<string, string> = {
-    FULL_DEMOUNT: 'Potpuna demontaža',
-    REPLACE_SIM: 'Zamjena SIM-a',
-    REMOVE_SIM_ONLY: 'Demontaža SIM-a (bez zamjene)',
+    FULL_DEMOUNT: 'labels.demountResolution.fullDemount',
+    REPLACE_SIM: 'labels.demountResolution.replaceSim',
+    REMOVE_SIM_ONLY: 'labels.demountResolution.removeSimOnly',
   }
-  return map[resolution] ?? resolution
+  return map[resolution] ? t(map[resolution]) : resolution
 }
 
-export const getMeterDemountCategoryLabel = (cat: string): string => {
+export const getMeterDemountCategoryLabel = (cat: string, t: TFn): string => {
   const map: Record<string, string> = {
-    METER_FAULTY: 'Brojilo neispravno',
-    TEMPORARY_REMOVAL: 'Privremeno demontirano',
-    MAINTENANCE: 'Servis / održavanje',
-    OTHER: 'Ostalo',
+    METER_FAULTY: 'labels.meterDemountCategory.meterFaulty',
+    TEMPORARY_REMOVAL: 'labels.meterDemountCategory.temporaryRemoval',
+    MAINTENANCE: 'labels.meterDemountCategory.maintenance',
+    OTHER: 'labels.meterDemountCategory.other',
   }
-  return map[cat] ?? cat
+  return map[cat] ? t(map[cat]) : cat
 }
 
-export const getRemovedSimDispositionLabel = (d: string): string => {
+export const getRemovedSimDispositionLabel = (d: string, t: TFn): string => {
   const map: Record<string, string> = {
-    MARK_DEFECTIVE: 'Uklonjena SIM neispravna',
-    RETURN_TO_STOCK: 'Uklonjena SIM vraćena u zalihe',
+    MARK_DEFECTIVE: 'labels.removedSimDisposition.markDefective',
+    RETURN_TO_STOCK: 'labels.removedSimDisposition.returnToStock',
   }
-  return map[d] ?? d
+  return map[d] ? t(map[d]) : d
 }
 
-export const getMeterStatusLabel = (status: MeterStatus): string => {
-  if (status === 'ACTIVE') return 'Aktivno'
-  if (status === 'DEFECTIVE') return 'Neispravno'
-  if (status === 'IN_CALIBRATION') return 'Na baždarenju / servis'
-  return 'Neaktivno'
+export const getMeterStatusLabel = (status: MeterStatus, t: TFn): string => {
+  if (status === 'ACTIVE') return t('labels.meterStatus.active')
+  if (status === 'DEFECTIVE') return t('labels.meterStatus.defective')
+  if (status === 'IN_CALIBRATION') return t('labels.meterStatus.inCalibration')
+  return t('labels.meterStatus.inactive')
 }
 
-export const getActivityLogActionLabel = (action: string): string => {
+export const getActivityLogActionLabel = (action: string, t: TFn): string => {
   const map: Record<string, string> = {
-    CREATE: 'Kreirano',
-    UPDATE: 'Ažurirano',
-    DELETE: 'Obrisano',
-    SEND: 'Poslano',
-    SEND_FAILED: 'Neuspješno slanje',
-    MARK_SEP_ACTIVATED: 'SEP aktiviran',
-    STATUS_CHANGE: 'Promjena statusa',
-    CLAIM: 'Zaduživanje',
-    ASSIGN: 'Dodjela',
-    UNASSIGN: 'Oduzimanje dodjele',
+    CREATE: 'labels.activityLogAction.create',
+    UPDATE: 'labels.activityLogAction.update',
+    DELETE: 'labels.activityLogAction.delete',
+    SEND: 'labels.activityLogAction.send',
+    SEND_FAILED: 'labels.activityLogAction.sendFailed',
+    MARK_SEP_ACTIVATED: 'labels.activityLogAction.markSepActivated',
+    STATUS_CHANGE: 'labels.activityLogAction.statusChange',
+    CLAIM: 'labels.activityLogAction.claim',
+    ASSIGN: 'labels.activityLogAction.assign',
+    UNASSIGN: 'labels.activityLogAction.unassign',
   }
-  return map[action] ?? action
+  return map[action] ? t(map[action]) : action
 }
-

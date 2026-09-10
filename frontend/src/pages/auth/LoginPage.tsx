@@ -6,11 +6,13 @@ import type { LoginInput } from '@/types/auth.types';
 import { useQuery } from '@tanstack/react-query';
 import { appReleasesApi } from '@/api/app-releases.api';
 import { API_BASE_URL } from '@/api/axios.instance';
+import { useTranslation } from '@/i18n';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  const { t } = useTranslation();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function LoginPage() {
           : fromPath ?? '/dashboard';
       navigate(safePath ?? '/dashboard', { replace: true });
     } catch {
-      setErrorMessage('Prijava nije uspjela. Provjeri kredencijale.');
+      setErrorMessage(t('auth.login.failed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -68,10 +70,10 @@ export default function LoginPage() {
           S
         </div>
         <Typography.Title level={3} className="!mb-1 !mt-3">
-          Prijava
+          {t('auth.login.title')}
         </Typography.Title>
         <Typography.Paragraph type="secondary" className="!mb-6">
-          Unesite pristupne podatke za SIM Tracker.
+          {t('auth.login.subtitle')}
         </Typography.Paragraph>
 
         {errorMessage ? (
@@ -80,35 +82,36 @@ export default function LoginPage() {
 
         <Form<LoginInput> layout="vertical" onFinish={(values) => void handleSubmit(values)}>
           <Form.Item
-            label="Email ili korisničko ime"
+            label={t('auth.login.emailOrUsernameLabel')}
             name="emailOrUsername"
-            rules={[{ required: true, message: 'Unesite email ili korisničko ime' }]}
+            rules={[{ required: true, message: t('auth.login.emailOrUsernameRequired') }]}
           >
             <Input
               size="large"
-              placeholder="email@example.com ili ime.prezime"
+              placeholder={t('auth.login.emailOrUsernamePlaceholder')}
               autoComplete="username"
             />
           </Form.Item>
           <Form.Item
-            label="Lozinka"
+            label={t('auth.login.passwordLabel')}
             name="password"
             rules={[{ required: true, min: 8 }]}
           >
             <Input.Password size="large" autoComplete="current-password" />
           </Form.Item>
           <Button htmlType="submit" type="primary" size="large" loading={isSubmitting} block>
-            Prijavi se
+            {t('auth.login.submitButton')}
           </Button>
         </Form>
 
         {latestReleaseQuery.isSuccess && latestReleaseQuery.data ? (
           <div className="mt-6 border-t border-slate-200 pt-4">
             <Typography.Text type="secondary" className="block mb-1">
-              Zadnja verzija mobilne aplikacije:
+              {t('auth.login.latestMobileVersion')}
             </Typography.Text>
             <Typography.Text strong>
-              {latestReleaseQuery.data.versionName} (kod {latestReleaseQuery.data.versionCode})
+              {latestReleaseQuery.data.versionName} (
+              {t('auth.login.versionCode', { code: latestReleaseQuery.data.versionCode })})
             </Typography.Text>
             <div>
               <a
@@ -117,7 +120,7 @@ export default function LoginPage() {
                 rel="noreferrer"
                 className="text-emerald-700 hover:text-emerald-800"
               >
-                Preuzmi .apk
+                {t('auth.login.downloadApk')}
               </a>
             </div>
           </div>

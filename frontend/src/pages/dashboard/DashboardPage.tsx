@@ -8,13 +8,14 @@ import {
   InboxOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from '@/i18n';
 
-const statusLabel: Record<string, string> = {
-  DRAFT: 'Nacrt',
-  SENT: 'Poslano',
-  SEND_FAILED: 'Greška slanja',
-  SEP_ACTIVATED: 'SEP aktiviran',
-  LEGACY_COMPLETED: 'Legacy završeno',
+const statusLabelKey: Record<string, string> = {
+  DRAFT: 'installationRecords.status.draft',
+  SENT: 'installationRecords.status.sent',
+  SEND_FAILED: 'installationRecords.status.sendFailed',
+  SEP_ACTIVATED: 'installationRecords.status.sepActivated',
+  LEGACY_COMPLETED: 'installationRecords.status.legacyCompleted',
 };
 
 const statusColor: Record<string, string> = {
@@ -26,6 +27,7 @@ const statusColor: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const { t, language } = useTranslation();
   const statsQuery = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => dashboardApi.getStats(),
@@ -45,6 +47,11 @@ export default function DashboardPage() {
   const recent = recentQuery.data ?? [];
   const chartData = chartQuery.data ?? [];
 
+  const statusLabel = (status: string) =>
+    statusLabelKey[status] ? t(statusLabelKey[status]) : status;
+
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
+
   return (
     <div
       className="space-y-6"
@@ -52,14 +59,14 @@ export default function DashboardPage() {
       data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
     >
       <Typography.Title level={3} className="!mb-0">
-        Dashboard
+        {t('dashboard.title')}
       </Typography.Title>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Zapisnici (ukupno)"
+              title={t('dashboard.stats.recordsTotal')}
               value={stats?.installationRecords?.total ?? 0}
               prefix={<FileTextOutlined />}
             />
@@ -68,20 +75,22 @@ export default function DashboardPage() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="SIM kartice"
+              title={t('dashboard.stats.simCards')}
               value={stats?.simCards?.total ?? 0}
               prefix={<InboxOutlined />}
             />
             <Typography.Text type="secondary" className="text-xs">
-              Dostupno: {stats?.simCards?.available ?? 0} | Instalirano:{' '}
-              {stats?.simCards?.installed ?? 0}
+              {t('dashboard.stats.simCardsBreakdown', {
+                available: stats?.simCards?.available ?? 0,
+                installed: stats?.simCards?.installed ?? 0,
+              })}
             </Typography.Text>
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Brojila"
+              title={t('dashboard.stats.meters')}
               value={stats?.meters ?? 0}
               prefix={<ThunderboltOutlined />}
             />
@@ -90,19 +99,19 @@ export default function DashboardPage() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <div className="space-y-1">
-              <Typography.Text strong>Zapisnici po statusu</Typography.Text>
+              <Typography.Text strong>{t('dashboard.stats.recordsByStatus')}</Typography.Text>
               <div className="flex flex-wrap gap-2 mt-2">
                 {stats?.installationRecords?.byStatus &&
                   Object.entries(stats.installationRecords.byStatus).map(
                     ([status, count]) => (
                       <Tag key={status} color={statusColor[status] ?? 'default'}>
-                        {statusLabel[status] ?? status}: {count}
+                        {statusLabel(status)}: {count}
                       </Tag>
                     ),
                   )}
                 {(!stats?.installationRecords?.byStatus ||
                   Object.keys(stats.installationRecords.byStatus).length === 0) && (
-                  <Typography.Text type="secondary">Nema podataka</Typography.Text>
+                  <Typography.Text type="secondary">{t('common.states.noData')}</Typography.Text>
                 )}
               </div>
             </div>
@@ -113,10 +122,10 @@ export default function DashboardPage() {
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
           <Card
-            title="Nedavni zapisnici"
+            title={t('dashboard.recentRecords.title')}
             loading={recentQuery.isLoading}
             extra={
-              <Link to="/installation-records">Svi zapisnici</Link>
+              <Link to="/installation-records">{t('dashboard.recentRecords.viewAll')}</Link>
             }
           >
             <Table
@@ -126,33 +135,33 @@ export default function DashboardPage() {
               pagination={false}
               columns={[
                 {
-                  title: 'Broj',
+                  title: t('dashboard.recentRecords.columns.number'),
                   dataIndex: 'recordNumber',
                   render: (val: string, row: RecentRecord) => (
                     <Link to={`/installation-records/${row.id}`}>{val}</Link>
                   ),
                 },
                 {
-                  title: 'Status',
+                  title: t('common.labels.status'),
                   dataIndex: 'status',
                   render: (s: string) => (
-                    <Tag color={statusColor[s]}>{statusLabel[s] ?? s}</Tag>
+                    <Tag color={statusColor[s]}>{statusLabel(s)}</Tag>
                   ),
                 },
                 {
-                  title: 'Brojilo',
+                  title: t('dashboard.recentRecords.columns.meter'),
                   render: (_: unknown, row: RecentRecord) =>
                     row.meter?.serialNumber ?? '–',
                 },
                 {
-                  title: 'Instalirao',
+                  title: t('dashboard.recentRecords.columns.installedBy'),
                   render: (_: unknown, row: RecentRecord) =>
                     row.installedBy
                       ? `${row.installedBy.firstName} ${row.installedBy.lastName}`
                       : '–',
                 },
                 {
-                  title: 'Datum',
+                  title: t('common.labels.date'),
                   dataIndex: 'createdAt',
                   render: (d: string) =>
                     d ? new Date(d).toLocaleDateString() : '–',
@@ -163,21 +172,21 @@ export default function DashboardPage() {
         </Col>
         <Col xs={24} lg={12}>
           <Card
-            title="Zapisnici po danima (30 dana)"
+            title={t('dashboard.recordsChart.title')}
             loading={chartQuery.isLoading}
           >
             <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
               {chartData.map(({ date, count }) => (
                 <div key={date} className="flex items-center gap-2">
                   <Typography.Text className="w-24 text-xs">
-                    {new Date(date).toLocaleDateString('bs-BA', {
+                    {new Date(date).toLocaleDateString(dateLocale, {
                       day: '2-digit',
                       month: '2-digit',
                     })}
                   </Typography.Text>
                   <div
                     className="flex-1 h-6 bg-slate-100 rounded overflow-hidden"
-                    title={`${count} zapisnika`}
+                    title={t('dashboard.recordsChart.barTooltip', { count })}
                   >
                     <div
                       className="h-full bg-blue-500 rounded"
