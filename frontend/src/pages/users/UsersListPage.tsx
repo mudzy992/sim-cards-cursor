@@ -22,6 +22,7 @@ import { branchModeratorsApi } from '@/api/branch-moderators.api'
 import { useAuthStore } from '@/store/auth.store';
 import type { UserListItem } from '@/types/user.types';
 import type { UserRole } from '@/types/auth.types';
+import { useTranslation } from '@/i18n';
 import { getUserRoleLabel, getUserStatusLabel } from '@/utils/labels.utils'
 
 const ROLE_OPTIONS: { label: string; value: UserRole }[] = [
@@ -37,6 +38,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function UsersListPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState<string>('users');
@@ -372,7 +374,7 @@ export default function UsersListPage() {
           {
             title: 'Role',
             dataIndex: 'role',
-            render: (r: UserRole) => <Tag>{getUserRoleLabel(r)}</Tag>,
+            render: (r: UserRole) => <Tag>{getUserRoleLabel(r, t)}</Tag>,
           },
           {
             title: 'Distribucija / Podružnica',
@@ -390,7 +392,7 @@ export default function UsersListPage() {
             dataIndex: 'status',
             render: (s) => (
               <Tag color={s === 'ACTIVE' ? 'green' : s === 'SUSPENDED' ? 'red' : 'orange'}>
-                {getUserStatusLabel(s)}
+                {getUserStatusLabel(s, t)}
               </Tag>
             ),
           },

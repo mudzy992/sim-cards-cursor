@@ -22,6 +22,7 @@ import type { InstallationRecordItem } from '@/types/installation-record.types';
 import { RecordPhotoImage } from '@/components/installation-records/RecordPhotoImage';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types';
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
+import { useTranslation } from '@/i18n';
 import { getActivityLogActionLabel, getSimCardStatusLabel } from '@/utils/labels.utils'
 
 const statusLabel: Record<string, string> = {
@@ -41,6 +42,7 @@ const statusColor: Record<string, string> = {
 };
 
 export default function InstallationRecordDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -421,7 +423,7 @@ export default function InstallationRecordDetailPage() {
                   )}
                   {record.simCard?.id && currentSimQuery.data ? (
                     <Tag color="blue">
-                      Trenutno: {getSimCardStatusLabel(currentSimQuery.data.status)}
+                      Trenutno: {getSimCardStatusLabel(currentSimQuery.data.status, t)}
                     </Tag>
                   ) : null}
                 </Space>
@@ -506,7 +508,7 @@ export default function InstallationRecordDetailPage() {
               children: (
                 <div className="flex flex-col gap-1">
                   <div className="flex items-start justify-between gap-4">
-                    <Typography.Text strong>{getActivityLogActionLabel(item.action)}</Typography.Text>
+                    <Typography.Text strong>{getActivityLogActionLabel(item.action, t)}</Typography.Text>
                     <Typography.Text type="secondary" className="text-xs whitespace-nowrap">
                       {new Date(item.createdAt).toLocaleString('bs-BA')}
                     </Typography.Text>

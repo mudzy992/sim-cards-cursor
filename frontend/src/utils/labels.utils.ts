@@ -1,3 +1,4 @@
+import type { TranslateOptions } from '@/i18n/core'
 import type { UserRole } from '@/types/auth.types'
 import type { UserStatus } from '@/types/user.types'
 import type { SimCardStatus } from '@/types/sim-card.types'
@@ -10,7 +11,7 @@ import type { MeterStatus } from '@/types/meter.types'
  * resolves to a stable i18n key under `labels.*` in
  * `frontend/src/i18n/locales/{bs,en}.ts`.
  */
-type TFn = (key: string, options?: Record<string, unknown>) => string
+type TFn = (key: string, options?: TranslateOptions) => string
 
 export const getUserRoleLabel = (role: UserRole, t: TFn): string => {
   if (role === 'SYSTEM_ADMIN') return t('labels.userRole.systemAdmin')

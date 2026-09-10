@@ -39,11 +39,12 @@ function interpolate(template: string, params?: TranslationParams): string {
   });
 }
 
-export interface TranslateOptions extends TranslationParams {
+export interface TranslateOptions {
   /** Overrides pluralization pick when provided; otherwise uses `count`. */
   count?: number;
   /** Explicit fallback text used only if the key is missing in every dictionary. */
   defaultValue?: string;
+  [key: string]: string | number | undefined;
 }
 
 /**

@@ -32,6 +32,7 @@ import { installTasksApi } from '@/api/install-tasks.api'
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
 import { useAuthStore } from '@/store/auth.store'
+import { useTranslation } from '@/i18n'
 import {
   getDemountResolutionLabel,
   getMeterDemountCategoryLabel,
@@ -72,6 +73,7 @@ type MeterFormValues = {
 }
 
 export default function MeterDetailPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [messageApi, messageContextHolder] = message.useMessage()
@@ -148,7 +150,7 @@ export default function MeterDetailPage() {
           ? `${openDemountTask.assignedTo.firstName} ${openDemountTask.assignedTo.lastName}`
           : '–',
         resolution: openDemountTask.requestedResolution
-          ? getDemountResolutionLabel(openDemountTask.requestedResolution)
+          ? getDemountResolutionLabel(openDemountTask.requestedResolution, t)
           : '–',
       }
     : null
@@ -927,7 +929,7 @@ export default function MeterDetailPage() {
               options={(
                 ['FULL_DEMOUNT', 'REPLACE_SIM', 'REMOVE_SIM_ONLY'] as DemountCompletionResolution[]
               ).map((v) => ({
-                label: getDemountResolutionLabel(v),
+                label: getDemountResolutionLabel(v, t),
                 value: v,
               }))}
             />
@@ -939,7 +941,7 @@ export default function MeterDetailPage() {
               value={demountRemovedSimDisposition || undefined}
               onChange={setDemountRemovedSimDisposition}
               options={(['MARK_DEFECTIVE', 'RETURN_TO_STOCK'] as RemovedSimDisposition[]).map((v) => ({
-                label: getRemovedSimDispositionLabel(v),
+                label: getRemovedSimDispositionLabel(v, t),
                 value: v,
               }))}
             />
@@ -959,7 +961,7 @@ export default function MeterDetailPage() {
                     'OTHER',
                   ] as MeterDemountCategory[]
                 ).map((v) => ({
-                  label: getMeterDemountCategoryLabel(v),
+                  label: getMeterDemountCategoryLabel(v, t),
                   value: v,
                 }))}
               />

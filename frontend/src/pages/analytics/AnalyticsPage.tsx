@@ -16,6 +16,7 @@ import {
   type AnalyticsRange,
   type TimeRangeParams,
 } from '@/api/analytics.api';
+import { useTranslation } from '@/i18n';
 import { getSimCardStatusLabel } from '@/utils/labels.utils'
 import type { SimCardStatus } from '@/types/sim-card.types'
 
@@ -48,6 +49,7 @@ function useTimeRange(): [TimeRangeParams, (r: AnalyticsRange) => void] {
 }
 
 export default function AnalyticsPage() {
+  const { t } = useTranslation();
   const [rangeParams, setRangeRange] = useTimeRange();
 
   const overviewQuery = useQuery({
@@ -162,7 +164,7 @@ export default function AnalyticsPage() {
               {sim?.byStatus &&
                 Object.entries(sim.byStatus).map(([status, count]) => (
                   <div key={status} className="flex items-center gap-2 text-xs">
-                    <span className="w-28">{getSimCardStatusLabel(status as SimCardStatus)}</span>
+                    <span className="w-28">{getSimCardStatusLabel(status as SimCardStatus, t)}</span>
                     <div className="flex-1 h-3 bg-slate-100 rounded">
                       <div
                         className="h-full bg-emerald-500 rounded"
