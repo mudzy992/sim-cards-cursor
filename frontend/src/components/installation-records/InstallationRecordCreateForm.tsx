@@ -12,6 +12,7 @@ import type {
   InstallationRecordKind,
 } from '@/types/installation-record.types';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
+import { useTranslation } from '@/i18n'
 
 type CreateMode = 'existing' | 'new';
 
@@ -29,6 +30,7 @@ export default function InstallationRecordCreateForm({
   onSuccess,
   onCancel,
 }: InstallationRecordCreateFormProps) {
+  const { t } = useTranslation();
   const userId = useAuthStore((state) => state.user?.id);
   const userRole = useAuthStore((state) => state.user?.role);
   const userBranch = useAuthStore((state) => state.user?.branch);
@@ -99,13 +101,13 @@ export default function InstallationRecordCreateForm({
     mutationFn: (payload: Parameters<typeof installationRecordsApi.create>[0]) =>
       installationRecordsApi.create(payload),
     onSuccess: (data) => {
-      messageApi.success('Zapisnik je kreiran.');
+      messageApi.success(t('installationRecords.form.created'));
       onSuccess?.(data);
     },
     onError: (err: unknown) => {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Kreiranje zapisnika nije uspjelo.';
+        t('installationRecords.form.createFailed');
       messageApi.error(msg);
     },
   });
@@ -121,9 +123,9 @@ export default function InstallationRecordCreateForm({
       value: m.id,
     })) ?? [];
   const meterTypeOptions =
-    meterTypesQuery.data?.map((t) => ({
-      label: t.name,
-      value: t.id,
+    meterTypesQuery.data?.map((mtd) => ({
+      label: mtd.name,
+      value: mtd.id,
     })) ?? [];
 
   const branchOptions =
@@ -230,8 +232,7 @@ export default function InstallationRecordCreateForm({
       {messageContextHolder}
       {!embedded && (
         <p className="text-slate-500 mb-4">
-          Zapisnik se kreira kada se SIM kartici pridružuje brojilo. Možete odabrati postojeće
-          brojilo ili unijeti novo (kao na terenu – tip, serijski broj, lokacija).
+          {t('installationRecords.form.intro')}
         </p>
       )}
       <Form
@@ -243,7 +244,7 @@ export default function InstallationRecordCreateForm({
           installRecordKind: 'NEW_CONNECTION',
         }}
       >
-        <Form.Item label="Način kreiranja">
+        <Form.Item label={t('installationRecords.form.creationModeLabel')}>
           <Radio.Group
             value={createMode}
             onChange={(e) => {
@@ -257,19 +258,19 @@ export default function InstallationRecordCreateForm({
               ]);
             }}
           >
-            <Radio value="new">Novo brojilo na terenu (tip + serijski broj + lokacija)</Radio>
-            <Radio value="existing">Postojeće brojilo</Radio>
+            <Radio value="new">{t('installationRecords.form.modeNew')}</Radio>
+            <Radio value="existing">{t('installationRecords.form.modeExisting')}</Radio>
           </Radio.Group>
         </Form.Item>
 
         {createMode === 'existing' ? (
           <Form.Item
             name="meterId"
-            label="Brojilo"
-            rules={[{ required: true, message: 'Odaberite brojilo.' }]}
+            label={t('layout.sidebar.meters')}
+            rules={[{ required: true, message: t('installationRecords.form.selectMeterRequired') }]}
           >
             <Select
-              placeholder="Odaberi brojilo (serijski broj – tip)"
+              placeholder={t('installationRecords.form.selectMeterPlaceholder')}
               options={meterOptions}
               loading={metersQuery.isLoading}
               showSearch
@@ -280,23 +281,23 @@ export default function InstallationRecordCreateForm({
           </Form.Item>
         ) : (
           <>
-            <Form.Item name="installRecordKind" label="Vrsta zapisnika">
+            <Form.Item name="installRecordKind" label={t('installationRecords.form.recordKindLabel')}>
               <Radio.Group>
-                <Radio value="NEW_CONNECTION">Novi priključak</Radio>
-                <Radio value="METER_REPLACEMENT">Zamjena brojila</Radio>
+                <Radio value="NEW_CONNECTION">{t('installationRecords.form.kindNewConnection')}</Radio>
+                <Radio value="METER_REPLACEMENT">{t('installationRecords.form.kindMeterReplacement')}</Radio>
               </Radio.Group>
             </Form.Item>
 
             {installRecordKind === 'METER_REPLACEMENT' && (
               <>
-                <Divider orientation="left">Demontirano brojilo</Divider>
+                <Divider orientation="left">{t('installationRecords.form.demountedMeterDivider')}</Divider>
                 <Form.Item
                   name={['demountedMeter', 'meterTypeDefinitionId']}
-                  label="Tip demontiranog brojila"
-                  rules={[{ required: true, message: 'Odaberite tip demontiranog brojila.' }]}
+                  label={t('installationRecords.form.demountedTypeLabel')}
+                  rules={[{ required: true, message: t('installationRecords.form.demountedTypeRequired') }]}
                 >
                   <Select
-                    placeholder="Odaberi tip"
+                    placeholder={t('installationRecords.form.selectTypePlaceholder')}
                     options={meterTypeOptions}
                     loading={meterTypesQuery.isLoading}
                     showSearch
@@ -307,14 +308,14 @@ export default function InstallationRecordCreateForm({
                 </Form.Item>
                 <Form.Item
                   name={['demountedMeter', 'serialNumber']}
-                  label="Serijski broj demontiranog"
-                  rules={[{ required: true, message: 'Unesite serijski broj demontiranog brojila.' }]}
+                  label={t('installationRecords.form.demountedSerialLabel')}
+                  rules={[{ required: true, message: t('installationRecords.form.demountedSerialRequired') }]}
                 >
-                  <Input placeholder="Serijski broj" />
+                  <Input placeholder={t('installationRecords.form.serialNumberPlaceholder')} />
                 </Form.Item>
                 {demountedMeterTypeDefinitionId && (
                   <div className="rounded-md border border-slate-200 p-3 mb-3">
-                    <div className="font-medium mb-2">Dodatna polja (demontirano)</div>
+                    <div className="font-medium mb-2">{t('installationRecords.form.extraFieldsDemounted')}</div>
                     {(demountedMeterTypeFieldsQuery.data ?? [])
                       .slice()
                       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -325,7 +326,7 @@ export default function InstallationRecordCreateForm({
                           label={field.label}
                           rules={
                             field.isRequired && isFieldEditable(field)
-                              ? [{ required: true, message: `Unesite: ${field.label}` }]
+                              ? [{ required: true, message: t('installationRecords.form.fieldRequired', { label: field.label }) }]
                               : []
                           }
                           initialValue={field.defaultValue ?? undefined}
@@ -335,51 +336,51 @@ export default function InstallationRecordCreateForm({
                         </Form.Item>
                       ))}
                     {demountedMeterTypeFieldsQuery.isLoading && (
-                      <div className="text-sm text-slate-500">Učitavanje polja…</div>
+                      <div className="text-sm text-slate-500">{t('installationRecords.form.loadingFields')}</div>
                     )}
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">
                   <Form.Item
                     name={['demountedMeter', 'year']}
-                    label="Godina proizvodnje (demontirano)"
-                    rules={[{ required: true, message: 'Obavezno.' }]}
+                    label={t('installationRecords.form.demountedYearLabel')}
+                    rules={[{ required: true, message: t('installationRecords.form.requiredShort') }]}
                   >
                     <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
                   </Form.Item>
                   <Form.Item
                     name={['demountedMeter', 'calibrationYear']}
-                    label="Godina baždarenja (demontirano)"
-                    rules={[{ required: true, message: 'Obavezno.' }]}
+                    label={t('installationRecords.form.demountedCalibrationYearLabel')}
+                    rules={[{ required: true, message: t('installationRecords.form.requiredShort') }]}
                   >
                     <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
                   </Form.Item>
                 </div>
-                <Form.Item name={['demountedMeter', 'notes']} label="Napomena (demontirano brojilo)">
-                  <Input.TextArea rows={2} placeholder="Opcionalno" />
+                <Form.Item name={['demountedMeter', 'notes']} label={t('installationRecords.form.demountedNotesLabel')}>
+                  <Input.TextArea rows={2} placeholder={t('common.labels.optional')} />
                 </Form.Item>
                 <Form.Item
                   name={['demountedMeter', 'hadIntegratedSim']}
-                  label="Staro brojilo ima ugrađenu SIM karticu"
+                  label={t('installationRecords.form.hadIntegratedSimLabel')}
                   valuePropName="checked"
                   initialValue={false}
                 >
                   <Switch />
                 </Form.Item>
-                <Form.Item name={['demountedMeter', 'noSimNote']} label="Napomena (SIM na starom brojilu)">
-                  <Input placeholder="Opcionalno" />
+                <Form.Item name={['demountedMeter', 'noSimNote']} label={t('installationRecords.form.noSimNoteLabel')}>
+                  <Input placeholder={t('common.labels.optional')} />
                 </Form.Item>
-                <Divider orientation="left">Novo brojilo</Divider>
+                <Divider orientation="left">{t('installationRecords.form.newMeterDivider')}</Divider>
               </>
             )}
 
             <Form.Item
               name="meterTypeDefinitionId"
-              label="Tip brojila"
-              rules={[{ required: true, message: 'Odaberite tip brojila.' }]}
+              label={t('installationRecords.form.meterTypeLabel')}
+              rules={[{ required: true, message: t('installationRecords.form.meterTypeRequired') }]}
             >
               <Select
-                placeholder="Odaberi tip brojila"
+                placeholder={t('meterTypeFields.selectTypePlaceholder')}
                 options={meterTypeOptions}
                 loading={meterTypesQuery.isLoading}
                 showSearch
@@ -390,44 +391,44 @@ export default function InstallationRecordCreateForm({
             </Form.Item>
             <Form.Item
               name="serialNumber"
-              label="Serijski broj brojila"
-              rules={[{ required: true, message: 'Unesite serijski broj.' }]}
+              label={t('installationRecords.form.meterSerialLabel')}
+              rules={[{ required: true, message: t('installationRecords.form.serialNumberRequired') }]}
             >
-              <Input placeholder="Serijski broj s brojila" />
+              <Input placeholder={t('installationRecords.form.meterSerialPlaceholder')} />
             </Form.Item>
             <div className="grid grid-cols-2 gap-4">
               <Form.Item
                 name="year"
-                label="Godina proizvodnje"
-                rules={[{ required: true, message: 'Obavezno.' }]}
+                label={t('installationRecords.form.yearLabel')}
+                rules={[{ required: true, message: t('installationRecords.form.requiredShort') }]}
               >
                 <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
               </Form.Item>
               <Form.Item
                 name="calibrationYear"
-                label="Godina baždarenja"
-                rules={[{ required: true, message: 'Obavezno.' }]}
+                label={t('installationRecords.form.calibrationYearLabel')}
+                rules={[{ required: true, message: t('installationRecords.form.requiredShort') }]}
               >
                 <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
               </Form.Item>
             </div>
-            <Form.Item name="installationAddress" label="Adresa instalacije">
-              <Input placeholder="Ulica, broj, mjesto" />
+            <Form.Item name="installationAddress" label={t('installationRecords.form.addressLabel')}>
+              <Input placeholder={t('installationRecords.form.addressPlaceholder')} />
             </Form.Item>
             <div className="grid grid-cols-2 gap-4">
-              <Form.Item name="city" label="Grad">
-                <Input placeholder="Grad" />
+              <Form.Item name="city" label={t('installationRecords.form.cityLabel')}>
+                <Input placeholder={t('installationRecords.form.cityLabel')} />
               </Form.Item>
               <Form.Item
                 name={isOperator ? 'municipality' : 'branchId'}
-                label="Opština"
+                label={t('installationRecords.form.municipalityLabel')}
                 initialValue={isOperator ? municipalityValue : undefined}
               >
                 {isOperator ? (
-                  <Input placeholder="Opština" disabled />
+                  <Input placeholder={t('installationRecords.form.municipalityLabel')} disabled />
                 ) : (
                   <Select
-                    placeholder="Odaberi opštinu (podružnicu)"
+                    placeholder={t('installationRecords.form.selectMunicipalityPlaceholder')}
                     options={branchOptions}
                     loading={branchesQuery.isLoading}
                     allowClear
@@ -442,7 +443,7 @@ export default function InstallationRecordCreateForm({
 
             {selectedMeterTypeDefinitionId && (
               <div className="rounded-md border border-slate-200 p-3">
-                <div className="font-medium mb-2">Dodatna polja</div>
+                <div className="font-medium mb-2">{t('installationRecords.form.extraFields')}</div>
                 {(meterTypeFieldsQuery.data ?? [])
                   .slice()
                   .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -453,7 +454,7 @@ export default function InstallationRecordCreateForm({
                       label={field.label}
                       rules={
                         field.isRequired && isFieldEditable(field)
-                          ? [{ required: true, message: `Unesite: ${field.label}` }]
+                          ? [{ required: true, message: t('installationRecords.form.fieldRequired', { label: field.label }) }]
                           : []
                       }
                       initialValue={field.defaultValue ?? undefined}
@@ -463,21 +464,21 @@ export default function InstallationRecordCreateForm({
                     </Form.Item>
                   ))}
                 {meterTypeFieldsQuery.isLoading && (
-                  <div className="text-sm text-slate-500">Učitavanje polja…</div>
+                  <div className="text-sm text-slate-500">{t('installationRecords.form.loadingFields')}</div>
                 )}
               </div>
             )}
-            <Form.Item name="measuringPoint" label="Mjerno mjesto">
-              <Input placeholder="Opcionalno" />
+            <Form.Item name="measuringPoint" label={t('installationRecords.form.measuringPointLabel')}>
+              <Input placeholder={t('common.labels.optional')} />
             </Form.Item>
-            <Form.Item name="installationDate" label="Datum instalacije">
+            <Form.Item name="installationDate" label={t('installationRecords.list.columns.installationDate')}>
               <Input type="date" />
             </Form.Item>
             <div className="grid grid-cols-2 gap-4">
-              <Form.Item name="latitude" label="GPS širina">
+              <Form.Item name="latitude" label={t('installationRecords.form.gpsLatLabel')}>
                 <Input type="number" step="any" placeholder="npr. 43.85" />
               </Form.Item>
-              <Form.Item name="longitude" label="GPS dužina">
+              <Form.Item name="longitude" label={t('installationRecords.form.gpsLngLabel')}>
                 <Input type="number" step="any" placeholder="npr. 18.41" />
               </Form.Item>
             </div>
@@ -486,11 +487,11 @@ export default function InstallationRecordCreateForm({
 
         <Form.Item
           name="simCardId"
-          label="SIM kartica"
-          rules={[{ required: true, message: 'Odaberite SIM karticu.' }]}
+          label={t('layout.sidebar.simCards')}
+          rules={[{ required: true, message: t('installationRecords.form.simCardRequired') }]}
         >
           <Select
-            placeholder="Odaberi zaduženu SIM karticu"
+            placeholder={t('installationRecords.form.simCardPlaceholder')}
             options={simOptions}
             loading={simCardsQuery.isLoading}
             showSearch
@@ -499,16 +500,16 @@ export default function InstallationRecordCreateForm({
             }
           />
         </Form.Item>
-        <Form.Item name="notes" label="Napomena">
-          <Input.TextArea rows={2} placeholder="Opcionalno" />
+        <Form.Item name="notes" label={t('common.labels.notes')}>
+          <Input.TextArea rows={2} placeholder={t('common.labels.optional')} />
         </Form.Item>
         <Form.Item>
           <div className="flex gap-2">
             <Button type="primary" htmlType="submit" loading={createMutation.isPending}>
-              Kreiraj zapisnik
+              {t('installationRecords.form.submitButton')}
             </Button>
             {embedded && onCancel && (
-              <Button onClick={onCancel}>Odustani</Button>
+              <Button onClick={onCancel}>{t('common.actions.cancel')}</Button>
             )}
           </div>
         </Form.Item>
@@ -522,7 +523,7 @@ export default function InstallationRecordCreateForm({
 
   return (
     <div className="max-w-2xl">
-      <Card title="Novi zapisnik ugradnje">{formContent}</Card>
+      <Card title={t('installationRecords.form.cardTitle')}>{formContent}</Card>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import type { ImportPreviewRow, ShipmentImportPreview } from '@/types/import.types';
 import { exportIssuesToCsv, printIssuesReport } from './import-report.utils';
+import { useTranslation } from '@/i18n';
 
 /**
  * Review importa: pregled svih redova sa greškama/upozorenjima,
@@ -28,6 +29,8 @@ type FilterKey = 'all' | 'valid' | 'errors' | 'dupFile' | 'dupDb';
 
 export function ImportReviewTable(props: ImportReviewTableProps) {
   const { preview, shipmentName, selectedRowNumbers, onChangeSelection } = props;
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
   const [filter, setFilter] = useState<FilterKey>('all');
 
   const rows = preview.previewRows;
@@ -69,17 +72,17 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
       render: (n: number) => <span className="text-xs text-slate-400">{n}</span>,
     },
     {
-      title: 'Status',
+      title: t('common.labels.status'),
       key: 'status',
       width: 74,
       align: 'center',
       render: (_, row) =>
         row.importable ? (
-          <Tooltip title="Red je ispravan">
+          <Tooltip title={t('shipments.importReview.rowValid')}>
             <CheckCircleTwoTone twoToneColor="#16a34a" />
           </Tooltip>
         ) : (
-          <Tooltip title="Red ima grešku i ne može se uvesti">
+          <Tooltip title={t('shipments.importReview.rowInvalid')}>
             <CloseCircleTwoTone twoToneColor="#dc2626" />
           </Tooltip>
         ),
@@ -94,19 +97,19 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
       ),
     },
     {
-      title: 'Interna IP',
+      title: t('shipments.importReview.internalIp'),
       key: 'ip',
       render: (_, row) => <span className="font-mono text-xs">{row.data.ipAddress ?? '—'}</span>,
     },
     {
-      title: 'Javna IP',
+      title: t('simCards.details.publicIp'),
       key: 'publicIp',
       render: (_, row) => (
         <span className="font-mono text-xs text-slate-500">{row.data.publicIpAddress ?? '—'}</span>
       ),
     },
     {
-      title: 'Problem',
+      title: t('shipments.importReview.issueColumn'),
       key: 'issues',
       width: '38%',
       render: (_, row) =>
@@ -120,7 +123,7 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
                   color={issue.severity === 'error' ? 'red' : 'gold'}
                   className="!me-1 !text-[10px]"
                 >
-                  {issue.severity === 'error' ? 'greška' : 'upozorenje'}
+                  {issue.severity === 'error' ? t('shipments.importReview.error') : t('shipments.importReview.warning')}
                 </Tag>
                 <span className={issue.severity === 'error' ? 'text-red-700' : 'text-amber-700'}>
                   {issue.message}
@@ -129,9 +132,9 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
             ))}
             {row.duplicateOf ? (
               <div className="mt-1 rounded bg-red-50 px-2 py-1 text-[11px] text-red-800">
-                Izvorna isporuka: <strong>{row.duplicateOf.shipmentName}</strong> · datum prijema{' '}
+                {t('shipments.importReview.originalShipment')} <strong>{row.duplicateOf.shipmentName}</strong> · {t('shipments.details.receivedDate').toLowerCase()}{' '}
                 <strong>
-                  {new Date(row.duplicateOf.receivedDate).toLocaleDateString('bs-BA')}
+                  {new Date(row.duplicateOf.receivedDate).toLocaleDateString(dateLocale)}
                 </strong>
               </div>
             ) : null}
@@ -141,30 +144,30 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
   ];
 
   const filterButtons: Array<{ key: FilterKey; label: string; count: number; danger?: boolean }> = [
-    { key: 'all', label: 'Svi redovi', count: rows.length },
-    { key: 'valid', label: 'Ispravni', count: importableCount },
-    { key: 'errors', label: 'Sa greškom', count: errorRows.length, danger: true },
-    { key: 'dupFile', label: 'Duplikat u fajlu', count: dupFileRows.length },
-    { key: 'dupDb', label: 'Duplikat u bazi', count: dupDbRows.length },
+    { key: 'all', label: t('shipments.importReview.filterAll'), count: rows.length },
+    { key: 'valid', label: t('shipments.importReview.filterValid'), count: importableCount },
+    { key: 'errors', label: t('shipments.importReview.filterErrors'), count: errorRows.length, danger: true },
+    { key: 'dupFile', label: t('shipments.importReview.filterDupFile'), count: dupFileRows.length },
+    { key: 'dupDb', label: t('shipments.importReview.filterDupDb'), count: dupDbRows.length },
   ];
 
   return (
     <div className="space-y-4">
       {/* sažetak */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <SummaryBox label="Ukupno redova" value={preview.summary.totalRows} />
-        <SummaryBox label="Ispravnih" value={preview.summary.validRows} tone="ok" />
-        <SummaryBox label="Sa greškom" value={preview.summary.invalidRows} tone="err" />
-        <SummaryBox label="Duplikat u fajlu" value={preview.summary.duplicatesInFile} tone="warn" />
-        <SummaryBox label="Duplikat u bazi" value={preview.summary.duplicatesInDatabase} tone="warn" />
+        <SummaryBox label={t('shipments.importReview.summaryTotal')} value={preview.summary.totalRows} />
+        <SummaryBox label={t('shipments.importReview.summaryValid')} value={preview.summary.validRows} tone="ok" />
+        <SummaryBox label={t('shipments.importReview.summaryInvalid')} value={preview.summary.invalidRows} tone="err" />
+        <SummaryBox label={t('shipments.importReview.summaryDupFile')} value={preview.summary.duplicatesInFile} tone="warn" />
+        <SummaryBox label={t('shipments.importReview.summaryDupDb')} value={preview.summary.duplicatesInDatabase} tone="warn" />
       </div>
 
       {errorRows.length > 0 ? (
         <Alert
           type="warning"
           showIcon
-          message={`${errorRows.length} red(ova) ima grešku i neće biti uvezeno`}
-          description="Redovi sa greškom se ne mogu čekirati. Izvještaj možete izvesti u CSV ili odštampati, ispraviti u izvornom fajlu i ponoviti import."
+          message={t('shipments.importReview.rowsHaveErrors', { count: errorRows.length })}
+          description={t('shipments.importReview.errorsDescription')}
           action={
             <Space direction="vertical" size={4}>
               <Button
@@ -172,7 +175,7 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
                 icon={<DownloadOutlined />}
                 onClick={() => exportIssuesToCsv(errorRows, preview.fileName)}
               >
-                CSV greške
+                {t('shipments.importReview.csvErrors')}
               </Button>
               <Button
                 size="small"
@@ -181,13 +184,13 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
                   printIssuesReport(errorRows, { fileName: preview.fileName, shipmentName })
                 }
               >
-                Štampaj
+                {t('common.actions.print')}
               </Button>
             </Space>
           }
         />
       ) : (
-        <Alert type="success" showIcon message="Svi redovi u fajlu su ispravni." />
+        <Alert type="success" showIcon message={t('shipments.importReview.allRowsValid')} />
       )}
 
       {/* filteri + masovna selekcija */}
@@ -206,16 +209,16 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
           ))}
           <div className="ms-auto flex items-center gap-2">
             <Typography.Text className="text-xs text-slate-500">
-              Odabrano: <strong>{selectedRowNumbers.length}</strong> / {importableCount}
+              {t('shipments.importReview.selectedLabel')} <strong>{selectedRowNumbers.length}</strong> / {importableCount}
             </Typography.Text>
             <Button
               size="small"
               onClick={() => onChangeSelection(rows.filter((r) => r.importable).map((r) => r.rowNumber))}
             >
-              Označi sve ispravne
+              {t('shipments.importReview.selectAllValid')}
             </Button>
             <Button size="small" onClick={() => onChangeSelection([])}>
-              Poništi izbor
+              {t('common.actions.deselectAll')}
             </Button>
           </div>
         </div>
@@ -235,7 +238,7 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
             .map((r) => r.rowNumber),
           getCheckboxProps: (row) => ({
             disabled: !row.importable,
-            title: row.importable ? undefined : 'Red sa greškom se ne može uvesti',
+            title: row.importable ? undefined : t('shipments.importReview.cannotImportErrorRow'),
           }),
           onSelect: (row, checked) => {
             const next = new Set(selectedRowNumbers);
@@ -270,7 +273,7 @@ function SummaryBox(props: { label: string; value: number; tone?: 'ok' | 'err' |
   return (
     <div className={`rounded-md px-3 py-2 ring-1 ${tone}`}>
       <div className="text-[11px] uppercase tracking-wide opacity-70">{props.label}</div>
-      <div className="text-xl font-semibold">{props.value.toLocaleString('bs-BA')}</div>
+      <div className="text-xl font-semibold">{props.value.toLocaleString()}</div>
     </div>
   );
 }

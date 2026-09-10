@@ -43,8 +43,8 @@ import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 import type {
   MeterTypeDefinitionItem,
 } from '@/types/meter-type-definition.types';
-import { useTranslation } from '@/i18n';
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
+import { useTranslation } from '@/i18n';
 import {
   getDemountResolutionLabel,
   getMeterDemountCategoryLabel,

@@ -8,6 +8,7 @@ import type {
 } from './label-formats';
 import { MM_TO_PX, filledInSheet, formatMm } from './label-formats';
 import { SimLabelContent } from './SimLabelContent';
+import { useTranslation } from '@/i18n';
 
 /**
  * Ekranski pregled jednog A4 lista — geometrijski identičan printu,
@@ -32,6 +33,7 @@ export interface LabelSheetPreviewProps {
 }
 
 export function LabelSheetPreview(props: LabelSheetPreviewProps) {
+  const { t } = useTranslation();
   const {
     cells,
     layout,
@@ -65,14 +67,14 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
     <div className="select-none">
       <div className="mb-2 flex items-center justify-between px-1 text-xs text-slate-500">
         <span className="font-medium">
-          List {sheetNumber} / {totalSheets}
+          {t('shipments.print.sheetOf', { sheet: sheetNumber, total: totalSheets })}
           <span
             className={`ms-2 rounded px-1.5 py-0.5 text-[11px] font-semibold ${
               filled === cells.length
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-slate-100 text-slate-500'
             }`}
-            title="Popunjenih etiketa na ovom listu"
+            title={t('shipments.print.filledLabelsOnSheet')}
           >
             {filled}/{cells.length}
           </span>
@@ -119,8 +121,8 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
                   title={
                     interactive
                       ? cell.used
-                        ? `Etiketa #${i + 1} je označena kao iskorištena — klik da print ponovo krene odavde`
-                        : `Klik: print počinje od etikete #${i + 1}`
+                        ? t('shipments.print.labelMarkedUsed', { index: i + 1 })
+                        : t('shipments.print.clickToStartFrom', { index: i + 1 })
                       : undefined
                   }
                   onClick={interactive && onPickStart ? () => onPickStart(i) : undefined}
@@ -133,7 +135,7 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
                         className="font-medium uppercase tracking-widest text-slate-400"
                         style={{ fontSize: 9 }}
                       >
-                        iskorištena
+                        {t('shipments.print.usedLabel')}
                       </span>
                     </div>
                   ) : null}

@@ -6,6 +6,7 @@ import type { UploadFile } from 'antd/es/upload/interface';
 import { shipmentsApi } from '@/api/shipments.api';
 import { ImportReviewTable } from './ImportReviewTable';
 import type { ImportColumnMapping, ShipmentImportApply, ShipmentImportPreview } from '@/types/import.types';
+import { useTranslation } from '@/i18n';
 
 export interface ShipmentImportPanelProps {
   shipmentId: string;
@@ -14,16 +15,20 @@ export interface ShipmentImportPanelProps {
   footer?: React.ReactNode;
 }
 
-const MAPPING_KEYS: Array<{ key: keyof ImportColumnMapping; label: string }> = [
-  { key: 'iccid', label: 'ICCID' },
-  { key: 'ipAddress', label: 'Interna (epbih) IP' },
-  { key: 'publicIpAddress', label: 'Javna IP' },
-  { key: 'phoneNumber', label: 'Broj telefona' },
-  { key: 'apn', label: 'APN' },
-];
+function getMappingKeys(t: (key: string) => string): Array<{ key: keyof ImportColumnMapping; label: string }> {
+  return [
+    { key: 'iccid', label: 'ICCID' },
+    { key: 'ipAddress', label: t('shipments.import.internalIpLabel') },
+    { key: 'publicIpAddress', label: t('simCards.details.publicIp') },
+    { key: 'phoneNumber', label: t('common.labels.phone') },
+    { key: 'apn', label: 'APN' },
+  ];
+}
 
 export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
   const { shipmentId, shipmentName, onImported, footer } = props;
+  const { t } = useTranslation();
+  const MAPPING_KEYS = getMappingKeys(t);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ShipmentImportPreview | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
@@ -57,7 +62,7 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
         apn: previewWithFileName.resolvedMapping.apn ?? undefined,
       });
     },
-    onError: () => messageApi.error('Fajl nije moguće pročitati. Provjerite format (.xlsx, .xls, .csv).'),
+    onError: () => messageApi.error(t('shipments.import.readFailed')),
   });
 
   const applyMutation = useMutation({
@@ -83,11 +88,11 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
     onSuccess: (data) => {
       if (data.mode !== 'import') return;
       setResult(data);
-      messageApi.success(`Uvezeno ${data.insertedRows} kartica.`);
+      messageApi.success(t('shipments.import.importedCards', { count: data.insertedRows }));
       void queryClient.invalidateQueries({ queryKey: ['shipments'] });
       onImported?.(data);
     },
-    onError: () => messageApi.error('Import nije uspio.'),
+    onError: () => messageApi.error(t('shipments.import.importFailed')),
   });
 
   const reset = () => {
@@ -102,10 +107,10 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
     return (
       <>
         {contextHolder}
-        <Result status="success" title={`Uvezeno ${result.insertedRows} SIM kartica`}
-          subTitle={<span>Isporuka <strong>{shipmentName}</strong> · fajl {result.fileName}
-            {result.skippedRows > 0 ? ` · ${result.skippedRows} red(ova) preskočeno.` : ''}</span>}
-          extra={<Space><Button icon={<ReloadOutlined />} onClick={reset}>Novi import</Button>{footer}</Space>}
+        <Result status="success" title={t('shipments.import.importedSimCards', { count: result.insertedRows })}
+          subTitle={<span>{t('shipments.import.shipmentPrefix')} <strong>{shipmentName}</strong> · {t('shipments.import.filePrefix')} {result.fileName}
+            {result.skippedRows > 0 ? ` · ${t('shipments.import.rowsSkipped', { count: result.skippedRows })}` : ''}</span>}
+          extra={<Space><Button icon={<ReloadOutlined />} onClick={reset}>{t('shipments.import.newImport')}</Button>{footer}</Space>}
         />
       </>
     );
@@ -116,16 +121,16 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
       <>
         {contextHolder}
         <Card className="shadow-sm">
-          <Spin spinning={previewMutation.isPending} tip="Analiziram fajl…">
+          <Spin spinning={previewMutation.isPending} tip={t('shipments.import.analyzingFile')}>
             <Upload.Dragger accept=".xlsx,.xls,.csv" maxCount={1}
               fileList={file ? ([{ uid: '1', name: file.name, status: 'done' }] as UploadFile[]) : []}
               beforeUpload={(f) => { setFile(f); previewMutation.mutate({ file: f }); return false; }}
               onRemove={() => reset()}>
               <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-              <p className="ant-upload-text">Prevucite fajl ovdje ili kliknite za odabir</p>
+              <p className="ant-upload-text">{t('shipments.import.dragDropText')}</p>
             </Upload.Dragger>
           </Spin>
-          <Alert className="mt-4" type="info" showIcon message="Fajl se prvo analizira (preview)." />
+          <Alert className="mt-4" type="info" showIcon message={t('shipments.import.previewFirstHint')} />
           {footer ? <div className="mt-4">{footer}</div> : null}
         </Card>
       </>
@@ -136,15 +141,15 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
     <>
       {contextHolder}
       <Card className="shadow-sm"
-        title={<div className="flex justify-between"><span>Pregled importa: {preview.fileName}</span>
-          <Button size="small" icon={<ReloadOutlined />} onClick={reset}>Drugi fajl</Button></div>}>
-        <Collapse className="mb-4" ghost items={[{ key: 'mapping', label: 'Mapiranje kolona', children: (
+        title={<div className="flex justify-between"><span>{t('shipments.import.reviewTitle')} {preview.fileName}</span>
+          <Button size="small" icon={<ReloadOutlined />} onClick={reset}>{t('shipments.import.anotherFile')}</Button></div>}>
+        <Collapse className="mb-4" ghost items={[{ key: 'mapping', label: t('shipments.import.columnMapping'), children: (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {MAPPING_KEYS.map(({ key, label }) => (
                 <div key={key}>
                   <div className="mb-1 text-xs text-slate-500">{label}</div>
-                  <Select size="small" allowClear className="w-full" placeholder="— kolona —"
+                  <Select size="small" allowClear className="w-full" placeholder={t('shipments.import.columnPlaceholder')}
                     value={mappingDraft[key] ?? null}
                     options={(preview.headers ?? []).map((h) => ({ label: h, value: h }))}
                     onChange={(v) => setMappingDraft((prev) => ({ ...prev, [key]: v ?? undefined }))} />
@@ -153,7 +158,7 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
             </div>
             <Button size="small" loading={previewMutation.isPending}
               onClick={() => file && previewMutation.mutate({ file, columnMapping: mappingDraft })}>
-              Osvježi preview
+              {t('shipments.import.refreshPreview')}
             </Button>
           </div>)}]} />
         <ImportReviewTable preview={preview} shipmentName={shipmentName}
@@ -162,7 +167,7 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
           {footer}
           <Button type="primary" icon={<UploadOutlined />} disabled={selected.length === 0}
             loading={applyMutation.isPending} onClick={() => applyMutation.mutate()}>
-            Uvezi odabrano ({selected.length})
+            {t('shipments.import.importSelected', { count: selected.length })}
           </Button>
         </div>
       </Card>

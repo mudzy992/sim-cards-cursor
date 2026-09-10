@@ -22,7 +22,7 @@ import type { InstallationRecordItem } from '@/types/installation-record.types';
 import { RecordPhotoImage } from '@/components/installation-records/RecordPhotoImage';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types';
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
-import { useTranslation } from '@/i18n';
+import { useTranslation } from '@/i18n'
 import { getActivityLogActionLabel, getSimCardStatusLabel } from '@/utils/labels.utils'
 
 const statusLabel: Record<string, string> = {
@@ -42,7 +42,7 @@ const statusColor: Record<string, string> = {
 };
 
 export default function InstallationRecordDetailPage() {
-  const { t } = useTranslation();
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [messageApi, messageContextHolder] = message.useMessage();

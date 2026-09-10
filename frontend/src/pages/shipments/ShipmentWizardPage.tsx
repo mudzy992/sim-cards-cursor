@@ -24,6 +24,7 @@ import { distributionsApi } from '@/api/distributions.api';
 import { useAuthStore } from '@/store/auth.store';
 import type { CreateShipmentInput, ShipmentItem } from '@/types/shipment.types';
 import { ShipmentImportPanel } from './import/ShipmentImportPanel';
+import { useTranslation } from '@/i18n';
 
 /**
  * Kreiranje isporuke kroz stepper:
@@ -44,6 +45,8 @@ type FormValues = {
 
 export default function ShipmentWizardPage() {
   const navigate = useNavigate();
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
   const [form] = Form.useForm<FormValues>();
   const [step, setStep] = useState(0);
   const [shipment, setShipment] = useState<ShipmentItem | null>(null);
@@ -77,7 +80,7 @@ export default function ShipmentWizardPage() {
       if (!isDistAdmin) {
         const known = distributions.some((d) => d.id === distributionId);
         if (!distributionId || !known) {
-          throw new Error('Odaberite važeću distribuciju iz liste.');
+          throw new Error(t('shipments.wizard.invalidDistribution'));
         }
       }
 
@@ -93,7 +96,7 @@ export default function ShipmentWizardPage() {
     onSuccess: async (created) => {
       setShipment(created);
       setStep(1);
-      messageApi.success('Isporuka je kreirana — nastavite sa importom kartica.');
+      messageApi.success(t('shipments.wizard.createdContinueImport'));
       await queryClient.invalidateQueries({ queryKey: ['shipments'] });
     },
     onError: (error: unknown) => {
@@ -104,7 +107,7 @@ export default function ShipmentWizardPage() {
       messageApi.error(
         typeof serverMessage === 'string'
           ? serverMessage
-          : (localMessage ?? 'Kreiranje isporuke nije uspjelo.'),
+          : (localMessage ?? t('shipments.wizard.createFailed')),
       );
     },
   });
@@ -115,10 +118,10 @@ export default function ShipmentWizardPage() {
 
       <div className="mb-5 flex items-center gap-3">
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/shipments')}>
-          Nazad
+          {t('common.actions.back')}
         </Button>
         <Typography.Title level={3} className="!mb-0">
-          Nova isporuka
+          {t('shipments.list.newShipment')}
         </Typography.Title>
       </div>
 
@@ -126,16 +129,16 @@ export default function ShipmentWizardPage() {
         <Steps
           current={step}
           items={[
-            { title: 'Podaci o isporuci', description: 'Naziv, dobavljač, datum' },
-            { title: 'Import kartica', description: 'Excel/CSV + review' },
-            { title: 'Završeno', description: 'Pregled isporuke' },
+            { title: t('shipments.wizard.step1Title'), description: t('shipments.wizard.step1Desc') },
+            { title: t('shipments.wizard.step2Title'), description: t('shipments.wizard.step2Desc') },
+            { title: t('shipments.wizard.step3Title'), description: t('shipments.wizard.step3Desc') },
           ]}
         />
       </Card>
 
       {/* ------------------------------- KORAK 1 ------------------------------- */}
       {step === 0 ? (
-        <Card title="Podaci o isporuci" className="shadow-sm">
+        <Card title={t('shipments.edit.metaTabLabel')} className="shadow-sm">
           <Form<FormValues>
             form={form}
             layout="vertical"
@@ -146,25 +149,25 @@ export default function ShipmentWizardPage() {
           >
             <Form.Item
               name="name"
-              label="Naziv isporuke"
-              rules={[{ required: true, message: 'Naziv je obavezan' }]}
+              label={t('shipments.edit.nameLabel')}
+              rules={[{ required: true, message: t('shipments.edit.nameRequired') }]}
             >
-              <Input placeholder="npr. Isporuka 06/2026 — M2M paket" autoFocus />
+              <Input placeholder={t('shipments.wizard.namePlaceholder')} autoFocus />
             </Form.Item>
 
             <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
               <Form.Item
                 name="provider"
-                label="Dobavljač"
-                rules={[{ required: true, message: 'Dobavljač je obavezan' }]}
+                label={t('shipments.details.provider')}
+                rules={[{ required: true, message: t('shipments.edit.providerRequired') }]}
               >
-                <Input placeholder="npr. BH Telecom" />
+                <Input placeholder={t('shipments.wizard.providerPlaceholder')} />
               </Form.Item>
 
               <Form.Item
                 name="receivedDate"
-                label="Datum prijema"
-                rules={[{ required: true, message: 'Datum je obavezan' }]}
+                label={t('shipments.details.receivedDate')}
+                rules={[{ required: true, message: t('shipments.edit.dateRequired') }]}
               >
                 <DatePicker className="w-full" format="DD.MM.YYYY" />
               </Form.Item>
@@ -172,11 +175,11 @@ export default function ShipmentWizardPage() {
 
             <Form.Item
               name="distributionId"
-              label="Distribucija"
-              rules={[{ required: true, message: 'Distribucija je obavezna' }]}
+              label={t('shipments.wizard.distributionLabel')}
+              rules={[{ required: true, message: t('shipments.wizard.distributionRequired') }]}
             >
               <Select
-                placeholder={isDistAdmin ? undefined : 'Odaberite distribuciju'}
+                placeholder={isDistAdmin ? undefined : t('shipments.wizard.selectDistributionPlaceholder')}
                 options={distributions.map((d) => ({
                   label: `${d.name} (${d.code})`,
                   value: d.id,
@@ -186,15 +189,15 @@ export default function ShipmentWizardPage() {
               />
             </Form.Item>
 
-            <Form.Item name="notes" label="Napomena">
-              <Input.TextArea rows={3} placeholder="Opcionalna napomena o isporuci" />
+            <Form.Item name="notes" label={t('common.labels.notes')}>
+              <Input.TextArea rows={3} placeholder={t('shipments.wizard.notesPlaceholder')} />
             </Form.Item>
 
             <Space>
               <Button type="primary" htmlType="submit" loading={createMutation.isPending}>
-                Kreiraj i nastavi na import
+                {t('shipments.wizard.createAndContinue')}
               </Button>
-              <Button onClick={() => navigate('/shipments')}>Odustani</Button>
+              <Button onClick={() => navigate('/shipments')}>{t('common.actions.cancel')}</Button>
             </Space>
           </Form>
         </Card>
@@ -208,7 +211,7 @@ export default function ShipmentWizardPage() {
             showIcon
             message={
               <span>
-                Isporuka <strong>{shipment.name}</strong> je kreirana i automatski odabrana za import.
+                {t('shipments.wizard.createdSuccessPrefix')} <strong>{shipment.name}</strong> {t('shipments.wizard.createdSuccessSuffix')}
               </span>
             }
           />
@@ -220,7 +223,7 @@ export default function ShipmentWizardPage() {
               setStep(2);
             }}
             footer={
-              <Button onClick={() => setStep(2)}>Preskoči import (dodaj kartice kasnije)</Button>
+              <Button onClick={() => setStep(2)}>{t('shipments.wizard.skipImport')}</Button>
             }
           />
         </div>
@@ -232,27 +235,27 @@ export default function ShipmentWizardPage() {
           <Result
             status="success"
             icon={<CheckOutlined className="text-emerald-600" />}
-            title="Isporuka je spremna"
+            title={t('shipments.wizard.readyTitle')}
             subTitle={
               importedCount !== null
-                ? `Uvezeno ${importedCount} SIM kartica.`
-                : 'Isporuka je kreirana bez kartica — import možete uraditi kasnije kroz izmjenu isporuke.'
+                ? t('shipments.wizard.importedCount', { count: importedCount })
+                : t('shipments.wizard.createdNoCards')
             }
           />
           <Descriptions bordered size="small" column={1} className="mx-auto max-w-2xl">
-            <Descriptions.Item label="Naziv">{shipment.name}</Descriptions.Item>
-            <Descriptions.Item label="Dobavljač">{shipment.provider}</Descriptions.Item>
-            <Descriptions.Item label="Datum prijema">
-              {new Date(shipment.receivedDate).toLocaleDateString('bs-BA')}
+            <Descriptions.Item label={t('common.labels.name')}>{shipment.name}</Descriptions.Item>
+            <Descriptions.Item label={t('shipments.details.provider')}>{shipment.provider}</Descriptions.Item>
+            <Descriptions.Item label={t('shipments.details.receivedDate')}>
+              {new Date(shipment.receivedDate).toLocaleDateString(dateLocale)}
             </Descriptions.Item>
-            <Descriptions.Item label="Napomena">{shipment.notes ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label={t('common.labels.notes')}>{shipment.notes ?? '—'}</Descriptions.Item>
           </Descriptions>
           <div className="mt-5 flex justify-center gap-2">
             <Button type="primary" onClick={() => navigate('/shipments')}>
-              Nazad na listu isporuka
+              {t('shipments.wizard.backToShipmentsList')}
             </Button>
             <Button onClick={() => navigate(`/shipments/${shipment.id}/print`)}>
-              Idi na print etiketa
+              {t('shipments.wizard.goToPrintLabels')}
             </Button>
           </div>
         </Card>
