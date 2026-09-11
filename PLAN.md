@@ -13,11 +13,11 @@ prije nego nastavim dalje.
 - [x] ImportReviewTable.tsx
 - [x] ShipmentCreatePage.tsx (legacy/neruotovana stranica — ipak migrirana)
 - [x] LabelSheetPreview.tsx (print)
-- [ ] AnalyticsPage.tsx
-- [ ] PushCampaignsPage.tsx
-- [ ] MeterTypeUpsertPage.tsx
-- [ ] InstallationRecordDetailPage.tsx
-- [ ] app-settings.manifest.ts (labeli/opisi postavki — veliki broj kratkih stringova)
+- [x] AnalyticsPage.tsx
+- [x] PushCampaignsPage.tsx
+- [x] MeterTypeUpsertPage.tsx
+- [x] InstallationRecordDetailPage.tsx
+- [x] app-settings.manifest.ts (labeli/opisi postavki — veliki broj kratkih stringova)
 - [ ] ShipmentPrintPage.tsx
 - [ ] UsersListPage.tsx
 - [ ] MetersListPage.tsx

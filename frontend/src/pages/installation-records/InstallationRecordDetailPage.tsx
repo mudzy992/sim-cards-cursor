@@ -25,12 +25,12 @@ import { buildOsmEmbedUrl } from '@/utils/osm.utils'
 import { useTranslation } from '@/i18n'
 import { getActivityLogActionLabel, getSimCardStatusLabel } from '@/utils/labels.utils'
 
-const statusLabel: Record<string, string> = {
-  DRAFT: 'Nacrt',
-  SENT: 'Poslano',
-  SEND_FAILED: 'Greška slanja',
-  SEP_ACTIVATED: 'SEP aktiviran',
-  LEGACY_COMPLETED: 'Legacy završeno',
+const statusLabelKey: Record<string, string> = {
+  DRAFT: 'installationRecords.status.draft',
+  SENT: 'installationRecords.status.sent',
+  SEND_FAILED: 'installationRecords.status.sendFailed',
+  SEP_ACTIVATED: 'installationRecords.status.sepActivated',
+  LEGACY_COMPLETED: 'installationRecords.status.legacyCompleted',
 };
 
 const statusColor: Record<string, string> = {
@@ -42,7 +42,8 @@ const statusColor: Record<string, string> = {
 };
 
 export default function InstallationRecordDetailPage() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -116,14 +117,14 @@ export default function InstallationRecordDetailPage() {
   const markSepActivatedMutation = useMutation({
     mutationFn: () => installationRecordsApi.markSepActivated(id!),
     onSuccess: () => {
-      messageApi.success('Zapisnik je označen kao SEP aktiviran.');
+      messageApi.success(t('installationRecords.detail.sepMarked'));
       void recordQuery.refetch();
       void permissionsQuery.refetch();
     },
     onError: (err: unknown) => {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Akcija nije uspjela.';
+        t('installationRecords.detail.actionFailed');
       messageApi.error(msg);
     },
   });
@@ -131,14 +132,14 @@ export default function InstallationRecordDetailPage() {
   const retrySendMutation = useMutation({
     mutationFn: () => installationRecordsApi.retrySend(id!),
     onSuccess: () => {
-      messageApi.success('Email je ponovo poslan.');
+      messageApi.success(t('installationRecords.detail.emailResent'));
       void recordQuery.refetch();
       void permissionsQuery.refetch();
     },
     onError: (err: unknown) => {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Akcija nije uspjela.';
+        t('installationRecords.detail.actionFailed');
       messageApi.error(msg);
     },
   });
@@ -153,9 +154,9 @@ export default function InstallationRecordDetailPage() {
       a.download = `zapisnik-${recordQuery.data?.recordNumber ?? id}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-      messageApi.success('PDF je preuzet.');
+      messageApi.success(t('installationRecords.detail.pdfDownloaded'));
     } catch {
-      messageApi.error('Preuzimanje PDF-a nije uspjelo.');
+      messageApi.error(t('installationRecords.detail.pdfDownloadFailed'));
     }
   }, [id, recordQuery.data?.recordNumber, messageApi]);
 
@@ -184,7 +185,7 @@ export default function InstallationRecordDetailPage() {
   if (recordQuery.isLoading || !record) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Typography.Text>Učitavanje...</Typography.Text>
+        <Typography.Text>{t('common.states.loading')}</Typography.Text>
       </div>
     );
   }
@@ -192,11 +193,11 @@ export default function InstallationRecordDetailPage() {
   const formatDynamicFieldValue = (field: MeterTypeFieldItem, raw: unknown) => {
     if (raw === undefined || raw === null || raw === '') return null
     if (field.fieldType === 'BOOLEAN') {
-      return raw === true || raw === 'true' ? 'Da' : 'Ne'
+      return raw === true || raw === 'true' ? t('common.actions.yes') : t('common.actions.no')
     }
     if (field.fieldType === 'DATE') {
       const d = new Date(String(raw))
-      return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString('bs-BA')
+      return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString(dateLocale)
     }
     return String(raw)
   }
@@ -205,7 +206,7 @@ export default function InstallationRecordDetailPage() {
     return (
       <Typography.Text type="danger">
         {(recordQuery.error as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? 'Zapisnik nije pronađen.'}
+          ?.message ?? t('installationRecords.detail.notFound')}
       </Typography.Text>
     );
   }
@@ -215,17 +216,17 @@ export default function InstallationRecordDetailPage() {
       {messageContextHolder}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Typography.Title level={3} className="!mb-0">
-          Zapisnik {record.recordNumber}
+          {t('installationRecords.detail.recordTitle', { number: record.recordNumber })}
         </Typography.Title>
         {isMobile ? (
           <Dropdown
             trigger={['click']}
             menu={{
               items: [
-                { key: 'back', label: 'Natrag na listu' },
-                ...(canMarkSepActivated ? [{ key: 'sep', label: 'Označi SEP aktiviran' }] : []),
-                ...(canRetrySend ? [{ key: 'retry', label: 'Ponovo pošalji email' }] : []),
-                ...(canDownloadPdf ? [{ key: 'pdf', label: 'Preuzmi PDF' }] : []),
+                { key: 'back', label: t('installationRecords.detail.backToList') },
+                ...(canMarkSepActivated ? [{ key: 'sep', label: t('installationRecords.detail.markSep') }] : []),
+                ...(canRetrySend ? [{ key: 'retry', label: t('installationRecords.detail.resendEmail') }] : []),
+                ...(canDownloadPdf ? [{ key: 'pdf', label: t('installationRecords.detail.downloadPdf') }] : []),
               ],
               onClick: ({ key }) => {
                 if (key === 'back') navigate('/installation-records')
@@ -235,18 +236,18 @@ export default function InstallationRecordDetailPage() {
               },
             }}
           >
-            <Button type="primary">Akcije</Button>
+            <Button type="primary">{t('common.actions.actions')}</Button>
           </Dropdown>
         ) : (
           <Space wrap>
-            <Button onClick={() => navigate('/installation-records')}>Natrag na listu</Button>
+            <Button onClick={() => navigate('/installation-records')}>{t('installationRecords.detail.backToList')}</Button>
             {canMarkSepActivated && (
               <Button
                 type="primary"
                 onClick={() => markSepActivatedMutation.mutate()}
                 loading={markSepActivatedMutation.isPending}
               >
-                Označi SEP aktiviran
+                {t('installationRecords.detail.markSep')}
               </Button>
             )}
             {canRetrySend && (
@@ -254,52 +255,52 @@ export default function InstallationRecordDetailPage() {
                 onClick={() => retrySendMutation.mutate()}
                 loading={retrySendMutation.isPending}
               >
-                Ponovo pošalji email
+                {t('installationRecords.detail.resendEmail')}
               </Button>
             )}
             {canDownloadPdf && (
               <Button onClick={handleDownloadPdf} loading={pdfQuery.isLoading}>
-                Preuzmi PDF
+                {t('installationRecords.detail.downloadPdf')}
               </Button>
             )}
           </Space>
         )}
       </div>
 
-      <Card title="Podaci zapisnika">
+      <Card title={t('installationRecords.detail.recordDataTitle')}>
         <Descriptions column={1} bordered size="small">
-          <Descriptions.Item label="Broj zapisnika">{record.recordNumber}</Descriptions.Item>
+          <Descriptions.Item label={t('installationRecords.list.columns.recordNumber')}>{record.recordNumber}</Descriptions.Item>
           {record.kind && (
-            <Descriptions.Item label="Vrsta">
-              {record.kind === 'METER_REPLACEMENT' ? 'Zamjena brojila' : 'Novi priključak'}
+            <Descriptions.Item label={t('installationRecords.form.recordKindLabel')}>
+              {record.kind === 'METER_REPLACEMENT' ? t('installationRecords.form.kindMeterReplacement') : t('installationRecords.form.kindNewConnection')}
             </Descriptions.Item>
           )}
-          <Descriptions.Item label="Status">
-            <Tag color={statusColor[record.status]}>{statusLabel[record.status]}</Tag>
+          <Descriptions.Item label={t('common.labels.status')}>
+            <Tag color={statusColor[record.status]}>{statusLabelKey[record.status] ? t(statusLabelKey[record.status]) : record.status}</Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="Instalirao">
+          <Descriptions.Item label={t('installationRecords.list.columns.installedBy')}>
             {record.installedBy
               ? `${record.installedBy.firstName} ${record.installedBy.lastName}`
               : '–'}
           </Descriptions.Item>
           {record.approvedBy && (
-            <Descriptions.Item label="Odobrio">
+            <Descriptions.Item label={t('installationRecords.detail.approvedBy')}>
               {record.approvedBy.firstName} {record.approvedBy.lastName}
             </Descriptions.Item>
           )}
           {record.rejectionReason && (
-            <Descriptions.Item label="Razlog odbijanja">
+            <Descriptions.Item label={t('installationRecords.detail.rejectionReason')}>
               {record.rejectionReason}
             </Descriptions.Item>
           )}
           {record.notes && (
-            <Descriptions.Item label="Napomena">{record.notes}</Descriptions.Item>
+            <Descriptions.Item label={t('common.labels.notes')}>{record.notes}</Descriptions.Item>
           )}
         </Descriptions>
       </Card>
 
       {record.kind === 'METER_REPLACEMENT' && record.demountedMeterSnapshot && (
-        <Card title="Demontirano brojilo (prije zamjene)">
+        <Card title={t('installationRecords.detail.demountedMeterCardTitle')}>
           <Descriptions column={1} bordered size="small">
             {(() => {
               const snap = record.demountedMeterSnapshot as Record<string, unknown>
@@ -310,21 +311,21 @@ export default function InstallationRecordDetailPage() {
               const noSimNote = typeof snap.noSimNote === 'string' ? snap.noSimNote : null
               return (
                 <>
-                  <Descriptions.Item label="Serijski broj">{serial}</Descriptions.Item>
-                  <Descriptions.Item label="Tip brojila">
+                  <Descriptions.Item label={t('installationRecords.form.demountedSerialLabel')}>{serial}</Descriptions.Item>
+                  <Descriptions.Item label={t('installationRecords.form.demountedTypeLabel')}>
                     {demountedTypeQuery.data?.name ?? '–'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Proizvođač">
+                  <Descriptions.Item label={t('meterTypes.manufacturer')}>
                     {demountedTypeQuery.data?.manufacturer ?? '–'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Model">{demountedTypeQuery.data?.model ?? '–'}</Descriptions.Item>
-                  <Descriptions.Item label="Godina proizvodnje">{year}</Descriptions.Item>
-                  <Descriptions.Item label="Godina baždarenja">{calYear}</Descriptions.Item>
-                  <Descriptions.Item label="Ugrađena SIM u starom brojilu">
-                    {hadSim === true ? 'Da' : hadSim === false ? 'Ne' : '–'}
+                  <Descriptions.Item label={t('meterTypes.model')}>{demountedTypeQuery.data?.model ?? '–'}</Descriptions.Item>
+                  <Descriptions.Item label={t('installationRecords.form.yearLabel')}>{year}</Descriptions.Item>
+                  <Descriptions.Item label={t('installationRecords.form.calibrationYearLabel')}>{calYear}</Descriptions.Item>
+                  <Descriptions.Item label={t('installationRecords.form.hadIntegratedSimLabel')}>
+                    {hadSim === true ? t('common.actions.yes') : hadSim === false ? t('common.actions.no') : '–'}
                   </Descriptions.Item>
                   {noSimNote ? (
-                    <Descriptions.Item label="Napomena (SIM / staro brojilo)">{noSimNote}</Descriptions.Item>
+                    <Descriptions.Item label={t('installationRecords.detail.noSimNoteLabel')}>{noSimNote}</Descriptions.Item>
                   ) : null}
                 </>
               )
@@ -347,31 +348,31 @@ export default function InstallationRecordDetailPage() {
               const snap = record.demountedMeterSnapshot as Record<string, unknown>
               const notes = typeof snap.notes === 'string' ? snap.notes : null
               return notes ? (
-                <Descriptions.Item label="Napomena (brojilo)">{notes}</Descriptions.Item>
+                <Descriptions.Item label={t('installationRecords.detail.meterNotesLabel')}>{notes}</Descriptions.Item>
               ) : null
             })()}
           </Descriptions>
         </Card>
       )}
 
-      <Card title="Podaci o brojilu">
+      <Card title={t('installationRecords.detail.meterDataTitle')}>
         <Descriptions column={1} bordered size="small">
-          <Descriptions.Item label="Serijski broj">{record.meter?.serialNumber ?? '–'}</Descriptions.Item>
-          <Descriptions.Item label="Tip brojila">
+          <Descriptions.Item label={t('installationRecords.form.meterSerialLabel')}>{record.meter?.serialNumber ?? '–'}</Descriptions.Item>
+          <Descriptions.Item label={t('installationRecords.form.meterTypeLabel')}>
             {record.meter?.meterTypeDefinition?.name ?? '–'}
           </Descriptions.Item>
-          <Descriptions.Item label="Lokacija instalacije">
+          <Descriptions.Item label={t('installationRecords.detail.installationLocationLabel')}>
             {record.meter?.installationAddress ?? '–'}
           </Descriptions.Item>
-          <Descriptions.Item label="Grad / Općina">
+          <Descriptions.Item label={t('installationRecords.detail.cityMunicipalityLabel')}>
             {[record.meter?.city, record.meter?.municipality].filter(Boolean).join(', ') || '–'}
           </Descriptions.Item>
-          <Descriptions.Item label="Datum instalacije">
+          <Descriptions.Item label={t('installationRecords.list.columns.installationDate')}>
             {record.meter?.installationDate
               ? new Date(record.meter.installationDate).toISOString().slice(0, 10)
               : '–'}
           </Descriptions.Item>
-          <Descriptions.Item label="Mjerno mjesto">
+          <Descriptions.Item label={t('installationRecords.form.measuringPointLabel')}>
             {record.meter?.measuringPoint ?? '–'}
           </Descriptions.Item>
           {(record.meter?.dynamicFieldValues &&
@@ -399,16 +400,16 @@ export default function InstallationRecordDetailPage() {
           )}
           {(record.meter?.latitude != null || record.meter?.longitude != null) && (
             <>
-              <Descriptions.Item label="GPS širina">
+              <Descriptions.Item label={t('installationRecords.form.gpsLatLabel')}>
                 {record.meter?.latitude != null ? String(record.meter.latitude) : '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="GPS dužina">
+              <Descriptions.Item label={t('installationRecords.form.gpsLngLabel')}>
                 {record.meter?.longitude != null ? String(record.meter.longitude) : '–'}
               </Descriptions.Item>
             </>
           )}
-          <Descriptions.Item label="Status SIM-a">
-            {record.simCard ? 'Ugrađena (iz zapisnika)' : record.meter?.simCard ? 'Ugrađena (trenutno na brojilu)' : 'Bez kartice'}
+          <Descriptions.Item label={t('installationRecords.detail.simStatusLabel')}>
+            {record.simCard ? t('installationRecords.detail.simInstalledFromRecord') : record.meter?.simCard ? t('installationRecords.detail.simInstalledCurrently') : t('installationRecords.detail.simNone')}
           </Descriptions.Item>
           {(record.simCard ?? record.meter?.simCard) && (
             <>
@@ -423,12 +424,12 @@ export default function InstallationRecordDetailPage() {
                   )}
                   {record.simCard?.id && currentSimQuery.data ? (
                     <Tag color="blue">
-                      Trenutno: {getSimCardStatusLabel(currentSimQuery.data.status, t)}
+                      {t('installationRecords.detail.currentlyLabel')} {getSimCardStatusLabel(currentSimQuery.data.status, t)}
                     </Tag>
                   ) : null}
                 </Space>
               </Descriptions.Item>
-              <Descriptions.Item label="IP adresa">
+              <Descriptions.Item label={t('simCards.details.ipAddress')}>
                 {(record.simCard ?? record.meter?.simCard)?.ipAddress ?? '–'}
               </Descriptions.Item>
             </>
@@ -437,9 +438,9 @@ export default function InstallationRecordDetailPage() {
       </Card>
 
       {(record.meter?.latitude != null && record.meter?.longitude != null) && (
-        <Card title="Lokacija na mapi">
+        <Card title={t('installationRecords.detail.mapCardTitle')}>
           <iframe
-            title="Lokacija ugradnje"
+            title={t('installationRecords.detail.mapIframeTitle')}
             src={buildOsmEmbedUrl({
               latitude: Number(record.meter.latitude),
               longitude: Number(record.meter.longitude),
@@ -454,14 +455,14 @@ export default function InstallationRecordDetailPage() {
       )}
 
       {record.photos && Array.isArray(record.photos) && record.photos.length > 0 && (
-        <Card title="Fotografije">
+        <Card title={t('installationRecords.detail.photosCardTitle')}>
           <Image.PreviewGroup>
             <Space wrap>
               {record.photos.map((path, idx) => (
                 <RecordPhotoImage
                   key={idx}
                   path={path}
-                  alt={`Fotografija ${idx + 1}`}
+                  alt={t('installationRecords.detail.photoAlt', { index: idx + 1 })}
                   width={120}
                   height={120}
                 />
@@ -471,33 +472,33 @@ export default function InstallationRecordDetailPage() {
         </Card>
       )}
 
-      <Card title="Pregled PDF-a">
-        {pdfQuery.isLoading && <Typography.Text>Generiranje PDF-a...</Typography.Text>}
+      <Card title={t('installationRecords.detail.pdfCardTitle')}>
+        {pdfQuery.isLoading && <Typography.Text>{t('installationRecords.detail.pdfGenerating')}</Typography.Text>}
         {pdfQuery.isError && (
-          <Typography.Text type="secondary">PDF nije dostupan.</Typography.Text>
+          <Typography.Text type="secondary">{t('installationRecords.detail.pdfUnavailable')}</Typography.Text>
         )}
         {pdfObjectUrl && !pdfQuery.isLoading && (
             <iframe
               src={pdfObjectUrl}
-              title="PDF pregled"
+              title={t('installationRecords.detail.pdfPreviewTitle')}
               className="w-full border rounded"
               style={{ minHeight: 480 }}
             />
         )}
       </Card>
 
-      <Card title="Timeline aktivnosti">
+      <Card title={t('installationRecords.detail.timelineCardTitle')}>
         {timelineQuery.isLoading && (
-          <Typography.Text>Učitavanje timeline-a...</Typography.Text>
+          <Typography.Text>{t('installationRecords.detail.timelineLoading')}</Typography.Text>
         )}
         {timelineQuery.isError && (
           <Typography.Text type="secondary">
-            Timeline trenutno nije dostupan.
+            {t('installationRecords.detail.timelineUnavailable')}
           </Typography.Text>
         )}
         {timelineQuery.data && timelineQuery.data.items.length === 0 && (
           <Typography.Text type="secondary">
-            Još nema zabilježenih aktivnosti za ovaj zapisnik.
+            {t('installationRecords.detail.timelineEmpty')}
           </Typography.Text>
         )}
         {timelineQuery.data && timelineQuery.data.items.length > 0 && (
@@ -510,13 +511,13 @@ export default function InstallationRecordDetailPage() {
                   <div className="flex items-start justify-between gap-4">
                     <Typography.Text strong>{getActivityLogActionLabel(item.action, t)}</Typography.Text>
                     <Typography.Text type="secondary" className="text-xs whitespace-nowrap">
-                      {new Date(item.createdAt).toLocaleString('bs-BA')}
+                      {new Date(item.createdAt).toLocaleString(dateLocale)}
                     </Typography.Text>
                   </div>
                   <Typography.Text type="secondary" className="text-xs">
                     {item.user
                       ? `${item.user.firstName} ${item.user.lastName} (${item.user.role})`
-                      : 'Sistem'}
+                      : t('installationRecords.detail.system')}
                   </Typography.Text>
                 </div>
               ),

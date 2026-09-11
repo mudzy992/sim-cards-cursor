@@ -8,6 +8,7 @@ import { usersApi } from '@/api/users.api';
 import type { UserListItem } from '@/types/user.types';
 import { useAppFeatures } from '@/hooks/useAppFeatures';
 import { Alert } from 'antd';
+import { useTranslation } from '@/i18n';
 
 const statusColor: Record<PushCampaignStatus, string> = {
   DRAFT: 'default',
@@ -18,14 +19,15 @@ const statusColor: Record<PushCampaignStatus, string> = {
 };
 
 export default function PushCampaignsPage() {
+  const { t } = useTranslation();
   const featuresQuery = useAppFeatures();
   const pushEnabled = featuresQuery.data?.pushCampaignsEnabled ?? true;
   if (!pushEnabled) {
     return (
       <Alert
         type="warning"
-        message="Push kampanje su onemogućene"
-        description="Ova funkcionalnost je isključena u sistemskim postavkama (push/mobile notifikacije)."
+        message={t('pushCampaigns.disabledTitle')}
+        description={t('pushCampaigns.disabledDescription')}
         showIcon
       />
     );
@@ -75,7 +77,7 @@ export default function PushCampaignsPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['push-campaigns', 'list'] });
-      message.success('Kampanja je kreirana kao draft');
+      message.success(t('pushCampaigns.createdDraft'));
       setCreateOpen(false);
       createForm.resetFields();
     },
@@ -85,40 +87,40 @@ export default function PushCampaignsPage() {
     mutationFn: (id: string) => pushCampaignsApi.send(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['push-campaigns', 'list'] });
-      message.success('Kampanja je poslana');
+      message.success(t('pushCampaigns.sent'));
     },
   });
 
   const columns: ColumnsType<PushCampaign> = useMemo(
     () => [
       {
-        title: 'Status',
+        title: t('common.labels.status'),
         dataIndex: 'status',
         key: 'status',
         render: (s: PushCampaignStatus) => <Tag color={statusColor[s]}>{s}</Tag>,
         width: 120,
       },
       {
-        title: 'Naslov',
+        title: t('pushCampaigns.columns.title'),
         dataIndex: 'title',
         key: 'title',
-        render: (t: string) => <Typography.Text strong>{t}</Typography.Text>,
+        render: (title: string) => <Typography.Text strong>{title}</Typography.Text>,
       },
       {
-        title: 'Publika',
+        title: t('pushCampaigns.columns.audience'),
         dataIndex: 'audienceType',
         key: 'audienceType',
         width: 110,
       },
       {
-        title: 'Kreirano',
+        title: t('common.labels.createdAt'),
         dataIndex: 'createdAt',
         key: 'createdAt',
         width: 180,
         render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm'),
       },
       {
-        title: 'Akcije',
+        title: t('common.actions.actions'),
         key: 'actions',
         width: 240,
         render: (_, row) => (
@@ -129,7 +131,7 @@ export default function PushCampaignsPage() {
                 setDetailsOpen(true);
               }}
             >
-              Detalji
+              {t('common.actions.details')}
             </Button>
             <Button
               type="primary"
@@ -137,7 +139,7 @@ export default function PushCampaignsPage() {
               loading={sendMutation.isPending}
               onClick={() => sendMutation.mutate(row.id)}
             >
-              Pošalji
+              {t('pushCampaigns.sendButton')}
             </Button>
           </Space>
         ),
@@ -180,7 +182,7 @@ export default function PushCampaignsPage() {
   const recipientColumns: ColumnsType<PushDeliveryListItem> = useMemo(
     () => [
       {
-        title: 'Korisnik',
+        title: t('common.labels.username'),
         key: 'user',
         render: (_, r) => (
           <div>
@@ -192,14 +194,14 @@ export default function PushCampaignsPage() {
         ),
       },
       {
-        title: 'Status',
+        title: t('common.labels.status'),
         dataIndex: 'status',
         key: 'status',
         width: 140,
         render: (s: string) => <Tag>{s}</Tag>,
       },
       {
-        title: 'Greška',
+        title: t('common.states.error'),
         key: 'error',
         render: (_, r) => r.errorCode ?? '',
         width: 180,
@@ -220,14 +222,14 @@ export default function PushCampaignsPage() {
       <div className="flex items-center justify-between">
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>
-            Push kampanje
+            {t('layout.sidebar.pushCampaigns')}
           </Typography.Title>
           <Typography.Text type="secondary">
-            Ručno slanje push notifikacija (SYSTEM_ADMIN i DIST_ADMIN u scope-u).
+            {t('pushCampaigns.pageIntro')}
           </Typography.Text>
         </div>
         <Button type="primary" onClick={openCreate}>
-          Nova kampanja
+          {t('pushCampaigns.newCampaign')}
         </Button>
       </div>
 
@@ -240,14 +242,14 @@ export default function PushCampaignsPage() {
       />
 
       <Drawer
-        title="Nova kampanja"
+        title={t('pushCampaigns.newCampaign')}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         destroyOnClose
         width={520}
         extra={
           <Space>
-            <Button onClick={() => setCreateOpen(false)}>Otkaži</Button>
+            <Button onClick={() => setCreateOpen(false)}>{t('common.actions.cancel')}</Button>
             <Button
               type="primary"
               loading={createMutation.isPending}
@@ -258,27 +260,27 @@ export default function PushCampaignsPage() {
                   .catch(() => undefined);
               }}
             >
-              Snimi draft
+              {t('pushCampaigns.saveDraft')}
             </Button>
           </Space>
         }
       >
         <Form form={createForm} layout="vertical">
-          <Form.Item name="title" label="Naslov" rules={[{ required: true }]}>
-            <Input placeholder="Npr. Planirani prekid" />
+          <Form.Item name="title" label={t('pushCampaigns.columns.title')} rules={[{ required: true }]}>
+            <Input placeholder={t('pushCampaigns.titlePlaceholder')} />
           </Form.Item>
-          <Form.Item name="message" label="Poruka" rules={[{ required: true }]}>
-            <Input.TextArea rows={5} placeholder="Tekst push poruke" />
+          <Form.Item name="message" label={t('pushCampaigns.messageLabel')} rules={[{ required: true }]}>
+            <Input.TextArea rows={5} placeholder={t('pushCampaigns.messagePlaceholder')} />
           </Form.Item>
-          <Form.Item name="deepLink" label="Deep link (opciono)">
+          <Form.Item name="deepLink" label={t('pushCampaigns.deepLinkLabel')}>
             <Input placeholder="/installation-records" />
           </Form.Item>
-          <Form.Item name="audienceType" label="Publika" rules={[{ required: true }]}>
+          <Form.Item name="audienceType" label={t('pushCampaigns.columns.audience')} rules={[{ required: true }]}>
             <Select
               options={[
-                { value: 'ALL', label: 'Svi korisnici (scope)' },
-                { value: 'USER', label: 'Jedan korisnik' },
-                { value: 'FILTER', label: 'Više korisnika (lista)' },
+                { value: 'ALL', label: t('pushCampaigns.audienceAll') },
+                { value: 'USER', label: t('pushCampaigns.audienceOne') },
+                { value: 'FILTER', label: t('pushCampaigns.audienceMany') },
               ]}
             />
           </Form.Item>
@@ -289,12 +291,12 @@ export default function PushCampaignsPage() {
                 return (
                   <Form.Item
                     name="targetUserId"
-                    label="Korisnik"
+                    label={t('common.labels.username')}
                     rules={[{ required: true }]}
                   >
                     <Select
                       showSearch
-                      placeholder="Odaberi korisnika"
+                      placeholder={t('shipments.list.selectUserPlaceholder')}
                       loading={usersQuery.isLoading}
                       optionFilterProp="label"
                       onSearch={(v) => setUserSearch(v)}
@@ -311,13 +313,13 @@ export default function PushCampaignsPage() {
                 return (
                   <Form.Item
                     name="targetUserIds"
-                    label="Korisnici (jedan ili više)"
+                    label={t('pushCampaigns.usersMultiLabel')}
                     rules={[{ required: true }]}
                   >
                     <Select
                       mode="multiple"
                       showSearch
-                      placeholder="Odaberi korisnike"
+                      placeholder={t('pushCampaigns.selectUsersPlaceholder')}
                       loading={usersQuery.isLoading}
                       optionFilterProp="label"
                       onSearch={(v) => setUserSearch(v)}
@@ -337,7 +339,7 @@ export default function PushCampaignsPage() {
       </Drawer>
 
       <Drawer
-        title={selectedCampaign ? `Detalji: ${selectedCampaign.title}` : 'Detalji'}
+        title={selectedCampaign ? t('pushCampaigns.detailsTitle', { title: selectedCampaign.title }) : t('common.actions.details')}
         open={detailsOpen}
         onClose={() => {
           setDetailsOpen(false);
@@ -350,7 +352,7 @@ export default function PushCampaignsPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Typography.Text type="secondary">Status</Typography.Text>
+                <Typography.Text type="secondary">{t('common.labels.status')}</Typography.Text>
                 <div>
                   <Tag color={statusColor[selectedCampaign.status]}>
                     {selectedCampaign.status}
@@ -358,7 +360,7 @@ export default function PushCampaignsPage() {
                 </div>
               </div>
               <div>
-                <Typography.Text type="secondary">Poslano</Typography.Text>
+                <Typography.Text type="secondary">{t('pushCampaigns.sentLabel')}</Typography.Text>
                 <div>
                   {selectedCampaign.sentAt
                     ? dayjs(selectedCampaign.sentAt).format('YYYY-MM-DD HH:mm')
@@ -366,13 +368,13 @@ export default function PushCampaignsPage() {
                 </div>
               </div>
               <div className="col-span-2">
-                <Typography.Text type="secondary">Poruka</Typography.Text>
+                <Typography.Text type="secondary">{t('pushCampaigns.messageLabel')}</Typography.Text>
                 <div className="whitespace-pre-wrap">{selectedCampaign.message}</div>
               </div>
             </div>
 
             <div>
-              <Typography.Title level={5}>Statistika dostave</Typography.Title>
+              <Typography.Title level={5}>{t('pushCampaigns.deliveryStatsTitle')}</Typography.Title>
               <Space>
                 <Tag>total: {stats?.total ?? '-'}</Tag>
                 <Tag>queued: {stats?.queued ?? '-'}</Tag>
@@ -384,7 +386,7 @@ export default function PushCampaignsPage() {
             </div>
 
             <div>
-              <Typography.Title level={5}>Recipienti</Typography.Title>
+              <Typography.Title level={5}>{t('pushCampaigns.recipientsTitle')}</Typography.Title>
               <Table
                 rowKey="id"
                 loading={recipientsLoading}

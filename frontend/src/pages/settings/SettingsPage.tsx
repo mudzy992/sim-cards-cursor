@@ -19,7 +19,7 @@ import { useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
 import { useTranslation } from '@/i18n';
 import {
-  APP_SETTINGS_MANIFEST,
+  getAppSettingsManifest,
   MANIFEST_GROUP_ORDER,
   MANIFEST_KEYS,
   type AppSettingManifestEntry,
@@ -307,8 +307,9 @@ export default function SettingsPage() {
   }, []);
 
   const manifestGroups = useMemo(() => {
+    const manifest = getAppSettingsManifest(t);
     const byGroup = new Map<string, AppSettingManifestEntry[]>();
-    APP_SETTINGS_MANIFEST.forEach((e) => {
+    manifest.forEach((e) => {
       if (!byGroup.has(e.groupId)) {
         byGroup.set(e.groupId, []);
       }
@@ -324,7 +325,7 @@ export default function SettingsPage() {
         entries,
       };
     });
-  }, []);
+  }, [t]);
 
   const handleBooleanChange = (row: SettingRow, entry: AppSettingManifestEntry, next: boolean) => {
     const apply = () => {

@@ -20,12 +20,12 @@ import { useTranslation } from '@/i18n';
 import { getSimCardStatusLabel } from '@/utils/labels.utils'
 import type { SimCardStatus } from '@/types/sim-card.types'
 
-const statusLabel: Record<string, string> = {
-  DRAFT: 'Nacrt',
-  SENT: 'Poslano',
-  SEND_FAILED: 'Greška slanja',
-  SEP_ACTIVATED: 'SEP aktiviran',
-  LEGACY_COMPLETED: 'Legacy završeno',
+const statusLabelKey: Record<string, string> = {
+  DRAFT: 'installationRecords.status.draft',
+  SENT: 'installationRecords.status.sent',
+  SEND_FAILED: 'installationRecords.status.sendFailed',
+  SEP_ACTIVATED: 'installationRecords.status.sepActivated',
+  LEGACY_COMPLETED: 'installationRecords.status.legacyCompleted',
 };
 
 const statusColor: Record<string, string> = {
@@ -36,12 +36,14 @@ const statusColor: Record<string, string> = {
   LEGACY_COMPLETED: 'default',
 };
 
-const rangeOptions: { label: string; value: AnalyticsRange }[] = [
-  { label: '7 dana', value: '7_DAYS' },
-  { label: '30 dana', value: '30_DAYS' },
-  { label: 'Mjesec', value: 'MONTH' },
-  { label: 'Godina', value: 'YEAR' },
-];
+function getRangeOptions(t: (key: string) => string): { label: string; value: AnalyticsRange }[] {
+  return [
+    { label: t('analytics.range.days7'), value: '7_DAYS' },
+    { label: t('analytics.range.days30'), value: '30_DAYS' },
+    { label: t('analytics.range.month'), value: 'MONTH' },
+    { label: t('analytics.range.year'), value: 'YEAR' },
+  ];
+}
 
 function useTimeRange(): [TimeRangeParams, (r: AnalyticsRange) => void] {
   const [range, setRange] = useState<AnalyticsRange>('30_DAYS');
@@ -49,7 +51,9 @@ function useTimeRange(): [TimeRangeParams, (r: AnalyticsRange) => void] {
 }
 
 export default function AnalyticsPage() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
+  const rangeOptions = getRangeOptions(t);
   const [rangeParams, setRangeRange] = useTimeRange();
 
   const overviewQuery = useQuery({
@@ -93,11 +97,11 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <Typography.Title level={3} className="!mb-0">
-          Analitika
+          {t('layout.sidebar.analytics')}
         </Typography.Title>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
           <Typography.Text type="secondary" className="text-xs sm:text-sm">
-            Vremenski raspon:
+            {t('analytics.timeRangeLabel')}
           </Typography.Text>
           <Segmented
             options={rangeOptions}
@@ -110,7 +114,7 @@ export default function AnalyticsPage() {
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
           <Card
-            title="Pregled (KPI)"
+            title={t('analytics.overviewCardTitle')}
             loading={overviewQuery.isLoading}
             extra={
               <Button size="small" onClick={() => void handleDownloadCsv('overview')}>
@@ -120,27 +124,27 @@ export default function AnalyticsPage() {
           >
             <div className="space-y-2 text-sm">
               <div>
-                <Typography.Text strong>Zapisnici (ukupno): </Typography.Text>
+                <Typography.Text strong>{t('analytics.recordsTotal')}: </Typography.Text>
                 <Typography.Text>
                   {overview?.installationRecords.total ?? 0}
                 </Typography.Text>
               </div>
               <div>
-                <Typography.Text strong>SIM kartice (ukupno): </Typography.Text>
+                <Typography.Text strong>{t('analytics.simCardsTotal')}: </Typography.Text>
                 <Typography.Text>{overview?.simCards.total ?? 0}</Typography.Text>
               </div>
               <div>
-                <Typography.Text strong>Brojila: </Typography.Text>
+                <Typography.Text strong>{t('layout.sidebar.meters')}: </Typography.Text>
                 <Typography.Text>{overview?.metersTotal ?? 0}</Typography.Text>
               </div>
               <div className="mt-2">
-                <Typography.Text strong>Brzina aktivacije (sekunde):</Typography.Text>
+                <Typography.Text strong>{t('analytics.activationSpeed')}</Typography.Text>
                 <div className="grid grid-cols-2 gap-x-4 text-xs mt-1">
-                  <span>Broj uzoraka:</span>
+                  <span>{t('analytics.sampleCount')}</span>
                   <span>{overview?.activationKpi.count ?? 0}</span>
-                  <span>Prosjek (avg):</span>
+                  <span>{t('analytics.average')}</span>
                   <span>{overview?.activationKpi.avgSeconds?.toFixed(0) ?? '–'}</span>
-                  <span>Median (p50):</span>
+                  <span>{t('analytics.median')}</span>
                   <span>{overview?.activationKpi.p50Seconds?.toFixed(0) ?? '–'}</span>
                   <span>p90:</span>
                   <span>{overview?.activationKpi.p90Seconds?.toFixed(0) ?? '–'}</span>
@@ -152,7 +156,7 @@ export default function AnalyticsPage() {
 
         <Col xs={24} lg={8}>
           <Card
-            title="SIM kartice po statusu"
+            title={t('analytics.simByStatusTitle')}
             loading={simQuery.isLoading}
             extra={
               <Button size="small" onClick={() => void handleDownloadCsv('sim-cards')}>
@@ -186,7 +190,7 @@ export default function AnalyticsPage() {
                 ))}
               {!sim?.byStatus && (
                 <Typography.Text type="secondary" className="text-xs">
-                  Nema podataka.
+                  {t('common.states.noData')}
                 </Typography.Text>
               )}
             </div>
@@ -195,7 +199,7 @@ export default function AnalyticsPage() {
 
         <Col xs={24} lg={8}>
           <Card
-            title="Zapisnici po statusu (funnel)"
+            title={t('analytics.recordsFunnelTitle')}
             loading={recordsQuery.isLoading}
             extra={
               <Button
@@ -211,7 +215,7 @@ export default function AnalyticsPage() {
                 Object.entries(records.funnel).map(([status, count]) => (
                   <div key={status} className="flex items-center gap-2 text-xs">
                     <span className="w-32">
-                      {statusLabel[status] ?? status}
+                      {statusLabelKey[status] ? t(statusLabelKey[status]) : status}
                     </span>
                     <div className="flex-1 h-3 bg-slate-100 rounded">
                       <div
@@ -236,7 +240,7 @@ export default function AnalyticsPage() {
                 ))}
               {!records?.funnel && (
                 <Typography.Text type="secondary" className="text-xs">
-                  Nema podataka.
+                  {t('common.states.noData')}
                 </Typography.Text>
               )}
             </div>
@@ -246,7 +250,7 @@ export default function AnalyticsPage() {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
-          <Card title="SIM kartice po distribucijama" loading={simQuery.isLoading}>
+          <Card title={t('analytics.simByDistributionTitle')} loading={simQuery.isLoading}>
             <div className="-mx-4 overflow-x-auto px-4">
               <Table
                 dataSource={sim?.byDistribution ?? []}
@@ -255,15 +259,15 @@ export default function AnalyticsPage() {
                 pagination={false}
                 scroll={{ x: 'max-content' }}
                 columns={[
-                  { title: 'Distribucija', dataIndex: 'distributionName' },
-                  { title: 'SIM kartice', dataIndex: 'total' },
+                  { title: t('analytics.distributionColumn'), dataIndex: 'distributionName' },
+                  { title: t('layout.sidebar.simCards'), dataIndex: 'total' },
                 ]}
               />
             </div>
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title="SIM kartice po podružnicama (instalirane)" loading={simQuery.isLoading}>
+          <Card title={t('analytics.simByBranchTitle')} loading={simQuery.isLoading}>
             <div className="-mx-4 overflow-x-auto px-4">
               <Table
                 dataSource={sim?.byBranch ?? []}
@@ -272,9 +276,9 @@ export default function AnalyticsPage() {
                 pagination={false}
                 scroll={{ x: 'max-content' }}
                 columns={[
-                  { title: 'Distribucija', dataIndex: 'distributionName' },
-                  { title: 'Podružnica', dataIndex: 'branchName' },
-                  { title: 'Instalirano SIM', dataIndex: 'installedCount' },
+                  { title: t('analytics.distributionColumn'), dataIndex: 'distributionName' },
+                  { title: t('analytics.branchColumn'), dataIndex: 'branchName' },
+                  { title: t('analytics.installedSimColumn'), dataIndex: 'installedCount' },
                 ]}
               />
             </div>
@@ -284,7 +288,7 @@ export default function AnalyticsPage() {
 
       <Row gutter={[16, 16]}>
         <Col xs={24}>
-          <Card title="SIM kartice po operatorima" loading={simQuery.isLoading}>
+          <Card title={t('analytics.simByOperatorTitle')} loading={simQuery.isLoading}>
             <div className="-mx-4 overflow-x-auto px-4">
               <Table
                 dataSource={sim?.byOperator ?? []}
@@ -294,13 +298,13 @@ export default function AnalyticsPage() {
                 scroll={{ x: 'max-content' }}
                 columns={[
                   {
-                    title: 'Operator',
+                    title: t('analytics.operatorColumn'),
                     render: (_: unknown, row) => `${row.firstName} ${row.lastName}`,
                   },
-                  { title: 'Distribucija', dataIndex: 'distributionName' },
-                  { title: 'Podružnica', dataIndex: 'branchName' },
-                  { title: 'Zaduženih SIM', dataIndex: 'totalAssigned' },
-                  { title: 'Instaliranih SIM', dataIndex: 'totalInstalled' },
+                  { title: t('analytics.distributionColumn'), dataIndex: 'distributionName' },
+                  { title: t('analytics.branchColumn'), dataIndex: 'branchName' },
+                  { title: t('analytics.assignedSimColumn'), dataIndex: 'totalAssigned' },
+                  { title: t('analytics.installedSimColumnShort'), dataIndex: 'totalInstalled' },
                 ]}
               />
             </div>
@@ -310,12 +314,12 @@ export default function AnalyticsPage() {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
-          <Card title="Timeline zapisnika" loading={recordsQuery.isLoading}>
+          <Card title={t('analytics.timelineTitle')} loading={recordsQuery.isLoading}>
             <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
               {records?.timeline.map(({ date, count }) => (
                 <div key={date} className="flex items-center gap-2">
                   <Typography.Text className="w-24 text-xs">
-                    {new Date(date).toLocaleDateString('bs-BA', {
+                    {new Date(date).toLocaleDateString(dateLocale, {
                       day: '2-digit',
                       month: '2-digit',
                     })}
@@ -343,7 +347,7 @@ export default function AnalyticsPage() {
               ))}
               {!records?.timeline?.length && (
                 <Typography.Text type="secondary" className="text-xs">
-                  Nema podataka za odabrani raspon.
+                  {t('analytics.noDataForRange')}
                 </Typography.Text>
               )}
             </div>
@@ -352,7 +356,7 @@ export default function AnalyticsPage() {
 
         <Col xs={24} lg={12}>
           <Card
-            title="Aktivnost korisnika"
+            title={t('analytics.userActivityTitle')}
             loading={usersQuery.isLoading}
             extra={
               <Button size="small" onClick={() => void handleDownloadCsv('users')}>
@@ -369,17 +373,17 @@ export default function AnalyticsPage() {
                 scroll={{ x: 'max-content' }}
                 columns={[
                   {
-                    title: 'Korisnik',
+                    title: t('common.labels.username'),
                     render: (_: unknown, row) => `${row.firstName} ${row.lastName}`,
                   },
-                  { title: 'Email', dataIndex: 'email' },
+                  { title: t('common.labels.email'), dataIndex: 'email' },
                   {
-                    title: 'Rola',
+                    title: t('common.labels.role'),
                     dataIndex: 'role',
                     render: (r: string) => <Tag>{r}</Tag>,
                   },
-                  { title: 'Kreirani zapisnici', dataIndex: 'created' },
-                  { title: 'Odobreni zapisnici', dataIndex: 'approved' },
+                  { title: t('analytics.createdRecordsColumn'), dataIndex: 'created' },
+                  { title: t('analytics.approvedRecordsColumn'), dataIndex: 'approved' },
                 ]}
               />
             </div>

@@ -12,110 +12,131 @@ export type AppSettingManifestEntry = {
   confirmDangerousChange?: { title: string; content: string };
 };
 
-const M = {
-  mobile: {
-    groupId: 'mobile',
-    groupTitle: 'Mobile',
-    groupDescription:
-      'Postavke za mobilnu aplikaciju (queue, GPS, push kanal). Globalni push on/off je u sekciji Notifikacije; ovdje je kompatibilnost `mobile.push.enabled` za `/settings/mobile-push`.',
-  },
-  uploads: {
-    groupId: 'uploads',
-    groupTitle: 'Upload',
-    groupDescription:
-      'Limiti i MIME tipovi za fotografije i dokumente. Backend `PhotoUploadService` koristi `uploads.maxPhotoSizeMb` i `uploads.allowedPhotoMimeTypes` za slike zapisnika.',
-  },
-} as const;
+type TFn = (key: string, options?: Record<string, unknown>) => string;
 
-export const APP_SETTINGS_MANIFEST: AppSettingManifestEntry[] = [
-  {
-    ...M.mobile,
-    key: 'mobile.offlineQueue.enabled',
-    label: 'Offline queue',
-    description:
-      'Uključuje lokalni red čekanja akcija kada nema mreže (kad klijent to podrži).',
-    valueType: 'boolean',
-  },
-  {
-    ...M.mobile,
-    key: 'mobile.offlineQueue.maxItems',
-    label: 'Maks. stavki u offline redu',
-    description: 'Gornja granica broja akcija u redu prije odbijanja ili forsiranog sync-a.',
-    valueType: 'number',
-  },
-  {
-    ...M.mobile,
-    key: 'mobile.requireGpsForRecord',
-    label: 'Obavezan GPS za zapisnik',
-    description: 'Ako je uključeno, klijent bi trebao zahtijevati koordinate prije kreiranja zapisa.',
-    valueType: 'boolean',
-  },
-  {
-    ...M.mobile,
-    key: 'mobile.push.testMode',
-    label: 'Push test režim',
-    description: 'Namjena za QA: označava test push poruke (kad klijent to koristi).',
-    valueType: 'boolean',
-  },
-  {
-    ...M.mobile,
-    key: 'mobile.push.defaultChannel',
-    label: 'Podrazumijevani push kanal',
-    description: 'Tema/topic za push (approval / records / system).',
-    valueType: 'enum',
-    enumOptions: [
-      { value: 'approval', label: 'Approval' },
-      { value: 'records', label: 'Records' },
-      { value: 'system', label: 'System' },
-    ],
-  },
-  {
-    ...M.mobile,
-    key: 'mobile.push.enabled',
-    label: 'Mobile push (kompatibilnost)',
-    description:
-      'Mora biti uključeno zajedno s globalnim pushom u Notifikacijama da bi mobilni klijenti registrovali tokene.',
-    valueType: 'boolean',
-    confirmDangerousChange: {
-      title: 'Isključiti mobile push?',
-      content:
-        'Mobilne aplikacije neće registrovati push tokene dok ovo ne bude ponovo uključeno. Nastaviti?',
+/**
+ * Builds the app settings manifest with labels/descriptions translated via `t`.
+ * This is a function (not a static constant) because the labels are
+ * user-facing text and must follow the active language — call it from
+ * within a component that has `useTranslation()`.
+ */
+export function getAppSettingsManifest(t: TFn): AppSettingManifestEntry[] {
+  const M = {
+    mobile: {
+      groupId: 'mobile',
+      groupTitle: 'Mobile',
+      groupDescription: t('appSettingsManifest.mobileGroupDescription'),
     },
-  },
-  {
-    ...M.uploads,
-    key: 'uploads.maxPhotoSizeMb',
-    label: 'Maks. veličina fotografije (MB)',
-    description: 'Backend validacija uploada fotografija zapisnika (uz usklađivanje s reverse proxy limitima).',
-    valueType: 'number',
-  },
-  {
-    ...M.uploads,
-    key: 'uploads.allowedPhotoMimeTypes',
-    label: 'Dozvoljeni MIME tipovi za slike',
-    description: 'Lista odvojena zarezom, npr. image/jpeg,image/png.',
-    valueType: 'string',
-  },
-  {
-    ...M.uploads,
-    key: 'uploads.maxDocumentSizeMb',
-    label: 'Maks. veličina dokumenta (MB)',
-    description: 'Za PDF/Word/Excel upload (kad se koristi u aplikaciji).',
-    valueType: 'number',
-  },
-  {
-    ...M.uploads,
-    key: 'uploads.allowedDocumentMimeTypes',
-    label: 'Dozvoljeni MIME tipovi za dokumente',
-    description: 'Lista odvojena zarezom (PDF, Office…).',
-    valueType: 'string',
-  },
-];
+    uploads: {
+      groupId: 'uploads',
+      groupTitle: t('appSettingsManifest.uploadsGroupTitle'),
+      groupDescription: t('appSettingsManifest.uploadsGroupDescription'),
+    },
+  } as const;
 
-export const MANIFEST_KEYS = new Set(APP_SETTINGS_MANIFEST.map((e) => e.key));
+  return [
+    {
+      ...M.mobile,
+      key: 'mobile.offlineQueue.enabled',
+      label: t('appSettingsManifest.offlineQueueEnabled.label'),
+      description: t('appSettingsManifest.offlineQueueEnabled.description'),
+      valueType: 'boolean',
+    },
+    {
+      ...M.mobile,
+      key: 'mobile.offlineQueue.maxItems',
+      label: t('appSettingsManifest.offlineQueueMaxItems.label'),
+      description: t('appSettingsManifest.offlineQueueMaxItems.description'),
+      valueType: 'number',
+    },
+    {
+      ...M.mobile,
+      key: 'mobile.requireGpsForRecord',
+      label: t('appSettingsManifest.requireGpsForRecord.label'),
+      description: t('appSettingsManifest.requireGpsForRecord.description'),
+      valueType: 'boolean',
+    },
+    {
+      ...M.mobile,
+      key: 'mobile.push.testMode',
+      label: t('appSettingsManifest.pushTestMode.label'),
+      description: t('appSettingsManifest.pushTestMode.description'),
+      valueType: 'boolean',
+    },
+    {
+      ...M.mobile,
+      key: 'mobile.push.defaultChannel',
+      label: t('appSettingsManifest.pushDefaultChannel.label'),
+      description: t('appSettingsManifest.pushDefaultChannel.description'),
+      valueType: 'enum',
+      enumOptions: [
+        { value: 'approval', label: 'Approval' },
+        { value: 'records', label: 'Records' },
+        { value: 'system', label: 'System' },
+      ],
+    },
+    {
+      ...M.mobile,
+      key: 'mobile.push.enabled',
+      label: t('appSettingsManifest.pushEnabledCompat.label'),
+      description: t('appSettingsManifest.pushEnabledCompat.description'),
+      valueType: 'boolean',
+      confirmDangerousChange: {
+        title: t('appSettingsManifest.pushEnabledCompat.confirmTitle'),
+        content: t('appSettingsManifest.pushEnabledCompat.confirmContent'),
+      },
+    },
+    {
+      ...M.uploads,
+      key: 'uploads.maxPhotoSizeMb',
+      label: t('appSettingsManifest.maxPhotoSizeMb.label'),
+      description: t('appSettingsManifest.maxPhotoSizeMb.description'),
+      valueType: 'number',
+    },
+    {
+      ...M.uploads,
+      key: 'uploads.allowedPhotoMimeTypes',
+      label: t('appSettingsManifest.allowedPhotoMimeTypes.label'),
+      description: t('appSettingsManifest.allowedPhotoMimeTypes.description'),
+      valueType: 'string',
+    },
+    {
+      ...M.uploads,
+      key: 'uploads.maxDocumentSizeMb',
+      label: t('appSettingsManifest.maxDocumentSizeMb.label'),
+      description: t('appSettingsManifest.maxDocumentSizeMb.description'),
+      valueType: 'number',
+    },
+    {
+      ...M.uploads,
+      key: 'uploads.allowedDocumentMimeTypes',
+      label: t('appSettingsManifest.allowedDocumentMimeTypes.label'),
+      description: t('appSettingsManifest.allowedDocumentMimeTypes.description'),
+      valueType: 'string',
+    },
+  ];
+}
 
+/** Language-independent: setting keys only, used to exclude manifest keys from the "other" table. */
+export const MANIFEST_KEYS = new Set([
+  'mobile.offlineQueue.enabled',
+  'mobile.offlineQueue.maxItems',
+  'mobile.requireGpsForRecord',
+  'mobile.push.testMode',
+  'mobile.push.defaultChannel',
+  'mobile.push.enabled',
+  'uploads.maxPhotoSizeMb',
+  'uploads.allowedPhotoMimeTypes',
+  'uploads.maxDocumentSizeMb',
+  'uploads.allowedDocumentMimeTypes',
+]);
+
+/** Language-independent: group ids only, in display order. */
 export const MANIFEST_GROUP_ORDER = ['mobile', 'uploads'] as const;
 
-export function getManifestEntry(key: string): AppSettingManifestEntry | undefined {
-  return APP_SETTINGS_MANIFEST.find((e) => e.key === key);
+export function getManifestEntry(
+  key: string,
+  manifest: AppSettingManifestEntry[],
+): AppSettingManifestEntry | undefined {
+  return manifest.find((e) => e.key === key);
 }

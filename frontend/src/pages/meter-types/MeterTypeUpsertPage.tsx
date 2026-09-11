@@ -21,11 +21,14 @@ import { useAuthStore } from '@/store/auth.store'
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import type { CreateMeterTypeDefinitionInput, MeterType, MeterTypeDefinitionItem } from '@/types/meter-type-definition.types'
 import type { MeterFieldType, MeterTypeFieldItem } from '@/types/meter-type-field.types'
+import { useTranslation } from '@/i18n'
 
-const meterTypeOptions: { label: string; value: MeterType }[] = [
-  { label: 'Jednofazno', value: 'SINGLE_PHASE' },
-  { label: 'Trofazno', value: 'THREE_PHASE' },
-]
+function getMeterTypeOptions(t: (key: string) => string): { label: string; value: MeterType }[] {
+  return [
+    { label: t('meterTypes.phaseSingle'), value: 'SINGLE_PHASE' },
+    { label: t('meterTypes.phaseThree'), value: 'THREE_PHASE' },
+  ]
+}
 
 const FIELD_TYPE_OPTIONS: { label: string; value: MeterFieldType }[] = [
   { label: 'String', value: 'STRING' },
@@ -53,15 +56,17 @@ type FieldFormValues = {
   sortOrder?: number
 }
 
-const renderMeterPhaseLabel = (t: MeterType | undefined) => {
-  if (t === 'SINGLE_PHASE') return 'Jednofazno'
-  if (t === 'THREE_PHASE') return 'Trofazno'
+function renderMeterPhaseLabel(mt: MeterType | undefined, t: (key: string) => string) {
+  if (mt === 'SINGLE_PHASE') return t('meterTypes.phaseSingle')
+  if (mt === 'THREE_PHASE') return t('meterTypes.phaseThree')
   return '–'
 }
 
 export default function MeterTypeUpsertPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { t } = useTranslation();
+  const meterTypeOptions = getMeterTypeOptions(t)
   const [messageApi, messageContextHolder] = message.useMessage()
   const params = useParams()
   const definitionId = params.id
@@ -102,7 +107,7 @@ export default function MeterTypeUpsertPage() {
       return meterTypeDefinitionsApi.create(payload)
     },
     onSuccess: async (data) => {
-      messageApi.success(isCreate ? 'Tip brojila je kreiran.' : 'Tip brojila je ažuriran.')
+      messageApi.success(isCreate ? t('meterTypes.created') : t('meterTypes.updated'))
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions'] })
       if (!definitionId) {
         navigate(`/meter-types/${data.id}`, { replace: true })
@@ -112,7 +117,7 @@ export default function MeterTypeUpsertPage() {
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -121,7 +126,7 @@ export default function MeterTypeUpsertPage() {
     mutationFn: (values: Parameters<typeof meterTypeDefinitionsApi.createField>[1]) =>
       meterTypeDefinitionsApi.createField(definitionId!, values),
     onSuccess: async () => {
-      messageApi.success('Polje je dodano.')
+      messageApi.success(t('meterTypeFields.messages.created'))
       setFieldDrawerOpen(false)
       setEditingField(null)
       fieldForm.resetFields()
@@ -129,7 +134,7 @@ export default function MeterTypeUpsertPage() {
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -138,7 +143,7 @@ export default function MeterTypeUpsertPage() {
     mutationFn: (payload: { id: string; data: Record<string, unknown> }) =>
       meterTypeDefinitionsApi.updateField(definitionId!, payload.id, payload.data as any),
     onSuccess: async () => {
-      messageApi.success('Polje je ažurirano.')
+      messageApi.success(t('meterTypeFields.messages.updated'))
       setFieldDrawerOpen(false)
       setEditingField(null)
       fieldForm.resetFields()
@@ -146,7 +151,7 @@ export default function MeterTypeUpsertPage() {
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -154,12 +159,12 @@ export default function MeterTypeUpsertPage() {
   const removeFieldMutation = useMutation({
     mutationFn: (fieldId: string) => meterTypeDefinitionsApi.removeField(definitionId!, fieldId),
     onSuccess: async () => {
-      messageApi.success('Polje je obrisano.')
+      messageApi.success(t('meterTypeFields.messages.deleted'))
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields', definitionId] })
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -167,12 +172,12 @@ export default function MeterTypeUpsertPage() {
   const reorderFieldsMutation = useMutation({
     mutationFn: (fieldIds: string[]) => meterTypeDefinitionsApi.reorderFields(definitionId!, fieldIds),
     onSuccess: async () => {
-      messageApi.success('Redoslijed je sačuvan.')
+      messageApi.success(t('meterTypeFields.messages.reordered'))
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields', definitionId] })
     },
     onError: (e: unknown) => {
       messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Greška',
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
       )
     },
   })
@@ -215,24 +220,24 @@ export default function MeterTypeUpsertPage() {
   }
 
   const fieldsColumnsReadOnly = [
-    { title: 'Name', dataIndex: 'name', width: 180 },
-    { title: 'Label', dataIndex: 'label' },
-    { title: 'Type', dataIndex: 'fieldType', width: 110 },
-    { title: 'Obavezno', dataIndex: 'isRequired', width: 100, render: (v: boolean) => (v ? 'Da' : 'Ne') },
+    { title: t('meterTypeFields.columns.name'), dataIndex: 'name', width: 180 },
+    { title: t('meterTypeFields.columns.label'), dataIndex: 'label' },
+    { title: t('common.labels.type'), dataIndex: 'fieldType', width: 110 },
+    { title: t('meterTypeFields.columns.required'), dataIndex: 'isRequired', width: 100, render: (v: boolean) => (v ? t('common.actions.yes') : t('common.actions.no')) },
     {
-      title: 'Operator popunjava',
+      title: t('meterTypeFields.columns.operatorFill'),
       dataIndex: 'isOperatorFillable',
       width: 140,
-      render: (v: boolean) => (v ? 'Da' : 'Ne'),
+      render: (v: boolean) => (v ? t('common.actions.yes') : t('common.actions.no')),
     },
-    { title: 'Default', dataIndex: 'defaultValue', width: 140, render: (v: string | null) => v ?? '–' },
-    { title: 'Redoslijed', dataIndex: 'sortOrder', width: 90 },
+    { title: t('meterTypeFields.columns.default'), dataIndex: 'defaultValue', width: 140, render: (v: string | null) => v ?? '–' },
+    { title: t('meterTypeFields.columns.sort'), dataIndex: 'sortOrder', width: 90 },
   ]
 
   const fieldsColumnsEditable = [
     ...fieldsColumnsReadOnly,
     {
-      title: 'Akcije',
+      title: t('common.actions.actions'),
       width: 260,
       render: (_: unknown, row: MeterTypeFieldItem) => (
         <Space>
@@ -242,7 +247,7 @@ export default function MeterTypeUpsertPage() {
             onClick={() => handleMoveField(row.id, -1)}
             disabled={reorderFieldsMutation.isPending}
           >
-            Gore
+            {t('meterTypeFields.moveUp')}
           </Button>
           <Button
             size="small"
@@ -250,10 +255,10 @@ export default function MeterTypeUpsertPage() {
             onClick={() => handleMoveField(row.id, 1)}
             disabled={reorderFieldsMutation.isPending}
           >
-            Dolje
+            {t('meterTypeFields.moveDown')}
           </Button>
           <Button size="small" onClick={() => handleOpenEditField(row)}>
-            Uredi
+            {t('common.actions.edit')}
           </Button>
           <Button
             size="small"
@@ -261,7 +266,7 @@ export default function MeterTypeUpsertPage() {
             onClick={() => removeFieldMutation.mutate(row.id)}
             loading={removeFieldMutation.isPending}
           >
-            Obriši
+            {t('common.actions.delete')}
           </Button>
         </Space>
       ),
@@ -274,19 +279,19 @@ export default function MeterTypeUpsertPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Typography.Title level={3} className="!mb-0">
-            {isCreate ? 'Novi tip brojila' : readOnlyMode ? 'Detalji tipa brojila' : 'Uredi tip brojila'}
+            {isCreate ? t('meterTypes.newTitle') : readOnlyMode ? t('meterTypes.detailsTitle') : t('meterTypes.editTitle')}
           </Typography.Title>
           <Typography.Text type="secondary">
             {readOnlyMode
-              ? 'Pregled tipa brojila i dodatnih polja (samo čitanje).'
-              : 'Definiši tip brojila i dodatna polja koja se vežu za taj tip.'}
+              ? t('meterTypes.readOnlyIntro')
+              : t('meterTypes.editIntro')}
           </Typography.Text>
         </div>
         <Space>
-          <Button onClick={() => navigate('/meters')}>Nazad</Button>
+          <Button onClick={() => navigate('/meters')}>{t('common.actions.back')}</Button>
           {!readOnlyMode && (
             <Button type="primary" loading={upsertMutation.isPending} onClick={() => typeForm.submit()}>
-              {isCreate ? 'Kreiraj tip' : 'Snimi'}
+              {isCreate ? t('meterTypes.createButton') : t('common.actions.save')}
             </Button>
           )}
         </Space>
@@ -297,30 +302,30 @@ export default function MeterTypeUpsertPage() {
           {typeQuery.isError && (
             <Typography.Text type="danger">
               {(typeQuery.error as { response?: { data?: { message?: string } } })?.response?.data
-                ?.message ?? 'Učitavanje tipa nije uspjelo.'}
+                ?.message ?? t('meterTypes.loadFailed')}
             </Typography.Text>
           )}
-          {typeQuery.isLoading && <Typography.Text type="secondary">Učitavanje…</Typography.Text>}
+          {typeQuery.isLoading && <Typography.Text type="secondary">{t('common.states.loading')}</Typography.Text>}
           {typeQuery.data && (
             <Descriptions bordered column={{ xs: 1, sm: 1, md: 2 }} size="small">
-              <Descriptions.Item label="Naziv">{typeQuery.data.name}</Descriptions.Item>
-              <Descriptions.Item label="Jednofazno / Trofazno">
-                {renderMeterPhaseLabel(typeQuery.data.type)}
+              <Descriptions.Item label={t('common.labels.name')}>{typeQuery.data.name}</Descriptions.Item>
+              <Descriptions.Item label={t('meterTypes.phaseColumn')}>
+                {renderMeterPhaseLabel(typeQuery.data.type, t)}
               </Descriptions.Item>
-              <Descriptions.Item label="Proizvođač">{typeQuery.data.manufacturer ?? '–'}</Descriptions.Item>
-              <Descriptions.Item label="Model">{typeQuery.data.model ?? '–'}</Descriptions.Item>
-              <Descriptions.Item label="Maks. struja (A)">{typeQuery.data.maxCurrent ?? '–'}</Descriptions.Item>
-              <Descriptions.Item label="Napomena" span={2}>
+              <Descriptions.Item label={t('meterTypes.manufacturer')}>{typeQuery.data.manufacturer ?? '–'}</Descriptions.Item>
+              <Descriptions.Item label={t('meterTypes.model')}>{typeQuery.data.model ?? '–'}</Descriptions.Item>
+              <Descriptions.Item label={t('meterTypes.maxCurrent')}>{typeQuery.data.maxCurrent ?? '–'}</Descriptions.Item>
+              <Descriptions.Item label={t('common.labels.notes')} span={2}>
                 {typeQuery.data.notes ?? '–'}
               </Descriptions.Item>
             </Descriptions>
           )}
           <Divider className="!my-2" />
           <Typography.Title level={5} className="!mb-2">
-            Dodatna polja
+            {t('meterTypes.extraFieldsTitle')}
           </Typography.Title>
           <Typography.Paragraph type="secondary" className="!mb-4 !mt-0">
-            Polja koja se prikupljaju za ovaj tip brojila.
+            {t('meterTypes.extraFieldsIntro')}
           </Typography.Paragraph>
           <Table<MeterTypeFieldItem>
             rowKey="id"
@@ -358,24 +363,24 @@ export default function MeterTypeUpsertPage() {
             }
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Form.Item name="name" label="Naziv" rules={[{ required: true, message: 'Unesite naziv.' }]}>
+              <Form.Item name="name" label={t('common.labels.name')} rules={[{ required: true, message: t('meterTypes.nameRequired') }]}>
                 <Input placeholder="npr. AMM 3.0" />
               </Form.Item>
-              <Form.Item name="type" label="Tip">
-                <Select allowClear placeholder="Odaberi" options={meterTypeOptions} />
+              <Form.Item name="type" label={t('common.labels.type')}>
+                <Select allowClear placeholder={t('common.actions.select')} options={meterTypeOptions} />
               </Form.Item>
-              <Form.Item name="manufacturer" label="Proizvođač">
-                <Input placeholder="Opcionalno" />
+              <Form.Item name="manufacturer" label={t('meterTypes.manufacturer')}>
+                <Input placeholder={t('common.labels.optional')} />
               </Form.Item>
-              <Form.Item name="model" label="Model">
-                <Input placeholder="Opcionalno" />
+              <Form.Item name="model" label={t('meterTypes.model')}>
+                <Input placeholder={t('common.labels.optional')} />
               </Form.Item>
-              <Form.Item name="maxCurrent" label="Maks. struja (A)">
-                <Input placeholder="Opcionalno" />
+              <Form.Item name="maxCurrent" label={t('meterTypes.maxCurrent')}>
+                <Input placeholder={t('common.labels.optional')} />
               </Form.Item>
             </div>
-            <Form.Item name="notes" label="Napomena">
-              <Input.TextArea rows={2} placeholder="Opcionalno" />
+            <Form.Item name="notes" label={t('common.labels.notes')}>
+              <Input.TextArea rows={2} placeholder={t('common.labels.optional')} />
             </Form.Item>
           </Form>
 
@@ -384,10 +389,10 @@ export default function MeterTypeUpsertPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <Typography.Title level={5} className="!mb-0">
-                Dodatna polja
+                {t('meterTypes.extraFieldsTitle')}
               </Typography.Title>
               <Typography.Text type="secondary">
-                Polja su aktivna tek nakon što tip bude sačuvan.
+                {t('meterTypes.extraFieldsActiveAfterSave')}
               </Typography.Text>
             </div>
             <Button
@@ -396,7 +401,7 @@ export default function MeterTypeUpsertPage() {
               disabled={!definitionId}
               onClick={handleOpenCreateField}
             >
-              Dodaj polje
+              {t('meterTypeFields.addField')}
             </Button>
           </div>
 
@@ -411,7 +416,7 @@ export default function MeterTypeUpsertPage() {
       )}
 
       <Drawer
-        title={editingField ? 'Uredi polje' : 'Novo polje'}
+        title={editingField ? t('meterTypeFields.editFieldTitle') : t('meterTypeFields.newFieldTitle')}
         open={fieldDrawerOpen}
         width={520}
         onClose={() => {
@@ -429,14 +434,14 @@ export default function MeterTypeUpsertPage() {
                 fieldForm.resetFields()
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button
               type="primary"
               loading={createFieldMutation.isPending || updateFieldMutation.isPending}
               onClick={() => fieldForm.submit()}
             >
-              {editingField ? 'Snimi' : 'Dodaj'}
+              {editingField ? t('common.actions.save') : t('common.actions.add')}
             </Button>
           </div>
         }
@@ -461,27 +466,27 @@ export default function MeterTypeUpsertPage() {
             createFieldMutation.mutate(payload as any)
           }}
         >
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Form.Item name="name" label={t('meterTypeFields.columns.name')} rules={[{ required: true }]}>
             <Input placeholder="npr. transformer_ratio" />
           </Form.Item>
-          <Form.Item name="label" label="Label" rules={[{ required: true }]}>
+          <Form.Item name="label" label={t('meterTypeFields.columns.label')} rules={[{ required: true }]}>
             <Input placeholder="npr. Prijenosni omjer" />
           </Form.Item>
-          <Form.Item name="fieldType" label="Type" rules={[{ required: true }]}>
+          <Form.Item name="fieldType" label={t('common.labels.type')} rules={[{ required: true }]}>
             <Select options={FIELD_TYPE_OPTIONS} />
           </Form.Item>
           <Space size="large" wrap>
-            <Form.Item name="isRequired" label="Required" valuePropName="checked">
+            <Form.Item name="isRequired" label={t('meterTypeFields.columns.required')} valuePropName="checked">
               <Switch />
             </Form.Item>
-            <Form.Item name="isOperatorFillable" label="Operator fill" valuePropName="checked">
+            <Form.Item name="isOperatorFillable" label={t('meterTypeFields.columns.operatorFill')} valuePropName="checked">
               <Switch />
             </Form.Item>
           </Space>
-          <Form.Item name="defaultValue" label="Default value">
-            <Input placeholder="Opcionalno" />
+          <Form.Item name="defaultValue" label={t('meterTypeFields.defaultValueLabel')}>
+            <Input placeholder={t('common.labels.optional')} />
           </Form.Item>
-          <Form.Item name="sortOrder" label="Sort order">
+          <Form.Item name="sortOrder" label={t('meterTypeFields.sortOrderLabel')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
