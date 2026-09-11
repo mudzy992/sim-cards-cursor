@@ -12,7 +12,9 @@ export type AppSettingManifestEntry = {
   confirmDangerousChange?: { title: string; content: string };
 };
 
-type TFn = (key: string, options?: Record<string, unknown>) => string;
+import type { TranslateOptions } from '@/i18n/core';
+
+type TFn = (key: string, options?: TranslateOptions) => string;
 
 /**
  * Builds the app settings manifest with labels/descriptions translated via `t`.
