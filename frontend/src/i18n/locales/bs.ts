@@ -578,6 +578,31 @@ const bs: TranslationDictionary = {
 
   shipments: {
 
+    list: {
+      assignSuccess: 'SIM kartica je dodijeljena korisniku.',
+      assignFailed: 'Dodjela nije uspjela.',
+      unassignSuccess: 'SIM kartica je vraćena na AVAILABLE.',
+      unassignFailed: 'Oduzimanje nije uspjelo.',
+      noCards: 'Nema kartica',
+      cardsUnit: 'kartica',
+      tabIntro: 'Pregled isporuka SIM kartica. Pretraga i filteri.',
+      newShipment: 'Nova isporuka',
+      searchNamePlaceholder: 'Pretraga naziva',
+      providerPlaceholder: 'Filter po provajderu',
+      columns: {
+        cards: 'Kartice',
+      },
+      labelsShort: 'Etikete',
+      simTabIntro: 'Distribucijski admin vidi samo SIM kartice iz isporuka dodijeljenih njegovoj distribuciji.',
+      pageIntro: 'Isporuke SIM kartica i pregled kartica. Sistemski administrator može dodavati isporuke i birati distribuciju. Distribucijski admin može dodavati isporuke i importovati liste samo za svoju distribuciju.',
+      assignDrawerTitle: 'Dodjela SIM kartice',
+      selectUserWarning: 'Odaberi korisnika za dodjelu.',
+      assign: 'Dodijeli',
+      unassign: 'Oduzmi',
+      simColon: 'SIM:',
+      selectUserPlaceholder: 'Odaberi korisnika',
+    },
+
     printPage: {
       headerTitle: 'Print etiketa — {{name}}',
       testSheetTag: 'PROBNI LIST',
@@ -898,6 +923,7 @@ const bs: TranslationDictionary = {
     },
     demount: {
       drawerTitle: 'Zadatak demontaže SIM kartice',
+      buttonLabel: 'Demontaža',
       taskCreated: 'Zadatak demontaže je kreiran.',
       resolutionLabel: 'Rezolucija',
       selectResolutionPlaceholder: 'Odaberite rezoluciju',

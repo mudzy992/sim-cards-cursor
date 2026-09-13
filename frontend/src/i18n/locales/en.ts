@@ -578,6 +578,31 @@ const en: TranslationDictionary = {
 
   shipments: {
 
+    list: {
+      assignSuccess: 'SIM card assigned to user.',
+      assignFailed: 'Assignment failed.',
+      unassignSuccess: 'SIM card returned to AVAILABLE.',
+      unassignFailed: 'Unassignment failed.',
+      noCards: 'No cards',
+      cardsUnit: 'cards',
+      tabIntro: 'Overview of SIM card shipments. Search and filters.',
+      newShipment: 'New shipment',
+      searchNamePlaceholder: 'Search by name',
+      providerPlaceholder: 'Filter by provider',
+      columns: {
+        cards: 'Cards',
+      },
+      labelsShort: 'Labels',
+      simTabIntro: 'Distribution admins only see SIM cards from shipments assigned to their distribution.',
+      pageIntro: 'SIM card shipments and card overview. System admins can add shipments and choose the distribution. Distribution admins can add shipments and import lists only for their own distribution.',
+      assignDrawerTitle: 'Assign SIM card',
+      selectUserWarning: 'Select a user to assign to.',
+      assign: 'Assign',
+      unassign: 'Unassign',
+      simColon: 'SIM:',
+      selectUserPlaceholder: 'Select a user',
+    },
+
     printPage: {
       headerTitle: 'Print labels — {{name}}',
       testSheetTag: 'TEST SHEET',
@@ -898,6 +923,7 @@ const en: TranslationDictionary = {
     },
     demount: {
       drawerTitle: 'SIM demount task',
+      buttonLabel: 'Demount',
       taskCreated: 'Demount task created.',
       resolutionLabel: 'Resolution',
       selectResolutionPlaceholder: 'Select a resolution',

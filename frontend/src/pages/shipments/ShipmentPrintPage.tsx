@@ -298,7 +298,7 @@ export default function ShipmentPrintPage() {
             <Space size={8} className="mt-1" wrap>
               <Tag color="geekblue">{shipment.provider}</Tag>
               <Tag>{new Date(shipment.receivedDate).toLocaleDateString(dateLocale)}</Tag>
-              <Tag color="default">{t('shipments.edit.cardsCount', { count: totalCards.toLocaleString(dateLocale) })}</Tag>
+              <Tag color="default">{t('shipments.edit.cardsCount', { count: totalCards })}</Tag>
               {testSheetOnly ? <Tag color="orange">{t('shipments.printPage.testSheetTag')}</Tag> : null}
             </Space>
           ) : null}
