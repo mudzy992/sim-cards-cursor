@@ -39,7 +39,6 @@ export interface LabelSheetLayout {
 export interface LabelFormatPreset extends LabelSheetLayout {
   id: LabelFormatId;
   name: string;
-  description: string;
 }
 
 /**
@@ -52,7 +51,6 @@ export const LABEL_FORMAT_PRESETS: LabelFormatPreset[] = [
   {
     id: 'a4-35.6x16.9',
     name: '35,6 × 16,9 mm',
-    description: '5 kolona × 16 redova · 80 etiketa/list',
     labelWidthMm: 35.6,
     labelHeightMm: 16.9,
     columns: 5,
@@ -65,7 +63,6 @@ export const LABEL_FORMAT_PRESETS: LabelFormatPreset[] = [
   {
     id: 'a4-37x14',
     name: '37 × 14 mm',
-    description: '5 kolona × 21 red · 105 etiketa/list',
     labelWidthMm: 37,
     labelHeightMm: 14,
     columns: 5,
@@ -78,7 +75,6 @@ export const LABEL_FORMAT_PRESETS: LabelFormatPreset[] = [
   {
     id: 'a4-52.5x21.2',
     name: 'F20 · 52,5 × 21,2 mm',
-    description: '4 kolone × 14 redova · 56 etiketa/list',
     labelWidthMm: 52.5,
     labelHeightMm: 21.2,
     columns: 4,
@@ -91,7 +87,6 @@ export const LABEL_FORMAT_PRESETS: LabelFormatPreset[] = [
   {
     id: 'a4-37.6x23.5',
     name: 'F14 · 37,6 × 23,5 mm',
-    description: '5 kolona × 12 redova · 60 etiketa/list',
     labelWidthMm: 37.6,
     labelHeightMm: 23.5,
     columns: 5,
@@ -104,7 +99,6 @@ export const LABEL_FORMAT_PRESETS: LabelFormatPreset[] = [
   {
     id: 'a4-48.5x16.9',
     name: 'F10 · 48,5 × 16,9 mm',
-    description: '4 kolone × 17 redova · 68 etiketa/list',
     labelWidthMm: 48.5,
     labelHeightMm: 16.9,
     columns: 4,
@@ -117,7 +111,6 @@ export const LABEL_FORMAT_PRESETS: LabelFormatPreset[] = [
   {
     id: 'a4-38x21.2',
     name: 'F01 · 38 × 21,2 mm',
-    description: '5 kolona × 14 redova · 70 etiketa/list',
     labelWidthMm: 38,
     labelHeightMm: 21.2,
     columns: 5,

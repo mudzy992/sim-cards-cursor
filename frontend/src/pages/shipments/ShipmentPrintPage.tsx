@@ -60,6 +60,7 @@ import { LabelSheetPreview } from './print/LabelSheetPreview';
 import { PrintSheets } from './print/PrintSheets';
 import { SimLabelContent } from './print/SimLabelContent';
 import './print/print-labels.css';
+import { useTranslation } from '@/i18n';
 
 /** sentinel: opseg "do kraja" */
 const RANGE_TO_END = -1;
@@ -72,6 +73,8 @@ const PAD_Y_MM = 1.6; // 0.8mm gore + 0.8mm dolje
 export default function ShipmentPrintPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
 
   /* ------------------------------ perzistentne postavke ------------------------------ */
   const [persisted, setPersisted] = useState<PersistedPrintSettings>(() => loadPersistedSettings());
@@ -129,8 +132,8 @@ export default function ShipmentPrintPage() {
   const shipment = shipmentQuery.data;
 
   const receivedDateText = useMemo(
-    () => (shipment?.receivedDate ? new Date(shipment.receivedDate).toLocaleDateString('bs-BA') : '—'),
-    [shipment?.receivedDate],
+    () => (shipment?.receivedDate ? new Date(shipment.receivedDate).toLocaleDateString(dateLocale) : '—'),
+    [shipment?.receivedDate, dateLocale],
   );
 
   /* ---------------------------------- izvedene vrijednosti ---------------------------- */
@@ -270,10 +273,10 @@ export default function ShipmentPrintPage() {
     return (
       <Result
         status="404"
-        title="Isporuka nije pronađena"
+        title={t('shipments.edit.notFound')}
         extra={
           <Button type="primary" onClick={() => navigate('/shipments')}>
-            Nazad na isporuke
+            {t('shipments.edit.backToShipments')}
           </Button>
         }
       />
@@ -285,23 +288,23 @@ export default function ShipmentPrintPage() {
       {/* zaglavlje */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
-          Nazad
+          {t('common.actions.back')}
         </Button>
         <div className="min-w-0">
           <Typography.Title level={3} className="!mb-0 truncate">
-            Print etiketa — {shipment?.name ?? '…'}
+            {t('shipments.printPage.headerTitle', { name: shipment?.name ?? '…' })}
           </Typography.Title>
           {shipment ? (
             <Space size={8} className="mt-1" wrap>
               <Tag color="geekblue">{shipment.provider}</Tag>
-              <Tag>{new Date(shipment.receivedDate).toLocaleDateString('bs-BA')}</Tag>
-              <Tag color="default">{totalCards.toLocaleString('bs-BA')} kartica</Tag>
-              {testSheetOnly ? <Tag color="orange">PROBNI LIST</Tag> : null}
+              <Tag>{new Date(shipment.receivedDate).toLocaleDateString(dateLocale)}</Tag>
+              <Tag color="default">{t('shipments.edit.cardsCount', { count: totalCards.toLocaleString(dateLocale) })}</Tag>
+              {testSheetOnly ? <Tag color="orange">{t('shipments.printPage.testSheetTag')}</Tag> : null}
             </Space>
           ) : null}
         </div>
         <div className="ms-auto">
-          <Tooltip title={!canPrint ? 'Nema kartica u obuhvatu ili geometrija ne staje na A4' : undefined}>
+          <Tooltip title={!canPrint ? t('shipments.printPage.cannotPrintTooltip') : undefined}>
             <Button
               type="primary"
               size="large"
@@ -309,7 +312,7 @@ export default function ShipmentPrintPage() {
               disabled={!canPrint}
               onClick={() => setPrintModalOpen(true)}
             >
-              Pripremi print
+              {t('shipments.printPage.preparePrint')}
             </Button>
           </Tooltip>
         </div>
@@ -319,7 +322,7 @@ export default function ShipmentPrintPage() {
         {/* ------------------------------- lijevi panel ------------------------------- */}
         <div className="print-settings-scroll space-y-4 self-start xl:sticky xl:top-4 xl:max-h-[calc(100vh-110px)] xl:overflow-y-auto xl:pe-1">
           {/* format */}
-          <Card size="small" title="1. Format etikete" className="shadow-sm">
+          <Card size="small" title={t('shipments.printPage.step1Title')} className="shadow-sm">
             <div className="grid grid-cols-2 gap-3">
               {LABEL_FORMAT_PRESETS.map((preset) => {
                 const active = preset.id === formatId;
@@ -345,9 +348,15 @@ export default function ShipmentPrintPage() {
                       }}
                     />
                     <span className="block text-sm font-semibold text-slate-800">{preset.name}</span>
-                    <span className="block text-xs text-slate-500">{preset.description}</span>
+                    <span className="block text-xs text-slate-500">
+                      {t('shipments.printPage.presetDescription', {
+                        columns: preset.columns,
+                        rows: preset.rows,
+                        count: preset.columns * preset.rows,
+                      })}
+                    </span>
                     <span className="mt-1 block text-xs font-medium text-blue-700">
-                      {per} etiketa / list
+                      {t('shipments.printPage.labelsPerSheet', { count: per })}
                     </span>
                   </button>
                 );
@@ -357,7 +366,7 @@ export default function ShipmentPrintPage() {
             {/* brzi razmaci — uvijek vidljivi */}
             <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
               <LabeledNumber
-                label="Razmak X — između kolona (mm)"
+                label={t('shipments.printPage.gapXLabel')}
                 value={layout.gapXMm}
                 step={0.1}
                 min={0}
@@ -365,7 +374,7 @@ export default function ShipmentPrintPage() {
                 onChange={(v) => updateLayout({ gapXMm: v })}
               />
               <LabeledNumber
-                label="Razmak Y — između redova (mm)"
+                label={t('shipments.printPage.gapYLabel')}
                 value={layout.gapYMm}
                 step={0.1}
                 min={0}
@@ -375,17 +384,17 @@ export default function ShipmentPrintPage() {
             </div>
             <div className={`mt-2 text-[11px] ${overflowed ? 'text-red-600' : 'text-slate-500'}`}>
               {overflowed
-                ? 'Pažnja: sa ovim razmacima mreža više ne staje na A4 — provjerite napredna podešavanja.'
-                : `Nakon razmaka: desna margina ${formatMm(rightMarginMm(layout))} mm · donja ${formatMm(bottomMarginMm(layout))} mm`}
+                ? t('shipments.printPage.gridOverflowWarning')
+                : t('shipments.printPage.marginsSummary', { right: formatMm(rightMarginMm(layout)), bottom: formatMm(bottomMarginMm(layout)) })}
             </div>
           </Card>
 
           {/* obuhvat + kopije */}
-          <Card size="small" title="2. Šta se printa" className="shadow-sm">
+          <Card size="small" title={t('shipments.printPage.step2Title')} className="shadow-sm">
             <div className="space-y-3">
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <div className="mb-1 text-xs text-slate-500">Kartice od (redni br.)</div>
+                  <div className="mb-1 text-xs text-slate-500">{t('shipments.printPage.cardsFromLabel')}</div>
                   <InputNumber
                     min={1}
                     max={Math.max(1, totalCards)}
@@ -396,25 +405,25 @@ export default function ShipmentPrintPage() {
                   />
                 </div>
                 <div className="flex-1">
-                  <div className="mb-1 text-xs text-slate-500">do</div>
+                  <div className="mb-1 text-xs text-slate-500">{t('shipments.printPage.toLabel')}</div>
                   <InputNumber
                     min={effectiveFrom}
                     max={Math.max(1, totalCards)}
                     value={rangeTo === RANGE_TO_END ? null : effectiveTo}
-                    placeholder={totalCards > 0 ? `Sve (${totalCards})` : '—'}
+                    placeholder={totalCards > 0 ? t('shipments.printPage.allCount', { count: totalCards }) : '—'}
                     onChange={(v) => setRangeTo(typeof v === 'number' ? v : RANGE_TO_END)}
                     className="w-full"
                     disabled={totalCards === 0}
                   />
                 </div>
                 <Button onClick={() => { setRangeFrom(1); setRangeTo(RANGE_TO_END); }} disabled={totalCards === 0}>
-                  Sve
+                  {t('common.labels.all')}
                 </Button>
               </div>
 
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <div className="mb-1 text-xs text-slate-500">Kopija po kartici</div>
+                  <div className="mb-1 text-xs text-slate-500">{t('shipments.printPage.copiesPerCardLabel')}</div>
                   <InputNumber
                     min={1}
                     max={10}
@@ -424,7 +433,7 @@ export default function ShipmentPrintPage() {
                   />
                 </div>
                 <div className="flex-1">
-                  <div className="mb-1 text-xs text-slate-500">Početna pozicija na 1. listu</div>
+                  <div className="mb-1 text-xs text-slate-500">{t('shipments.printPage.startPositionLabel')}</div>
                   <InputNumber
                     min={1}
                     max={perSheet}
@@ -441,8 +450,8 @@ export default function ShipmentPrintPage() {
                 icon={<InfoCircleOutlined />}
                 message={
                   <span className="text-xs">
-                    Dio etiketa na papiru već potrošen? <strong>Kliknite na prvu slobodnu etiketu</strong>{' '}
-                    na prikazu prvog lista — korisno i za nastavak printa nakon zastoja printera.
+                    {t('shipments.printPage.usedLabelHint1')} <strong>{t('shipments.printPage.usedLabelHint2')}</strong>{' '}
+                    {t('shipments.printPage.usedLabelHint3')}
                   </span>
                 }
               />
@@ -450,7 +459,7 @@ export default function ShipmentPrintPage() {
           </Card>
 
           {/* sadržaj etikete */}
-          <Card size="small" title="3. Sadržaj etikete" className="shadow-sm">
+          <Card size="small" title={t('shipments.printPage.step3Title')} className="shadow-sm">
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 <Checkbox checked disabled>
@@ -460,24 +469,24 @@ export default function ShipmentPrintPage() {
                   checked={persisted.showIp}
                   onChange={(e) => setPersisted((p) => ({ ...p, showIp: e.target.checked }))}
                 >
-                  Interna (epbih) IP
+                  {t('shipments.import.internalIpLabel')}
                 </Checkbox>
                 <Checkbox
                   checked={persisted.showPublicIp}
                   onChange={(e) => setPersisted((p) => ({ ...p, showPublicIp: e.target.checked }))}
                 >
-                  Javna IP
+                  {t('simCards.details.publicIp')}
                 </Checkbox>
                 <Checkbox
                   checked={persisted.showReceivedDate}
                   onChange={(e) => setPersisted((p) => ({ ...p, showReceivedDate: e.target.checked }))}
                 >
-                  Datum prijema
+                  {t('shipments.details.receivedDate')}
                 </Checkbox>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">Prikaz ICCID-a:</span>
+                <span className="text-xs text-slate-500">{t('shipments.printPage.iccidDisplayLabel')}</span>
                 <Segmented
                   size="small"
                   value={persisted.iccidGrouping}
@@ -485,15 +494,15 @@ export default function ShipmentPrintPage() {
                     setPersisted((p) => ({ ...p, iccidGrouping: v as PersistedPrintSettings['iccidGrouping'] }))
                   }
                   options={[
-                    { label: 'Bez razmaka', value: 'plain' },
-                    { label: 'Grupe od 4', value: 'group4' },
+                    { label: t('shipments.printPage.groupingPlain'), value: 'plain' },
+                    { label: t('shipments.printPage.groupingBy4'), value: 'group4' },
                   ]}
                 />
               </div>
 
               <div>
                 <div className="mb-1 flex justify-between text-xs text-slate-500">
-                  <span>Veličina fonta (uklapa se i u širinu i u visinu)</span>
+                  <span>{t('shipments.printPage.fontSizeLabel')}</span>
                   <span>{persisted.fontScale}%</span>
                 </div>
                 <Slider
@@ -506,7 +515,7 @@ export default function ShipmentPrintPage() {
 
               {/* živi primjer etikete */}
               <div className="rounded-md bg-slate-50 p-3">
-                <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-400">Pregled etikete</div>
+                <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-400">{t('shipments.printPage.labelPreview')}</div>
                 <div className="flex justify-center overflow-hidden">
                   <div
                     className="relative rounded-[3px] bg-white shadow ring-1 ring-slate-300"
@@ -541,46 +550,45 @@ export default function ShipmentPrintPage() {
               items={[
                 {
                   key: 'advanced',
-                  label: <span className="text-sm font-medium">Napredna podešavanja papira (kalibracija)</span>,
+                  label: <span className="text-sm font-medium">{t('shipments.printPage.advancedTitle')}</span>,
                   children: (
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">
-                        <LabeledNumber label="Širina etikete (mm)" value={layout.labelWidthMm} step={0.1} min={10} max={A4_WIDTH_MM} onChange={(v) => updateLayout({ labelWidthMm: v })} />
-                        <LabeledNumber label="Visina etikete (mm)" value={layout.labelHeightMm} step={0.1} min={5} max={80} onChange={(v) => updateLayout({ labelHeightMm: v })} />
-                        <LabeledNumber label="Kolona" value={layout.columns} step={1} min={1} max={12} precision={0} onChange={(v) => updateLayout({ columns: Math.round(v) })} />
-                        <LabeledNumber label="Redova" value={layout.rows} step={1} min={1} max={60} precision={0} onChange={(v) => updateLayout({ rows: Math.round(v) })} />
-                        <LabeledNumber label="Margina lijevo (mm)" value={layout.marginLeftMm} step={0.1} min={0} max={100} onChange={(v) => updateLayout({ marginLeftMm: v })} />
-                        <LabeledNumber label="Margina gore (mm)" value={layout.marginTopMm} step={0.1} min={0} max={200} onChange={(v) => updateLayout({ marginTopMm: v })} />
-                        <LabeledNumber label="Razmak X (mm)" value={layout.gapXMm} step={0.1} min={0} max={30} onChange={(v) => updateLayout({ gapXMm: v })} />
-                        <LabeledNumber label="Razmak Y (mm)" value={layout.gapYMm} step={0.1} min={0} max={30} onChange={(v) => updateLayout({ gapYMm: v })} />
+                        <LabeledNumber label={t('shipments.printPage.labelWidthMm')} value={layout.labelWidthMm} step={0.1} min={10} max={A4_WIDTH_MM} onChange={(v) => updateLayout({ labelWidthMm: v })} />
+                        <LabeledNumber label={t('shipments.printPage.labelHeightMm')} value={layout.labelHeightMm} step={0.1} min={5} max={80} onChange={(v) => updateLayout({ labelHeightMm: v })} />
+                        <LabeledNumber label={t('shipments.printPage.columnsLabel')} value={layout.columns} step={1} min={1} max={12} precision={0} onChange={(v) => updateLayout({ columns: Math.round(v) })} />
+                        <LabeledNumber label={t('shipments.printPage.rowsLabel')} value={layout.rows} step={1} min={1} max={60} precision={0} onChange={(v) => updateLayout({ rows: Math.round(v) })} />
+                        <LabeledNumber label={t('shipments.printPage.marginLeftMm')} value={layout.marginLeftMm} step={0.1} min={0} max={100} onChange={(v) => updateLayout({ marginLeftMm: v })} />
+                        <LabeledNumber label={t('shipments.printPage.marginTopMm')} value={layout.marginTopMm} step={0.1} min={0} max={200} onChange={(v) => updateLayout({ marginTopMm: v })} />
+                        <LabeledNumber label={t('shipments.printPage.gapXLabel')} value={layout.gapXMm} step={0.1} min={0} max={30} onChange={(v) => updateLayout({ gapXMm: v })} />
+                        <LabeledNumber label={t('shipments.printPage.gapYLabel')} value={layout.gapYMm} step={0.1} min={0} max={30} onChange={(v) => updateLayout({ gapYMm: v })} />
                       </div>
 
                       <div className={`rounded-md p-2 text-xs ${overflowed ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
                         {overflowed ? (
                           <>
-                            Geometrija <strong>ne staje na A4</strong>: desna margina {formatMm(rightMarginMm(layout))} mm,
-                            donja {formatMm(bottomMarginMm(layout))} mm. Smanjite dimenzije/margine ili ukloni kolone/redove.
+                            {t('shipments.printPage.overflowMessage1')} <strong>{t('shipments.printPage.overflowMessage2')}</strong>: {t('shipments.printPage.rightMarginLabel')} {formatMm(rightMarginMm(layout))} mm,
+                            {t('shipments.printPage.bottomMarginLabel')} {formatMm(bottomMarginMm(layout))} mm. {t('shipments.printPage.overflowMessage3')}
                           </>
                         ) : (
                           <>
-                            Desna margina: <strong>{formatMm(rightMarginMm(layout))} mm</strong> · Donja margina:{' '}
-                            <strong>{formatMm(bottomMarginMm(layout))} mm</strong> — geometrija staje na A4.
+                            {t('shipments.printPage.rightMarginLabel')} <strong>{formatMm(rightMarginMm(layout))} mm</strong> · {t('shipments.printPage.bottomMarginLabel')}{' '}
+                            <strong>{formatMm(bottomMarginMm(layout))} mm</strong> — {t('shipments.printPage.fitsA4')}
                           </>
                         )}
                       </div>
 
                       <Space wrap>
                         <Button size="small" icon={<CompressOutlined />} onClick={() => updateLayout(centeredLayout(layout))}>
-                          Centriraj na papir
+                          {t('shipments.printPage.centerOnPaper')}
                         </Button>
                         <Button size="small" icon={<ReloadOutlined />} onClick={resetLayout}>
-                          Vrati fabričke ({presetById(formatId).name})
+                          {t('shipments.printPage.restoreDefaults', { name: presetById(formatId).name })}
                         </Button>
                       </Space>
 
                       <div className="text-xs text-slate-500">
-                        Postavke geometrije se pamte lokalno, posebno za svaki format — jednom kalibriran papir ostaje
-                        kalibriran.
+                        {t('shipments.printPage.settingsPersistedHint')}
                       </div>
                     </div>
                   ),
@@ -590,23 +598,23 @@ export default function ShipmentPrintPage() {
           </Card>
 
           {/* priprema i print */}
-          <Card size="small" title="4. Printanje" className="shadow-sm">
+          <Card size="small" title={t('shipments.printPage.step4Title')} className="shadow-sm">
             <div className="space-y-3">
               <Checkbox
                 checked={persisted.showOutlines}
                 onChange={(e) => setPersisted((p) => ({ ...p, showOutlines: e.target.checked }))}
               >
-                Iscrtaj okvire etiketa (kalibracija — isključiti za finalni print)
+                {t('shipments.printPage.showOutlinesLabel')}
               </Checkbox>
               <Checkbox checked={testSheetOnly} onChange={(e) => setTestSheetOnly(e.target.checked)}>
-                Samo prvi list (probni print)
+                {t('shipments.printPage.testSheetOnlyLabel')}
               </Checkbox>
 
               <div className="grid grid-cols-2 gap-2">
-                <StatBox label="Kartica u obuhvatu" value={cardsInRange.length} />
-                <StatBox label="Etiketa za print" value={totalLabels} />
-                <StatBox label="Listova A4" value={printSheets.length} suffix={testSheetOnly ? `/ ${sheets.length}` : undefined} />
-                <StatBox label="Početak na etiketi" value={`#${startOffset + 1}`} />
+                <StatBox label={t('shipments.printPage.statCardsInRange')} value={cardsInRange.length} />
+                <StatBox label={t('shipments.printPage.statLabelsToPrint')} value={totalLabels} />
+                <StatBox label={t('shipments.printPage.statSheetsA4')} value={printSheets.length} suffix={testSheetOnly ? `/ ${sheets.length}` : undefined} />
+                <StatBox label={t('shipments.printPage.statStartAtLabel')} value={`#${startOffset + 1}`} />
               </div>
 
               <Button
@@ -617,7 +625,7 @@ export default function ShipmentPrintPage() {
                 disabled={!canPrint}
                 onClick={() => setPrintModalOpen(true)}
               >
-                {testSheetOnly ? 'Odštampaj probni list' : `Odštampaj ${printSheets.length} list(ov)a`}
+                {testSheetOnly ? t('shipments.printPage.printTestSheet') : t('shipments.printPage.printNSheets', { count: printSheets.length })}
               </Button>
             </div>
           </Card>
@@ -631,12 +639,12 @@ export default function ShipmentPrintPage() {
               value={zoomMode}
               onChange={(v) => setZoomMode(v as 'fit' | 'full')}
               options={[
-                { label: 'Uklopi u širinu', value: 'fit' },
+                { label: t('shipments.printPage.zoomFit'), value: 'fit' },
                 { label: '100%', value: 'full' },
               ]}
             />
             <Tag color="default" className="ms-auto">
-              {sheets.length} list(ov)a A4 · {totalLabels} etiketa · {perSheet}/list
+              {t('shipments.printPage.sheetsSummary', { sheets: sheets.length, labels: totalLabels, perSheet })}
             </Tag>
           </div>
 
@@ -650,10 +658,10 @@ export default function ShipmentPrintPage() {
               onClose={() => setStartOffset(0)}
               message={
                 <span className="text-sm">
-                  Print počinje od etikete <strong>#{startOffset + 1}</strong> na prvom listu
-                  ({startOffset} {startOffset === 1 ? 'označena' : 'označenih'} kao iskorištene).{' '}
+                  {t('shipments.printPage.printStartsFrom')} <strong>#{startOffset + 1}</strong> {t('shipments.printPage.onFirstSheet')}
+                  ({startOffset} {startOffset === 1 ? t('shipments.printPage.markedSingular') : t('shipments.printPage.markedPlural')}).{' '}
                   <Button size="small" type="link" className="!p-0" onClick={() => setStartOffset(0)}>
-                    Poništi — kreni od etikete #1
+                    {t('shipments.printPage.resetToLabel1')}
                   </Button>
                 </span>
               }
@@ -666,7 +674,7 @@ export default function ShipmentPrintPage() {
                 <Spin size="large" />
                 <div className="w-72">
                   <div className="mb-1 text-center text-sm text-slate-600">
-                    Učitavam kartice isporuke…{' '}
+                    {t('shipments.printPage.loadingCards')}{' '}
                     {loadProgress && loadProgress.total > 0
                       ? `${loadProgress.fetched}/${loadProgress.total}`
                       : ''}
@@ -688,8 +696,8 @@ export default function ShipmentPrintPage() {
               <Empty
                 description={
                   totalCards === 0
-                    ? 'Ova isporuka nema uvezenih SIM kartica — nema šta printati.'
-                    : 'Odabrani opseg ne sadrži nijednu karticu.'
+                    ? t('shipments.printPage.noCardsInShipment')
+                    : t('shipments.printPage.noCardsInRange')
                 }
               />
             </Card>
@@ -728,37 +736,36 @@ export default function ShipmentPrintPage() {
 
       {/* kontrolna lista prije printa */}
       <Modal
-        title="Kontrolna lista prije printanja"
+        title={t('shipments.printPage.checklistTitle')}
         open={printModalOpen}
-        okText="Otvori print dijalog"
-        cancelText="Odustani"
+        okText={t('shipments.printPage.openPrintDialog')}
+        cancelText={t('common.actions.cancel')}
         onOk={openPrintDialog}
         onCancel={() => setPrintModalOpen(false)}
       >
         <div className="space-y-2 text-sm">
           <p className="text-slate-600">
-            Etikete se printaju u stvarnoj veličini (mm). U dijalogu za print obavezno:
+            {t('shipments.printPage.checklistIntro')}
           </p>
           <ul className="list-disc space-y-1 ps-5">
             <li>
-              Margine: <strong>Bez (None)</strong> — margine su već ugrađene u geometriju papira
+              {t('shipments.printPage.checklistMargins')} <strong>{t('shipments.printPage.checklistMarginsValue')}</strong> — {t('shipments.printPage.checklistMarginsHint')}
             </li>
             <li>
-              Razmjer: <strong>100 %</strong> (isključiti „Prilagodi stranici“ / „Fit to page“)
+              {t('shipments.printPage.checklistScale')} <strong>100 %</strong> {t('shipments.printPage.checklistScaleHint')}
             </li>
             <li>
-              Orijentacija: <strong>Portret</strong>, papir A4
+              {t('shipments.printPage.checklistOrientation')} <strong>{t('shipments.printPage.checklistOrientationValue')}</strong>, {t('shipments.printPage.checklistOrientationPaper')}
             </li>
-            <li>Isključiti zaglavlja i podnožja (headers/footers)</li>
+            <li>{t('shipments.printPage.checklistHeaders')}</li>
             <li>
-              Prvi put: odštampati <strong>probni list na običnom papiru</strong>, preklopiti preko etiketnog papira
-              prema svjetlu i po potrebi kalibrirati margine/razmake.
+              {t('shipments.printPage.checklistFirstTime1')} <strong>{t('shipments.printPage.checklistFirstTime2')}</strong> {t('shipments.printPage.checklistFirstTime3')}
             </li>
           </ul>
           <Alert
             type="warning"
             showIcon
-            message="Provjerite da je u printer ubacen ispravan etiketni papir za odabrani format."
+            message={t('shipments.printPage.checklistPaperWarning')}
           />
         </div>
       </Modal>
@@ -773,7 +780,7 @@ function StatBox(props: { label: string; value: number | string; suffix?: string
     <div className="rounded-md bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
       <div className="text-[11px] uppercase tracking-wide text-slate-400">{props.label}</div>
       <div className="text-lg font-semibold text-slate-800">
-        {typeof props.value === 'number' ? props.value.toLocaleString('bs-BA') : props.value}
+        {typeof props.value === 'number' ? props.value.toLocaleString() : props.value}
         {props.suffix ? <span className="text-xs font-normal text-slate-400"> {props.suffix}</span> : null}
       </div>
     </div>

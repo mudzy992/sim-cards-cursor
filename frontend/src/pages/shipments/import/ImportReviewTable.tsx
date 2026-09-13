@@ -173,7 +173,7 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
               <Button
                 size="small"
                 icon={<DownloadOutlined />}
-                onClick={() => exportIssuesToCsv(errorRows, preview.fileName)}
+                onClick={() => exportIssuesToCsv(errorRows, preview.fileName, t, dateLocale)}
               >
                 {t('shipments.importReview.csvErrors')}
               </Button>
@@ -181,7 +181,7 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
                 size="small"
                 icon={<PrinterOutlined />}
                 onClick={() =>
-                  printIssuesReport(errorRows, { fileName: preview.fileName, shipmentName })
+                  printIssuesReport(errorRows, { fileName: preview.fileName, shipmentName }, t, dateLocale)
                 }
               >
                 {t('common.actions.print')}

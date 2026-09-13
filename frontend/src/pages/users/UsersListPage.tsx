@@ -25,20 +25,26 @@ import type { UserRole } from '@/types/auth.types';
 import { useTranslation } from '@/i18n';
 import { getUserRoleLabel, getUserStatusLabel } from '@/utils/labels.utils'
 
-const ROLE_OPTIONS: { label: string; value: UserRole }[] = [
-  { label: 'Sistemski administrator', value: 'SYSTEM_ADMIN' },
-  { label: 'Distribucijski admin', value: 'DIST_ADMIN' },
-  { label: 'Operator', value: 'USER' },
-];
+function getRoleOptions(t: (key: string) => string): { label: string; value: UserRole }[] {
+  return [
+    { label: t('labels.userRole.systemAdmin'), value: 'SYSTEM_ADMIN' },
+    { label: t('labels.userRole.distAdmin'), value: 'DIST_ADMIN' },
+    { label: t('labels.userRole.operator'), value: 'USER' },
+  ]
+}
 
-const STATUS_OPTIONS = [
-  { label: 'Aktivan', value: 'ACTIVE' },
-  { label: 'Neaktivan', value: 'INACTIVE' },
-  { label: 'Suspendovan', value: 'SUSPENDED' },
-];
+function getStatusOptions(t: (key: string) => string) {
+  return [
+    { label: t('labels.userStatus.active'), value: 'ACTIVE' },
+    { label: t('labels.userStatus.inactive'), value: 'INACTIVE' },
+    { label: t('labels.userStatus.suspended'), value: 'SUSPENDED' },
+  ]
+}
 
 export default function UsersListPage() {
   const { t } = useTranslation();
+  const ROLE_OPTIONS = getRoleOptions(t)
+  const STATUS_OPTIONS = getStatusOptions(t)
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState<string>('users');
@@ -85,13 +91,13 @@ export default function UsersListPage() {
   const createDistMutation = useMutation({
     mutationFn: (data: { name: string; code: string }) => distributionsApi.create(data),
     onSuccess: () => {
-      messageApi.success('Distribucija kreirana');
+      messageApi.success(t('users.distributions.created'));
       queryClient.invalidateQueries({ queryKey: ['distributions'] });
       setDistDrawerOpen(false);
       distForm.resetFields();
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? 'Greška');
+      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
     },
   });
 
@@ -99,25 +105,25 @@ export default function UsersListPage() {
     mutationFn: ({ id, data }: { id: string; data: Partial<{ name: string; code: string }> }) =>
       distributionsApi.update(id, data),
     onSuccess: () => {
-      messageApi.success('Distribucija ažurirana');
+      messageApi.success(t('users.distributions.updated'));
       queryClient.invalidateQueries({ queryKey: ['distributions'] });
       setDistDrawerOpen(false);
       setEditingDist(null);
       distForm.resetFields();
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? 'Greška');
+      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
     },
   });
 
   const deleteDistMutation = useMutation({
     mutationFn: (id: string) => distributionsApi.delete(id),
     onSuccess: () => {
-      messageApi.success('Distribucija obrisana');
+      messageApi.success(t('users.distributions.deleted'));
       queryClient.invalidateQueries({ queryKey: ['distributions'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? 'Greška');
+      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
     },
   });
 
@@ -125,13 +131,13 @@ export default function UsersListPage() {
     mutationFn: (data: { distributionId: string; name: string; code: string }) =>
       branchesApi.create(data),
     onSuccess: () => {
-      messageApi.success('Podružnica kreirana');
+      messageApi.success(t('users.branches.created'));
       queryClient.invalidateQueries({ queryKey: ['branches'] });
       setBranchDrawerOpen(false);
       branchForm.resetFields();
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? 'Greška');
+      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
     },
   });
 
@@ -139,39 +145,39 @@ export default function UsersListPage() {
     mutationFn: ({ id, data }: { id: string; data: Partial<{ name: string; code: string }> }) =>
       branchesApi.update(id, data),
     onSuccess: () => {
-      messageApi.success('Podružnica ažurirana');
+      messageApi.success(t('users.branches.updated'));
       queryClient.invalidateQueries({ queryKey: ['branches'] });
       setBranchDrawerOpen(false);
       setEditingBranch(null);
       branchForm.resetFields();
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? 'Greška');
+      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
     },
   });
 
   const deleteBranchMutation = useMutation({
     mutationFn: (id: string) => branchesApi.delete(id),
     onSuccess: () => {
-      messageApi.success('Podružnica obrisana');
+      messageApi.success(t('users.branches.deleted'));
       queryClient.invalidateQueries({ queryKey: ['branches'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? 'Greška');
+      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
     },
   });
 
   const createMutation = useMutation({
     mutationFn: (data: CreateUserInput) => usersApi.create(data),
     onSuccess: () => {
-      messageApi.success('Korisnik kreiran');
+      messageApi.success(t('users.userCreated'));
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setUserDrawerOpen(false);
       setEditing(null);
       form.resetFields();
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? 'Greška');
+      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
     },
   });
 
@@ -179,7 +185,7 @@ export default function UsersListPage() {
     mutationFn: ({ id, data }: { id: string; data: UpdateUserInput }) =>
       usersApi.update(id, data),
     onSuccess: async () => {
-      messageApi.success('Korisnik ažuriran');
+      messageApi.success(t('users.userUpdated'));
       queryClient.invalidateQueries({ queryKey: ['users'] });
       if (pendingModeratorSync?.userId) {
         const currentAssignments = branchModeratorAssignmentsQuery.data ?? []
@@ -196,7 +202,7 @@ export default function UsersListPage() {
         } catch (e) {
           messageApi.error(
             (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-              'Greška pri spremanju moderatora podružnica.',
+              t('users.moderatorSyncFailed'),
           )
         } finally {
           setPendingModeratorSync(null)
@@ -207,18 +213,18 @@ export default function UsersListPage() {
       form.resetFields();
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? 'Greška');
+      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => usersApi.delete(id),
     onSuccess: () => {
-      messageApi.success('Korisnik obrisan');
+      messageApi.success(t('users.userDeleted'));
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? 'Greška');
+      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
     },
   });
 
@@ -299,7 +305,7 @@ export default function UsersListPage() {
     form.validateFields().then((values) => {
       const { confirmPassword, ...rest } = values;
       if (!editing && rest.password && rest.password !== confirmPassword) {
-        messageApi.error('Lozinke se ne podudaraju');
+        messageApi.error(t('validation.passwordsMustMatch'));
         return;
       }
       const payload: CreateUserInput & UpdateUserInput = {
@@ -336,7 +342,7 @@ export default function UsersListPage() {
       key: 'users',
       label: (
         <span>
-          <UserOutlined /> Korisnici
+          <UserOutlined /> {t('layout.sidebar.users')}
         </span>
       ),
       children: (
@@ -346,11 +352,11 @@ export default function UsersListPage() {
             data-tour-id="users-header"
           >
             <Typography.Text type="secondary">
-              Upravljanje korisnicima, ulogama i statusima.
+              {t('users.manageIntro')}
             </Typography.Text>
             {canManage && (
               <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>
-                Novi korisnik
+                {t('users.newUser')}
               </Button>
             )}
           </div>
@@ -362,33 +368,33 @@ export default function UsersListPage() {
         scroll={{ x: 900 }}
         columns={[
           {
-            title: 'Ime i prezime',
+            title: t('users.columns.fullName'),
             render: (_, row) => `${row.firstName} ${row.lastName}`,
           },
-          { title: 'Email', dataIndex: 'email' },
+          { title: t('common.labels.email'), dataIndex: 'email' },
           {
-            title: 'Korisničko ime',
+            title: t('common.labels.username'),
             dataIndex: 'username',
             render: (v: string | null) => v ?? '-',
           },
           {
-            title: 'Role',
+            title: t('common.labels.role'),
             dataIndex: 'role',
             render: (r: UserRole) => <Tag>{getUserRoleLabel(r, t)}</Tag>,
           },
           {
-            title: 'Distribucija / Podružnica',
+            title: t('users.columns.distributionOrBranch'),
             render: (_, row) =>
               row.distributionId ? (
-                <Tag color="blue">Distribucija</Tag>
+                <Tag color="blue">{t('users.distributionTag')}</Tag>
               ) : row.branchId ? (
-                <Tag color="green">Podružnica</Tag>
+                <Tag color="green">{t('users.branchTag')}</Tag>
               ) : (
                 '-'
               ),
           },
           {
-            title: 'Status',
+            title: t('common.labels.status'),
             dataIndex: 'status',
             render: (s) => (
               <Tag color={s === 'ACTIVE' ? 'green' : s === 'SUSPENDED' ? 'red' : 'orange'}>
@@ -399,7 +405,7 @@ export default function UsersListPage() {
           ...(canEdit
             ? [
                 {
-                  title: 'Akcije',
+                  title: t('common.actions.actions'),
                   render: (_: unknown, row: UserListItem) => (
                     <div className="flex gap-2">
                       <Button
@@ -407,15 +413,15 @@ export default function UsersListPage() {
                         icon={<EditOutlined />}
                         onClick={() => handleOpenEdit(row)}
                       >
-                        Uredi
+                        {t('common.actions.edit')}
                       </Button>
                       {canManage && (
                         <Popconfirm
-                          title="Obrisati korisnika?"
+                          title={t('users.confirmDeleteUser')}
                           onConfirm={() => deleteMutation.mutate(row.id)}
                         >
                           <Button size="small" danger>
-                            Obriši
+                            {t('common.actions.delete')}
                           </Button>
                         </Popconfirm>
                       )}
@@ -436,7 +442,7 @@ export default function UsersListPage() {
             key: 'distributions',
             label: (
               <span>
-                <ApartmentOutlined /> Distribucije
+                <ApartmentOutlined /> {t('users.tabs.distributions')}
               </span>
             ),
             children: (
@@ -446,10 +452,10 @@ export default function UsersListPage() {
                   data-tour-id="users-distributions-header"
                 >
                   <Typography.Text type="secondary">
-                    Organizacijske jedinice – distribucije (npr. ED Zenica).
+                    {t('users.distributions.intro')}
                   </Typography.Text>
                   <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenDistCreate}>
-                    Nova distribucija
+                    {t('users.distributions.newDistribution')}
                   </Button>
                 </div>
                 <Table<Distribution>
@@ -458,21 +464,21 @@ export default function UsersListPage() {
                   dataSource={distributions}
                   pagination={false}
                   columns={[
-                    { title: 'Naziv', dataIndex: 'name' },
-                    { title: 'Kod', dataIndex: 'code' },
+                    { title: t('common.labels.name'), dataIndex: 'name' },
+                    { title: t('users.codeColumn'), dataIndex: 'code' },
                     {
-                      title: 'Akcije',
+                      title: t('common.actions.actions'),
                       render: (_: unknown, row: Distribution) => (
                         <div className="flex gap-2">
                           <Button size="small" onClick={() => handleOpenDistEdit(row)}>
-                            Uredi
+                            {t('common.actions.edit')}
                           </Button>
                           <Popconfirm
-                            title="Obrisati distribuciju?"
+                            title={t('users.distributions.confirmDelete')}
                             onConfirm={() => deleteDistMutation.mutate(row.id)}
                           >
                             <Button size="small" danger>
-                              Obriši
+                              {t('common.actions.delete')}
                             </Button>
                           </Popconfirm>
                         </div>
@@ -488,7 +494,7 @@ export default function UsersListPage() {
             key: 'branches',
             label: (
               <span>
-                <BankOutlined /> Podružnice
+                <BankOutlined /> {t('users.tabs.branches')}
               </span>
             ),
             children: (
@@ -498,10 +504,10 @@ export default function UsersListPage() {
                   data-tour-id="users-branches-header"
                 >
                   <Typography.Text type="secondary">
-                    Podružnice unutar distribucija (npr. Zenica, Travnik).
+                    {t('users.branches.intro')}
                   </Typography.Text>
                   <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenBranchCreate}>
-                    Nova podružnica
+                    {t('users.branches.newBranch')}
                   </Button>
                 </div>
                 <Table<Branch>
@@ -511,24 +517,24 @@ export default function UsersListPage() {
                   pagination={false}
                   columns={[
                     {
-                      title: 'Distribucija',
+                      title: t('common.labels.branch'),
                       render: (_: unknown, row: Branch) => row.distribution?.name ?? row.distributionId,
                     },
-                    { title: 'Naziv', dataIndex: 'name' },
-                    { title: 'Kod', dataIndex: 'code' },
+                    { title: t('common.labels.name'), dataIndex: 'name' },
+                    { title: t('users.codeColumn'), dataIndex: 'code' },
                     {
-                      title: 'Akcije',
+                      title: t('common.actions.actions'),
                       render: (_: unknown, row: Branch) => (
                         <div className="flex gap-2">
                           <Button size="small" onClick={() => handleOpenBranchEdit(row)}>
-                            Uredi
+                            {t('common.actions.edit')}
                           </Button>
                           <Popconfirm
-                            title="Obrisati podružnicu?"
+                            title={t('users.branches.confirmDelete')}
                             onConfirm={() => deleteBranchMutation.mutate(row.id)}
                           >
                             <Button size="small" danger>
-                              Obriši
+                              {t('common.actions.delete')}
                             </Button>
                           </Popconfirm>
                         </div>
@@ -553,12 +559,12 @@ export default function UsersListPage() {
       {messageContextHolder}
       <div className="flex justify-between items-center">
         <Typography.Title level={3} className="!mb-0">
-          Korisnici
+          {t('layout.sidebar.users')}
         </Typography.Title>
       </div>
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
       <Drawer
-        title={editing ? 'Uredi korisnika' : 'Novi korisnik'}
+        title={editing ? t('users.editUser') : t('users.newUser')}
         open={userDrawerOpen}
         width={520}
         onClose={() => {
@@ -577,14 +583,14 @@ export default function UsersListPage() {
                 form.resetFields()
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button
               type="primary"
               loading={createMutation.isPending || updateMutation.isPending}
               onClick={handleSubmit}
             >
-              {editing ? 'Snimi' : 'Kreiraj'}
+              {editing ? t('common.actions.save') : t('common.actions.create')}
             </Button>
           </div>
         }
@@ -601,7 +607,7 @@ export default function UsersListPage() {
         >
           <Form.Item
             name="email"
-            label="Email"
+            label={t('common.labels.email')}
             rules={[{ required: true }, { type: 'email' }]}
           >
             <Input placeholder="email@example.com" disabled={!!editing} />
@@ -610,14 +616,14 @@ export default function UsersListPage() {
             <>
               <Form.Item
                 name="password"
-                label="Lozinka"
+                label={t('users.form.passwordLabel')}
                 rules={[{ required: true }, { min: 8 }]}
               >
-                <Input.Password placeholder="Min. 8 znakova" />
+                <Input.Password placeholder={t('users.form.minChars', { min: 8 })} />
               </Form.Item>
               <Form.Item
                 name="confirmPassword"
-                label="Potvrdi lozinku"
+                label={t('users.form.confirmPasswordLabel')}
                 rules={[
                   { required: true },
                   ({ getFieldValue }) => ({
@@ -625,38 +631,38 @@ export default function UsersListPage() {
                       if (!value || getFieldValue('password') === value) {
                         return Promise.resolve();
                       }
-                      return Promise.reject(new Error('Lozinke se ne podudaraju'));
+                      return Promise.reject(new Error(t('validation.passwordsMustMatch')));
                     },
                   }),
                 ]}
               >
-                <Input.Password placeholder="Ponovi lozinku" />
+                <Input.Password placeholder={t('users.form.repeatPasswordPlaceholder')} />
               </Form.Item>
             </>
           )}
           {editing && (
-            <Form.Item name="password" label="Nova lozinka (ostavite prazno za bez promjene)">
-              <Input.Password placeholder="Opcionalno" />
+            <Form.Item name="password" label={t('users.form.newPasswordLabel')}>
+              <Input.Password placeholder={t('common.labels.optional')} />
             </Form.Item>
           )}
-          <Form.Item name="firstName" label="Ime" rules={[{ required: true }]}>
-            <Input placeholder="Ime" />
+          <Form.Item name="firstName" label={t('users.form.firstNameLabel')} rules={[{ required: true }]}>
+            <Input placeholder={t('users.form.firstNameLabel')} />
           </Form.Item>
-          <Form.Item name="lastName" label="Prezime" rules={[{ required: true }]}>
-            <Input placeholder="Prezime" />
+          <Form.Item name="lastName" label={t('users.form.lastNameLabel')} rules={[{ required: true }]}>
+            <Input placeholder={t('users.form.lastNameLabel')} />
           </Form.Item>
-          <Form.Item name="phone" label="Telefon">
+          <Form.Item name="phone" label={t('common.labels.phone')}>
             <Input placeholder="+38761111222" />
           </Form.Item>
-          <Form.Item name="role" label="Uloga" rules={[{ required: true }]}>
+          <Form.Item name="role" label={t('common.labels.role')} rules={[{ required: true }]}>
             <Select
-              placeholder="Odaberi ulogu"
+              placeholder={t('users.form.selectRolePlaceholder')}
               options={ROLE_OPTIONS}
               disabled={editing?.id === currentUser?.id}
             />
           </Form.Item>
-          <Form.Item name="status" label="Status">
-            <Select placeholder="Odaberi status" options={STATUS_OPTIONS} />
+          <Form.Item name="status" label={t('common.labels.status')}>
+            <Select placeholder={t('users.form.selectStatusPlaceholder')} options={STATUS_OPTIONS} />
           </Form.Item>
           <Form.Item
             noStyle
@@ -669,9 +675,9 @@ export default function UsersListPage() {
               return (
                 <>
                   {showDistribution && (
-                    <Form.Item name="distributionId" label="Distribucija">
+                    <Form.Item name="distributionId" label={t('shipments.wizard.distributionLabel')}>
                       <Select
-                        placeholder="Odaberi distribuciju (za distribucijskog admina)"
+                        placeholder={t('users.form.selectDistributionForAdmin')}
                         allowClear
                         options={distributions.map((d) => ({
                           label: `${d.name} (${d.code})`,
@@ -681,9 +687,9 @@ export default function UsersListPage() {
                     </Form.Item>
                   )}
                   {showBranch && (
-                    <Form.Item name="branchId" label="Podružnica">
+                    <Form.Item name="branchId" label={t('common.labels.branch')}>
                       <Select
-                        placeholder="Odaberi podružnicu (za operatora)"
+                        placeholder={t('users.form.selectBranchForOperator')}
                         allowClear
                         options={branches.map((b) => ({
                           label: `${b.name} (${b.code})${b.distribution ? ` – ${b.distribution.name}` : ''}`,
@@ -699,11 +705,11 @@ export default function UsersListPage() {
           {currentUserRole === 'SYSTEM_ADMIN' && editing?.id && (
             <>
               <Divider className="!my-3" />
-              <Form.Item label="Moderator podružnica (opciono)">
+              <Form.Item label={t('users.form.branchModeratorLabel')}>
                 <Select
                   mode="multiple"
                   allowClear
-                  placeholder="Odaberi jednu ili više podružnica"
+                  placeholder={t('users.form.selectOneOrMoreBranches')}
                   value={moderatorBranchIds}
                   onChange={(next) => setModeratorBranchIds(next)}
                   options={branches.map((b) => ({
@@ -716,14 +722,14 @@ export default function UsersListPage() {
                 />
               </Form.Item>
               <Typography.Text type="secondary" className="block -mt-2">
-                Korisnik ostaje USER/OPERATOR po roli, ali ima dodatnu moderatorsku ovlast za odabrane podružnice.
+                {t('users.form.moderatorHint')}
               </Typography.Text>
             </>
           )}
         </Form>
       </Drawer>
       <Drawer
-        title={editingDist ? 'Uredi distribuciju' : 'Nova distribucija'}
+        title={editingDist ? t('users.distributions.editTitle') : t('users.distributions.newDistribution')}
         open={distDrawerOpen}
         width={520}
         onClose={() => {
@@ -741,29 +747,29 @@ export default function UsersListPage() {
                 distForm.resetFields()
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button
               type="primary"
               loading={createDistMutation.isPending || updateDistMutation.isPending}
               onClick={handleDistSubmit}
             >
-              {editingDist ? 'Snimi' : 'Kreiraj'}
+              {editingDist ? t('common.actions.save') : t('common.actions.create')}
             </Button>
           </div>
         }
       >
         <Form form={distForm} layout="vertical">
-          <Form.Item name="name" label="Naziv" rules={[{ required: true }]}>
+          <Form.Item name="name" label={t('common.labels.name')} rules={[{ required: true }]}>
             <Input placeholder="npr. ED Zenica" />
           </Form.Item>
-          <Form.Item name="code" label="Kod" rules={[{ required: true }]}>
+          <Form.Item name="code" label={t('users.codeColumn')} rules={[{ required: true }]}>
             <Input placeholder="npr. EDZ" disabled={!!editingDist} />
           </Form.Item>
         </Form>
       </Drawer>
       <Drawer
-        title={editingBranch ? 'Uredi podružnicu' : 'Nova podružnica'}
+        title={editingBranch ? t('users.branches.editTitle') : t('users.branches.newBranch')}
         open={branchDrawerOpen}
         width={520}
         onClose={() => {
@@ -781,14 +787,14 @@ export default function UsersListPage() {
                 branchForm.resetFields()
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button
               type="primary"
               loading={createBranchMutation.isPending || updateBranchMutation.isPending}
               onClick={handleBranchSubmit}
             >
-              {editingBranch ? 'Snimi' : 'Kreiraj'}
+              {editingBranch ? t('common.actions.save') : t('common.actions.create')}
             </Button>
           </div>
         }
@@ -796,19 +802,19 @@ export default function UsersListPage() {
         <Form form={branchForm} layout="vertical">
           <Form.Item
             name="distributionId"
-            label="Distribucija"
+            label={t('shipments.wizard.distributionLabel')}
             rules={[{ required: true }]}
           >
             <Select
-              placeholder="Odaberi distribuciju"
+              placeholder={t('shipments.wizard.selectDistributionPlaceholder')}
               options={distributions.map((d) => ({ label: `${d.name} (${d.code})`, value: d.id }))}
               disabled={!!editingBranch}
             />
           </Form.Item>
-          <Form.Item name="name" label="Naziv" rules={[{ required: true }]}>
+          <Form.Item name="name" label={t('common.labels.name')} rules={[{ required: true }]}>
             <Input placeholder="npr. Zenica" />
           </Form.Item>
-          <Form.Item name="code" label="Kod" rules={[{ required: true }]}>
+          <Form.Item name="code" label={t('users.codeColumn')} rules={[{ required: true }]}>
             <Input placeholder="npr. ZEN" disabled={!!editingBranch} />
           </Form.Item>
         </Form>

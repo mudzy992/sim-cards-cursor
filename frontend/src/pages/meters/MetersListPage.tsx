@@ -52,10 +52,12 @@ import {
   getRemovedSimDispositionLabel,
 } from '@/utils/labels.utils'
 
-const meterTypeOptions: { label: string; value: MeterType }[] = [
-  { label: 'Jednofazno', value: 'SINGLE_PHASE' },
-  { label: 'Trofazno', value: 'THREE_PHASE' },
-];
+function getMeterTypeOptions(t: (key: string) => string): { label: string; value: MeterType }[] {
+  return [
+    { label: t('meterTypes.phaseSingle'), value: 'SINGLE_PHASE' },
+    { label: t('meterTypes.phaseThree'), value: 'THREE_PHASE' },
+  ]
+}
 
 type MeterFormValues = {
   serialNumber: string;
@@ -76,7 +78,9 @@ type MeterFormValues = {
 const defaultPagination = { page: 1, limit: 20 };
 
 export default function MetersListPage() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
+  const meterTypeOptions = getMeterTypeOptions(t)
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -149,7 +153,7 @@ export default function MetersListPage() {
     queryFn: () => meterTypeDefinitionsApi.list({ page: 1, limit: 100 }),
   });
   const meterTypeDefinitionOptions =
-    meterTypesQuery.data?.map((t) => ({ label: t.name, value: t.id })) ?? [];
+    meterTypesQuery.data?.map((mtd) => ({ label: mtd.name, value: mtd.id })) ?? [];
 
   const operatorsQuery = useQuery({
     queryKey: ['users', 'operators'],
@@ -168,7 +172,7 @@ export default function MetersListPage() {
       requestedMeterDemountCategory?: MeterDemountCategory
     }) => demountTasksApi.create(payload),
     onSuccess: () => {
-      messageApi.success('Zadatak demontaže je kreiran.');
+      messageApi.success(t('meters.demount.taskCreated'));
       setDemountDrawerOpen(false);
       setDemountMeter(null);
       setDemountOperatorId('');
@@ -181,7 +185,7 @@ export default function MetersListPage() {
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Kreiranje zadatka nije uspjelo.',
+          t('meters.taskCreateFailed'),
       );
     },
   });
@@ -190,7 +194,7 @@ export default function MetersListPage() {
     mutationFn: (payload: { meterId: string; assignedToId: string; notes?: string }) =>
       installTasksApi.create(payload),
     onSuccess: () => {
-      messageApi.success('Zadatak ugradnje SIM-a je kreiran.');
+      messageApi.success(t('meters.install.taskCreated'));
       setInstallDrawerOpen(false);
       setInstallMeter(null);
       setInstallOperatorId('');
@@ -199,7 +203,7 @@ export default function MetersListPage() {
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Kreiranje zadatka nije uspjelo.',
+          t('meters.taskCreateFailed'),
       );
     },
   });
@@ -218,7 +222,7 @@ export default function MetersListPage() {
   const createMeterMutation = useMutation({
     mutationFn: (payload: CreateMeterInput) => metersApi.create(payload),
     onSuccess: () => {
-      messageApi.success('Brojilo je kreirano.');
+      messageApi.success(t('meters.created'));
       setMeterDrawerOpen(false);
       setEditingMeter(null);
       meterForm.resetFields();
@@ -229,7 +233,7 @@ export default function MetersListPage() {
         typeof (err as { response?: { data?: { message?: string } } })?.response?.data?.message ===
         'string'
           ? (err as { response: { data: { message: string } } }).response.data.message
-          : 'Kreiranje brojila nije uspjelo.';
+          : t('meters.createFailed');
       messageApi.error(msg);
     },
   });
@@ -238,7 +242,7 @@ export default function MetersListPage() {
     mutationFn: ({ id, payload }: { id: string; payload: UpdateMeterInput }) =>
       metersApi.update(id, payload),
     onSuccess: () => {
-      messageApi.success('Brojilo je ažurirano.');
+      messageApi.success(t('meters.updated'));
       setMeterDrawerOpen(false);
       setEditingMeter(null);
       meterForm.resetFields();
@@ -250,7 +254,7 @@ export default function MetersListPage() {
         typeof (err as { response?: { data?: { message?: string } } })?.response?.data?.message ===
         'string'
           ? (err as { response: { data: { message: string } } }).response.data.message
-          : 'Ažuriranje brojila nije uspjelo.';
+          : t('meters.updateFailed');
       messageApi.error(msg);
     },
   });
@@ -258,13 +262,13 @@ export default function MetersListPage() {
   const deleteTypeMutation = useMutation({
     mutationFn: (id: string) => meterTypeDefinitionsApi.remove(id),
     onSuccess: () => {
-      messageApi.success('Tip brojila je obrisan.');
+      messageApi.success(t('meters.typeDeleted'));
       void queryClient.invalidateQueries({ queryKey: ['meter-type-definitions'] });
     },
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Brisanje tipa nije uspjelo.',
+          t('meters.typeDeleteFailed'),
       );
     },
   });
@@ -347,11 +351,11 @@ export default function MetersListPage() {
   const formatDynamicFieldValue = (field: MeterTypeFieldItem, raw: unknown) => {
     if (raw === undefined || raw === null || raw === '') return null
     if (field.fieldType === 'BOOLEAN') {
-      return raw === true || raw === 'true' ? 'Da' : 'Ne'
+      return raw === true || raw === 'true' ? t('common.actions.yes') : t('common.actions.no')
     }
     if (field.fieldType === 'DATE') {
       const d = new Date(String(raw))
-      return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString('bs-BA')
+      return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString(dateLocale)
     }
     return String(raw)
   }
@@ -359,8 +363,8 @@ export default function MetersListPage() {
   const meterRows = listQuery.data?.items ?? [];
   const typeRows = typesListQuery.data ?? [];
   const recordsForMeter = recordsByMeterQuery.data?.items ?? [];
-  const renderType = (t: MeterType) =>
-    t === 'SINGLE_PHASE' ? 'Jednofazno' : t === 'THREE_PHASE' ? 'Trofazno' : t;
+  const renderType = (mt: MeterType) =>
+    mt === 'SINGLE_PHASE' ? t('meterTypes.phaseSingle') : mt === 'THREE_PHASE' ? t('meterTypes.phaseThree') : mt;
 
   const canCreateInstallTaskForMeter = (m: MeterItem | null) => {
     if (!m) return false
@@ -380,11 +384,10 @@ export default function MetersListPage() {
     >
       {messageContextHolder}
       <Typography.Title level={3} className="!mb-0">
-        Brojila
+        {t('layout.sidebar.meters')}
       </Typography.Title>
       <Typography.Paragraph type="secondary" className="!mb-4">
-        Pregled svih brojila (po serijskim brojevima), upravljanje tipovima brojila te dodavanje i
-        izmjena. Jedan tip – više brojila; jedno brojilo – jedna SIM (trenutna), više zapisnika.
+        {t('meters.pageIntro')}
       </Typography.Paragraph>
 
       <Tabs
@@ -395,7 +398,7 @@ export default function MetersListPage() {
             key: 'meters',
             label: (
               <span>
-                <ThunderboltOutlined /> Brojila
+                <ThunderboltOutlined /> {t('layout.sidebar.meters')}
               </span>
             ),
             children: (
@@ -407,7 +410,7 @@ export default function MetersListPage() {
                   >
                     <Select
                       allowClear
-                      placeholder="Filter po tipu brojila"
+                      placeholder={t('meters.filterByType')}
                       options={meterTypeDefinitionOptions}
                       value={filterTypeId}
                       onChange={setFilterTypeId}
@@ -415,7 +418,7 @@ export default function MetersListPage() {
                     />
                     <Select
                       allowClear
-                      placeholder="SIM na brojilu"
+                      placeholder={t('meters.simOnMeterFilter')}
                       style={{ minWidth: 180 }}
                       value={filterSimCardState}
                       onChange={(v) => {
@@ -423,12 +426,12 @@ export default function MetersListPage() {
                         setPagination((p) => ({ ...p, page: 1 }));
                       }}
                       options={[
-                        { label: 'Bez SIM', value: 'NO_SIM' },
-                        { label: 'SIM ugrađena', value: 'INSTALLED' },
+                        { label: t('meters.noSimOption'), value: 'NO_SIM' },
+                        { label: t('meters.simInstalledOption'), value: 'INSTALLED' },
                       ]}
                     />
                     <Input
-                      placeholder="Serijski broj"
+                      placeholder={t('installationRecords.form.meterSerialLabel')}
                       value={serialSearchInput}
                       onChange={(e) => setSerialSearchInput(e.target.value)}
                       onPressEnter={() => {
@@ -443,7 +446,7 @@ export default function MetersListPage() {
                         setPagination((p) => ({ ...p, page: 1 }));
                       }}
                     >
-                      Pretraži
+                      {t('common.actions.search')}
                     </Button>
                     {(serialNumberFilter || filterTypeId || filterSimCardState) && (
                       <Button
@@ -455,7 +458,7 @@ export default function MetersListPage() {
                           setPagination(defaultPagination);
                         }}
                       >
-                        Reset
+                        {t('common.actions.reset')}
                       </Button>
                     )}
                   </Space>
@@ -465,13 +468,13 @@ export default function MetersListPage() {
                     onClick={openMeterCreate}
                     data-tour-id="meters-new-record"
                   >
-                    Novi zapisnik
+                    {t('meters.newRecord')}
                   </Button>
                 </div>
                 {listQuery.isError && (
                   <Typography.Text type="danger">
                     {(listQuery.error as { response?: { data?: { message?: string } } })?.response
-                      ?.data?.message ?? 'Učitavanje liste nije uspjelo.'}
+                      ?.data?.message ?? t('meters.loadListFailed')}
                   </Typography.Text>
                 )}
                 <div className="-mx-4 overflow-x-auto px-4">
@@ -484,7 +487,7 @@ export default function MetersListPage() {
                       pageSize: listQuery.data?.limit,
                       total: listQuery.data?.total,
                       showSizeChanger: true,
-                      showTotal: (total) => `Ukupno: ${total}`,
+                      showTotal: (total) => t('common.pagination.totalItems', { count: total }),
                       onChange: (page, pageSize) =>
                         setPagination((p) => ({ ...p, page, limit: pageSize ?? 20 })),
                     }}
@@ -495,42 +498,42 @@ export default function MetersListPage() {
                     })}
                     columns={[
                       {
-                        title: 'Serijski broj',
+                        title: t('installationRecords.form.meterSerialLabel'),
                         dataIndex: 'serialNumber',
                         key: 'serialNumber',
                       },
                       {
-                        title: 'Tip brojila',
+                        title: t('installationRecords.form.meterTypeLabel'),
                         key: 'meterTypeDefinition',
                         render: (_: unknown, row: MeterItem) =>
                           row.meterTypeDefinition?.name ?? '–',
                       },
                       {
-                        title: 'Proizvođač',
+                        title: t('meterTypes.manufacturer'),
                         key: 'manufacturer',
                         render: (_: unknown, row: MeterItem) =>
                           row.meterTypeDefinition?.manufacturer ?? '–',
                       },
                       {
-                        title: 'Model',
+                        title: t('meterTypes.model'),
                         key: 'model',
                         render: (_: unknown, row: MeterItem) =>
                           row.meterTypeDefinition?.model ?? '–',
                       },
                       {
-                        title: 'God. proizv.',
+                        title: t('meters.columns.yearShort'),
                         dataIndex: 'year',
                         key: 'year',
                         render: (val: number | null) => (val != null ? String(val) : '–'),
                       },
                       {
-                        title: 'God. baždarenja',
+                        title: t('meters.columns.calibrationYearShort'),
                         dataIndex: 'calibrationYear',
                         key: 'calibrationYear',
                         render: (val: number | null) => (val != null ? String(val) : '–'),
                       },
                       {
-                        title: 'Status brojila',
+                        title: t('meters.columns.meterStatus'),
                         key: 'meterStatus',
                         width: 160,
                         render: (_: unknown, row: MeterItem) => {
@@ -554,31 +557,31 @@ export default function MetersListPage() {
                           const noSim = row.simCardState === 'NO_SIM' || !row.simCard;
                           return (
                             <Tag color={noSim ? 'warning' : 'success'}>
-                              {noSim ? 'Bez SIM' : 'SIM ugrađena'}
+                              {noSim ? t('meters.noSimOption') : t('meters.simInstalledOption')}
                             </Tag>
                           );
                         },
                       },
                       {
-                        title: 'Demontaža',
+                        title: t('meters.columns.demount'),
                         key: 'demountTask',
                         width: 220,
                         render: (_: unknown, row: MeterItem) => {
-                          const t = row.demountTasks?.[0]
-                          if (!t) return '—'
-                          const date = new Date(t.createdAt).toLocaleString('bs-BA')
-                          const op = t.assignedTo
-                            ? `${t.assignedTo.firstName} ${t.assignedTo.lastName}`
+                          const task = row.demountTasks?.[0]
+                          if (!task) return '—'
+                          const date = new Date(task.createdAt).toLocaleString(dateLocale)
+                          const op = task.assignedTo
+                            ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
                             : '—'
                           return (
                             <Tag color="gold">
-                              Nalog: {date} • {op}
+                              {t('meters.columns.orderLabel')} {date} • {op}
                             </Tag>
                           )
                         },
                       },
                       {
-                        title: 'Akcije',
+                        title: t('common.actions.actions'),
                         key: 'actions',
                         width: 120,
                         render: (_, record) => (
@@ -588,7 +591,7 @@ export default function MetersListPage() {
                               size="small"
                               onClick={() => navigate(`/meters/${record.id}`)}
                             >
-                              Detalji
+                              {t('common.actions.details')}
                             </Button>
                           </Space>
                         ),
@@ -604,14 +607,14 @@ export default function MetersListPage() {
             key: 'types',
             label: (
               <span>
-                <AppstoreOutlined /> Tipovi brojila
+                <AppstoreOutlined /> {t('layout.sidebar.meterTypes')}
               </span>
             ),
             children: (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <Typography.Text type="secondary">
-                    Katalog tipova brojila (npr. ME84, AMM 3.0). Jedan tip može imati više brojila.
+                    {t('meters.typesCatalogIntro')}
                   </Typography.Text>
                   {userRole === 'SYSTEM_ADMIN' && (
                     <Button
@@ -620,7 +623,7 @@ export default function MetersListPage() {
                       onClick={openTypeCreate}
                       data-tour-id="meters-new-type"
                     >
-                      Novi tip brojila
+                      {t('meterTypes.newTitle')}
                     </Button>
                   )}
                 </div>
@@ -632,33 +635,33 @@ export default function MetersListPage() {
                     pagination={false}
                     scroll={{ x: 'max-content' }}
                     columns={[
-                      { title: 'Naziv', dataIndex: 'name', key: 'name' },
+                      { title: t('common.labels.name'), dataIndex: 'name', key: 'name' },
                       {
-                        title: 'Proizvođač',
+                        title: t('meterTypes.manufacturer'),
                         dataIndex: 'manufacturer',
                         key: 'manufacturer',
                         render: (v: string | null) => v ?? '–',
                       },
                       {
-                        title: 'Model',
+                        title: t('meterTypes.model'),
                         dataIndex: 'model',
                         key: 'model',
                         render: (v: string | null) => v ?? '–',
                       },
                       {
-                        title: 'Tip',
+                        title: t('common.labels.type'),
                         dataIndex: 'type',
                         key: 'type',
-                        render: (t: MeterType) => renderType(t),
+                        render: (mt: MeterType) => renderType(mt),
                       },
                       {
-                        title: 'Max struja',
+                        title: t('meters.columns.maxCurrent'),
                         dataIndex: 'maxCurrent',
                         key: 'maxCurrent',
                         render: (v: string | null) => v ?? '–',
                       },
                       {
-                        title: 'Akcije',
+                        title: t('common.actions.actions'),
                         key: 'actions',
                         width: 160,
                         render: (_, record) => (
@@ -666,13 +669,13 @@ export default function MetersListPage() {
                             {userRole === 'SYSTEM_ADMIN' ? (
                               <>
                                 <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
-                                  Uredi
+                                  {t('common.actions.edit')}
                                 </Button>
                                 <Popconfirm
-                                  title="Obrisati tip brojila?"
+                                  title={t('meters.confirmDeleteType')}
                                   onConfirm={() => deleteTypeMutation.mutate(record.id)}
-                                  okText="Da"
-                                  cancelText="Ne"
+                                  okText={t('common.actions.yes')}
+                                  cancelText={t('common.actions.no')}
                                   okButtonProps={{ danger: true }}
                                 >
                                   <Button
@@ -681,13 +684,13 @@ export default function MetersListPage() {
                                     danger
                                     disabled={deleteTypeMutation.isPending}
                                   >
-                                    Obriši
+                                    {t('common.actions.delete')}
                                   </Button>
                                 </Popconfirm>
                               </>
                             ) : (
                               <Button type="link" size="small" onClick={() => openTypeEdit(record)}>
-                                Detalji
+                                {t('common.actions.details')}
                               </Button>
                             )}
                           </Space>
@@ -704,7 +707,7 @@ export default function MetersListPage() {
       />
 
       <Drawer
-        title={`Brojilo: ${detailMeter?.serialNumber ?? ''}`}
+        title={t('meters.meterDrawerTitle', { serial: detailMeter?.serialNumber ?? '' })}
         placement="right"
         width={480}
         open={Boolean(detailMeter)}
@@ -716,67 +719,67 @@ export default function MetersListPage() {
         {detailMeter && (
           <>
             <Descriptions column={1} size="small" bordered className="mb-4">
-              <Descriptions.Item label="Serijski broj">{detailMeter.serialNumber}</Descriptions.Item>
-              <Descriptions.Item label="Tip brojila">
+              <Descriptions.Item label={t('installationRecords.form.meterSerialLabel')}>{detailMeter.serialNumber}</Descriptions.Item>
+              <Descriptions.Item label={t('installationRecords.form.meterTypeLabel')}>
                 {detailMeter.meterTypeDefinition?.name ?? '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Proizvođač">
+              <Descriptions.Item label={t('meterTypes.manufacturer')}>
                 {detailMeter.meterTypeDefinition?.manufacturer ?? '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Model">
+              <Descriptions.Item label={t('meterTypes.model')}>
                 {detailMeter.meterTypeDefinition?.model ?? '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Jednofazno / Trofazno">
+              <Descriptions.Item label={t('meterTypes.phaseColumn')}>
                 {detailMeter.meterTypeDefinition?.type
                   ? renderType(detailMeter.meterTypeDefinition.type)
                   : '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Maks. struja (A)">
+              <Descriptions.Item label={t('meterTypes.maxCurrent')}>
                 {detailMeter.meterTypeDefinition?.maxCurrent ?? '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Godina proizvodnje">
+              <Descriptions.Item label={t('installationRecords.form.yearLabel')}>
                 {detailMeter.year != null ? String(detailMeter.year) : '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Godina baždarenja">
+              <Descriptions.Item label={t('installationRecords.form.calibrationYearLabel')}>
                 {detailMeter.calibrationYear != null ? String(detailMeter.calibrationYear) : '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Lokacija instalacije">
+              <Descriptions.Item label={t('installationRecords.detail.installationLocationLabel')}>
                 {(detailMeter as MeterItem & { installationAddress?: string }).installationAddress ?? '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Datum instalacije">
+              <Descriptions.Item label={t('installationRecords.list.columns.installationDate')}>
                 {(detailMeter as MeterItem & { installationDate?: string })?.installationDate?.slice(0, 10) ?? '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Mjerno mjesto">
+              <Descriptions.Item label={t('installationRecords.form.measuringPointLabel')}>
                 {(detailMeter as MeterItem & { measuringPoint?: string }).measuringPoint ?? '–'}
               </Descriptions.Item>
               {((detailMeter as MeterItem).latitude != null || (detailMeter as MeterItem).longitude != null) && (
                 <>
-                  <Descriptions.Item label="GPS širina">
+                  <Descriptions.Item label={t('installationRecords.form.gpsLatLabel')}>
                     {(detailMeter as MeterItem).latitude != null
                       ? String((detailMeter as MeterItem).latitude)
                       : '–'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="GPS dužina">
+                  <Descriptions.Item label={t('installationRecords.form.gpsLngLabel')}>
                     {(detailMeter as MeterItem).longitude != null
                       ? String((detailMeter as MeterItem).longitude)
                       : '–'}
                   </Descriptions.Item>
                 </>
               )}
-              <Descriptions.Item label="Napomena">
+              <Descriptions.Item label={t('common.labels.notes')}>
                 {detailMeter.notes ?? '–'}
               </Descriptions.Item>
-              <Descriptions.Item label="Status SIM-a">
+              <Descriptions.Item label={t('installationRecords.detail.simStatusLabel')}>
                 {detailMeter.simCardState === 'NO_SIM' || !detailMeter.simCard
-                  ? `Bez kartice${detailMeter.noSimReason ? ` (${detailMeter.noSimReason})` : ''}`
-                  : 'Ugrađena'}
+                  ? `${t('installationRecords.detail.simNone')}${detailMeter.noSimReason ? ` (${detailMeter.noSimReason})` : ''}`
+                  : t('meters.simInstalledShort')}
               </Descriptions.Item>
               {(detailMeter as MeterItem & { simCard?: { id: string; iccid: string; ipAddress?: string } }).simCard && (
                 <>
-                  <Descriptions.Item label="IP adresa">
+                  <Descriptions.Item label={t('simCards.details.ipAddress')}>
                     {(detailMeter as MeterItem & { simCard?: { ipAddress?: string } }).simCard?.ipAddress ?? '–'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="SIM kartica (ugradjena)">
+                  <Descriptions.Item label={t('meters.installedSimCardLabel')}>
                     <Link
                       to={`/sim-cards/${(detailMeter as MeterItem & { simCard?: { id: string } }).simCard?.id}`}
                     >
@@ -814,7 +817,7 @@ export default function MetersListPage() {
       </Drawer>
 
       <Drawer
-        title={editingMeter ? 'Uredi brojilo' : 'Novi zapisnik'}
+        title={editingMeter ? t('meters.editMeter') : t('meters.newRecord')}
         open={meterDrawerOpen}
         width={560}
         onClose={() => {
@@ -833,14 +836,14 @@ export default function MetersListPage() {
                   meterForm.resetFields()
                 }}
               >
-                Odustani
+                {t('common.actions.cancel')}
               </Button>
               <Button
                 type="primary"
                 loading={updateMeterMutation.isPending}
                 onClick={() => meterForm.submit()}
               >
-                Snimi
+                {t('common.actions.save')}
               </Button>
             </div>
           ) : null
@@ -855,58 +858,58 @@ export default function MetersListPage() {
           >
             <Form.Item
               name="serialNumber"
-              label="Serijski broj"
-              rules={[{ required: true, message: 'Unesite serijski broj.' }]}
+              label={t('installationRecords.form.meterSerialLabel')}
+              rules={[{ required: true, message: t('installationRecords.form.serialNumberRequired') }]}
             >
               <Input placeholder="npr. AMM-12345" />
             </Form.Item>
             <Form.Item
               name="meterTypeDefinitionId"
-              label="Tip brojila (katalog) *"
-              rules={[{ required: true, message: 'Odaberite tip brojila.' }]}
+              label={t('meters.meterTypeCatalogLabel')}
+              rules={[{ required: true, message: t('installationRecords.form.meterTypeRequired') }]}
             >
               <Select
-                placeholder="Odaberi tip iz kataloga"
+                placeholder={t('meters.selectFromCatalogPlaceholder')}
                 options={meterTypeDefinitionOptions}
                 loading={meterTypesQuery.isLoading}
               />
             </Form.Item>
             <Form.Item
               name="year"
-              label="Godina proizvodnje"
-              rules={[{ required: true, message: 'Obavezno.' }]}
+              label={t('installationRecords.form.yearLabel')}
+              rules={[{ required: true, message: t('installationRecords.form.requiredShort') }]}
             >
               <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item
               name="calibrationYear"
-              label="Godina baždarenja"
-              rules={[{ required: true, message: 'Obavezno.' }]}
+              label={t('installationRecords.form.calibrationYearLabel')}
+              rules={[{ required: true, message: t('installationRecords.form.requiredShort') }]}
             >
               <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="installationAddress" label="Lokacija instalacije">
-              <Input.TextArea rows={2} placeholder="Adresa ugradnje" />
+            <Form.Item name="installationAddress" label={t('installationRecords.detail.installationLocationLabel')}>
+              <Input.TextArea rows={2} placeholder={t('installationRecords.form.addressPlaceholder')} />
             </Form.Item>
-            <Form.Item name="installationDate" label="Datum instalacije">
+            <Form.Item name="installationDate" label={t('installationRecords.list.columns.installationDate')}>
               <Input type="date" placeholder="YYYY-MM-DD" />
             </Form.Item>
-            <Form.Item name="city" label="Grad / Mjesto">
-              <Input placeholder="Opcionalno" />
+            <Form.Item name="city" label={t('meters.cityPlaceLabel')}>
+              <Input placeholder={t('common.labels.optional')} />
             </Form.Item>
-            <Form.Item name="municipality" label="Općina">
-              <Input placeholder="Opcionalno" />
+            <Form.Item name="municipality" label={t('installationRecords.form.municipalityLabel')}>
+              <Input placeholder={t('common.labels.optional')} />
             </Form.Item>
-            <Form.Item name="measuringPoint" label="Mjerno mjesto (MM)">
-              <Input placeholder="Opcionalno" />
+            <Form.Item name="measuringPoint" label={t('meters.measuringPointMMLabel')}>
+              <Input placeholder={t('common.labels.optional')} />
             </Form.Item>
-            <Form.Item name="notes" label="Napomena">
-              <Input.TextArea rows={2} placeholder="Opcionalno" />
+            <Form.Item name="notes" label={t('common.labels.notes')}>
+              <Input.TextArea rows={2} placeholder={t('common.labels.optional')} />
             </Form.Item>
 
             {selectedEditMeterTypeDefinitionId && (
               <div className="rounded-md border border-slate-200 p-3">
-                <div className="font-medium mb-2">Dodatna polja</div>
+                <div className="font-medium mb-2">{t('installationRecords.form.extraFields')}</div>
                 {(meterTypeFieldsQuery.data ?? [])
                   .slice()
                   .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -919,7 +922,7 @@ export default function MetersListPage() {
                       valuePropName={field.fieldType === 'BOOLEAN' ? 'checked' : 'value'}
                       rules={
                         field.isRequired && isDynamicFieldEditable(field)
-                          ? [{ required: true, message: `Unesite: ${field.label}` }]
+                          ? [{ required: true, message: t('installationRecords.form.fieldRequired', { label: field.label }) }]
                           : []
                       }
                     >
@@ -927,7 +930,7 @@ export default function MetersListPage() {
                     </Form.Item>
                   ))}
                 {meterTypeFieldsQuery.isLoading && (
-                  <div className="text-sm text-slate-500">Učitavanje polja…</div>
+                  <div className="text-sm text-slate-500">{t('installationRecords.form.loadingFields')}</div>
                 )}
               </div>
             )}
@@ -950,7 +953,7 @@ export default function MetersListPage() {
       </Drawer>
 
       <Drawer
-        title="Zadatak ugradnje SIM kartice"
+        title={t('meters.install.drawerTitle')}
         open={installDrawerOpen}
         width={520}
         onClose={() => {
@@ -970,7 +973,7 @@ export default function MetersListPage() {
                 setInstallNotes('')
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button
               type="primary"
@@ -984,7 +987,7 @@ export default function MetersListPage() {
                 })
               }}
             >
-              Kreiraj zadatak
+              {t('meters.createTaskButton')}
             </Button>
           </div>
         }
@@ -992,12 +995,12 @@ export default function MetersListPage() {
         {installMeter && (
           <Space direction="vertical" className="w-full" size="middle">
             <Typography.Text>
-              Brojilo: {installMeter.serialNumber}
-              {installMeter.simCardState === 'NO_SIM' ? ' – status: Bez kartice' : ''}
+              {t('meters.meterColonLabel')} {installMeter.serialNumber}
+              {installMeter.simCardState === 'NO_SIM' ? ` – ${t('meters.statusNoCardSuffix')}` : ''}
             </Typography.Text>
-            <Form.Item label="Operator (kojem šaljete zadatak)" required>
+            <Form.Item label={t('meters.operatorFieldLabel')} required>
               <Select
-                placeholder="Odaberite operatora"
+                placeholder={t('meters.selectOperatorPlaceholder')}
                 value={installOperatorId || undefined}
                 onChange={setInstallOperatorId}
                 options={
@@ -1015,12 +1018,12 @@ export default function MetersListPage() {
                 }
               />
             </Form.Item>
-            <Form.Item label="Napomena">
+            <Form.Item label={t('common.labels.notes')}>
               <Input.TextArea
                 rows={2}
                 value={installNotes}
                 onChange={(e) => setInstallNotes(e.target.value)}
-                placeholder="Opcionalno"
+                placeholder={t('common.labels.optional')}
               />
             </Form.Item>
           </Space>
@@ -1028,7 +1031,7 @@ export default function MetersListPage() {
       </Drawer>
 
       <Drawer
-        title="Zadatak demontaže SIM kartice"
+        title={t('meters.demount.drawerTitle')}
         open={demountDrawerOpen}
         width={520}
         onClose={() => {
@@ -1052,7 +1055,7 @@ export default function MetersListPage() {
                 setDemountNotes('')
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button
               type="primary"
@@ -1085,7 +1088,7 @@ export default function MetersListPage() {
                 })
               }}
             >
-              Kreiraj zadatak
+              {t('meters.createTaskButton')}
             </Button>
           </div>
         }
@@ -1093,12 +1096,12 @@ export default function MetersListPage() {
         {demountMeter && (
           <Space direction="vertical" className="w-full" size="middle">
             <Typography.Text>
-              Brojilo: {demountMeter.serialNumber}
+              {t('meters.meterColonLabel')} {demountMeter.serialNumber}
               {demountMeter.simCard ? ` – SIM: ${demountMeter.simCard.iccid}` : ''}
             </Typography.Text>
-            <Form.Item label="Operator (kojem šaljete zadatak)" required>
+            <Form.Item label={t('meters.operatorFieldLabel')} required>
               <Select
-                placeholder="Odaberite operatora"
+                placeholder={t('meters.selectOperatorPlaceholder')}
                 value={demountOperatorId || undefined}
                 onChange={setDemountOperatorId}
                 options={
@@ -1116,18 +1119,18 @@ export default function MetersListPage() {
                 }
               />
             </Form.Item>
-            <Form.Item label="Napomena">
+            <Form.Item label={t('common.labels.notes')}>
               <Input.TextArea
                 rows={2}
                 value={demountNotes}
                 onChange={(e) => setDemountNotes(e.target.value)}
-                placeholder="Opcionalno"
+                placeholder={t('common.labels.optional')}
               />
             </Form.Item>
 
-            <Form.Item label="Rezolucija" required>
+            <Form.Item label={t('meters.demount.resolutionLabel')} required>
               <Select
-                placeholder="Odaberite rezoluciju"
+                placeholder={t('meters.demount.selectResolutionPlaceholder')}
                 value={demountResolution || undefined}
                 onChange={(v) => {
                   setDemountResolution(v)
@@ -1142,9 +1145,9 @@ export default function MetersListPage() {
               />
             </Form.Item>
 
-            <Form.Item label="Ishod uklonjene SIM" required>
+            <Form.Item label={t('meters.demount.removedSimOutcomeLabel')} required>
               <Select
-                placeholder="Odaberite ishod uklonjene SIM"
+                placeholder={t('meters.demount.selectRemovedSimOutcomePlaceholder')}
                 value={demountRemovedSimDisposition || undefined}
                 onChange={setDemountRemovedSimDisposition}
                 options={(['MARK_DEFECTIVE', 'RETURN_TO_STOCK'] as RemovedSimDisposition[]).map(
@@ -1157,9 +1160,9 @@ export default function MetersListPage() {
             </Form.Item>
 
             {demountResolution === 'FULL_DEMOUNT' || demountResolution === 'REMOVE_SIM_ONLY' ? (
-              <Form.Item label="Kategorija (brojilo ostaje bez SIM-a)" required>
+              <Form.Item label={t('meters.demount.categoryLabel')} required>
                 <Select
-                  placeholder="Odaberite kategoriju"
+                  placeholder={t('meters.demount.selectCategoryPlaceholder')}
                   value={demountMeterDemountCategory || undefined}
                   onChange={setDemountMeterDemountCategory}
                   options={(
@@ -1178,16 +1181,16 @@ export default function MetersListPage() {
             ) : null}
 
             <Form.Item
-              label="Obrazloženje"
+              label={t('meters.demount.reasonLabel')}
               required
               validateStatus={demountReason.trim().length >= 3 ? undefined : 'error'}
-              help={demountReason.trim().length >= 3 ? undefined : 'Unesite najmanje 3 znaka.'}
+              help={demountReason.trim().length >= 3 ? undefined : t('meters.demount.minCharsHelp')}
             >
               <Input.TextArea
                 rows={3}
                 value={demountReason}
                 onChange={(e) => setDemountReason(e.target.value)}
-                placeholder="Kratko obrazloženje odluke inicijatora"
+                placeholder={t('meters.demount.reasonPlaceholder')}
               />
             </Form.Item>
           </Space>

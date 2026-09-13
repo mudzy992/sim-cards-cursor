@@ -47,14 +47,15 @@ import type {
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 import type { UserRole } from '@/types/auth.types'
 
-const renderType = (t: MeterType) =>
-  t === 'SINGLE_PHASE' ? 'Jednofazno' : t === 'THREE_PHASE' ? 'Trofazno' : t
+function renderType(mt: MeterType, t: (key: string) => string) {
+  return mt === 'SINGLE_PHASE' ? t('meterTypes.phaseSingle') : mt === 'THREE_PHASE' ? t('meterTypes.phaseThree') : mt
+}
 
-const meterStatusLabel = (s: MeterStatus) => {
-  if (s === 'ACTIVE') return 'Aktivno'
-  if (s === 'DEFECTIVE') return 'Neispravno'
-  if (s === 'INACTIVE') return 'Neaktivno'
-  return 'Na baždarenju / servis'
+function meterStatusLabel(s: MeterStatus, t: (key: string) => string) {
+  if (s === 'ACTIVE') return t('labels.meterStatus.active')
+  if (s === 'DEFECTIVE') return t('labels.meterStatus.defective')
+  if (s === 'INACTIVE') return t('labels.meterStatus.inactive')
+  return t('labels.meterStatus.inCalibration')
 }
 
 type MeterFormValues = {
@@ -73,7 +74,8 @@ type MeterFormValues = {
 }
 
 export default function MeterDetailPage() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US'
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [messageApi, messageContextHolder] = message.useMessage()
@@ -130,22 +132,22 @@ export default function MeterDetailPage() {
   const isActiveMeter = !meter?.status || meter.status === 'ACTIVE'
   const openInstallLabel = openInstallTask
     ? {
-        date: new Date(openInstallTask.createdAt).toLocaleString('bs-BA'),
+        date: new Date(openInstallTask.createdAt).toLocaleString(dateLocale),
         operator: openInstallTask.assignedTo
           ? `${openInstallTask.assignedTo.firstName} ${openInstallTask.assignedTo.lastName}`
           : '–',
         status:
           openInstallTask.status === 'IN_PROGRESS'
-            ? 'U toku'
+            ? t('meters.detail.statusInProgress')
             : openInstallTask.status === 'PENDING'
-              ? 'Čeka'
+              ? t('meters.detail.statusWaiting')
               : openInstallTask.status,
       }
     : null
 
   const openDemountLabel = openDemountTask
     ? {
-        date: new Date(openDemountTask.createdAt).toLocaleString('bs-BA'),
+        date: new Date(openDemountTask.createdAt).toLocaleString(dateLocale),
         operator: openDemountTask.assignedTo
           ? `${openDemountTask.assignedTo.firstName} ${openDemountTask.assignedTo.lastName}`
           : '–',
@@ -176,7 +178,7 @@ export default function MeterDetailPage() {
     mutationFn: (payload: DeleteMeterWithConfirmInput) =>
       metersApi.deleteWithConfirm(id!, payload),
     onSuccess: async () => {
-      messageApi.success('Brojilo je obrisano.')
+      messageApi.success(t('meters.detail.meterDeleted'))
       setDeleteModalOpen(false)
       setDeletePassword('')
       navigate('/meters')
@@ -188,7 +190,7 @@ export default function MeterDetailPage() {
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Brisanje brojila nije uspjelo.',
+          t('meters.detail.deleteFailed'),
       )
     },
   })
@@ -202,9 +204,9 @@ export default function MeterDetailPage() {
       a.download = `zapisnik-${recordNumber ?? recordId}.pdf`
       a.click()
       URL.revokeObjectURL(url)
-      messageApi.success('PDF je preuzet.')
+      messageApi.success(t('installationRecords.detail.pdfDownloaded'))
     } catch {
-      messageApi.error('Preuzimanje PDF-a nije uspjelo.')
+      messageApi.error(t('installationRecords.detail.pdfDownloadFailed'))
     }
   }
 
@@ -217,9 +219,9 @@ export default function MeterDetailPage() {
       a.download = photoPath.split('/').filter(Boolean).pop() ?? 'photo'
       a.click()
       URL.revokeObjectURL(url)
-      messageApi.success('Fotografija je preuzeta.')
+      messageApi.success(t('meters.detail.photoDownloaded'))
     } catch {
-      messageApi.error('Preuzimanje fotografije nije uspjelo.')
+      messageApi.error(t('meters.detail.photoDownloadFailed'))
     }
   }
 
@@ -264,7 +266,7 @@ export default function MeterDetailPage() {
   const updateMeterMutation = useMutation({
     mutationFn: ({ payload }: { payload: UpdateMeterInput }) => metersApi.update(id!, payload),
     onSuccess: async () => {
-      messageApi.success('Brojilo je ažurirano.')
+      messageApi.success(t('meters.updated'))
       setEditDrawerOpen(false)
       await queryClient.invalidateQueries({ queryKey: ['meters'] })
       await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
@@ -272,7 +274,7 @@ export default function MeterDetailPage() {
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Ažuriranje brojila nije uspjelo.',
+          t('meters.updateFailed'),
       )
     },
   })
@@ -281,7 +283,7 @@ export default function MeterDetailPage() {
     mutationFn: (payload: { meterId: string; assignedToId: string; notes?: string }) =>
       installTasksApi.create(payload),
     onSuccess: () => {
-      messageApi.success('Zadatak ugradnje SIM-a je kreiran.')
+      messageApi.success(t('meters.install.taskCreated'))
       setInstallDrawerOpen(false)
       setInstallOperatorId('')
       setInstallNotes('')
@@ -289,7 +291,7 @@ export default function MeterDetailPage() {
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Kreiranje zadatka nije uspjelo.',
+          t('meters.taskCreateFailed'),
       )
     },
   })
@@ -305,7 +307,7 @@ export default function MeterDetailPage() {
       requestedMeterDemountCategory?: MeterDemountCategory
     }) => demountTasksApi.create(payload),
     onSuccess: () => {
-      messageApi.success('Zadatak demontaže SIM-a je kreiran.')
+      messageApi.success(t('meters.demount.taskCreated'))
       setDemountDrawerOpen(false)
       setDemountOperatorId('')
       setDemountNotes('')
@@ -318,7 +320,7 @@ export default function MeterDetailPage() {
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Kreiranje zadatka nije uspjelo.',
+          t('meters.taskCreateFailed'),
       )
     },
   })
@@ -326,14 +328,14 @@ export default function MeterDetailPage() {
   const cancelInstallTaskMutation = useMutation({
     mutationFn: (taskId: string) => installTasksApi.cancel(taskId),
     onSuccess: async () => {
-      messageApi.success('Nalog ugradnje je otkazan.')
+      messageApi.success(t('meters.detail.installOrderCanceled'))
       await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['meters'] })
     },
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Otkazivanje naloga nije uspjelo.',
+          t('meters.detail.cancelOrderFailed'),
       )
     },
   })
@@ -341,14 +343,14 @@ export default function MeterDetailPage() {
   const cancelDemountTaskMutation = useMutation({
     mutationFn: (taskId: string) => demountTasksApi.cancel(taskId),
     onSuccess: async () => {
-      messageApi.success('Nalog demontaže je otkazan.')
+      messageApi.success(t('meters.detail.demountOrderCanceled'))
       await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['meters'] })
     },
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Otkazivanje naloga nije uspjelo.',
+          t('meters.detail.cancelOrderFailed'),
       )
     },
   })
@@ -357,7 +359,7 @@ export default function MeterDetailPage() {
     mutationFn: (payload: { taskId: string; assignedToId: string }) =>
       installTasksApi.reassign(payload.taskId, payload.assignedToId),
     onSuccess: async () => {
-      messageApi.success('Nalog ugradnje je pre-dodijeljen.')
+      messageApi.success(t('meters.detail.installOrderReassigned'))
       setReassignDrawerOpen(false)
       setReassignTask(null)
       setReassignOperatorId('')
@@ -367,7 +369,7 @@ export default function MeterDetailPage() {
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Pre-dodjela naloga nije uspjela.',
+          t('meters.detail.reassignFailed'),
       )
     },
   })
@@ -376,7 +378,7 @@ export default function MeterDetailPage() {
     mutationFn: (payload: { taskId: string; assignedToId: string }) =>
       demountTasksApi.reassign(payload.taskId, payload.assignedToId),
     onSuccess: async () => {
-      messageApi.success('Nalog demontaže je pre-dodijeljen.')
+      messageApi.success(t('meters.detail.demountOrderReassigned'))
       setReassignDrawerOpen(false)
       setReassignTask(null)
       setReassignOperatorId('')
@@ -386,7 +388,7 @@ export default function MeterDetailPage() {
     onError: (err: unknown) => {
       messageApi.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Pre-dodjela naloga nije uspjela.',
+          t('meters.detail.reassignFailed'),
       )
     },
   })
@@ -445,11 +447,11 @@ export default function MeterDetailPage() {
   const formatDynamicFieldValue = (field: MeterTypeFieldItem, raw: unknown) => {
     if (raw === undefined || raw === null || raw === '') return null
     if (field.fieldType === 'BOOLEAN') {
-      return raw === true || raw === 'true' ? 'Da' : 'Ne'
+      return raw === true || raw === 'true' ? t('common.actions.yes') : t('common.actions.no')
     }
     if (field.fieldType === 'DATE') {
       const d = new Date(String(raw))
-      return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString('bs-BA')
+      return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString(dateLocale)
     }
     return String(raw)
   }
@@ -458,21 +460,21 @@ export default function MeterDetailPage() {
     <div className="space-y-4">
       {messageContextHolder}
       <Space>
-        <Button onClick={() => navigate('/meters')}>Nazad</Button>
+        <Button onClick={() => navigate('/meters')}>{t('common.actions.back')}</Button>
         <Typography.Title level={3} className="!mb-0">
-          Detalji brojila
+          {t('meters.detail.title')}
         </Typography.Title>
       </Space>
 
       <Card
         loading={meterQuery.isLoading}
-        title={meter ? `Brojilo: ${meter.serialNumber}` : 'Brojilo'}
+        title={meter ? t('meters.detail.meterColonTitle', { serial: meter.serialNumber }) : t('meters.detail.meterFallbackTitle')}
         extra={
           meter ? (
             <Space>
               {openDemountLabel ? (
                 <Tag color="gold">
-                  Kreiran nalog za demontažu: {openDemountLabel.date} • {openDemountLabel.operator} •{' '}
+                  {t('meters.detail.demountOrderCreated')} {openDemountLabel.date} • {openDemountLabel.operator} •{' '}
                   {openDemountLabel.resolution}
                 </Tag>
               ) : null}
@@ -485,17 +487,17 @@ export default function MeterDetailPage() {
                       setReassignDrawerOpen(true)
                     }}
                   >
-                    Pre-dodijeli
+                    {t('meters.detail.reassign')}
                   </Button>
                   <Popconfirm
-                    title="Otkaži nalog demontaže?"
-                    okText="Da"
-                    cancelText="Ne"
+                    title={t('meters.detail.confirmCancelDemount')}
+                    okText={t('common.actions.yes')}
+                    cancelText={t('common.actions.no')}
                     okButtonProps={{ danger: true }}
                     onConfirm={() => cancelDemountTaskMutation.mutate(openDemountTask.id)}
                   >
                     <Button danger loading={cancelDemountTaskMutation.isPending}>
-                      Otkaži
+                      {t('meters.detail.cancelButton')}
                     </Button>
                   </Popconfirm>
                 </Space>
@@ -505,26 +507,26 @@ export default function MeterDetailPage() {
                   disabled={!isActiveMeter || !canCreateDemountTask}
                   title={
                     !canCreateDemountTask
-                      ? 'Nemate pravo kreirati demontažu za ovo brojilo.'
+                      ? t('meters.detail.noPermissionDemount')
                       : !isActiveMeter
-                        ? 'Brojilo mora biti aktivno.'
+                        ? t('meters.detail.meterMustBeActive')
                         : undefined
                   }
                   onClick={() => {
                     if (!canCreateDemountTask) {
-                      messageApi.error('Nemate pravo kreirati demontažu za ovo brojilo.')
+                      messageApi.error(t('meters.detail.noPermissionDemount'))
                       return
                     }
                     setDemountDrawerOpen(true)
                   }}
                 >
-                  Demontaža
+                  {t('meters.demount.buttonLabel')}
                 </Button>
               ) : null}
               {meter.simCardState === 'NO_SIM' || !meter.simCard ? (
                 openInstallTask ? (
                   <Tag color={openInstallTask.status === 'IN_PROGRESS' ? 'gold' : 'blue'}>
-                    Kreiran nalog za ugradnju: {openInstallLabel?.date} • {openInstallLabel?.operator} (
+                    {t('meters.detail.installOrderCreated')} {openInstallLabel?.date} • {openInstallLabel?.operator} (
                     {openInstallLabel?.status})
                   </Tag>
                 ) : (
@@ -532,20 +534,20 @@ export default function MeterDetailPage() {
                     disabled={!isActiveMeter || !canCreateInstallTask}
                     title={
                       !canCreateInstallTask
-                        ? 'Nemate pravo kreirati ugradnju za ovo brojilo.'
+                        ? t('meters.detail.noPermissionInstall')
                         : !isActiveMeter
-                          ? 'Brojilo mora biti aktivno.'
+                          ? t('meters.detail.meterMustBeActive')
                           : undefined
                     }
                     onClick={() => {
                       if (!canCreateInstallTask) {
-                        messageApi.error('Nemate pravo kreirati ugradnju za ovo brojilo.')
+                        messageApi.error(t('meters.detail.noPermissionInstall'))
                         return
                       }
                       setInstallDrawerOpen(true)
                     }}
                   >
-                    Pošalji na ugradnju
+                    {t('meters.detail.sendToInstall')}
                   </Button>
                 )
               ) : null}
@@ -558,23 +560,23 @@ export default function MeterDetailPage() {
                       setReassignDrawerOpen(true)
                     }}
                   >
-                    Pre-dodijeli
+                    {t('meters.detail.reassign')}
                   </Button>
                   <Popconfirm
-                    title="Otkaži nalog ugradnje?"
-                    okText="Da"
-                    cancelText="Ne"
+                    title={t('meters.detail.confirmCancelInstall')}
+                    okText={t('common.actions.yes')}
+                    cancelText={t('common.actions.no')}
                     okButtonProps={{ danger: true }}
                     onConfirm={() => cancelInstallTaskMutation.mutate(openInstallTask.id)}
                   >
                     <Button danger loading={cancelInstallTaskMutation.isPending}>
-                      Otkaži
+                      {t('meters.detail.cancelButton')}
                     </Button>
                   </Popconfirm>
                 </Space>
               ) : null}
               <Button type="primary" onClick={handleOpenEdit}>
-                Uredi
+                {t('common.actions.edit')}
               </Button>
               {userRole === 'SYSTEM_ADMIN' ? (
                 <Button
@@ -586,7 +588,7 @@ export default function MeterDetailPage() {
                     setDeleteSimAction(meter.simCard ? 'RETURN_SIM_TO_AVAILABLE' : 'LEAVE_AS_IS')
                   }}
                 >
-                  Obriši brojilo
+                  {t('meters.detail.deleteMeterButton')}
                 </Button>
               ) : null}
             </Space>
@@ -595,38 +597,38 @@ export default function MeterDetailPage() {
       >
         {meter ? (
           <Descriptions column={1} size="small" bordered>
-            <Descriptions.Item label="Serijski broj">{meter.serialNumber}</Descriptions.Item>
-            <Descriptions.Item label="Status brojila">
+            <Descriptions.Item label={t('installationRecords.form.meterSerialLabel')}>{meter.serialNumber}</Descriptions.Item>
+            <Descriptions.Item label={t('meters.columns.meterStatus')}>
               {meter.status ? (
                 <Tag color={meter.status === 'ACTIVE' ? 'success' : meter.status === 'DEFECTIVE' ? 'error' : 'warning'}>
-                  {meterStatusLabel(meter.status)}
+                  {meterStatusLabel(meter.status, t)}
                 </Tag>
               ) : (
                 '–'
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="Tip brojila">{meter.meterTypeDefinition?.name ?? '–'}</Descriptions.Item>
-            <Descriptions.Item label="Proizvođač">{meter.meterTypeDefinition?.manufacturer ?? '–'}</Descriptions.Item>
-            <Descriptions.Item label="Model">{meter.meterTypeDefinition?.model ?? '–'}</Descriptions.Item>
-            <Descriptions.Item label="Jednofazno / Trofazno">
-              {meter.meterTypeDefinition?.type ? renderType(meter.meterTypeDefinition.type) : '–'}
+            <Descriptions.Item label={t('installationRecords.form.meterTypeLabel')}>{meter.meterTypeDefinition?.name ?? '–'}</Descriptions.Item>
+            <Descriptions.Item label={t('meterTypes.manufacturer')}>{meter.meterTypeDefinition?.manufacturer ?? '–'}</Descriptions.Item>
+            <Descriptions.Item label={t('meterTypes.model')}>{meter.meterTypeDefinition?.model ?? '–'}</Descriptions.Item>
+            <Descriptions.Item label={t('meterTypes.phaseColumn')}>
+              {meter.meterTypeDefinition?.type ? renderType(meter.meterTypeDefinition.type, t) : '–'}
             </Descriptions.Item>
-            <Descriptions.Item label="Maks. struja (A)">{meter.meterTypeDefinition?.maxCurrent ?? '–'}</Descriptions.Item>
-            <Descriptions.Item label="Godina proizvodnje">{meter.year != null ? String(meter.year) : '–'}</Descriptions.Item>
-            <Descriptions.Item label="Godina baždarenja">
+            <Descriptions.Item label={t('meterTypes.maxCurrent')}>{meter.meterTypeDefinition?.maxCurrent ?? '–'}</Descriptions.Item>
+            <Descriptions.Item label={t('installationRecords.form.yearLabel')}>{meter.year != null ? String(meter.year) : '–'}</Descriptions.Item>
+            <Descriptions.Item label={t('installationRecords.form.calibrationYearLabel')}>
               {meter.calibrationYear != null ? String(meter.calibrationYear) : '–'}
             </Descriptions.Item>
-            <Descriptions.Item label="Lokacija instalacije">{meter.installationAddress ?? '–'}</Descriptions.Item>
-            <Descriptions.Item label="Datum instalacije">
+            <Descriptions.Item label={t('installationRecords.detail.installationLocationLabel')}>{meter.installationAddress ?? '–'}</Descriptions.Item>
+            <Descriptions.Item label={t('installationRecords.list.columns.installationDate')}>
               {meter.installationDate ? String(meter.installationDate).slice(0, 10) : '–'}
             </Descriptions.Item>
-            <Descriptions.Item label="Mjerno mjesto">{meter.measuringPoint ?? '–'}</Descriptions.Item>
-            <Descriptions.Item label="Napomena">{meter.notes ?? '–'}</Descriptions.Item>
-            <Descriptions.Item label="Status SIM-a">
+            <Descriptions.Item label={t('installationRecords.form.measuringPointLabel')}>{meter.measuringPoint ?? '–'}</Descriptions.Item>
+            <Descriptions.Item label={t('common.labels.notes')}>{meter.notes ?? '–'}</Descriptions.Item>
+            <Descriptions.Item label={t('installationRecords.detail.simStatusLabel')}>
               {meter.simCardState === 'NO_SIM' || !meter.simCard ? (
-                <Tag color="warning">Bez SIM</Tag>
+                <Tag color="warning">{t('meters.noSimOption')}</Tag>
               ) : (
-                <Tag color="success">SIM ugrađena</Tag>
+                <Tag color="success">{t('meters.simInstalledOption')}</Tag>
               )}
               {meter.simCardState === 'NO_SIM' && meter.noSimReason ? (
                 <Typography.Text type="secondary" className="ml-2 text-xs">
@@ -636,10 +638,10 @@ export default function MeterDetailPage() {
             </Descriptions.Item>
             {meter.simCard ? (
               <>
-                <Descriptions.Item label="SIM kartica (ugrađena)">
+                <Descriptions.Item label={t('meters.installedSimCardLabel')}>
                   <Link to={`/sim-cards/${meter.simCard.id}`}>{meter.simCard.iccid}</Link>
                 </Descriptions.Item>
-                <Descriptions.Item label="IP adresa">{meter.simCard.ipAddress ?? '–'}</Descriptions.Item>
+                <Descriptions.Item label={t('simCards.details.ipAddress')}>{meter.simCard.ipAddress ?? '–'}</Descriptions.Item>
               </>
             ) : null}
 
@@ -671,9 +673,9 @@ export default function MeterDetailPage() {
       </Card>
 
       {meter?.latitude != null && meter?.longitude != null ? (
-        <Card title="Lokacija na mapi">
+        <Card title={t('installationRecords.detail.mapCardTitle')}>
           <iframe
-            title="Lokacija brojila"
+            title={t('meters.detail.meterLocationTitle')}
             src={buildOsmEmbedUrl({
               latitude: Number(meter.latitude),
               longitude: Number(meter.longitude),
@@ -687,7 +689,7 @@ export default function MeterDetailPage() {
         </Card>
       ) : null}
 
-      <Card title="Zapisnici za ovo brojilo" loading={recordsQuery.isLoading}>
+      <Card title={t('meters.detail.recordsForMeterTitle')} loading={recordsQuery.isLoading}>
         {recordsQuery.data?.items?.length ? (
           <ul className="list-disc pl-4 space-y-1">
             {recordsQuery.data.items.map((r) => (
@@ -697,18 +699,18 @@ export default function MeterDetailPage() {
             ))}
           </ul>
         ) : (
-          <Typography.Text type="secondary">Nema zapisnika.</Typography.Text>
+          <Typography.Text type="secondary">{t('meters.detail.noRecords')}</Typography.Text>
         )}
       </Card>
 
-      <Card title="Timeline aktivnosti">
+      <Card title={t('installationRecords.detail.timelineCardTitle')}>
         <Typography.Text type="secondary">
-          Timeline za brojilo će biti prikazan kada backend počne logovati aktivnosti sa entity = meter.
+          {t('meters.detail.timelinePlaceholder')}
         </Typography.Text>
       </Card>
 
       <Drawer
-        title="Pre-dodijeli nalog"
+        title={t('meters.detail.reassignOrderTitle')}
         open={reassignDrawerOpen}
         width={520}
         onClose={() => {
@@ -726,7 +728,7 @@ export default function MeterDetailPage() {
                 setReassignOperatorId('')
               }}
             >
-              Odustani
+              {t('common.actions.cancel')}
             </Button>
             <Button
               type="primary"
@@ -747,18 +749,18 @@ export default function MeterDetailPage() {
                 })
               }}
             >
-              Pre-dodijeli
+              {t('meters.detail.reassign')}
             </Button>
           </div>
         }
       >
         <Space direction="vertical" className="w-full" size="middle">
           <Typography.Text type="secondary">
-            Odaberite operatora kojem dodjeljujete ovaj nalog.
+            {t('meters.detail.reassignHint')}
           </Typography.Text>
-          <Form.Item label="Operator" required>
+          <Form.Item label={t('meters.detail.operatorLabel')} required>
             <Select
-              placeholder="Odaberite operatora"
+              placeholder={t('meters.selectOperatorPlaceholder')}
               value={reassignOperatorId || undefined}
               onChange={setReassignOperatorId}
               options={
@@ -780,7 +782,7 @@ export default function MeterDetailPage() {
       </Drawer>
 
       <Drawer
-        title="Zadatak ugradnje SIM kartice"
+        title={t('meters.install.drawerTitle')}
         open={installDrawerOpen}
         width={520}
         onClose={() => {
@@ -791,14 +793,14 @@ export default function MeterDetailPage() {
         destroyOnClose
         footer={
           <div className="flex justify-end gap-2">
-            <Button onClick={() => setInstallDrawerOpen(false)}>Odustani</Button>
+            <Button onClick={() => setInstallDrawerOpen(false)}>{t('common.actions.cancel')}</Button>
             <Button
               type="primary"
               loading={createInstallMutation.isPending}
               onClick={() => {
                 if (!id || !installOperatorId) return
                 if (!canCreateInstallTask) {
-                  messageApi.error('Nemate pravo kreirati ugradnju za ovo brojilo.')
+                  messageApi.error(t('meters.detail.noPermissionInstall'))
                   return
                 }
                 createInstallMutation.mutate({
@@ -808,15 +810,15 @@ export default function MeterDetailPage() {
                 })
               }}
             >
-              Kreiraj zadatak
+              {t('meters.createTaskButton')}
             </Button>
           </div>
         }
       >
         <Space direction="vertical" className="w-full" size="middle">
-          <Form.Item label="Operator" required>
+          <Form.Item label={t('meters.detail.operatorLabel')} required>
             <Select
-              placeholder="Odaberite operatora"
+              placeholder={t('meters.selectOperatorPlaceholder')}
               value={installOperatorId || undefined}
               onChange={setInstallOperatorId}
               options={operatorOptions}
@@ -827,19 +829,19 @@ export default function MeterDetailPage() {
               }
             />
           </Form.Item>
-          <Form.Item label="Napomena">
+          <Form.Item label={t('common.labels.notes')}>
             <Input.TextArea
               rows={2}
               value={installNotes}
               onChange={(e) => setInstallNotes(e.target.value)}
-              placeholder="Opcionalno"
+              placeholder={t('common.labels.optional')}
             />
           </Form.Item>
         </Space>
       </Drawer>
 
       <Drawer
-        title="Zadatak demontaže SIM kartice"
+        title={t('meters.demount.drawerTitle')}
         open={demountDrawerOpen}
         width={520}
         onClose={() => {
@@ -854,14 +856,14 @@ export default function MeterDetailPage() {
         destroyOnClose
         footer={
           <div className="flex justify-end gap-2">
-            <Button onClick={() => setDemountDrawerOpen(false)}>Odustani</Button>
+            <Button onClick={() => setDemountDrawerOpen(false)}>{t('common.actions.cancel')}</Button>
             <Button
               type="primary"
               loading={createDemountMutation.isPending}
               onClick={() => {
                 if (!id || !demountOperatorId) return
                 if (!canCreateDemountTask) {
-                  messageApi.error('Nemate pravo kreirati demontažu za ovo brojilo.')
+                  messageApi.error(t('meters.detail.noPermissionDemount'))
                   return
                 }
                 if (!demountResolution) return
@@ -890,15 +892,15 @@ export default function MeterDetailPage() {
                 })
               }}
             >
-              Kreiraj zadatak
+              {t('meters.createTaskButton')}
             </Button>
           </div>
         }
       >
         <Space direction="vertical" className="w-full" size="middle">
-          <Form.Item label="Operator " required>
+          <Form.Item label={t('meters.detail.operatorLabel')} required>
             <Select
-              placeholder="Odaberite operatora"
+              placeholder={t('meters.selectOperatorPlaceholder')}
               value={demountOperatorId || undefined}
               onChange={setDemountOperatorId}
               options={operatorOptions.map((o) => ({ ...o, label: String(o.label).replace(/\s*\(.*\)\s*$/, '') }))}
@@ -909,18 +911,18 @@ export default function MeterDetailPage() {
               }
             />
           </Form.Item>
-          <Form.Item label="Napomena">
+          <Form.Item label={t('common.labels.notes')}>
             <Input.TextArea
               rows={2}
               value={demountNotes}
               onChange={(e) => setDemountNotes(e.target.value)}
-              placeholder="Opcionalno"
+              placeholder={t('common.labels.optional')}
             />
           </Form.Item>
 
-          <Form.Item label="Rezolucija" required>
+          <Form.Item label={t('meters.demount.resolutionLabel')} required>
             <Select
-              placeholder="Odaberite rezoluciju"
+              placeholder={t('meters.demount.selectResolutionPlaceholder')}
               value={demountResolution || undefined}
               onChange={(v) => {
                 setDemountResolution(v)
@@ -935,9 +937,9 @@ export default function MeterDetailPage() {
             />
           </Form.Item>
 
-          <Form.Item label="Ishod uklonjene SIM" required>
+          <Form.Item label={t('meters.demount.removedSimOutcomeLabel')} required>
             <Select
-              placeholder="Odaberite ishod uklonjene SIM"
+              placeholder={t('meters.demount.selectRemovedSimOutcomePlaceholder')}
               value={demountRemovedSimDisposition || undefined}
               onChange={setDemountRemovedSimDisposition}
               options={(['MARK_DEFECTIVE', 'RETURN_TO_STOCK'] as RemovedSimDisposition[]).map((v) => ({
@@ -948,9 +950,9 @@ export default function MeterDetailPage() {
           </Form.Item>
 
           {demountResolution === 'FULL_DEMOUNT' || demountResolution === 'REMOVE_SIM_ONLY' ? (
-            <Form.Item label="Kategorija (brojilo ostaje bez SIM-a)" required>
+            <Form.Item label={t('meters.demount.categoryLabel')} required>
               <Select
-                placeholder="Odaberite kategoriju"
+                placeholder={t('meters.demount.selectCategoryPlaceholder')}
                 value={demountMeterDemountCategory || undefined}
                 onChange={setDemountMeterDemountCategory}
                 options={(
@@ -969,89 +971,89 @@ export default function MeterDetailPage() {
           ) : null}
 
           <Form.Item
-            label="Obrazloženje"
+            label={t('meters.demount.reasonLabel')}
             required
             validateStatus={demountReason.trim().length >= 3 ? undefined : 'error'}
-            help={demountReason.trim().length >= 3 ? undefined : 'Unesite najmanje 3 znaka.'}
+            help={demountReason.trim().length >= 3 ? undefined : t('meters.demount.minCharsHelp')}
           >
             <Input.TextArea
               rows={3}
               value={demountReason}
               onChange={(e) => setDemountReason(e.target.value)}
-              placeholder="Kratko obrazloženje odluke inicijatora"
+              placeholder={t('meters.demount.reasonPlaceholder')}
             />
           </Form.Item>
         </Space>
       </Drawer>
 
       <Drawer
-        title="Uredi brojilo"
+        title={t('meters.editMeter')}
         open={editDrawerOpen}
         width={560}
         onClose={() => setEditDrawerOpen(false)}
         destroyOnClose
         footer={
           <div className="flex justify-end gap-2">
-            <Button onClick={() => setEditDrawerOpen(false)}>Odustani</Button>
+            <Button onClick={() => setEditDrawerOpen(false)}>{t('common.actions.cancel')}</Button>
             <Button type="primary" loading={updateMeterMutation.isPending} onClick={() => meterForm.submit()}>
-              Snimi
+              {t('common.actions.save')}
             </Button>
           </div>
         }
       >
         <Form form={meterForm} layout="vertical" onFinish={handleMeterSubmit} className="mt-4">
-          <Form.Item name="serialNumber" label="Serijski broj" rules={[{ required: true, message: 'Unesite serijski broj.' }]}>
+          <Form.Item name="serialNumber" label={t('installationRecords.form.meterSerialLabel')} rules={[{ required: true, message: t('installationRecords.form.serialNumberRequired') }]}>
             <Input placeholder="npr. AMM-12345" />
           </Form.Item>
           <Form.Item
             name="meterTypeDefinitionId"
-            label="Tip brojila (katalog) *"
-            rules={[{ required: true, message: 'Odaberite tip brojila.' }]}
+            label={t('meters.meterTypeCatalogLabel')}
+            rules={[{ required: true, message: t('installationRecords.form.meterTypeRequired') }]}
           >
             <Select
-              placeholder="Odaberi tip iz kataloga"
-              options={meterTypesQuery.data?.map((t) => ({ label: t.name, value: t.id })) ?? []}
+              placeholder={t('meters.selectFromCatalogPlaceholder')}
+              options={meterTypesQuery.data?.map((mtd) => ({ label: mtd.name, value: mtd.id })) ?? []}
               loading={meterTypesQuery.isLoading}
             />
           </Form.Item>
-          <Form.Item name="status" label="Status brojila">
+          <Form.Item name="status" label={t('meters.columns.meterStatus')}>
             <Select
               options={[
-                { label: 'Aktivno', value: 'ACTIVE' },
-                { label: 'Neispravno', value: 'DEFECTIVE' },
-                { label: 'Na baždarenju / servis', value: 'IN_CALIBRATION' },
-                { label: 'Neaktivno', value: 'INACTIVE' },
+                { label: t('labels.meterStatus.active'), value: 'ACTIVE' },
+                { label: t('labels.meterStatus.defective'), value: 'DEFECTIVE' },
+                { label: t('labels.meterStatus.inCalibration'), value: 'IN_CALIBRATION' },
+                { label: t('labels.meterStatus.inactive'), value: 'INACTIVE' },
               ]}
             />
           </Form.Item>
-          <Form.Item name="year" label="Godina proizvodnje" rules={[{ required: true, message: 'Obavezno.' }]}>
+          <Form.Item name="year" label={t('installationRecords.form.yearLabel')} rules={[{ required: true, message: t('installationRecords.form.requiredShort') }]}>
             <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="calibrationYear" label="Godina baždarenja" rules={[{ required: true, message: 'Obavezno.' }]}>
+          <Form.Item name="calibrationYear" label={t('installationRecords.form.calibrationYearLabel')} rules={[{ required: true, message: t('installationRecords.form.requiredShort') }]}>
             <InputNumber min={1970} max={2100} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="installationAddress" label="Lokacija instalacije">
-            <Input.TextArea rows={2} placeholder="Adresa ugradnje" />
+          <Form.Item name="installationAddress" label={t('installationRecords.detail.installationLocationLabel')}>
+            <Input.TextArea rows={2} placeholder={t('installationRecords.form.addressPlaceholder')} />
           </Form.Item>
-          <Form.Item name="installationDate" label="Datum instalacije">
+          <Form.Item name="installationDate" label={t('installationRecords.list.columns.installationDate')}>
             <Input type="date" placeholder="YYYY-MM-DD" />
           </Form.Item>
-          <Form.Item name="city" label="Grad / Mjesto">
-            <Input placeholder="Opcionalno" />
+          <Form.Item name="city" label={t('meters.cityPlaceLabel')}>
+            <Input placeholder={t('common.labels.optional')} />
           </Form.Item>
-          <Form.Item name="municipality" label="Općina">
-            <Input placeholder="Opcionalno" />
+          <Form.Item name="municipality" label={t('installationRecords.form.municipalityLabel')}>
+            <Input placeholder={t('common.labels.optional')} />
           </Form.Item>
-          <Form.Item name="measuringPoint" label="Mjerno mjesto (MM)">
-            <Input placeholder="Opcionalno" />
+          <Form.Item name="measuringPoint" label={t('meters.measuringPointMMLabel')}>
+            <Input placeholder={t('common.labels.optional')} />
           </Form.Item>
-          <Form.Item name="notes" label="Napomena">
-            <Input.TextArea rows={2} placeholder="Opcionalno" />
+          <Form.Item name="notes" label={t('common.labels.notes')}>
+            <Input.TextArea rows={2} placeholder={t('common.labels.optional')} />
           </Form.Item>
 
           {meter?.meterTypeDefinitionId ? (
             <div className="rounded-md border border-slate-200 p-3">
-              <div className="font-medium mb-2">Dodatna polja</div>
+              <div className="font-medium mb-2">{t('installationRecords.form.extraFields')}</div>
               {(meterTypeFieldsQuery.data ?? [])
                 .slice()
                 .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -1064,7 +1066,7 @@ export default function MeterDetailPage() {
                     valuePropName={field.fieldType === 'BOOLEAN' ? 'checked' : 'value'}
                     rules={
                       field.isRequired && isDynamicFieldEditable(field)
-                        ? [{ required: true, message: `Unesite: ${field.label}` }]
+                        ? [{ required: true, message: t('installationRecords.form.fieldRequired', { label: field.label }) }]
                         : []
                     }
                   >
@@ -1072,7 +1074,7 @@ export default function MeterDetailPage() {
                   </Form.Item>
                 ))}
               {meterTypeFieldsQuery.isLoading ? (
-                <div className="text-sm text-slate-500">Učitavanje polja…</div>
+                <div className="text-sm text-slate-500">{t('installationRecords.form.loadingFields')}</div>
               ) : null}
             </div>
           ) : null}
@@ -1080,10 +1082,10 @@ export default function MeterDetailPage() {
       </Drawer>
 
       <Modal
-        title="Brisanje brojila (SYSTEM_ADMIN)"
+        title={t('meters.detail.deleteModalTitle')}
         open={deleteModalOpen}
-        okText="Obriši"
-        cancelText="Odustani"
+        okText={t('common.actions.delete')}
+        cancelText={t('common.actions.cancel')}
         okButtonProps={{
           danger: true,
           loading: deleteWithConfirmMutation.isPending,
@@ -1106,26 +1108,26 @@ export default function MeterDetailPage() {
         destroyOnClose
       >
         {deleteSummaryQuery.isLoading ? (
-          <Typography.Text type="secondary">Učitavanje veza…</Typography.Text>
+          <Typography.Text type="secondary">{t('meters.detail.loadingLinks')}</Typography.Text>
         ) : deleteSummaryQuery.data ? (
           <div className="space-y-3">
             <Typography.Text>
-              Brisanje će trajno ukloniti brojilo iz baze. Prije nastavka provjerite sve veze.
+              {t('meters.detail.deleteWarningIntro')}
             </Typography.Text>
 
-            <Card size="small" title="Veze">
+            <Card size="small" title={t('meters.detail.linksCardTitle')}>
               <div className="space-y-2">
                 {deleteSummaryQuery.data.meter.hasOpenInstallTask ||
                 deleteSummaryQuery.data.meter.hasOpenDemountTask ? (
                   <Typography.Text type="warning">
-                    Upozorenje: brojilo ima otvoren nalog (
-                    {deleteSummaryQuery.data.meter.hasOpenInstallTask ? 'ugradnja' : null}
+                    {t('meters.detail.openOrderWarning')} (
+                    {deleteSummaryQuery.data.meter.hasOpenInstallTask ? t('meters.detail.installWord') : null}
                     {deleteSummaryQuery.data.meter.hasOpenInstallTask &&
                     deleteSummaryQuery.data.meter.hasOpenDemountTask
                       ? ' + '
                       : null}
-                    {deleteSummaryQuery.data.meter.hasOpenDemountTask ? 'demontaža' : null}
-                    ). Preporuka je prvo zatvoriti/otkazati naloge prije brisanja.
+                    {deleteSummaryQuery.data.meter.hasOpenDemountTask ? t('meters.detail.demountWord') : null}
+                    ). {t('meters.detail.closeOrdersRecommendation')}
                   </Typography.Text>
                 ) : null}
 
@@ -1135,7 +1137,7 @@ export default function MeterDetailPage() {
                     {deleteSummaryQuery.data.simCard ? (
                       <div className="space-y-2">
                         <Typography.Text>
-                          Ugrađena SIM: {deleteSummaryQuery.data.simCard.iccid} •{' '}
+                          {t('meters.detail.installedSimColon')} {deleteSummaryQuery.data.simCard.iccid} •{' '}
                           {deleteSummaryQuery.data.simCard.status}
                         </Typography.Text>
                         <Radio.Group
@@ -1143,23 +1145,23 @@ export default function MeterDetailPage() {
                           onChange={(e) => setDeleteSimAction(e.target.value)}
                         >
                           <Space direction="vertical">
-                            <Radio value="RETURN_SIM_TO_AVAILABLE">Vrati SIM u dostupne (AVAILABLE)</Radio>
-                            <Radio value="DELETE_SIM">Obriši SIM iz baze</Radio>
-                            <Radio value="LEAVE_AS_IS">Ne diraj SIM (nije preporučeno)</Radio>
+                            <Radio value="RETURN_SIM_TO_AVAILABLE">{t('meters.detail.returnSimToAvailable')}</Radio>
+                            <Radio value="DELETE_SIM">{t('meters.detail.deleteSimFromDb')}</Radio>
+                            <Radio value="LEAVE_AS_IS">{t('meters.detail.leaveSimAsIs')}</Radio>
                           </Space>
                         </Radio.Group>
                       </div>
                     ) : (
-                      <Typography.Text type="secondary">Nema ugrađene SIM kartice.</Typography.Text>
+                      <Typography.Text type="secondary">{t('meters.detail.noInstalledSim')}</Typography.Text>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <Typography.Text strong>Zapisnici</Typography.Text>
+                  <Typography.Text strong>{t('installationRecords.list.title')}</Typography.Text>
                   <div className="mt-1 space-y-2">
                     <Typography.Text>
-                      Ukupno: {deleteSummaryQuery.data.installationRecords.count}
+                      {t('common.labels.total')}: {deleteSummaryQuery.data.installationRecords.count}
                     </Typography.Text>
                     {deleteSummaryQuery.data.installationRecords.items.length ? (
                       <ul className="list-disc pl-4 space-y-1">
@@ -1178,24 +1180,24 @@ export default function MeterDetailPage() {
                                       size="small"
                                       onClick={() => handleDownloadPhoto(String(p))}
                                     >
-                                      Foto {idx + 1}
+                                      {t('meters.detail.photoLabel')} {idx + 1}
                                     </Button>
                                   ))}
                                   {(r.photos ?? []).length > 5 ? (
                                     <Typography.Text type="secondary">
-                                      +{(r.photos ?? []).length - 5} foto
+                                      +{(r.photos ?? []).length - 5} {t('meters.detail.photoLabel').toLowerCase()}
                                     </Typography.Text>
                                   ) : null}
                                 </Space>
                               ) : (
-                                <Typography.Text type="secondary">Nema foto</Typography.Text>
+                                <Typography.Text type="secondary">{t('meters.detail.noPhotos')}</Typography.Text>
                               )}
                             </Space>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <Typography.Text type="secondary">Nema zapisnika.</Typography.Text>
+                      <Typography.Text type="secondary">{t('meters.detail.noRecords')}</Typography.Text>
                     )}
 
                     <Radio.Group
@@ -1204,54 +1206,54 @@ export default function MeterDetailPage() {
                     >
                       <Space direction="vertical">
                         <Radio value="ABORT_IF_EXISTS">
-                          Ne briši zapisnike (blokiraj brisanje ako postoje)
+                          {t('meters.detail.dontDeleteRecords')}
                         </Radio>
-                        <Radio value="DELETE_ALL">Obriši sve zapisnike (DB + fajlovi)</Radio>
+                        <Radio value="DELETE_ALL">{t('meters.detail.deleteAllRecords')}</Radio>
                       </Space>
                     </Radio.Group>
 
                     {(deleteSummaryQuery.data.installationRecords.count ?? 0) > 0 &&
                     deleteRecordsAction !== 'DELETE_ALL' ? (
                       <Typography.Text type="warning">
-                        Da biste obrisali brojilo, morate odabrati “Obriši sve zapisnike” (prethodno ručno preuzmite PDF/foto).
+                        {t('meters.detail.deleteAllRecordsWarning')}
                       </Typography.Text>
                     ) : null}
                   </div>
                 </div>
 
                 <div>
-                  <Typography.Text strong>Ostale veze</Typography.Text>
+                  <Typography.Text strong>{t('meters.detail.otherLinks')}</Typography.Text>
                   <div className="mt-1">
                     <ul className="list-disc pl-4 space-y-1">
                       <li>
-                        Install taskovi: {deleteSummaryQuery.data.tasks.installTasksCount} (open:{' '}
-                        {deleteSummaryQuery.data.meter.hasOpenInstallTask ? 'da' : 'ne'})
+                        {t('meters.detail.installTasksLabel')} {deleteSummaryQuery.data.tasks.installTasksCount} (open:{' '}
+                        {deleteSummaryQuery.data.meter.hasOpenInstallTask ? t('common.actions.yes') : t('common.actions.no')})
                       </li>
                       <li>
-                        Demount taskovi: {deleteSummaryQuery.data.tasks.demountTasksCount} (open:{' '}
-                        {deleteSummaryQuery.data.meter.hasOpenDemountTask ? 'da' : 'ne'})
+                        {t('meters.detail.demountTasksLabel')} {deleteSummaryQuery.data.tasks.demountTasksCount} (open:{' '}
+                        {deleteSummaryQuery.data.meter.hasOpenDemountTask ? t('common.actions.yes') : t('common.actions.no')})
                       </li>
                       <li>Branch ID: {deleteSummaryQuery.data.meter.branchId ?? '–'}</li>
-                      <li>Tip brojila ID: {deleteSummaryQuery.data.meter.meterTypeDefinitionId}</li>
+                      <li>{t('meters.detail.meterTypeIdLabel')} {deleteSummaryQuery.data.meter.meterTypeDefinitionId}</li>
                     </ul>
                   </div>
                 </div>
               </div>
             </Card>
 
-            <Card size="small" title="Potvrda lozinkom">
+            <Card size="small" title={t('meters.detail.passwordConfirmTitle')}>
               <Input.Password
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
-                placeholder="Unesite lozinku"
+                placeholder={t('meters.detail.enterPasswordPlaceholder')}
               />
               <Typography.Text type="secondary" className="block mt-2">
-                Potvrda lozinkom je obavezna za konačno brisanje.
+                {t('meters.detail.passwordConfirmHint')}
               </Typography.Text>
             </Card>
           </div>
         ) : (
-          <Typography.Text type="danger">Nije moguće učitati podatke za brisanje.</Typography.Text>
+          <Typography.Text type="danger">{t('meters.detail.cannotLoadDeleteData')}</Typography.Text>
         )}
       </Modal>
     </div>

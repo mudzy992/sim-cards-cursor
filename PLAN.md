@@ -18,16 +18,21 @@ prije nego nastavim dalje.
 - [x] MeterTypeUpsertPage.tsx
 - [x] InstallationRecordDetailPage.tsx
 - [x] app-settings.manifest.ts (labeli/opisi postavki — veliki broj kratkih stringova)
-- [ ] ShipmentPrintPage.tsx
-- [ ] UsersListPage.tsx
-- [ ] MetersListPage.tsx
-- [ ] MeterDetailPage.tsx (najveći fajl, 1257 linija)
+- [x] ShipmentPrintPage.tsx
+- [x] UsersListPage.tsx
+- [x] MetersListPage.tsx
+- [x] MeterDetailPage.tsx (najveći fajl, 1257 linija)
+
+**FAZA 1 KOMPLETNA** ✅ (svih 16 stranica migrirano, rječnik: 926 ključeva, bs/en parity potvrđena)
 
 ## FAZA 2 — Frontend, ostalo
-- [ ] Ponovni grep cijelog `frontend/src` za preostale bosanske string literale
-      (isti heuristički audit kao do sad) — dok ne bude 0 stvarnih pogodaka
-      (izuzev namjerno-nepreveden brand naziv "SIM Tracker" i tehnički
-      identifikatori/enum vrijednosti).
+- [x] Ponovni grep cijelog `frontend/src` za preostale bosanske string literale — **gotovo**.
+      Preostalo: samo `npr. ...` placeholder primjeri u input poljima, brand "SIM Tracker",
+      i tehnički identifikatori (ICCID, enum vrijednosti) — namjerno nepromijenjeni.
+      Dodatno migrirano u ovoj fazi: `label-formats.ts` (opis formata etiketa, sada
+      izračunat dinamički umjesto statičkog stringa) i `import-report.utils.ts`
+      (CSV/print izvještaj o greškama importa — prima `t`/`dateLocale` kao parametre
+      jer nije React komponenta).
 
 ## FAZA 3 — Mobile (Expo), ekrani i komponente
 Redoslijed (manji → veći, isti obrazac: `useTranslation` iz `@/i18n/i18n.store`):
