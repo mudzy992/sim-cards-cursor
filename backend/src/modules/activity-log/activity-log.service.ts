@@ -38,12 +38,12 @@ export class ActivityLogService {
     const page = filter.page ?? 1;
     const limit = filter.limit ?? 20;
 
-    if (scope?.role === UserRole.DIST_ADMIN && !scope.distributionId) {
+    if (scope && scope.role === UserRole.DIST_ADMIN && !scope.distributionId) {
       return { items: [], page, limit, total: 0, totalPages: 1 };
     }
 
     const tenantFilter: Prisma.ActivityLogWhereInput =
-      scope?.role === UserRole.DIST_ADMIN && scope.distributionId
+      scope && scope.role === UserRole.DIST_ADMIN && scope.distributionId
         ? {
             user: {
               OR: [

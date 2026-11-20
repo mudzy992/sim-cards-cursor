@@ -72,11 +72,11 @@ export class BranchModeratorsService {
     userId: string,
     actor?: { role: UserRole; distributionId: string | null },
   ) {
-    if (actor?.role === UserRole.DIST_ADMIN && !actor.distributionId) {
+    if (actor && actor.role === UserRole.DIST_ADMIN && !actor.distributionId) {
       return []
     }
     const where =
-      actor?.role === UserRole.DIST_ADMIN && actor.distributionId
+      actor && actor.role === UserRole.DIST_ADMIN && actor.distributionId
         ? { userId, branch: { distributionId: actor.distributionId } }
         : { userId }
 

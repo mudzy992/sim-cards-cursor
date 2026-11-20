@@ -140,6 +140,7 @@ jobs:
           BACKEND_DOMAIN: api.example.com
           UPLOAD_DIR: /app/uploads
         run: |
+          test -f backend/.env.prod || touch backend/.env.prod
           docker compose -f docker-compose.yml config -q
           docker compose -f docker-compose.vm.db.yml config -q
           docker compose -f docker-compose.vm.app.yml config -q

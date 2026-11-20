@@ -331,7 +331,7 @@ export class DemountTasksService {
     if (assignedTo.role !== UserRole.USER) {
       throw new BadRequestException('Nalog se može dodijeliti samo operatoru.');
     }
-    if (scope?.role === UserRole.DIST_ADMIN && scope.distributionId) {
+    if (scope && scope.role === UserRole.DIST_ADMIN && scope.distributionId) {
       const opDistributionId = assignedTo.distributionId ?? assignedTo.branch?.distributionId;
       if (opDistributionId !== scope.distributionId) {
         throw new BadRequestException('Možete dodijeliti nalog samo operatorima iz svoje distribucije.');

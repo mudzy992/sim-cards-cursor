@@ -161,7 +161,7 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    if (scope?.role === UserRole.DIST_ADMIN) {
+    if (scope && scope.role === UserRole.DIST_ADMIN) {
       if (existing.role === UserRole.SYSTEM_ADMIN) {
         throw new ForbiddenException('Cannot modify a system administrator');
       }

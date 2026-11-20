@@ -96,11 +96,11 @@ export class MetersService {
       if (!branch) {
         throw new BadRequestException('Odabrana podružnica ne postoji.');
       }
-      if (
-        scope?.role === UserRole.DIST_ADMIN &&
-        (!scope.distributionId || branch.distributionId !== scope.distributionId)
-      ) {
-        throw new ForbiddenException('Podružnica ne pripada vašoj distribuciji.');
+      if (scope && scope.role === UserRole.DIST_ADMIN) {
+        const distId = scope.distributionId;
+        if (!distId || branch.distributionId !== distId) {
+          throw new ForbiddenException('Podružnica ne pripada vašoj distribuciji.');
+        }
       }
     }
     const data: Record<string, unknown> = {
@@ -147,7 +147,7 @@ export class MetersService {
     }
 
     return this.prisma.meter.create({
-      data: data as Parameters<typeof this.prisma.meter.create>[0]['data'],
+      data: data as Prisma.MeterUncheckedCreateInput,
     });
   }
 
@@ -306,7 +306,7 @@ export class MetersService {
     try {
       return await this.prisma.meter.update({
         where: { id },
-        data: data as Parameters<typeof this.prisma.meter.update>[0]['data'],
+        data: data as Prisma.MeterUncheckedUpdateInput,
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -514,7 +514,8 @@ export class MetersService {
 
   private getMetersReadScopeClause(scope?: ScopeContext | null) {
     if (
-      scope?.role === UserRole.USER &&
+      scope &&
+      scope.role === UserRole.USER &&
       (scope.branchModeratorBranchIds?.length ?? 0) > 0
     ) {
       if (scope.distributionId) {

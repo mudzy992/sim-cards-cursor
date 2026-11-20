@@ -147,10 +147,11 @@ export class InstallationRecordsService {
         })
       : null;
 
-    if (ctx?.role === UserRole.USER && ctx.userId) {
+    if (ctx && ctx.role === UserRole.USER && ctx.userId) {
       effectiveInstalledById = ctx.userId;
     } else if (
-      ctx?.role === UserRole.DIST_ADMIN &&
+      ctx &&
+      ctx.role === UserRole.DIST_ADMIN &&
       createInstallationRecordDto.installedById &&
       createInstallationRecordDto.installedById !== ctx.userId
     ) {
@@ -250,7 +251,7 @@ export class InstallationRecordsService {
       }
       const branchId =
         createInstallationRecordDto.branchId ?? ctx?.branchId ?? undefined;
-      if (branchId && ctx?.role === UserRole.DIST_ADMIN) {
+      if (branchId && ctx && ctx.role === UserRole.DIST_ADMIN) {
         const branch = await this.prisma.branch.findUnique({
           where: { id: branchId },
           select: { distributionId: true },
