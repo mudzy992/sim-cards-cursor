@@ -14,7 +14,7 @@ export interface StatCardProps {
 
 const TONE_ACCENT_CLASSES: Record<StatusTone, string> = {
   neutral: 'text-fg-primary',
-  accent: 'text-accent-fg',
+  accent: 'text-accent-link',
   info: 'text-status-info-fg',
   success: 'text-status-success-fg',
   warning: 'text-status-warning-fg',
@@ -23,7 +23,7 @@ const TONE_ACCENT_CLASSES: Record<StatusTone, string> = {
 
 const TONE_ICON_BG_CLASSES: Record<StatusTone, string> = {
   neutral: 'bg-surface-sunken text-fg-secondary border-subtle',
-  accent: 'bg-accent-soft text-accent-fg border-default',
+  accent: 'bg-accent-soft text-accent-soft-fg border-line-subtle',
   info: 'bg-status-info-bg text-status-info-fg border-status-info-border',
   success: 'bg-status-success-bg text-status-success-fg border-status-success-border',
   warning: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border',
@@ -40,12 +40,14 @@ export function StatCard({
   className = '',
 }: StatCardProps) {
   return (
-    <Card loading={loading} className={`border-subtle bg-surface ${className}`.trim()}>
+    <Card loading={loading} className={`rounded-lg border-subtle bg-surface ${className}`.trim()}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <div className="text-xs font-medium uppercase tracking-wide text-fg-muted">{label}</div>
+        <div className="min-w-0 space-y-1.5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-fg-muted">
+            {label}
+          </div>
           <div
-            className={`text-2xl font-semibold tabular-nums tracking-tight ${TONE_ACCENT_CLASSES[tone]}`}
+            className={`font-mono text-2xl font-semibold tabular-nums tracking-tight ${TONE_ACCENT_CLASSES[tone]}`}
           >
             {value}
           </div>
@@ -54,7 +56,7 @@ export function StatCard({
         {icon ? (
           <div
             aria-hidden="true"
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-lg ${TONE_ICON_BG_CLASSES[tone]}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border text-base ${TONE_ICON_BG_CLASSES[tone]}`}
           >
             {icon}
           </div>

@@ -21,9 +21,11 @@ export default function LanguageSwitcher() {
     >
       <Button
         type="text"
+        size="small"
         icon={<GlobalOutlined />}
         aria-label={t('language.switchLanguage')}
         title={t('language.switchLanguage')}
+        className="!px-2 text-fg-secondary hover:text-fg-primary"
       />
     </Dropdown>
   );

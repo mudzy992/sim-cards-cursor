@@ -44,6 +44,7 @@ export default {
           DEFAULT: 'var(--accent-primary)',
           hover: 'var(--accent-hover)',
           foreground: 'var(--accent-on-primary)',
+          fg: 'var(--accent-link)',
           link: 'var(--accent-link)',
           soft: 'var(--accent-soft-bg)',
           'soft-fg': 'var(--accent-soft-fg)',
@@ -65,6 +66,11 @@ export default {
           'neutral-fg': 'var(--status-neutral-fg)',
           'neutral-border': 'var(--status-neutral-border)',
         },
+      },
+      borderColor: {
+        subtle: 'var(--border-subtle)',
+        default: 'var(--border-default)',
+        strong: 'var(--border-strong)',
       },
       boxShadow: {
         card: 'var(--shadow-card)',

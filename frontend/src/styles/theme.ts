@@ -5,8 +5,13 @@ const FONT_STACK =
   "'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
 /**
- * Dinamička konfiguracija Ant Design tokena za Light i Dark režim,
- * u potpunosti sinhronizovana sa tokens.json / tokens.css (WCAG AAA).
+ * Industrial minimalist Ant Design token configuration synchronized
+ * with tokens.json / tokens.css (WCAG AAA light & dark).
+ *
+ * Notice: `colorPrimary` for filled button surfaces uses `accentPrimary`
+ * (contrast >= 7:1 with white text), whereas interactive text/ink indicators
+ * (Tabs, Pagination, Links, Breadcrumbs) explicitly use `accentLink` so
+ * dark-mode active states always render crisp luminous steel-cyan (`>= 10:1`).
  */
 export function createAntdTheme(
   mode: ResolvedTheme,
@@ -44,11 +49,11 @@ export function createAntdTheme(
 
       fontFamily: FONT_STACK,
       fontSize: 14,
-      borderRadius: 10,
-      borderRadiusLG: 14,
-      borderRadiusSM: 8,
+      borderRadius: 6,
+      borderRadiusLG: 8,
+      borderRadiusSM: 4,
 
-      controlHeight: density === 'compact' ? 32 : 36,
+      controlHeight: density === 'compact' ? 30 : 34,
       boxShadow: t.shadowCard,
       boxShadowSecondary: t.shadowElevated,
     },
@@ -56,9 +61,9 @@ export function createAntdTheme(
       Layout: {
         headerBg: t.headerBackdrop,
         bodyBg: t.canvas,
-        siderBg: t.surfaceSunken,
+        siderBg: t.surface,
         footerBg: 'transparent',
-        headerHeight: 64,
+        headerHeight: 56,
         headerPadding: '0 24px',
       },
       Menu: {
@@ -69,43 +74,107 @@ export function createAntdTheme(
         itemSelectedBg: t.accentSoftBg,
         itemSelectedColor: t.accentSoftFg,
         itemActiveBg: t.surfaceHover,
-        itemBorderRadius: 8,
+        itemBorderRadius: 6,
+        itemHeight: 38,
+        itemMarginBlock: 2,
+        iconSize: 15,
         subMenuItemBg: 'transparent',
+      },
+      Tabs: {
+        itemColor: t.textMuted,
+        itemHoverColor: t.textPrimary,
+        itemSelectedColor: t.accentLink,
+        itemActiveColor: t.accentLinkHover,
+        inkBarColor: t.accentLink,
+        horizontalItemPadding: '10px 4px',
+        horizontalItemGutter: 24,
+        titleFontSize: 14,
+      },
+      Breadcrumb: {
+        itemColor: t.textMuted,
+        lastItemColor: t.textPrimary,
+        linkColor: t.textSecondary,
+        linkHoverColor: t.accentLink,
+        separatorColor: t.borderDefault,
+        fontSize: 12,
+      },
+      Pagination: {
+        colorPrimary: t.accentLink,
+        colorPrimaryHover: t.accentLinkHover,
+        itemActiveBg: t.accentSoftBg,
+        borderRadius: 6,
       },
       Card: {
         colorBgContainer: t.surface,
         colorBorderSecondary: t.borderSubtle,
-        borderRadiusLG: 14,
+        borderRadiusLG: 8,
         paddingLG: density === 'compact' ? 16 : 20,
       },
       Table: {
         colorBgContainer: t.surface,
         headerBg: t.surfaceSunken,
-        headerColor: t.textPrimary,
+        headerColor: t.textSecondary,
+        headerSplitColor: t.borderSubtle,
+        headerBorderRadius: 6,
         rowHoverBg: t.surfaceHover,
         borderColor: t.borderSubtle,
+        cellPaddingBlock: density === 'compact' ? 9 : 13,
+        cellPaddingInline: density === 'compact' ? 12 : 16,
       },
       Button: {
-        controlHeight: density === 'compact' ? 32 : 36,
-        borderRadius: 8,
+        controlHeight: density === 'compact' ? 30 : 34,
+        borderRadius: 6,
         primaryShadow: 'none',
+        defaultShadow: 'none',
         colorPrimary: t.accentPrimary,
         colorPrimaryHover: t.accentHover,
         primaryColor: t.accentOnPrimary,
+        defaultBg: t.surfaceRaised,
+        defaultBorderColor: t.borderSubtle,
+        defaultColor: t.textPrimary,
+        defaultHoverBg: t.surfaceHover,
+        defaultHoverBorderColor: t.borderDefault,
+        defaultHoverColor: t.textPrimary,
       },
       Input: {
         colorBgContainer: t.surfaceSunken,
+        colorBorder: t.borderSubtle,
         activeBorderColor: t.focusRing,
-        hoverBorderColor: t.borderStrong,
+        hoverBorderColor: t.borderDefault,
+        borderRadius: 6,
       },
       Select: {
         colorBgContainer: t.surfaceSunken,
+        colorBorder: t.borderSubtle,
+        hoverBorderColor: t.borderDefault,
+        activeBorderColor: t.focusRing,
         optionSelectedBg: t.accentSoftBg,
         optionSelectedColor: t.accentSoftFg,
+        borderRadius: 6,
+      },
+      DatePicker: {
+        colorBgContainer: t.surfaceSunken,
+        colorBorder: t.borderSubtle,
+        hoverBorderColor: t.borderDefault,
+        activeBorderColor: t.focusRing,
+        borderRadius: 6,
+      },
+      Switch: {
+        colorPrimary: t.accentPrimary,
+        colorPrimaryHover: t.accentHover,
+      },
+      Checkbox: {
+        colorPrimary: t.accentPrimary,
+        colorPrimaryHover: t.accentHover,
+      },
+      Radio: {
+        colorPrimary: t.accentPrimary,
+        colorPrimaryHover: t.accentHover,
       },
       Modal: {
         contentBg: t.surface,
         headerBg: t.surface,
+        borderRadiusLG: 8,
       },
       Drawer: {
         colorBgElevated: t.surface,

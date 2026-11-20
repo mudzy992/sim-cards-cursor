@@ -97,7 +97,7 @@ export function NotificationBell() {
   return (
     <Dropdown
       popupRender={() => (
-        <div className="rounded-xl border border-subtle bg-surface-raised shadow-card">
+        <div className="rounded-lg border border-subtle bg-surface-raised shadow-elevated">
           {dropdownContent}
         </div>
       )}
@@ -106,10 +106,12 @@ export function NotificationBell() {
     >
       <Button
         type="text"
+        size="small"
         aria-label={t('layout.notifications.title')}
-        icon={<BellOutlined className="text-lg" />}
+        className="!px-2 text-fg-secondary hover:text-fg-primary"
+        icon={<BellOutlined />}
       >
-        <Badge count={unreadCount} size="small" />
+        {unreadCount > 0 ? <Badge count={unreadCount} size="small" /> : null}
       </Button>
     </Dropdown>
   );

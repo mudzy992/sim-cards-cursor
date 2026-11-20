@@ -22,9 +22,9 @@ export function FilterBar({
 
   return (
     <div
-      className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3 ${className}`.trim()}
+      className={`flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-subtle bg-surface px-3.5 py-2.5 ${className}`.trim()}
     >
-      <div className="flex flex-1 flex-wrap items-center gap-3">{children}</div>
+      <div className="flex flex-1 flex-wrap items-center gap-2.5">{children}</div>
       {(onReset && hasActiveFilters) || actions ? (
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {onReset && hasActiveFilters ? (

@@ -30,7 +30,9 @@ describe('StatusBadge', () => {
     expect(getTaskStatusTone('IN_PROGRESS')).toBe('info');
     expect(getShipmentStatusTone('COMPLETED')).toBe('success');
     expect(getRecordStatusTone('SEND_FAILED')).toBe('danger');
-    expect(getUserRoleTone('SYSTEM_ADMIN')).toBe('danger');
+    expect(getUserRoleTone('SYSTEM_ADMIN')).toBe('accent');
+    expect(getUserRoleTone('DIST_ADMIN')).toBe('info');
+    expect(getUserRoleTone('USER')).toBe('neutral');
     expect(getUserStatusTone('ACTIVE')).toBe('success');
     expect(getActivityActionTone('DELETE')).toBe('danger');
   });

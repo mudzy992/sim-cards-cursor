@@ -238,25 +238,7 @@ export default function ShipmentsListPage() {
         </span>
       ),
       children: (
-        <div className="space-y-4">
-          <div
-            className="flex flex-wrap items-center justify-between gap-4"
-            data-tour-id="shipments-header"
-          >
-            <span className="text-sm text-fg-secondary">{t('shipments.list.tabIntro')}</span>
-
-            {canManageShipments ? (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => navigate(ROUTES.shipmentsNew)}
-                data-tour-id="shipments-new-button"
-              >
-                {t('shipments.list.newShipment')}
-              </Button>
-            ) : null}
-          </div>
-
+        <div className="space-y-4 pt-1">
           <FilterBar
             hasActiveFilters={hasShipmentFilters}
             onReset={handleShipmentReset}
@@ -565,6 +547,18 @@ export default function ShipmentsListPage() {
         <PageHeader
           title={t('layout.sidebar.shipments')}
           subtitle={t('shipments.list.pageIntro')}
+          actions={
+            canManageShipments ? (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => navigate(ROUTES.shipmentsNew)}
+                data-tour-id="shipments-new-button"
+              >
+                {t('shipments.list.newShipment')}
+              </Button>
+            ) : null
+          }
         />
 
         <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />

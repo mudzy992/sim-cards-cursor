@@ -11,7 +11,7 @@ export interface StatusBadgeProps {
 
 const TONE_CLASSES: Record<StatusTone, string> = {
   neutral: 'bg-status-neutral-bg text-status-neutral-fg border-status-neutral-border',
-  accent: 'bg-accent-soft text-accent-fg border-default',
+  accent: 'bg-accent-soft text-accent-soft-fg border-line-subtle',
   info: 'bg-status-info-bg text-status-info-fg border-status-info-border',
   success: 'bg-status-success-bg text-status-success-fg border-status-success-border',
   warning: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border',
@@ -27,7 +27,7 @@ export function StatusBadge({
 }: StatusBadgeProps) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium leading-5 ${
+      className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[11px] font-semibold leading-4 tracking-wide ${
         mono ? 'font-mono' : ''
       } ${TONE_CLASSES[tone]} ${className}`.trim()}
     >

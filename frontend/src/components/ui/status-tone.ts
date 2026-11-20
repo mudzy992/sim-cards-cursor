@@ -78,12 +78,12 @@ export function getRecordStatusTone(status: string): StatusTone {
 export function getUserRoleTone(role: string): StatusTone {
   switch (role) {
     case 'SYSTEM_ADMIN':
-      return 'danger';
-    case 'DIST_ADMIN':
       return 'accent';
+    case 'DIST_ADMIN':
+      return 'info';
     case 'USER':
     default:
-      return 'info';
+      return 'neutral';
   }
 }
 

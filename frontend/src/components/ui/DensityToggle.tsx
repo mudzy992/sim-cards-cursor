@@ -20,12 +20,15 @@ export function DensityToggle() {
   return (
     <Tooltip title={tooltip}>
       <Button
+        type="text"
+        size="small"
         icon={isCompact ? <CompressOutlined /> : <ColumnHeightOutlined />}
         onClick={() => setDensity(nextDensity)}
         aria-label={tooltip}
         aria-pressed={isCompact}
+        className="!px-2 text-fg-secondary hover:text-fg-primary"
       >
-        <span className="hidden lg:inline">{label}</span>
+        <span className="hidden xl:inline text-xs">{label}</span>
       </Button>
     </Tooltip>
   );

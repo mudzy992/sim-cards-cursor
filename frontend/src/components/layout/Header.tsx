@@ -7,7 +7,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Grid, Layout, Space, Tooltip } from 'antd';
+import { Button, Grid, Layout, Tooltip } from 'antd';
 import { useAuth } from '@/hooks/useAuth';
 import { NotificationBell } from './NotificationBell';
 import { branchModeratorsApi } from '@/api/branch-moderators.api';
@@ -96,53 +96,66 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   return (
     <AntHeader className="app-header !px-4 sm:!px-6">
       <div className="flex h-full items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
           {showMenuButton ? (
             <Button
               type="text"
+              size="small"
               icon={<MenuOutlined />}
               onClick={onMobileMenuClick}
               aria-label={t('layout.header.openMenu')}
-              className="-ml-2"
+              className="-ml-1"
             />
           ) : null}
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 truncate text-sm text-fg-secondary">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="min-w-0 truncate text-sm text-fg-muted">
               {t('layout.header.welcome')}{' '}
               <span className="font-semibold text-fg-primary">
                 {user?.firstName ?? t('layout.header.defaultUserName')}
               </span>
             </span>
-            <div className="flex shrink-0 items-center gap-2">
-              {roleBadge ? <Tooltip title={roleLabel}><span>{roleBadge}</span></Tooltip> : null}
+            <div className="flex shrink-0 items-center gap-1.5">
+              {roleBadge ? (
+                <Tooltip title={roleLabel}>
+                  <span className="inline-flex">{roleBadge}</span>
+                </Tooltip>
+              ) : null}
               {moderatorBadge}
             </div>
           </div>
         </div>
 
-        <Space size="small">
-          <div
-            data-tour-id={
-              user?.role === 'SYSTEM_ADMIN'
-                ? 'admin-notifications'
-                : user?.role === 'DIST_ADMIN'
-                  ? 'moderator-notifications'
-                  : undefined
-            }
-          >
-            <NotificationBell />
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="inline-flex items-center gap-0.5 rounded-md border border-subtle bg-surface-sunken px-1 py-0.5">
+            <div
+              data-tour-id={
+                user?.role === 'SYSTEM_ADMIN'
+                  ? 'admin-notifications'
+                  : user?.role === 'DIST_ADMIN'
+                    ? 'moderator-notifications'
+                    : undefined
+              }
+            >
+              <NotificationBell />
+            </div>
+            <DensityToggle />
+            <ThemeSwitcher />
+            <LanguageSwitcher />
           </div>
-          <DensityToggle />
-          <ThemeSwitcher />
-          <LanguageSwitcher />
+
+          <div aria-hidden="true" className="hidden h-5 w-px bg-line-subtle sm:block" />
+
           <Button
+            type="text"
+            size="small"
             icon={<LogoutOutlined />}
             onClick={() => void logout()}
             aria-label={t('layout.header.logout')}
+            className="!px-2.5 text-fg-secondary hover:text-fg-primary"
           >
-            <span className="hidden sm:inline">{t('layout.header.logout')}</span>
+            <span className="hidden sm:inline text-xs font-medium">{t('layout.header.logout')}</span>
           </Button>
-        </Space>
+        </div>
       </div>
     </AntHeader>
   );

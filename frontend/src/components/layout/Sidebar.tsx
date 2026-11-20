@@ -27,13 +27,24 @@ type SidebarProps = {
 
 function Brand({ subtitle }: { subtitle: string }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-default bg-accent text-sm font-bold text-on-accent">
-        S
+    <div className="flex items-center gap-3">
+      <div
+        aria-hidden="true"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground"
+      >
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75">
+          <rect x="3" y="2.5" width="14" height="15" rx="2" />
+          <path d="M7 7.5h6v5H7z" />
+          <path d="M10 2.5v5M10 12.5v5M3 10h4M13 10h4" />
+        </svg>
       </div>
       <div className="min-w-0 leading-tight">
-        <div className="truncate text-[15px] font-semibold text-fg-primary">SIM Tracker</div>
-        <div className="truncate text-[11px] text-fg-muted">{subtitle}</div>
+        <div className="truncate text-sm font-semibold tracking-tight text-fg-primary">
+          SIM TRACKER
+        </div>
+        <div className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-muted">
+          {subtitle}
+        </div>
       </div>
     </div>
   );
@@ -174,7 +185,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     : location.pathname;
 
   const menuNode = (
-    <nav aria-label={t('layout.a11y.primaryNavigation')}>
+    <nav aria-label={t('layout.a11y.primaryNavigation')} className="pt-2">
       <Menu
         mode="inline"
         selectedKeys={[selectedKey]}
@@ -193,7 +204,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         open={mobileOpen}
         onClose={onMobileClose}
         placement="left"
-        width={260}
+        width={256}
         styles={{ body: { padding: 0 } }}
         title={<Brand subtitle={t('layout.sidebar.consoleSubtitle')} />}
       >
@@ -204,7 +215,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   return (
     <Sider width={240} breakpoint="lg" collapsedWidth={0} className="app-sider">
-      <div className="px-4 py-5">
+      <div className="flex h-14 items-center border-b border-subtle px-4">
         <Brand subtitle={t('layout.sidebar.consoleSubtitle')} />
       </div>
       {menuNode}

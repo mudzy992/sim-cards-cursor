@@ -25,10 +25,10 @@ export function PageHeader({
   const { t } = useTranslation();
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-3 border-b border-subtle pb-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0 space-y-1">
         {backTo ? (
-          <div className="mb-2">
+          <div className="mb-1.5">
             <Button
               type="text"
               size="small"
@@ -41,10 +41,14 @@ export function PageHeader({
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="m-0 text-2xl font-semibold tracking-tight text-fg-primary">{title}</h1>
+          <h1 className="m-0 text-xl font-semibold tracking-tight text-fg-primary sm:text-2xl">
+            {title}
+          </h1>
           {badge}
         </div>
-        {subtitle ? <p className="m-0 text-sm text-fg-secondary">{subtitle}</p> : null}
+        {subtitle ? (
+          <p className="m-0 max-w-3xl text-sm text-fg-muted">{subtitle}</p>
+        ) : null}
       </div>
       {actions ? (
         <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>

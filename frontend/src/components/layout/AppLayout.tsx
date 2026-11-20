@@ -30,7 +30,7 @@ export function AppLayout() {
     <Layout className="min-h-screen bg-canvas">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-accent focus:shadow-card"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-accent-foreground focus:shadow-card"
       >
         {t('layout.a11y.skipToMain')}
       </a>
@@ -43,14 +43,14 @@ export function AppLayout() {
         <Content
           id="main-content"
           tabIndex={-1}
-          className="px-4 py-5 outline-none sm:px-6 lg:px-8"
+          className="px-4 py-5 outline-none sm:px-6 lg:px-8 lg:py-6"
         >
-          <div className="mx-auto w-full max-w-[1400px]">
+          <div className="mx-auto w-full max-w-[1440px]">
             <Breadcrumb />
             {user?.role === 'SYSTEM_ADMIN' && featuresQuery.data?.missingKeys?.length ? (
               <Alert
                 type="warning"
-                className="mb-4"
+                className="mb-5"
                 message={t('layout.appLayout.notFullyConfigured')}
                 description={
                   <div>
@@ -67,14 +67,12 @@ export function AppLayout() {
                 showIcon
               />
             ) : null}
-            <div className="rounded-2xl border border-subtle bg-surface p-4 shadow-card sm:p-6">
-              <PageErrorBoundary
-                resetKey={location.pathname}
-                onGoHome={() => navigate(ROUTES.root)}
-              >
-                <Outlet />
-              </PageErrorBoundary>
-            </div>
+            <PageErrorBoundary
+              resetKey={location.pathname}
+              onGoHome={() => navigate(ROUTES.root)}
+            >
+              <Outlet />
+            </PageErrorBoundary>
           </div>
         </Content>
         <Footer />

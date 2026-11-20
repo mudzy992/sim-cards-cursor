@@ -2,41 +2,110 @@
   line-height: normal;
 }
 
-/* Sticky, translucent, blurred header using semantic CSS tokens */
+/* Sticky, precision-bordered translucent header */
 .app-header {
   position: sticky;
   top: 0;
   z-index: 20;
+  height: 56px !important;
   background-color: var(--bg-header-backdrop) !important;
   border-bottom: 1px solid var(--border-subtle);
-  backdrop-filter: saturate(160%) blur(10px);
-  -webkit-backdrop-filter: saturate(160%) blur(10px);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
 }
 
-/* Sidebar: subtle right hairline using semantic border token */
+/* Industrial sidebar rail */
 .app-sider {
   border-right: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface) !important;
 }
 
 .app-sider .ant-menu {
   background: transparent;
-  padding: 8px;
+  padding: 6px 10px;
+  border-inline-end: none !important;
 }
 
 .app-sider .ant-menu-item {
+  position: relative;
   margin-inline: 0 !important;
   width: 100% !important;
+  font-weight: 500;
 }
 
-/* Global mobile safety: tables/descriptions should not overflow cards */
+.app-sider .ant-menu-item-selected {
+  font-weight: 600;
+}
+
+.app-sider .ant-menu-item-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 2px;
+  background-color: var(--accent-link);
+}
+
+/* Sharp industrial Tabs */
+.ant-tabs-top > .ant-tabs-nav::before {
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.ant-tabs .ant-tabs-tab {
+  font-weight: 500;
+}
+
+.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--accent-link) !important;
+  font-weight: 600;
+}
+
+.ant-tabs .ant-tabs-ink-bar {
+  background: var(--accent-link) !important;
+  height: 2px !important;
+}
+
+/* Crisp link buttons in dark & light themes */
+.ant-btn-link {
+  color: var(--accent-link);
+}
+
+.ant-btn-link:hover {
+  color: var(--accent-link-hover) !important;
+}
+
+/* Industrial telemetry tables */
 .ant-table-wrapper {
   max-width: 100%;
   overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-surface);
 }
 
 .ant-table {
   min-width: max-content;
   font-variant-numeric: tabular-nums;
+}
+
+.ant-table-thead > tr > th {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.ant-table-pagination.ant-pagination {
+  margin: 12px 16px !important;
+}
+
+.ant-card .ant-table-wrapper {
+  border: none;
+  border-radius: 0;
 }
 
 .ant-card-body {

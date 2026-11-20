@@ -54,6 +54,8 @@ export function ThemeSwitcher() {
       trigger={['click']}
     >
       <Button
+        type="text"
+        size="small"
         icon={activeIcon}
         aria-label={t('layout.theme.switchTheme', {
           mode: t(`layout.theme.${preference}`),
@@ -61,8 +63,9 @@ export function ThemeSwitcher() {
         title={t('layout.theme.switchTheme', {
           mode: t(`layout.theme.${preference}`),
         })}
+        className="!px-2 text-fg-secondary hover:text-fg-primary"
       >
-        <span className="hidden md:inline">{t(`layout.theme.${preference}`)}</span>
+        <span className="hidden xl:inline text-xs">{t(`layout.theme.${preference}`)}</span>
       </Button>
     </Dropdown>
   );

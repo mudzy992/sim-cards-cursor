@@ -21,7 +21,9 @@ export function SectionCard({
     title || description ? (
       <div className="min-w-0 py-0.5">
         {title ? (
-          <h2 className="m-0 text-base font-semibold text-fg-primary">{title}</h2>
+          <h2 className="m-0 text-sm font-semibold tracking-tight text-fg-primary sm:text-base">
+            {title}
+          </h2>
         ) : null}
         {description ? (
           <p className="m-0 mt-0.5 text-xs font-normal text-fg-muted">{description}</p>
@@ -33,7 +35,7 @@ export function SectionCard({
     <Card
       title={headerNode}
       extra={actions}
-      className={`border-subtle bg-surface ${className}`.trim()}
+      className={`rounded-lg border-subtle bg-surface ${className}`.trim()}
       {...rest}
     >
       {children}
