@@ -10,14 +10,21 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 WORKDIR /usr/app
 
 COPY package*.json ./
-COPY prisma ./prisma
+COPY packages/shared/package.json ./packages/shared/
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+COPY mobile/package.json ./mobile/
 
-RUN npm ci
-RUN npx prisma generate
+RUN npm ci --workspace=@sim-tracker/shared --workspace=sim-tracker-backend --include-workspace-root
 
-COPY . .
+COPY packages/shared ./packages/shared
+RUN npm run build --workspace=@sim-tracker/shared
 
-RUN npm run build
+COPY backend/prisma ./backend/prisma
+RUN npx --workspace=sim-tracker-backend prisma generate
+
+COPY backend ./backend
+RUN npm run build --workspace=sim-tracker-backend
 
 
 # STAGE 2: RUNTIME
@@ -37,16 +44,21 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     NODE_ENV=production
 
 COPY package*.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+COPY mobile/package.json ./mobile/
 
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --workspace=@sim-tracker/shared --workspace=sim-tracker-backend --include-workspace-root
 
-COPY --from=build --chown=node:node /usr/app/dist ./dist
+COPY --from=build --chown=node:node /usr/app/packages/shared/dist ./packages/shared/dist
+COPY --from=build --chown=node:node /usr/app/backend/dist ./dist
 COPY --from=build --chown=node:node /usr/app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build --chown=node:node /usr/app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY --from=build --chown=node:node /usr/app/prisma ./prisma
-COPY --from=build --chown=node:node /usr/app/src/templates ./templates
+COPY --from=build --chown=node:node /usr/app/backend/prisma ./prisma
+COPY --from=build --chown=node:node /usr/app/backend/src/templates ./templates
 
-RUN mkdir -p /app/uploads && chown -R node:node /usr/app /app/uploads
+RUN mkdir -p /app/uploads /usr/app/uploads && chown -R node:node /usr/app /app/uploads
 
 USER node
 

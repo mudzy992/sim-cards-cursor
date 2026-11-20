@@ -2,8 +2,8 @@ services:
   backend:
     container_name: sim-tracker-backend-vm
     build:
-      context: ./backend
-      dockerfile: Dockerfile.vm
+      context: .
+      dockerfile: backend/Dockerfile.vm
       args:
         - DEPS_IMAGE=${DEPS_IMAGE_TAG:-simtracker-backend-deps:latest}
     init: true

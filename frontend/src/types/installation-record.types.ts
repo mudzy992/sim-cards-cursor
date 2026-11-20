@@ -1,11 +1,7 @@
-export type RecordStatus =
-  | 'DRAFT'
-  | 'SENT'
-  | 'SEND_FAILED'
-  | 'SEP_ACTIVATED'
-  | 'LEGACY_COMPLETED';
+import type { InstallationRecordKind, RecordStatus } from '@sim-tracker/shared';
+import type { PaginatedResult } from './common.types';
 
-export type InstallationRecordKind = 'NEW_CONNECTION' | 'METER_REPLACEMENT';
+export type { InstallationRecordKind, RecordStatus };
 
 export type InstallationRecordItem = {
   id: string;
@@ -80,10 +76,4 @@ export type InstallationRecordsListParams = {
   meterId?: string;
 };
 
-export type InstallationRecordsResponse = {
-  items: InstallationRecordItem[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-};
+export type InstallationRecordsResponse = PaginatedResult<InstallationRecordItem>;

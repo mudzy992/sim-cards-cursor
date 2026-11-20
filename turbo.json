@@ -1,0 +1,31 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "@sim-tracker/shared#test": {
+      "dependsOn": ["build"]
+    },
+    "check:i18n": {
+      "dependsOn": ["^build"]
+    },
+    "check:ui": {
+      "dependsOn": ["^build"]
+    },
+    "check:wcag": {
+      "dependsOn": ["^build"]
+    },
+    "format:check": {}
+  }
+}

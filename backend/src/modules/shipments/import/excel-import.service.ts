@@ -1,6 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
 import * as XLSX from 'xlsx';
+import {
+  IPV4_REGEX,
+  isValidIccid,
+  normalizeIccid,
+  normalizePhoneNumber,
+} from '@sim-tracker/shared';
 import { ImportDomainKey } from './column-mapper.service';
+
+export { normalizeIccid, normalizePhoneNumber };
 
 type RawRow = Record<string, string>;
 
@@ -63,22 +71,11 @@ export type PreviewResponse = {
   canImport: boolean;
 };
 
-const IPV4_REGEX =
-  /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
-
 function safeString(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }
   return String(value).replace(/^\uFEFF/, '').trim();
-}
-
-export function normalizeIccid(value: string): string {
-  return value.replace(/\s+/g, '');
-}
-
-export function normalizePhoneNumber(value: string): string {
-  return value.replace(/[\s\-()/]+/g, '').trim();
 }
 
 function normalizeExistingMaps(
@@ -179,7 +176,7 @@ export class ExcelImportService {
 
       if (!iccid) {
         errors.push('ICCID nedostaje');
-      } else if (!/^\d{10,30}$/.test(iccid)) {
+      } else if (!isValidIccid(iccid)) {
         errors.push('ICCID nije ispravan (očekuje se 10–30 cifara)');
       }
 

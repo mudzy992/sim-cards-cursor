@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SHARED_THEME_COLORS } from '@sim-tracker/shared';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const tokensPath = path.resolve(__dirname, '../src/styles/tokens.json');
@@ -119,6 +120,46 @@ for (const [cssVar, hex] of expectedCssPairs) {
   if (!tokensCss.includes(`${cssVar}: ${hex}`)) {
     console.error(`[wcag-aaa] tokens.css out of sync with tokens.json for ${cssVar}: ${hex}`);
     failures++;
+  }
+}
+
+// Verify tokens.json stays in sync with @sim-tracker/shared SHARED_THEME_COLORS
+for (const mode of ['light', 'dark']) {
+  const shared = SHARED_THEME_COLORS[mode];
+  const local = tokens[mode];
+  const scalarKeys = [
+    'canvas',
+    'surface',
+    'surfaceRaised',
+    'surfaceSunken',
+    'textPrimary',
+    'textSecondary',
+    'textMuted',
+    'borderSubtle',
+    'borderDefault',
+    'borderStrong',
+    'accentPrimary',
+    'accentHover',
+    'accentOnPrimary',
+    'accentLink',
+  ];
+  for (const key of scalarKeys) {
+    if (shared[key] !== local[key]) {
+      console.error(
+        `[wcag-aaa] tokens.json (${mode}.${key}=${local[key]}) out of sync with @sim-tracker/shared (${shared[key]})`,
+      );
+      failures++;
+    }
+  }
+  for (const statusName of Object.keys(shared.status)) {
+    for (const part of ['bg', 'fg', 'border']) {
+      if (shared.status[statusName][part] !== local.status[statusName][part]) {
+        console.error(
+          `[wcag-aaa] tokens.json (${mode}.status.${statusName}.${part}) out of sync with @sim-tracker/shared`,
+        );
+        failures++;
+      }
+    }
   }
 }
 

@@ -2,8 +2,8 @@ services:
   backend:
     container_name: sim-tracker-backend
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -36,8 +36,8 @@ services:
   frontend:
     container_name: sim-tracker-frontend
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
         VITE_API_BASE_URLS: ${VITE_API_BASE_URLS}

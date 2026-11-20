@@ -1,12 +1,6 @@
 import type { AxiosError } from 'axios';
-
-type ApiErrorEnvelope = {
-  success?: boolean;
-  statusCode?: number;
-  message?: string;
-  errorCode?: string;
-  details?: unknown;
-};
+import { ERROR_CODE_I18N_MAP, type ApiErrorEnvelope } from '@sim-tracker/shared';
+import { useI18nStore } from '@/i18n/i18n.store';
 
 export function getApiErrorMessage(
   error: unknown,
@@ -18,8 +12,23 @@ export function getApiErrorMessage(
     const response = maybeAxiosError.response;
     const data = response?.data;
 
-    if (data && typeof data.message === 'string') {
-      return data.message;
+    if (
+      data?.errorCode &&
+      Object.prototype.hasOwnProperty.call(ERROR_CODE_I18N_MAP, data.errorCode)
+    ) {
+      return useI18nStore.getState().t(ERROR_CODE_I18N_MAP[data.errorCode]);
+    }
+
+    if (data) {
+      if (typeof data.message === 'string' && data.message.trim().length > 0) {
+        return data.message;
+      }
+      if (Array.isArray(data.message) && data.message.length > 0) {
+        const firstMsg = data.message.find(
+          (m) => typeof m === 'string' && m.trim().length > 0,
+        );
+        if (firstMsg) return firstMsg;
+      }
     }
 
     if (!response) {
@@ -37,4 +46,3 @@ export function getApiErrorMessage(
 
   return fallbackMessage;
 }
-

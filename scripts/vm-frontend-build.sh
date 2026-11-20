@@ -29,14 +29,15 @@ export MSYS_NO_PATHCONV=1
 VITE_API_BASE_URL="${VITE_API_BASE_URL:-/backend/api}"
 VITE_API_BASE_URLS="${VITE_API_BASE_URLS:-/backend/api}"
 
-step "npm ci (frontend)"
-(cd "${ROOT_DIR}/frontend" && npm ci)
+step "npm ci (workspace: @sim-tracker/shared + sim-tracker-frontend)"
+(cd "${ROOT_DIR}" && npm ci --workspace=@sim-tracker/shared --workspace=sim-tracker-frontend --include-workspace-root)
 
-step "npm run build (VITE_API_BASE_URL=${VITE_API_BASE_URL})"
-(cd "${ROOT_DIR}/frontend" && \
+step "build @sim-tracker/shared + sim-tracker-frontend (VITE_API_BASE_URL=${VITE_API_BASE_URL})"
+(cd "${ROOT_DIR}" && npm run build --workspace=@sim-tracker/shared)
+(cd "${ROOT_DIR}" && \
   VITE_API_BASE_URL="${VITE_API_BASE_URL}" \
   VITE_API_BASE_URLS="${VITE_API_BASE_URLS}" \
-  npm run build)
+  npm run build --workspace=sim-tracker-frontend)
 
 ok "Build gotov: ${ROOT_DIR}/frontend/dist"
 

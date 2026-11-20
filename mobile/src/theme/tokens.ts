@@ -10,7 +10,10 @@
  * pristupačnog kontrasta na grafitnim površinama.
  */
 import { Platform, type TextStyle } from 'react-native';
+import { SHARED_THEME_COLORS } from '@sim-tracker/shared';
 import { colors } from '@/theme/colors';
+
+const dark = SHARED_THEME_COLORS.dark;
 
 export const palette = {
   /* ------------------------------- brand -------------------------------- */
@@ -23,32 +26,32 @@ export const palette = {
   background: colors.background,
   surface: colors.surface,
   surfaceMuted: colors.surfaceMuted,
-  surfaceSunken: '#070B12',
+  surfaceSunken: dark.surfaceSunken,
   border: colors.border,
-  borderStrong: '#344155',
+  borderStrong: dark.borderDefault,
 
   textPrimary: colors.text,
-  textSecondary: '#AEB9C8',
-  textMuted: '#718096',
-  inverse: '#FFFFFF',
+  textSecondary: dark.textSecondary,
+  textMuted: dark.textMuted,
+  inverse: dark.accentOnPrimary,
 
   graphite: '#050810',
   graphiteSoft: '#0D1421',
   graphite0050: 'rgba(255,255,255,0.08)',
 
-  /* ------------------------------ semantic ------------------------------- */
-  success: '#4ADE80',
-  successSoft: '#10281B',
-  successBorder: '#1E5132',
-  warning: '#FBBF24',
-  warningSoft: '#2A2110',
-  warningBorder: '#5B471B',
-  danger: '#FB7185',
-  dangerSoft: '#2E151B',
-  dangerBorder: '#632938',
-  info: '#60A5FA',
-  infoSoft: '#12233D',
-  infoBorder: '#274C77',
+  /* ------------------------------ semantic (WCAG AAA via @sim-tracker/shared) */
+  success: dark.status.success.fg,
+  successSoft: dark.status.success.bg,
+  successBorder: dark.status.success.border,
+  warning: dark.status.warning.fg,
+  warningSoft: dark.status.warning.bg,
+  warningBorder: dark.status.warning.border,
+  danger: dark.status.danger.fg,
+  dangerSoft: dark.status.danger.bg,
+  dangerBorder: dark.status.danger.border,
+  info: dark.status.info.fg,
+  infoSoft: dark.status.info.bg,
+  infoBorder: dark.status.info.border,
 
   overlayScrim: 'rgba(0, 0, 0, 0.78)',
 } as const;

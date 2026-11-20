@@ -1,0 +1,24 @@
+{
+  "name": "sim-tracker-monorepo",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend",
+    "mobile"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "check:i18n": "turbo run check:i18n",
+    "check:ui": "turbo run check:ui",
+    "check:wcag": "turbo run check:wcag",
+    "format:check": "turbo run format:check"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.13"
+  }
+}

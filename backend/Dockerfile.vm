@@ -2,27 +2,34 @@ ARG DEPS_IMAGE=simtracker-backend-deps:latest
 
 FROM ${DEPS_IMAGE} AS build
 WORKDIR /usr/app
-COPY prisma ./prisma
-RUN npx prisma generate
-COPY . .
-RUN chmod -R +x node_modules/.bin
-RUN npm run build
+
+COPY packages/shared ./packages/shared
+RUN chmod -R +x node_modules/.bin && npm run build --workspace=@sim-tracker/shared
+
+COPY backend/prisma ./backend/prisma
+RUN npx --workspace=sim-tracker-backend prisma generate
+
+COPY backend ./backend
+RUN npm run build --workspace=sim-tracker-backend
+
 
 FROM ${DEPS_IMAGE} AS runtime
 WORKDIR /usr/app
 
 ENV NODE_ENV=production
 
-COPY --from=build --chown=node:node /usr/app/dist ./dist
+COPY --from=build --chown=node:node /usr/app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=build --chown=node:node /usr/app/packages/shared/dist ./packages/shared/dist
+COPY --from=build --chown=node:node /usr/app/backend/dist ./dist
 COPY --from=build --chown=node:node /usr/app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build --chown=node:node /usr/app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY --from=build --chown=node:node /usr/app/prisma ./prisma
-COPY --from=build --chown=node:node /usr/app/src/templates ./templates
+COPY --from=build --chown=node:node /usr/app/backend/prisma ./prisma
+COPY --from=build --chown=node:node /usr/app/backend/src/templates ./templates
 
 # Napomena za VM bind-mount (/mnt/shared-app-files/sim-cards):
 # Kontejner radi pod non-root korisnikom `node` (UID/GID 1000). Na VM-u
 # osigurati `chown -R 1000:1000 /mnt/shared-app-files/sim-cards`.
-RUN mkdir -p /app/uploads && chown -R node:node /usr/app /app/uploads
+RUN mkdir -p /app/uploads /usr/app/uploads && chown -R node:node /usr/app /app/uploads
 USER node
 
 EXPOSE 3003

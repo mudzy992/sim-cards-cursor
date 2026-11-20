@@ -1,7 +1,1 @@
-export interface PaginatedResult<T> {
-  items: T[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
+export type { PaginatedResult } from '@sim-tracker/shared';

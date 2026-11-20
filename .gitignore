@@ -21,6 +21,8 @@ coverage/
 # Build
 backend/dist/
 frontend/dist/
+packages/*/dist/
+.turbo/
 mobile/.expo/
 mobile/.expo-shared/
 *.tar

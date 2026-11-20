@@ -1,6 +1,7 @@
-import type { UserRole } from './auth.types';
+import type { UserRole, UserStatus } from '@sim-tracker/shared';
+import type { PaginatedResult } from './common.types';
 
-export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+export type { UserStatus };
 
 export type UserListItem = {
   id: string;
@@ -18,10 +19,4 @@ export type UserListItem = {
   lastLoginAt: string | null;
 };
 
-export type UsersResponse = {
-  items: UserListItem[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-};
+export type UsersResponse = PaginatedResult<UserListItem>;

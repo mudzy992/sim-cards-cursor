@@ -21,7 +21,7 @@ docker build \
   -f "${ROOT_DIR}/backend/Dockerfile.deps" \
   -t "${DEPS_IMAGE_TAGGED}" \
   -t "${DEPS_IMAGE_LATEST}" \
-  "${ROOT_DIR}/backend"
+  "${ROOT_DIR}"
 ok "Image izgrađen: ${DEPS_IMAGE_TAGGED} (i tagovan kao ${DEPS_IMAGE_LATEST})"
 
 OUT_FILE="${ARTIFACTS_DIR}/${DEPS_IMAGE_NAME}-${IMAGE_TAG}.tar.gz"

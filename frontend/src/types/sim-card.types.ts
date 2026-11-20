@@ -1,11 +1,7 @@
-export type SimCardStatus =
-  | 'AVAILABLE'
-  | 'ASSIGNED'
-  | 'INSTALLED'
-  | 'DEFECTIVE'
-  | 'DEMOUNTED'
-  | 'RETURNED'
-  | 'DEACTIVATED';
+import type { SimCardStatus } from '@sim-tracker/shared';
+import type { PaginatedResult } from './common.types';
+
+export type { SimCardStatus };
 
 export type SimEventItem = {
   id: string;
@@ -68,18 +64,6 @@ export type ModeratedInstalledSimCardItem = SimCardItem & {
   installedAt: string | null;
 };
 
-export type ModeratedInstalledSimCardsResponse = {
-  items: ModeratedInstalledSimCardItem[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-};
+export type ModeratedInstalledSimCardsResponse = PaginatedResult<ModeratedInstalledSimCardItem>;
 
-export type SimCardsResponse = {
-  items: SimCardItem[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-};
+export type SimCardsResponse = PaginatedResult<SimCardItem>;

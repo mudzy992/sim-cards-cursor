@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
+    "@sim-tracker/shared": "*",
     "@react-native-community/netinfo": "11.5.2",
     "@react-navigation/native": "^7.1.8",
     "@tanstack/react-query": "^5.90.6",

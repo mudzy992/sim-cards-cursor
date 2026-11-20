@@ -1,6 +1,13 @@
-export type MeterType = 'SINGLE_PHASE' | 'THREE_PHASE';
-export type MeterSimCardState = 'INSTALLED' | 'NO_SIM';
-export type MeterStatus = 'ACTIVE' | 'DEFECTIVE' | 'IN_CALIBRATION' | 'INACTIVE';
+import type {
+  DemountTaskStatus,
+  InstallTaskStatus,
+  MeterSimCardState,
+  MeterStatus,
+  MeterType,
+} from '@sim-tracker/shared';
+import type { PaginatedResult } from './common.types';
+
+export type { MeterSimCardState, MeterStatus, MeterType };
 
 export type MeterTypeDefinitionRef = {
   id: string;
@@ -24,17 +31,17 @@ export type MeterItem = {
   lastSimDemountCategory?: string | null;
   installTasks?: Array<{
     id: string;
-    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    status: InstallTaskStatus;
     createdAt: string;
     assignedTo?: { id: string; firstName: string; lastName: string } | null;
   }>;
   demountTasks?: Array<{
-    id: string
-    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
-    createdAt: string
-    requestedResolution?: string | null
-    assignedTo?: { id: string; firstName: string; lastName: string } | null
-  }>
+    id: string;
+    status: DemountTaskStatus;
+    createdAt: string;
+    requestedResolution?: string | null;
+    assignedTo?: { id: string; firstName: string; lastName: string } | null;
+  }>;
   year?: number | null;
   calibrationYear?: number | null;
   notes?: string | null;
@@ -58,13 +65,7 @@ export type MetersListParams = {
   simCardState?: MeterSimCardState;
 };
 
-export type MetersResponse = {
-  items: MeterItem[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-};
+export type MetersResponse = PaginatedResult<MeterItem>;
 
 export type CreateMeterInput = {
   serialNumber: string;

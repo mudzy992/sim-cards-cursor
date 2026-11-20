@@ -1,4 +1,1 @@
-export type ApiEnvelope<T> = {
-  success: boolean;
-  data: T;
-};
+export type { ApiEnvelope, ApiErrorEnvelope, PaginatedResult } from '@sim-tracker/shared';
