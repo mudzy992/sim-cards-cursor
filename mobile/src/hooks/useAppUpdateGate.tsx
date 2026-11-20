@@ -21,6 +21,19 @@ type GateState =
   | { kind: 'opening_browser'; latest: AndroidLatestRelease; url: string }
   | { kind: 'error'; message: string };
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+  return fallback;
+}
+
 function getAndroidVersionCode(): number {
   const raw =
     // Android: nativeBuildVersion is versionCode (string)
@@ -97,9 +110,9 @@ export function useAppUpdateGate() {
           isMandatory,
           deferUntil: deferUntil ?? null,
         });
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (cancelled) return;
-        setState({ kind: 'error', message: e?.message ?? 'Update check failed' });
+        setState({ kind: 'error', message: getErrorMessage(e, 'Update check failed') });
       }
     })();
 
@@ -123,12 +136,10 @@ export function useAppUpdateGate() {
         const canOpen = await Linking.canOpenURL(url);
         if (!canOpen) throw new Error('Ne mogu otvoriti link u browseru.');
         await Linking.openURL(url);
-      } catch (e: any) {
-        Alert.alert(
-          'Nadogradnja nije uspjela',
-          e?.message ?? 'Ne mogu otvoriti download u browseru.',
-        );
-        setState({ kind: 'error', message: e?.message ?? 'Browser open failed' });
+      } catch (e: unknown) {
+        const message = getErrorMessage(e, 'Ne mogu otvoriti download u browseru.');
+        Alert.alert('Nadogradnja nije uspjela', message);
+        setState({ kind: 'error', message: getErrorMessage(e, 'Browser open failed') });
       }
     };
 

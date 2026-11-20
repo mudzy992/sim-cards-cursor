@@ -148,25 +148,34 @@ function toErrorMessage(error: unknown): string {
   return 'Unknown error'
 }
 
+type OutboxInstallationBody = {
+  serialNumber?: unknown;
+  year?: number;
+  photos?: unknown;
+  [key: string]: unknown;
+};
+
 async function sendOne(item: OutboxItem): Promise<void> {
   if (item.kind === 'INSTALLATION_RECORD_CREATE' && item.meta?.localPhotoUris?.length) {
-    const body = item.request.body as any
-    const serialNumber = typeof body?.serialNumber === 'string' ? body.serialNumber.trim() : ''
+    const rawBody = item.request.body;
+    const body: OutboxInstallationBody =
+      rawBody && typeof rawBody === 'object' ? (rawBody as OutboxInstallationBody) : {};
+    const serialNumber = typeof body.serialNumber === 'string' ? body.serialNumber.trim() : '';
     if (!serialNumber) {
-      throw new Error('Nedostaje serialNumber za upload fotografija (offline queue).')
+      throw new Error('Nedostaje serialNumber za upload fotografija (offline queue).');
     }
-    const uploaded: string[] = []
+    const uploaded: string[] = [];
     for (const uri of item.meta.localPhotoUris) {
       const path = await installationRecordsUploadApi.uploadPhoto(uri, {
         serialNumber,
-        year: body?.year,
-      })
-      uploaded.push(path)
+        year: typeof body.year === 'number' ? body.year : undefined,
+      });
+      uploaded.push(path);
     }
     item.request.body = {
       ...body,
-      photos: Array.isArray(body?.photos) ? [...body.photos, ...uploaded] : uploaded,
-    }
+      photos: Array.isArray(body.photos) ? [...body.photos, ...uploaded] : uploaded,
+    };
   }
   if (item.request.method === 'POST') {
     await axiosInstance.post(item.request.url, item.request.body)

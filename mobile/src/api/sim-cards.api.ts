@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { normalizeIccid } from '@sim-tracker/shared';
 import { axiosInstance } from './axios.instance';
 import { useAuthStore } from '@/store/auth.store'
 import { offlineCache } from '@/offline/offline-cache'
@@ -33,7 +34,8 @@ function requireUser() {
 
 export const simCardsApi = {
   scanByIccid: async (iccid: string): Promise<MobileSimCard> => {
-    const response = await axiosInstance.get(`/sim-cards/scan/${iccid}`);
+    const normalized = normalizeIccid(iccid);
+    const response = await axiosInstance.get(`/sim-cards/scan/${encodeURIComponent(normalized)}`);
     return response.data.data;
   },
 

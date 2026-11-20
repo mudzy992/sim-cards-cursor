@@ -25,4 +25,40 @@ export default defineConfig({
             },
         },
     },
+    preview: {
+        port: 4173,
+        proxy: {
+            '/api': {
+                target: 'http://127.0.0.1:3003',
+                changeOrigin: true,
+            },
+        },
+    },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: function (id) {
+                    if (!id.includes('node_modules'))
+                        return undefined;
+                    var normalized = id.replace(/\\/g, '/');
+                    if (/\/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run\/router)\//.test(normalized)) {
+                        return 'vendor-react';
+                    }
+                    if (/\/node_modules\/(antd|@ant-design\/|rc-[^/]+|@rc-component\/|@babel\/runtime|classnames|@emotion\/)/.test(normalized)) {
+                        return 'vendor-antd';
+                    }
+                    if (/\/node_modules\/(@tanstack\/react-query|axios|zustand|immer|use-sync-external-store)\//.test(normalized)) {
+                        return 'vendor-data';
+                    }
+                    if (/\/node_modules\/(socket\.io-client|engine\.io-client|socket\.io-parser|@socket\.io\/)/.test(normalized)) {
+                        return 'vendor-realtime';
+                    }
+                    if (/\/node_modules\/dayjs\//.test(normalized)) {
+                        return 'vendor-dayjs';
+                    }
+                    return undefined;
+                },
+            },
+        },
+    },
 });

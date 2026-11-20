@@ -14,6 +14,7 @@
  * afterScan (demount/install/inventory), beep + vibracija, validacija unosa.
  */
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { isValidIccid, normalizeIccid } from '@sim-tracker/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAudioPlayer } from 'expo-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -121,9 +122,9 @@ export default function ScanScreen() {
 
   const openResult = useCallback(
     (rawIccid: string) => {
-      const iccid = rawIccid.trim();
-      if (!iccid) {
-        setScanError('Unesite ispravan ICCID.');
+      const iccid = normalizeIccid(rawIccid);
+      if (!iccid || !isValidIccid(iccid)) {
+        setScanError('Unesite ispravan ICCID (10–30 cifara).');
         return;
       }
       setHasScanned(true);

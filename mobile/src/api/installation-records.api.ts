@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { axiosInstance } from './axios.instance';
 import { useAuthStore } from '@/store/auth.store'
 import { enqueueOutboxItem, syncOutbox } from '@/offline/outbox'
@@ -113,29 +112,27 @@ export type CreateInstallationRecordPayload =
       clientRequestId?: string;
     };
 
+export type QueueInstallationRecordPayload = CreateInstallationRecordPayload & {
+  localPhotoUris?: string[];
+};
+
 function requireUser() {
   const user = useAuthStore.getState().user
   if (!user) throw new Error('Not authenticated')
   return user
 }
 
-export async function queueInstallationRecord(payload: CreateInstallationRecordPayload): Promise<void> {
+export async function queueInstallationRecord(payload: QueueInstallationRecordPayload): Promise<void> {
   const user = requireUser()
-  const localPhotoUris = (payload as any)?.localPhotoUris as unknown
-  const sanitizedPayload =
-    localPhotoUris && typeof localPhotoUris === 'object'
-      ? (() => {
-          const { localPhotoUris: _ignored, ...rest } = payload as any
-          return rest as CreateInstallationRecordPayload
-        })()
-      : payload
+  const { localPhotoUris, ...rest } = payload
+  const sanitizedPayload: CreateInstallationRecordPayload = rest
   await enqueueOutboxItem(user, {
     kind: 'INSTALLATION_RECORD_CREATE',
     request: { method: 'POST', url: '/installation-records', body: sanitizedPayload },
     meta: {
       simCardId: payload.simCardId,
       meterId: 'meterId' in payload ? payload.meterId : undefined,
-      localPhotoUris: Array.isArray(localPhotoUris) ? (localPhotoUris as string[]) : undefined,
+      localPhotoUris: Array.isArray(localPhotoUris) ? localPhotoUris : undefined,
     },
   })
 }

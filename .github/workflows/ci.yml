@@ -19,10 +19,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -62,10 +62,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -98,6 +98,8 @@ jobs:
 
       - name: Run E2E tests against ephemeral PostgreSQL
         working-directory: backend
+        env:
+          SEED_ADMIN_PASSWORD: CiSeedPassword!123
         run: npm run test:e2e
 
   frontend:
@@ -108,39 +110,129 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Install workspace dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
         run: npm ci --workspace=@sim-tracker/shared --workspace=sim-tracker-frontend --include-workspace-root
 
       - name: Run Typecheck, Lint, i18n, WCAG AAA, UI, Tests & Build (Turborepo)
         run: npx turbo run typecheck lint check:i18n check:wcag check:ui test build --filter=sim-tracker-frontend
 
   mobile:
-    name: Mobile (Typecheck)
+    name: Mobile (Typecheck, Lint & Unit Tests)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Install workspace dependencies
         run: npm ci --workspace=@sim-tracker/shared --workspace=sim-tracker-mobile --include-workspace-root
 
-      - name: Typecheck (Turborepo)
-        run: npx turbo run typecheck --filter=sim-tracker-mobile
+      - name: Typecheck, Lint & Test (Turborepo)
+        run: npx turbo run typecheck lint test --filter=sim-tracker-mobile
+
+  browser-e2e:
+    name: Browser Smoke E2E (Playwright Chromium)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: simtracker_ci
+          POSTGRES_PASSWORD: ci_password_only
+          POSTGRES_DB: simtracker_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U simtracker_ci -d simtracker_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://simtracker_ci:ci_password_only@localhost:5432/simtracker_ci?schema=public
+      JWT_SECRET: ci-only-jwt-secret-key-min-32-chars-012345
+      JWT_REFRESH_SECRET: ci-only-jwt-refresh-secret-min-32-chars-6789
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      API_GLOBAL_PREFIX: api
+      FRONTEND_URLS: http://127.0.0.1:4173
+      PORT: '3003'
+      SEED_ADMIN_PASSWORD: CiSeedPassword!123
+      VITE_API_BASE_URL: /api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install workspace dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm ci --workspace=@sim-tracker/shared --workspace=sim-tracker-backend --workspace=sim-tracker-frontend --include-workspace-root
+
+      - name: Build @sim-tracker/shared
+        run: npx turbo run build --filter=@sim-tracker/shared
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Build backend & frontend
+        run: npx turbo run build --filter=sim-tracker-backend --filter=sim-tracker-frontend
+
+      - name: Deploy migrations & seed ephemeral PostgreSQL
+        working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npm run prisma:seed
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install chromium --with-deps
+
+      - name: Start backend & run Playwright browser smoke suite
+        working-directory: frontend
+        env:
+          E2E_WITH_BACKEND: 'true'
+          E2E_ADMIN_EMAIL: admin@simtracker.local
+          E2E_ADMIN_PASSWORD: CiSeedPassword!123
+        run: |
+          (cd ../backend && node dist/src/main.js > /tmp/backend-e2e.log 2>&1) &
+          BACKEND_PID=$!
+          trap 'kill $BACKEND_PID 2>/dev/null || true' EXIT
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3003/api/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3003/api/health
+
+          npm run test:e2e:browser
 
   docker-compose-validate:
     name: Docker & Compose Config Validation

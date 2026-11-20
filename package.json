@@ -1,6 +1,9 @@
 {
   "name": "sim-tracker-monorepo",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "npm@10.9.2",
   "workspaces": [
     "packages/*",

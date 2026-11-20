@@ -1,6 +1,7 @@
 import axios from 'axios'
+import { normalizeIccid } from '@sim-tracker/shared'
 import type { AuthUser } from '@/types/auth.types'
-import { simCardsApi } from '@/api/sim-cards.api'
+import { simCardsApi, type MobileSimCard } from '@/api/sim-cards.api'
 import { offlineCache } from './offline-cache'
 
 type ReconcileResult = {
@@ -18,22 +19,22 @@ export async function reconcileOfflineSimInventory(user: AuthUser): Promise<Reco
   }
 
   const slice = cached.slice(0, MAX_ITEMS)
-  const removedIccids: string[] = []
-  const updatedByIccid = new Map<string, unknown>()
+  const removedIccids = new Set<string>()
+  const updatedByIccid = new Map<string, MobileSimCard>()
 
   for (const entry of slice) {
-    const iccid = entry.iccid?.trim()
+    const iccid = normalizeIccid(entry.iccid ?? '')
     if (!iccid) continue
     try {
       const fresh = await simCardsApi.scanByIccid(iccid)
-      const status = String((fresh as { status?: unknown }).status ?? '')
-      const assignedToId = (fresh as { assignedTo?: { id?: string } | null }).assignedTo?.id
+      const status = String(fresh.status ?? '')
+      const assignedToId = fresh.assignedTo?.id
 
       const shouldRemove =
         status !== 'AVAILABLE' && !(status === 'ASSIGNED' && assignedToId === user.id)
 
       if (shouldRemove) {
-        removedIccids.push(iccid)
+        removedIccids.add(iccid)
         continue
       }
 
@@ -45,21 +46,21 @@ export async function reconcileOfflineSimInventory(user: AuthUser): Promise<Reco
     }
   }
 
-  if (removedIccids.length === 0 && updatedByIccid.size === 0) {
+  if (removedIccids.size === 0 && updatedByIccid.size === 0) {
     return { removedIccids: [], kept: cached.length, updated: 0 }
   }
 
-  const next = cached
-    .filter((c) => !removedIccids.includes(c.iccid))
+  const next: MobileSimCard[] = cached
+    .filter((c) => !removedIccids.has(normalizeIccid(c.iccid)))
     .map((c) => {
-      const fresh = updatedByIccid.get(c.iccid) as any
+      const fresh = updatedByIccid.get(normalizeIccid(c.iccid))
       if (!fresh) return c
       return { ...fresh, fromOfflineCache: undefined }
     })
 
-  await offlineCache.offlineSimInventory.set(user, next as any)
+  await offlineCache.offlineSimInventory.set(user, next)
   return {
-    removedIccids,
+    removedIccids: Array.from(removedIccids),
     kept: next.length,
     updated: updatedByIccid.size,
   }

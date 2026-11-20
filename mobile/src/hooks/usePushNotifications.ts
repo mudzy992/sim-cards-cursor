@@ -13,9 +13,14 @@ import { useQueryClient } from '@tanstack/react-query'
 
 function resolveProjectId(): string | undefined {
   const fromEnv = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
-  const fromExpoConfig = (Constants?.expoConfig?.extra as any)?.eas?.projectId;
-  const fromEasConfig = (Constants as any)?.easConfig?.projectId;
-  const fromManifest2 = (Constants as any)?.manifest2?.extra?.eas?.projectId;
+  type EasExtra = { eas?: { projectId?: string } };
+  const constantsWithEas = Constants as typeof Constants & {
+    easConfig?: { projectId?: string };
+    manifest2?: { extra?: EasExtra };
+  };
+  const fromExpoConfig = (Constants?.expoConfig?.extra as EasExtra | undefined)?.eas?.projectId;
+  const fromEasConfig = constantsWithEas?.easConfig?.projectId;
+  const fromManifest2 = constantsWithEas?.manifest2?.extra?.eas?.projectId;
   return fromEnv || fromEasConfig || fromExpoConfig || fromManifest2;
 }
 
@@ -108,8 +113,9 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
     if (!token) return null;
     console.log('[Push] Expo push token acquired:', token);
     return token;
-  } catch (e: any) {
-    console.error('[Push] getExpoPushTokenAsync failed:', e?.message ?? e);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : e;
+    console.error('[Push] getExpoPushTokenAsync failed:', message);
     return null;
   }
 }

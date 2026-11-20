@@ -8,7 +8,7 @@
  */
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radii, spacing, type } from '@/theme/tokens';
+import { palette, spacing, type } from '@/theme/tokens';
 
 export type WorkflowStepState = 'done' | 'current' | 'pending' | 'error';
 

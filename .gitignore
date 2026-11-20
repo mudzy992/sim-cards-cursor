@@ -25,6 +25,8 @@ packages/*/dist/
 .turbo/
 mobile/.expo/
 mobile/.expo-shared/
+playwright-report/
+test-results/
 *.tar
 
 # Deploy artifacts (deps image tarballs, frontend dist tarballs, saved

@@ -8,6 +8,7 @@ export function LogoWatermark({ opacity = 0.1 }: LogoWatermarkProps) {
   return (
     <View pointerEvents="none" style={styles.root}>
       <Image
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         source={require('../../assets/Logo.png')}
         style={[styles.image, { opacity }]}
         resizeMode="contain"

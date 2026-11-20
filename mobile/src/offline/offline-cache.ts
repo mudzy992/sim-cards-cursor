@@ -1,3 +1,4 @@
+import { normalizeIccid } from '@sim-tracker/shared'
 import type { AuthUser } from '@/types/auth.types'
 import type { DemountTaskItem } from '@/api/demount-tasks.api'
 import type { InstallTaskItem } from '@/api/install-tasks.api'
@@ -91,15 +92,17 @@ export const offlineCache = {
     },
     async upsert(user: AuthUser, card: MobileSimCard): Promise<void> {
       const existing = (await this.get(user))?.data ?? []
-      const filtered = existing.filter((c) => c.iccid !== card.iccid)
-      const next = [{ ...card, fromOfflineCache: undefined }, ...filtered]
+      const targetIccid = normalizeIccid(card.iccid)
+      const filtered = existing.filter((c) => normalizeIccid(c.iccid) !== targetIccid)
+      const next = [{ ...card, iccid: targetIccid, fromOfflineCache: undefined }, ...filtered]
       await this.set(user, next)
     },
     async removeByIccid(user: AuthUser, iccid: string): Promise<void> {
       const existing = (await this.get(user))?.data ?? []
+      const targetIccid = normalizeIccid(iccid)
       await this.set(
         user,
-        existing.filter((c) => c.iccid !== iccid),
+        existing.filter((c) => normalizeIccid(c.iccid) !== targetIccid),
       )
     },
     async clear(user: AuthUser): Promise<void> {
@@ -107,7 +110,8 @@ export const offlineCache = {
     },
     async findByIccid(user: AuthUser, iccid: string): Promise<MobileSimCard | null> {
       const existing = (await this.get(user))?.data ?? []
-      const found = existing.find((c) => c.iccid === iccid)
+      const targetIccid = normalizeIccid(iccid)
+      const found = existing.find((c) => normalizeIccid(c.iccid) === targetIccid)
       return found ? { ...found, fromOfflineCache: true } : null
     },
   },
