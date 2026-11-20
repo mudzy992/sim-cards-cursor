@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Card, Form, Input, Select, Space, Switch, Tabs, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { settingsApi } from '@/api/settings.api';
 import { mailApi, type MailTemplate } from '@/api/mail.api';
 import { useTranslation } from '@/i18n';
@@ -378,6 +379,7 @@ function TemplatesCard() {
 
 export default function EmailSettingsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data: settings = [], isLoading } = useQuery<SettingRow[]>({
     queryKey: ['settings'],
     queryFn: () => settingsApi.list(),
@@ -407,7 +409,7 @@ export default function EmailSettingsPage() {
           <Typography.Paragraph type="secondary" className="!mb-0 max-w-2xl">
             {t('emailSettings.pageIntro')}
           </Typography.Paragraph>
-          <Button href="/settings">{t('emailSettings.backToSettings')}</Button>
+          <Button onClick={() => navigate('/settings')}>{t('emailSettings.backToSettings')}</Button>
         </Space>
       </Card>
 

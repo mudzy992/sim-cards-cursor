@@ -19,5 +19,9 @@ COPY --from=build /usr/app/node_modules/@prisma/client ./node_modules/@prisma/cl
 COPY --from=build /usr/app/prisma ./prisma
 COPY --from=build /usr/app/src/templates ./templates
 
+# Napomena za VM bind-mount (/mnt/shared-app-files/sim-cards):
+# Trenutni runtime ostaje pod podrazumijevanim korisnikom kako ne bi došlo do EACCES
+# nad postojećim host fajlovima; nakon `chown -R 1000:1000 /mnt/shared-app-files/sim-cards`
+# na VM-u ovdje se može uključiti `USER node`.
 EXPOSE 3003
 CMD ["node", "dist/src/main.js"]

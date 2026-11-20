@@ -190,6 +190,12 @@ const en: TranslationDictionary = {
       notFullyConfigured: 'System is not fully configured',
       missingKeysIntro: 'The following key settings are missing or unconfigured:',
     },
+    errorBoundary: {
+      title: 'An unexpected error occurred on this page',
+      subtitle: 'Try reloading the view or return to the home page.',
+      retry: 'Try again',
+      backHome: 'Home',
+    },
   },
 
   errors: {
@@ -206,6 +212,15 @@ const en: TranslationDictionary = {
     generic: {
       title: 'Error',
       subtitle: 'Something went wrong.',
+    },
+    codes: {
+      AUTH_INVALID_CREDENTIALS: 'Invalid credentials.',
+      AUTH_INVALID_REFRESH_TOKEN: 'Session expired. Please sign in again.',
+      AUTH_EMAIL_IN_USE: 'This email address is already in use.',
+      PRISMA_UNIQUE_CONFLICT: 'A record with this unique value already exists.',
+      PRISMA_RECORD_NOT_FOUND: 'Requested record was not found.',
+      PRISMA_FOREIGN_KEY_VIOLATION: 'Referenced record does not exist.',
+      PRISMA_RELATION_VIOLATION: 'Operation blocked by existing related records.',
     },
   },
 
@@ -667,6 +682,7 @@ const en: TranslationDictionary = {
       loadingCards: 'Loading shipment cards…',
       noCardsInShipment: 'This shipment has no imported SIM cards — nothing to print.',
       noCardsInRange: 'The selected range contains no cards.',
+      previewPaginationInfo: 'Showing sheets {{from}}–{{to}} of {{total}} (all sheets will print)',
       checklistTitle: 'Pre-print checklist',
       openPrintDialog: 'Open print dialog',
       checklistIntro: 'Labels print at actual size (mm). In the print dialog, make sure to:',

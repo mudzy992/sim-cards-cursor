@@ -134,6 +134,7 @@ export function usePushNotifications() {
 
     (async () => {
       const mobilePushEnabled = await settingsApi.getMobilePushEnabled();
+      if (!isMounted) return;
       if (!mobilePushEnabled) {
         console.log(
           '[Push] Globalni flag mobile.push.enabled = false, preskačem registraciju push notifikacija.',
@@ -149,6 +150,7 @@ export function usePushNotifications() {
       }
 
       const Notifications = await import('expo-notifications');
+      if (!isMounted) return;
       responseListener =
         Notifications.addNotificationResponseReceivedListener((response) => {
           const data = response.notification.request.content.data as {

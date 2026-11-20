@@ -190,6 +190,12 @@ const bs: TranslationDictionary = {
       notFullyConfigured: 'Sistem nije potpuno podešen',
       missingKeysIntro: 'Nedostaju ili nisu podešene ključne postavke:',
     },
+    errorBoundary: {
+      title: 'Došlo je do neočekivane greške na stranici',
+      subtitle: 'Pokušajte ponovo učitati prikaz ili se vratite na početnu stranicu.',
+      retry: 'Pokušaj ponovo',
+      backHome: 'Početna',
+    },
   },
 
   errors: {
@@ -206,6 +212,15 @@ const bs: TranslationDictionary = {
     generic: {
       title: 'Greška',
       subtitle: 'Nešto je pošlo po zlu.',
+    },
+    codes: {
+      AUTH_INVALID_CREDENTIALS: 'Neispravni pristupni podaci.',
+      AUTH_INVALID_REFRESH_TOKEN: 'Sesija je istekla. Prijavite se ponovo.',
+      AUTH_EMAIL_IN_USE: 'Navedena email adresa je već zauzeta.',
+      PRISMA_UNIQUE_CONFLICT: 'Zapis s ovom jedinstvenom vrijednošću već postoji.',
+      PRISMA_RECORD_NOT_FOUND: 'Traženi zapis nije pronađen.',
+      PRISMA_FOREIGN_KEY_VIOLATION: 'Povezani zapis ne postoji ili se referencira nevažeći ID.',
+      PRISMA_RELATION_VIOLATION: 'Operacija nije moguća zbog postojećih povezanih zapisa.',
     },
   },
 
@@ -667,6 +682,7 @@ const bs: TranslationDictionary = {
       loadingCards: 'Učitavam kartice isporuke…',
       noCardsInShipment: 'Ova isporuka nema uvezenih SIM kartica — nema šta printati.',
       noCardsInRange: 'Odabrani opseg ne sadrži nijednu karticu.',
+      previewPaginationInfo: 'Prikazani listovi {{from}}–{{to}} od ukupno {{total}} (svi listovi idu u print)',
       checklistTitle: 'Kontrolna lista prije printanja',
       openPrintDialog: 'Otvori print dijalog',
       checklistIntro: 'Etikete se printaju u stvarnoj veličini (mm). U dijalogu za print obavezno:',

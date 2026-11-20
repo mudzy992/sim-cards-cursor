@@ -16,4 +16,4 @@ export interface TranslationDictionary {
 }
 
 /** Values that can be interpolated into a translation string, e.g. t('a.b', { count: 3 }) */
-export type TranslationParams = Record<string, string | number>;
+export type TranslationParams = Record<string, string | number | undefined>;

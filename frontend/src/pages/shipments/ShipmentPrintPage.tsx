@@ -10,6 +10,7 @@ import {
   Empty,
   InputNumber,
   Modal,
+  Pagination,
   Progress,
   Result,
   Segmented,
@@ -104,6 +105,8 @@ export default function ShipmentPrintPage() {
   const [testSheetOnly, setTestSheetOnly] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [zoomMode, setZoomMode] = useState<'fit' | 'full'>('fit');
+  const [previewPage, setPreviewPage] = useState(1);
+  const PREVIEW_SHEETS_PER_PAGE = 6;
 
   /* ------------------------------------ podaci --------------------------------------- */
   const [loadProgress, setLoadProgress] = useState<{ fetched: number; total: number } | null>(null);
@@ -164,6 +167,15 @@ export default function ShipmentPrintPage() {
     () => buildSheets(cardsInRange, layout, effectiveStartOffset, copies),
     [cardsInRange, layout, effectiveStartOffset, copies],
   );
+  const previewTotalPages = Math.max(1, Math.ceil(sheets.length / PREVIEW_SHEETS_PER_PAGE));
+  const effectivePreviewPage = clamp(previewPage, 1, previewTotalPages);
+  const visiblePreviewSheets = useMemo(() => {
+    const start = (effectivePreviewPage - 1) * PREVIEW_SHEETS_PER_PAGE;
+    return sheets.slice(start, start + PREVIEW_SHEETS_PER_PAGE).map((cells, offset) => ({
+      cells,
+      sheetIndex: start + offset,
+    }));
+  }, [sheets, effectivePreviewPage]);
   const printSheets = testSheetOnly ? sheets.slice(0, 1) : sheets;
 
   const totalLabels = useMemo(
@@ -718,21 +730,54 @@ export default function ShipmentPrintPage() {
             </Card>
           ) : (
             <div className="space-y-8 pb-16">
-              {sheets.map((cells, i) => (
+              {sheets.length > PREVIEW_SHEETS_PER_PAGE ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
+                  <span className="text-xs text-slate-600">
+                    {t('shipments.printPage.previewPaginationInfo', {
+                      from: (effectivePreviewPage - 1) * PREVIEW_SHEETS_PER_PAGE + 1,
+                      to: Math.min(effectivePreviewPage * PREVIEW_SHEETS_PER_PAGE, sheets.length),
+                      total: sheets.length,
+                    })}
+                  </span>
+                  <Pagination
+                    size="small"
+                    current={effectivePreviewPage}
+                    pageSize={PREVIEW_SHEETS_PER_PAGE}
+                    total={sheets.length}
+                    showSizeChanger={false}
+                    onChange={(page) => setPreviewPage(page)}
+                  />
+                </div>
+              ) : null}
+
+              {visiblePreviewSheets.map(({ cells, sheetIndex }) => (
                 <LabelSheetPreview
-                  key={i}
+                  key={sheetIndex}
                   cells={cells}
                   layout={layout}
                   scale={scale}
-                  sheetNumber={i + 1}
+                  sheetNumber={sheetIndex + 1}
                   totalSheets={sheets.length}
-                  interactive={i === 0}
+                  interactive={sheetIndex === 0}
                   showGuides
                   makeLines={makeLines}
                   lineGapMm={LABEL_LINE_GAP_MM}
                   onPickStart={(cellIndex) => setStartOffset(cellIndex)}
                 />
               ))}
+
+              {sheets.length > PREVIEW_SHEETS_PER_PAGE ? (
+                <div className="flex justify-center pt-2">
+                  <Pagination
+                    size="small"
+                    current={effectivePreviewPage}
+                    pageSize={PREVIEW_SHEETS_PER_PAGE}
+                    total={sheets.length}
+                    showSizeChanger={false}
+                    onChange={(page) => setPreviewPage(page)}
+                  />
+                </div>
+              ) : null}
             </div>
           )}
         </div>

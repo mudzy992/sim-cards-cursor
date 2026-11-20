@@ -1,9 +1,10 @@
 import { Alert, Layout } from 'antd';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useNotificationSocket } from '@/hooks/useNotificationSocket';
 import { Breadcrumb } from './Breadcrumb';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { PageErrorBoundary } from './PageErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '@/store/auth.store';
 import { useState } from 'react';
@@ -17,8 +18,10 @@ export function AppLayout() {
 
   const user = useAuthStore((s) => s.user);
   const featuresQuery = useAppFeatures();
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   return (
     <Layout className="min-h-screen bg-slate-50">
@@ -49,7 +52,12 @@ export function AppLayout() {
               />
             ) : null}
             <div className="rounded-2xl border border-slate-200 bg-surface p-4 shadow-card sm:p-6">
-              <Outlet />
+              <PageErrorBoundary
+                resetKey={location.pathname}
+                onGoHome={() => navigate('/')}
+              >
+                <Outlet />
+              </PageErrorBoundary>
             </div>
           </div>
         </Content>

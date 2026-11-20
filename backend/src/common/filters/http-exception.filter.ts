@@ -7,6 +7,24 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { ErrorCodes } from '../constants/error-codes';
+
+function defaultErrorCodeForStatus(status: number): ErrorCodes | undefined {
+  switch (status) {
+    case HttpStatus.UNAUTHORIZED:
+      return ErrorCodes.UNAUTHORIZED;
+    case HttpStatus.FORBIDDEN:
+      return ErrorCodes.FORBIDDEN;
+    case HttpStatus.NOT_FOUND:
+      return ErrorCodes.NOT_FOUND;
+    case HttpStatus.CONFLICT:
+      return ErrorCodes.CONFLICT;
+    case HttpStatus.INTERNAL_SERVER_ERROR:
+      return ErrorCodes.INTERNAL_SERVER_ERROR;
+    default:
+      return undefined;
+  }
+}
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -46,15 +64,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let details: unknown;
 
     if (raw && typeof raw === 'object') {
-      const rawObject = raw as { code?: unknown; details?: unknown };
+      const rawObject = raw as { code?: unknown; errorCode?: unknown; details?: unknown };
 
       if (typeof rawObject.code === 'string') {
         errorCode = rawObject.code;
+      } else if (typeof rawObject.errorCode === 'string') {
+        errorCode = rawObject.errorCode;
       }
 
       if (rawObject.details !== undefined) {
         details = rawObject.details;
       }
+    }
+
+    if (!errorCode) {
+      errorCode = defaultErrorCodeForStatus(status);
     }
 
     response.status(status).json({

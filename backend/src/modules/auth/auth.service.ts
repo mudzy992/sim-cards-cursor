@@ -16,6 +16,7 @@ import { normalizeEmail } from '../../common/utils/email-normalizer.util';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ErrorCodes } from '../../common/constants/error-codes';
 
 type SafeUser = {
   id: string;
@@ -60,12 +61,18 @@ export class AuthService {
     const user = await this.findUserWithBranch(loginDto.emailOrUsername);
 
     if (!user || user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException({
+        message: 'Invalid credentials',
+        code: ErrorCodes.AUTH_INVALID_CREDENTIALS,
+      });
     }
 
     const passwordMatches = await bcrypt.compare(loginDto.password, user.password);
     if (!passwordMatches) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException({
+        message: 'Invalid credentials',
+        code: ErrorCodes.AUTH_INVALID_CREDENTIALS,
+      });
     }
 
     const modBranchIds = await this.loadBranchModeratorIds(user.id, user.role);
@@ -110,7 +117,10 @@ export class AuthService {
     });
 
     if (existing) {
-      throw new ConflictException('Email is already in use');
+      throw new ConflictException({
+        message: 'Email is already in use',
+        code: ErrorCodes.AUTH_EMAIL_IN_USE,
+      });
     }
 
     const saltRounds = Number(this.configService.get('BCRYPT_SALT_ROUNDS', 12));
@@ -159,7 +169,10 @@ export class AuthService {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       });
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException({
+        message: 'Invalid refresh token',
+        code: ErrorCodes.AUTH_INVALID_REFRESH_TOKEN,
+      });
     }
 
     const user = await this.prisma.user.findUnique({
@@ -171,12 +184,18 @@ export class AuthService {
     });
 
     if (!user || !user.refreshToken || user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Refresh token rejected');
+      throw new UnauthorizedException({
+        message: 'Refresh token rejected',
+        code: ErrorCodes.AUTH_INVALID_REFRESH_TOKEN,
+      });
     }
 
     const tokenMatches = await this.verifyTokenHash(refreshToken, user.refreshToken);
     if (!tokenMatches) {
-      throw new UnauthorizedException('Refresh token mismatch');
+      throw new UnauthorizedException({
+        message: 'Refresh token mismatch',
+        code: ErrorCodes.AUTH_INVALID_REFRESH_TOKEN,
+      });
     }
 
     const tokenPair = await this.createTokenPair({

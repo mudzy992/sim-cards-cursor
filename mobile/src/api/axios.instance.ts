@@ -6,6 +6,8 @@ const API_BASE_URL =
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
+let refreshPromise: Promise<string> | null = null;
+
 export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
 });
@@ -36,21 +38,30 @@ axiosInstance.interceptors.response.use(
     originalRequest._retry = true;
 
     try {
-      const refreshResponse = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-        refreshToken: state.refreshToken,
-      });
+      if (!refreshPromise) {
+        refreshPromise = axios
+          .post(`${API_BASE_URL}/auth/refresh`, {
+            refreshToken: state.refreshToken,
+          })
+          .then(async (refreshResponse) => {
+            const payload = refreshResponse.data.data;
+            await useAuthStore.getState().setSession({
+              user: payload.user,
+              accessToken: payload.accessToken,
+              refreshToken: payload.refreshToken,
+            });
+            return payload.accessToken as string;
+          })
+          .finally(() => {
+            refreshPromise = null;
+          });
+      }
 
-      const payload = refreshResponse.data.data;
-      await state.setSession({
-        user: payload.user,
-        accessToken: payload.accessToken,
-        refreshToken: payload.refreshToken,
-      });
-
-      originalRequest.headers.Authorization = `Bearer ${payload.accessToken}`;
+      const newAccessToken = await refreshPromise;
+      originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
       return axiosInstance(originalRequest);
     } catch (refreshError) {
-      await state.clearSession();
+      await useAuthStore.getState().clearSession();
       return Promise.reject(refreshError);
     }
   },

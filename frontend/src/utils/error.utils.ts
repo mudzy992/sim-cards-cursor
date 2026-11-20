@@ -8,6 +8,16 @@ type ApiErrorEnvelope<T = unknown> = ApiEnvelope<T> & {
   details?: unknown;
 };
 
+const KNOWN_ERROR_CODE_KEYS: Record<string, string> = {
+  AUTH_INVALID_CREDENTIALS: 'errors.codes.AUTH_INVALID_CREDENTIALS',
+  AUTH_INVALID_REFRESH_TOKEN: 'errors.codes.AUTH_INVALID_REFRESH_TOKEN',
+  AUTH_EMAIL_IN_USE: 'errors.codes.AUTH_EMAIL_IN_USE',
+  PRISMA_UNIQUE_CONFLICT: 'errors.codes.PRISMA_UNIQUE_CONFLICT',
+  PRISMA_RECORD_NOT_FOUND: 'errors.codes.PRISMA_RECORD_NOT_FOUND',
+  PRISMA_FOREIGN_KEY_VIOLATION: 'errors.codes.PRISMA_FOREIGN_KEY_VIOLATION',
+  PRISMA_RELATION_VIOLATION: 'errors.codes.PRISMA_RELATION_VIOLATION',
+};
+
 export function getApiErrorMessage(
   error: unknown,
   fallbackMessage: string,
@@ -17,6 +27,10 @@ export function getApiErrorMessage(
   if (maybeAxiosError?.isAxiosError) {
     const response = maybeAxiosError.response;
     const data = response?.data;
+
+    if (data?.errorCode && data.errorCode in KNOWN_ERROR_CODE_KEYS) {
+      return translateCurrent(KNOWN_ERROR_CODE_KEYS[data.errorCode]);
+    }
 
     if (data) {
       if (typeof data.message === 'string' && data.message.trim().length > 0) {

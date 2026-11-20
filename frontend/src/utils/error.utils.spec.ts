@@ -27,6 +27,22 @@ describe('getApiErrorMessage', () => {
     expect(getApiErrorMessage(err, 'Fallback')).toBe('ICCID must be 19 digits');
   });
 
+  it('translates known backend errorCode into active UI language', () => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, 'bs');
+    const errBs = makeAxiosError(401, {
+      errorCode: 'AUTH_INVALID_CREDENTIALS',
+      message: 'Invalid credentials',
+    });
+    expect(getApiErrorMessage(errBs, 'Fallback')).toContain('Neispravni');
+
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en');
+    const errEn = makeAxiosError(409, {
+      errorCode: 'PRISMA_UNIQUE_CONFLICT',
+      message: 'Record with this unique value already exists',
+    });
+    expect(getApiErrorMessage(errEn, 'Fallback')).toContain('already exists');
+  });
+
   it('returns localized network error when no response', () => {
     const err = makeAxiosError(undefined);
     expect(getApiErrorMessage(err, 'Fallback')).toContain('internet connection');

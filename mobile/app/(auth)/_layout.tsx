@@ -7,7 +7,6 @@ export default function AuthLayout() {
       screenOptions={{
         headerShown: false,
         statusBarStyle: 'light',
-        statusBarColor: palette.graphite,
         contentStyle: { backgroundColor: palette.graphite },
       }}
     />

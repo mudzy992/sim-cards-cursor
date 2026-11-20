@@ -1,7 +1,11 @@
 # SIM Tracker — Plan implementacije (Phase 3 & Phase 4)
 
 **Grana:** `arena/015aa78f-sim-cards-cursor`  
-**Status:** Faza 1 (Audit) i Faza 2 (Specifikacije i plan) su završene. **Čeka se eksplicitno odobrenje korisnika (`"Odobravam početak implementacije"`) prije bilo kakvih izmjena aplikacijskog koda.**
+**Status:** Implementacija je završena (Faza 1–4 kompletirane, uključujući naknadna poboljšanja za stabilnu paginaciju štampe, 4-poljnu provjeru duplikata, `ErrorBoundary`, `ErrorCodes`, `reorderFields` DTO, paginaciju pregleda naljepnica i `mobile/` typecheck/401 mutex). Ovaj dokument služi kao historijska referenca plana izvršenja.
+
+> **Napomena za VM produkcijski deploy:**
+> 1. `backend/Dockerfile.vm` svjesno ostavlja podrazumijevanog korisnika radi kompatibilnosti s postojećim host bind-mount direktorijem `/mnt/shared-app-files/sim-cards`; nakon `chown -R 1000:1000 /mnt/shared-app-files/sim-cards` na VM-u može se uključiti `USER node`.
+> 2. Rotirati ranije committane tajne (Firebase Admin SDK ključ, DB/JWT/SMTP tajne iz ranijih `.env` fajlova) prije narednog produkcijskog izdanja.
 
 ---
 

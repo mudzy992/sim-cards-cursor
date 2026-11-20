@@ -16,6 +16,7 @@ import {
 } from 'antd';
 import { settingsApi } from '@/api/settings.api';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { useTranslation } from '@/i18n';
 import {
@@ -251,6 +252,7 @@ function ManifestGroupCard(props: ManifestGroupCardProps) {
 
 export default function SettingsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [manifestForm] = Form.useForm();
   const [legacyForm] = Form.useForm();
   const queryClient = useQueryClient();
@@ -535,7 +537,7 @@ export default function SettingsPage() {
           <Typography.Paragraph type="secondary" className="!mb-0 max-w-2xl">
             {t('settings.emailCardIntro')}
           </Typography.Paragraph>
-          <Button type="primary" href="/settings/email">
+          <Button type="primary" onClick={() => navigate('/settings/email')}>
             {t('settings.openEmailSettings')}
           </Button>
         </Space>

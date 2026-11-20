@@ -22,6 +22,7 @@ import { CreateMeterTypeDefinitionDto } from './dto/create-meter-type-definition
 import { UpdateMeterTypeDefinitionDto } from './dto/update-meter-type-definition.dto';
 import { CreateMeterTypeFieldDto } from './dto/create-meter-type-field.dto';
 import { UpdateMeterTypeFieldDto } from './dto/update-meter-type-field.dto';
+import { ReorderMeterTypeFieldsDto } from './dto/reorder-meter-type-fields.dto';
 
 @ApiTags('meter-type-definitions')
 @ApiBearerAuth()
@@ -123,8 +124,8 @@ export class MeterTypeDefinitionsController {
   @ApiOperation({ summary: 'Promijeni redoslijed polja tipa brojila' })
   reorderFields(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { fieldIds: string[] },
+    @Body() dto: ReorderMeterTypeFieldsDto,
   ) {
-    return this.meterTypeFieldsService.reorder(id, body.fieldIds);
+    return this.meterTypeFieldsService.reorder(id, dto.fieldIds);
   }
 }
