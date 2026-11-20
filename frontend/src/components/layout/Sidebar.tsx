@@ -16,31 +16,32 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { useAppFeatures } from '@/hooks/useAppFeatures';
 import { useTranslation } from '@/i18n';
+import { ROUTES } from '@/config/routes';
 
 const { Sider } = Layout;
 
 type SidebarProps = {
-  mobileOpen: boolean
-  onMobileClose: () => void
-}
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+};
 
 function Brand({ subtitle }: { subtitle: string }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-default bg-accent text-sm font-bold text-on-accent">
         S
       </div>
       <div className="min-w-0 leading-tight">
-        <div className="truncate text-[15px] font-semibold text-slate-900">SIM Tracker</div>
-        <div className="truncate text-[11px] text-slate-500">{subtitle}</div>
+        <div className="truncate text-[15px] font-semibold text-fg-primary">SIM Tracker</div>
+        <div className="truncate text-[11px] text-fg-muted">{subtitle}</div>
       </div>
     </div>
-  )
+  );
 }
 
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
-  const screens = Grid.useBreakpoint()
+  const screens = Grid.useBreakpoint();
   const user = useAuthStore((state) => state.user);
   const role = user?.role;
   const isModerator = role === 'USER' && (user?.branchModeratorBranchIds?.length ?? 0) > 0;
@@ -51,118 +52,140 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const items = [
     {
-      key: '/dashboard',
+      key: ROUTES.dashboard,
       icon: <DashboardOutlined />,
-      label: <Link to="/dashboard">{t('layout.sidebar.dashboard')}</Link>,
+      label: <Link to={ROUTES.dashboard}>{t('layout.sidebar.dashboard')}</Link>,
     },
     {
-      key: '/analytics',
+      key: ROUTES.analytics,
       icon: <AreaChartOutlined />,
-      label: <Link to="/analytics">{t('layout.sidebar.analytics')}</Link>,
+      label: <Link to={ROUTES.analytics}>{t('layout.sidebar.analytics')}</Link>,
     },
     ...(role === 'SYSTEM_ADMIN' || role === 'DIST_ADMIN'
       ? [
           {
-            key: '/shipments',
+            key: ROUTES.shipments,
             icon: <InboxOutlined />,
-            label: <Link to="/shipments">{t('layout.sidebar.shipments')}</Link>,
+            label: <Link to={ROUTES.shipments}>{t('layout.sidebar.shipments')}</Link>,
           },
           {
-            key: '/meters',
+            key: ROUTES.meters,
             icon: <ThunderboltOutlined />,
-            label: <Link to="/meters">{t('layout.sidebar.meters')}</Link>,
+            label: <Link to={ROUTES.meters}>{t('layout.sidebar.meters')}</Link>,
           },
           {
-            key: '/installation-records',
+            key: ROUTES.installationRecords,
             icon: <FileTextOutlined />,
-            label: <Link to="/installation-records">{t('layout.sidebar.installationRecords')}</Link>,
+            label: (
+              <Link to={ROUTES.installationRecords}>
+                {t('layout.sidebar.installationRecords')}
+              </Link>
+            ),
           },
           {
-            key: '/users',
+            key: ROUTES.users,
             icon: <UserOutlined />,
-            label: <Link to="/users">{t('layout.sidebar.users')}</Link>,
+            label: <Link to={ROUTES.users}>{t('layout.sidebar.users')}</Link>,
           },
           {
-            key: '/branch-email-recipients',
+            key: ROUTES.branchEmailRecipients,
             icon: <MailOutlined />,
-            label: <Link to="/branch-email-recipients">{t('layout.sidebar.branchEmailRecipients')}</Link>,
+            label: (
+              <Link to={ROUTES.branchEmailRecipients}>
+                {t('layout.sidebar.branchEmailRecipients')}
+              </Link>
+            ),
           },
           ...(pushCampaignsEnabled
             ? [
                 {
-                  key: '/push-campaigns',
+                  key: ROUTES.pushCampaigns,
                   icon: <NotificationOutlined />,
-                  label: <Link to="/push-campaigns">{t('layout.sidebar.pushCampaigns')}</Link>,
+                  label: (
+                    <Link to={ROUTES.pushCampaigns}>{t('layout.sidebar.pushCampaigns')}</Link>
+                  ),
                 },
               ]
             : []),
           {
-            key: '/activity-log',
+            key: ROUTES.activityLog,
             icon: <UnorderedListOutlined />,
-            label: <Link to="/activity-log">{t('layout.sidebar.activityLog')}</Link>,
+            label: <Link to={ROUTES.activityLog}>{t('layout.sidebar.activityLog')}</Link>,
           },
         ]
       : []),
     ...(isModerator
       ? [
           {
-            key: '/sim-cards',
+            key: ROUTES.simCards,
             icon: <CreditCardOutlined />,
-            label: <Link to="/sim-cards">{t('layout.sidebar.simCards')}</Link>,
+            label: <Link to={ROUTES.simCards}>{t('layout.sidebar.simCards')}</Link>,
           },
           {
-            key: '/meters',
+            key: ROUTES.meters,
             icon: <ThunderboltOutlined />,
-            label: <Link to="/meters">{t('layout.sidebar.meters')}</Link>,
+            label: <Link to={ROUTES.meters}>{t('layout.sidebar.meters')}</Link>,
           },
         ]
       : []),
     ...(role === 'USER'
       ? [
           {
-            key: '/installation-records',
+            key: ROUTES.installationRecords,
             icon: <FileTextOutlined />,
-            label: <Link to="/installation-records">{t('layout.sidebar.installationRecords')}</Link>,
+            label: (
+              <Link to={ROUTES.installationRecords}>
+                {t('layout.sidebar.installationRecords')}
+              </Link>
+            ),
           },
         ]
       : []),
     ...(role === 'SYSTEM_ADMIN'
       ? [
           {
-            key: '/settings',
+            key: ROUTES.settings,
             icon: <SettingOutlined />,
-            label: <Link to="/settings">{t('layout.sidebar.settings')}</Link>,
+            label: <Link to={ROUTES.settings}>{t('layout.sidebar.settings')}</Link>,
           },
           {
-            key: '/settings/email',
+            key: ROUTES.settingsEmail,
             icon: <MailOutlined />,
-            label: <Link to="/settings/email">{t('layout.sidebar.emailSmtp')}</Link>,
+            label: <Link to={ROUTES.settingsEmail}>{t('layout.sidebar.emailSmtp')}</Link>,
           },
           {
-            key: '/app-releases',
+            key: ROUTES.appReleases,
             icon: <SettingOutlined />,
-            label: <Link to="/app-releases">{t('layout.sidebar.appReleases')}</Link>,
+            label: <Link to={ROUTES.appReleases}>{t('layout.sidebar.appReleases')}</Link>,
           },
         ]
       : []),
   ];
 
-  const isMobile = !screens.lg
+  const isMobile = !screens.lg;
 
-  const isSimCards = location.pathname === '/sim-cards' || location.pathname.startsWith('/sim-cards/')
-  const selectedKey = isSimCards ? (isModerator ? '/sim-cards' : '/shipments') : location.pathname
+  const isSimCards =
+    location.pathname === ROUTES.simCards ||
+    location.pathname.startsWith(`${ROUTES.simCards}/`);
+  const selectedKey = isSimCards
+    ? isModerator
+      ? ROUTES.simCards
+      : ROUTES.shipments
+    : location.pathname;
 
   const menuNode = (
-    <Menu
-      mode="inline"
-      selectedKeys={[selectedKey]}
-      items={items}
-      onClick={() => {
-        if (!isMobile) return
-        onMobileClose()
-      }}
-    />
-  )
+    <nav aria-label={t('layout.a11y.primaryNavigation')}>
+      <Menu
+        mode="inline"
+        selectedKeys={[selectedKey]}
+        items={items}
+        onClick={() => {
+          if (!isMobile) return;
+          onMobileClose();
+        }}
+      />
+    </nav>
+  );
 
   if (isMobile) {
     return (
@@ -171,16 +194,16 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         onClose={onMobileClose}
         placement="left"
         width={260}
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
         title={<Brand subtitle={t('layout.sidebar.consoleSubtitle')} />}
       >
         {menuNode}
       </Drawer>
-    )
+    );
   }
 
   return (
-    <Sider width={240} theme="dark" breakpoint="lg" collapsedWidth={0} className="app-sider">
+    <Sider width={240} breakpoint="lg" collapsedWidth={0} className="app-sider">
       <div className="px-4 py-5">
         <Brand subtitle={t('layout.sidebar.consoleSubtitle')} />
       </div>

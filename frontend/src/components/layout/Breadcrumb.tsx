@@ -19,5 +19,9 @@ export function Breadcrumb() {
     }));
   }, [location.pathname, t]);
 
-  return <AntBreadcrumb items={items} className="mb-4" />;
+  return (
+    <nav aria-label={t('layout.a11y.breadcrumbNavigation')} className="mb-4">
+      <AntBreadcrumb items={items} />
+    </nav>
+  );
 }

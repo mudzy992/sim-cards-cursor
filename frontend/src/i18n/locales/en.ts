@@ -196,6 +196,17 @@ const en: TranslationDictionary = {
       dark: 'Dark',
       switchTheme: 'Switch theme (current: {{mode}})',
     },
+    density: {
+      comfortable: 'Comfortable',
+      compact: 'Compact',
+      toggleHint: 'Switch view density to: {{next}}',
+    },
+    a11y: {
+      skipToMain: 'Skip to main content',
+      primaryNavigation: 'Primary navigation',
+      breadcrumbNavigation: 'Breadcrumb',
+      themeChanged: 'Active theme: {{mode}}',
+    },
     errorBoundary: {
       title: 'An unexpected error occurred on this page',
       subtitle: 'Try reloading the view or return to the home page.',

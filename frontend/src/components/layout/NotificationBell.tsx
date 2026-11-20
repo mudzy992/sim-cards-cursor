@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Dropdown, List, Typography } from 'antd';
-import { BellOutlined } from '@ant-design/icons';
+import { BellOutlined, CheckOutlined } from '@ant-design/icons';
 import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { notificationsApi } from '@/api/notifications.api';
@@ -13,7 +13,7 @@ export function NotificationBell() {
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notifications-unread-count'],
     queryFn: () => notificationsApi.getUnreadCount(),
-    refetchInterval: 30_000, // fallback polling ako WebSocket ne radi
+    refetchInterval: 30_000,
   });
 
   const { data: notifications = [] } = useQuery({
@@ -38,14 +38,14 @@ export function NotificationBell() {
   }, [queryClient]);
 
   const dropdownContent = (
-    <div className="w-80 max-h-96 overflow-auto">
-      <div className="p-2 border-b flex justify-between items-center">
+    <div className="max-h-96 w-80 overflow-auto">
+      <div className="flex items-center justify-between border-b border-subtle p-2">
         <Typography.Text strong>{t('layout.notifications.title')}</Typography.Text>
-        {unreadCount > 0 && (
+        {unreadCount > 0 ? (
           <Button type="link" size="small" onClick={() => void markAllAsReadMutation()}>
             {t('layout.notifications.markAllRead')}
           </Button>
-        )}
+        ) : null}
       </div>
       <List
         size="small"
@@ -54,32 +54,37 @@ export function NotificationBell() {
         renderItem={(item) => (
           <List.Item
             className={item.isRead ? 'opacity-70' : ''}
-            onClick={() => !item.isRead && void markAsReadMutation(item.id)}
-            style={{ cursor: item.isRead ? 'default' : 'pointer' }}
+            actions={
+              !item.isRead
+                ? [
+                    <Button
+                      key="read"
+                      type="text"
+                      size="small"
+                      icon={<CheckOutlined />}
+                      aria-label={t('layout.notifications.markAllRead')}
+                      onClick={() => void markAsReadMutation(item.id)}
+                    />,
+                  ]
+                : undefined
+            }
           >
             <List.Item.Meta
               title={
-                <span className={item.isRead ? '' : 'font-semibold'}>
+                <span className={item.isRead ? '' : 'font-semibold text-fg-primary'}>
                   {item.title}
                 </span>
               }
               description={
                 <>
-                  <Typography.Text
-                    type="secondary"
-                    className="text-xs block truncate"
-                  >
+                  <Typography.Text type="secondary" className="block truncate text-xs">
                     {item.message}
                   </Typography.Text>
-                  {item.link && (
-                    <Link
-                      to={item.link}
-                      className="text-xs text-blue-600"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                  {item.link ? (
+                    <Link to={item.link} className="text-xs text-accent-fg hover:underline">
                       {t('layout.notifications.view')}
                     </Link>
-                  )}
+                  ) : null}
                 </>
               }
             />
@@ -91,8 +96,8 @@ export function NotificationBell() {
 
   return (
     <Dropdown
-      dropdownRender={() => (
-        <div className="bg-surface-raised rounded-xl shadow-card border border-slate-200">
+      popupRender={() => (
+        <div className="rounded-xl border border-subtle bg-surface-raised shadow-card">
           {dropdownContent}
         </div>
       )}

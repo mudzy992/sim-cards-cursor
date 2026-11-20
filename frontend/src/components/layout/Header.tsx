@@ -6,67 +6,72 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query'
-import { Button, Grid, Layout, Space, Tag, Tooltip, Typography } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import { Button, Grid, Layout, Space, Tooltip } from 'antd';
 import { useAuth } from '@/hooks/useAuth';
 import { NotificationBell } from './NotificationBell';
-import { branchModeratorsApi } from '@/api/branch-moderators.api'
-import { getUserRoleLabel } from '@/utils/labels.utils'
+import { branchModeratorsApi } from '@/api/branch-moderators.api';
+import { getUserRoleLabel } from '@/utils/labels.utils';
 import { useTranslation } from '@/i18n';
 import LanguageSwitcher from '@/components/common/LanguageSwitcher';
-import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher';
+import { DensityToggle, StatusBadge, ThemeSwitcher, getUserRoleTone } from '@/components/ui';
 
 const { Header: AntHeader } = Layout;
 
 type HeaderProps = {
-  onMobileMenuClick?: () => void
-}
+  onMobileMenuClick?: () => void;
+};
 
 export function Header({ onMobileMenuClick }: HeaderProps) {
-  const screens = Grid.useBreakpoint()
+  const screens = Grid.useBreakpoint();
   const { user, logout } = useAuth();
   const { t } = useTranslation();
   const moderatorsQuery = useQuery({
     queryKey: ['branch-moderators', 'list', 'me', user?.id],
     queryFn: () => branchModeratorsApi.list({ userId: user!.id }),
     enabled: Boolean(user?.id) && user?.role === 'USER',
-  })
+  });
 
   const moderatorBranchesLabel =
     (moderatorsQuery.data ?? [])
       .map((m) => m.branch?.name ?? m.branchId)
       .filter(Boolean)
-      .join(', ') || ''
+      .join(', ') || '';
 
-  const isBranchModerator = (moderatorsQuery.data ?? []).length > 0
-  const roleLabel = user?.role ? getUserRoleLabel(user.role, t) : ''
+  const isBranchModerator = (moderatorsQuery.data ?? []).length > 0;
+  const roleLabel = user?.role ? getUserRoleLabel(user.role, t) : '';
+  const hasMultipleRoles = user?.role === 'USER' && isBranchModerator;
 
-  const hasMultipleRoles = user?.role === 'USER' && isBranchModerator
-
-  const roleTag = (() => {
-    if (!user?.role) return null
+  const roleBadge = (() => {
+    if (!user?.role) return null;
     if (user.role === 'SYSTEM_ADMIN') {
       return (
-        <Tag color="gold" icon={<CrownOutlined />} className="!m-0">
-          {t('layout.header.roleTagAdmin')}
-        </Tag>
-      )
+        <StatusBadge
+          tone={getUserRoleTone(user.role)}
+          icon={<CrownOutlined />}
+          label={t('layout.header.roleTagAdmin')}
+        />
+      );
     }
     if (user.role === 'DIST_ADMIN') {
       return (
-        <Tag color="blue" icon={<TeamOutlined />} className="!m-0">
-          {t('layout.header.roleTagDist')}
-        </Tag>
-      )
+        <StatusBadge
+          tone={getUserRoleTone(user.role)}
+          icon={<TeamOutlined />}
+          label={t('layout.header.roleTagDist')}
+        />
+      );
     }
     return (
-      <Tag color="default" icon={<UserOutlined />} className="!m-0">
-        {hasMultipleRoles ? null : t('layout.header.roleTagOperator')}
-      </Tag>
-    )
-  })()
+      <StatusBadge
+        tone={getUserRoleTone(user.role)}
+        icon={<UserOutlined />}
+        label={hasMultipleRoles ? roleLabel : t('layout.header.roleTagOperator')}
+      />
+    );
+  })();
 
-  const moderatorTag =
+  const moderatorBadge =
     user?.role === 'USER' && isBranchModerator ? (
       <Tooltip
         title={
@@ -75,20 +80,24 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
             : undefined
         }
       >
-        <Tag color="geekblue" icon={<SafetyCertificateOutlined />} className="!m-0">
-          {hasMultipleRoles ? null : t('layout.header.roleTagModerator')}
-        </Tag>
+        <span>
+          <StatusBadge
+            tone="accent"
+            icon={<SafetyCertificateOutlined />}
+            label={t('layout.header.roleTagModerator')}
+          />
+        </span>
       </Tooltip>
-    ) : null
+    ) : null;
 
-  const isMobile = !screens.sm
-  const showMenuButton = Boolean(onMobileMenuClick) && isMobile
+  const isMobile = !screens.sm;
+  const showMenuButton = Boolean(onMobileMenuClick) && isMobile;
 
   return (
     <AntHeader className="app-header !px-4 sm:!px-6">
       <div className="flex h-full items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {showMenuButton && (
+        <div className="flex min-w-0 items-center gap-2">
+          {showMenuButton ? (
             <Button
               type="text"
               icon={<MenuOutlined />}
@@ -96,22 +105,22 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
               aria-label={t('layout.header.openMenu')}
               className="-ml-2"
             />
-          )}
+          ) : null}
           <div className="flex min-w-0 items-center gap-2">
-            <Typography.Text className="min-w-0 truncate text-slate-500">
+            <span className="min-w-0 truncate text-sm text-fg-secondary">
               {t('layout.header.welcome')}{' '}
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-fg-primary">
                 {user?.firstName ?? t('layout.header.defaultUserName')}
               </span>
-            </Typography.Text>
+            </span>
             <div className="flex shrink-0 items-center gap-2">
-              {roleTag ? <Tooltip title={roleLabel}>{roleTag}</Tooltip> : null}
-              {moderatorTag}
+              {roleBadge ? <Tooltip title={roleLabel}><span>{roleBadge}</span></Tooltip> : null}
+              {moderatorBadge}
             </div>
           </div>
         </div>
 
-        <Space size="middle">
+        <Space size="small">
           <div
             data-tour-id={
               user?.role === 'SYSTEM_ADMIN'
@@ -123,6 +132,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           >
             <NotificationBell />
           </div>
+          <DensityToggle />
           <ThemeSwitcher />
           <LanguageSwitcher />
           <Button

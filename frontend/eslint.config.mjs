@@ -11,7 +11,7 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  jsxA11y.flatConfigs.recommended,
+  jsxA11y.flatConfigs.strict,
   prettierConfig,
   {
     files: ['src/**/*.{ts,tsx}'],

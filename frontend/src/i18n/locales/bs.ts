@@ -196,6 +196,17 @@ const bs: TranslationDictionary = {
       dark: 'Tamna',
       switchTheme: 'Promijeni temu (trenutno: {{mode}})',
     },
+    density: {
+      comfortable: 'Komforno',
+      compact: 'Kompaktno',
+      toggleHint: 'Prebaci gustinu prikaza na: {{next}}',
+    },
+    a11y: {
+      skipToMain: 'Preskoči na glavni sadržaj',
+      primaryNavigation: 'Glavna navigacija',
+      breadcrumbNavigation: 'Putanja stranice',
+      themeChanged: 'Aktivna tema: {{mode}}',
+    },
     errorBoundary: {
       title: 'Došlo je do neočekivane greške na stranici',
       subtitle: 'Pokušajte ponovo učitati prikaz ili se vratite na početnu stranicu.',

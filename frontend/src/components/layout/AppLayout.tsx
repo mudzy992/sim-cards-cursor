@@ -7,9 +7,11 @@ import { Header } from './Header';
 import { PageErrorBoundary } from './PageErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '@/store/auth.store';
+import { useThemeStore } from '@/store/theme.store';
 import { useState } from 'react';
 import { useAppFeatures } from '@/hooks/useAppFeatures';
 import { useTranslation } from '@/i18n';
+import { ROUTES } from '@/config/routes';
 
 const { Content } = Layout;
 
@@ -17,6 +19,7 @@ export function AppLayout() {
   useNotificationSocket();
 
   const user = useAuthStore((s) => s.user);
+  const preference = useThemeStore((s) => s.preference);
   const featuresQuery = useAppFeatures();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { t } = useTranslation();
@@ -24,9 +27,18 @@ export function AppLayout() {
   const navigate = useNavigate();
 
   return (
-    <Layout className="min-h-screen bg-slate-50">
+    <Layout className="min-h-screen bg-canvas">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-accent focus:shadow-card"
+      >
+        {t('layout.a11y.skipToMain')}
+      </a>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {t('layout.a11y.themeChanged', { mode: t(`layout.theme.${preference}`) })}
+      </div>
       <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
-      <Layout className="bg-slate-50">
+      <Layout className="bg-canvas">
         <Header onMobileMenuClick={() => setMobileNavOpen(true)} />
         <Content className="px-4 py-5 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-[1400px]">
@@ -39,7 +51,7 @@ export function AppLayout() {
                 description={
                   <div>
                     <div>{t('layout.appLayout.missingKeysIntro')}</div>
-                    <ul className="list-disc ml-5">
+                    <ul className="ml-5 list-disc">
                       {featuresQuery.data.missingKeys.map((k) => (
                         <li key={k}>
                           <code>{k}</code>
@@ -51,14 +63,18 @@ export function AppLayout() {
                 showIcon
               />
             ) : null}
-            <div className="rounded-2xl border border-slate-200 bg-surface p-4 shadow-card sm:p-6">
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className="rounded-2xl border border-subtle bg-surface p-4 shadow-card outline-none sm:p-6"
+            >
               <PageErrorBoundary
                 resetKey={location.pathname}
-                onGoHome={() => navigate('/')}
+                onGoHome={() => navigate(ROUTES.root)}
               >
                 <Outlet />
               </PageErrorBoundary>
-            </div>
+            </main>
           </div>
         </Content>
         <Footer />
