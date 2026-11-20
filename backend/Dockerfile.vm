@@ -7,7 +7,7 @@ COPY packages/shared ./packages/shared
 RUN chmod -R +x node_modules/.bin && npm run build --workspace=@sim-tracker/shared
 
 COPY backend/prisma ./backend/prisma
-RUN npx --workspace=sim-tracker-backend prisma generate
+RUN ./node_modules/.bin/prisma generate --schema=backend/prisma/schema.prisma
 
 COPY backend ./backend
 RUN npm run build --workspace=sim-tracker-backend

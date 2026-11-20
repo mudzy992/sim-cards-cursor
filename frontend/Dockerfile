@@ -4,9 +4,7 @@ WORKDIR /usr/app
 
 COPY package*.json ./
 COPY packages/shared/package.json ./packages/shared/
-COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
-COPY mobile/package.json ./mobile/
 
 RUN npm ci --workspace=@sim-tracker/shared --workspace=sim-tracker-frontend --include-workspace-root
 
@@ -15,9 +13,11 @@ COPY frontend ./frontend
 
 ARG VITE_API_BASE_URL
 ARG VITE_API_BASE_URLS
+ARG VITE_API_GLOBAL_PREFIX
 
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_API_BASE_URLS=${VITE_API_BASE_URLS}
+ENV VITE_API_GLOBAL_PREFIX=${VITE_API_GLOBAL_PREFIX}
 
 RUN npm run build --workspace=@sim-tracker/shared && npm run build --workspace=sim-tracker-frontend
 

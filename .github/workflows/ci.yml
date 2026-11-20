@@ -167,3 +167,21 @@ jobs:
           docker compose -f docker-compose.vm.db.yml config -q
           docker compose -f docker-compose.vm.app.yml config -q
           docker compose -f docker-compose.vm.traefik.yml config -q
+
+      - name: Verify Coolify / public Dockerfiles build (frontend & backend)
+        run: |
+          docker build -f frontend/Dockerfile \
+            --build-arg VITE_API_BASE_URL=/backend/api \
+            --build-arg VITE_API_BASE_URLS=/backend/api \
+            -t simtracker-frontend:ci-test .
+          docker build -f backend/Dockerfile \
+            --target build \
+            -t simtracker-backend:ci-build-test .
+
+      - name: Verify offline VM Dockerfiles build (deps + vm)
+        run: |
+          docker build -f backend/Dockerfile.deps \
+            -t simtracker-backend-deps:ci-test .
+          docker build -f backend/Dockerfile.vm \
+            --build-arg DEPS_IMAGE=simtracker-backend-deps:ci-test \
+            -t simtracker-backend-vm:ci-test .

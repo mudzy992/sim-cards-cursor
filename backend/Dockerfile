@@ -12,8 +12,6 @@ WORKDIR /usr/app
 COPY package*.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY backend/package.json ./backend/
-COPY frontend/package.json ./frontend/
-COPY mobile/package.json ./mobile/
 
 RUN npm ci --workspace=@sim-tracker/shared --workspace=sim-tracker-backend --include-workspace-root
 
@@ -21,7 +19,7 @@ COPY packages/shared ./packages/shared
 RUN npm run build --workspace=@sim-tracker/shared
 
 COPY backend/prisma ./backend/prisma
-RUN npx --workspace=sim-tracker-backend prisma generate
+RUN ./node_modules/.bin/prisma generate --schema=backend/prisma/schema.prisma
 
 COPY backend ./backend
 RUN npm run build --workspace=sim-tracker-backend
@@ -46,8 +44,6 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 COPY package*.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY backend/package.json ./backend/
-COPY frontend/package.json ./frontend/
-COPY mobile/package.json ./mobile/
 
 RUN npm ci --omit=dev --workspace=@sim-tracker/shared --workspace=sim-tracker-backend --include-workspace-root
 
