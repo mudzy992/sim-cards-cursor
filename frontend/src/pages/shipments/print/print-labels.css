@@ -1,5 +1,5 @@
 @page {
-  size: A4 portrait;
+  size: 210mm 297mm;
   margin: 0;
 }
 
@@ -10,40 +10,69 @@
 @media print {
   html,
   body {
+    width: 210mm !important;
+    min-width: 0 !important;
+    max-width: 210mm !important;
+    height: auto !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
     background: #ffffff !important;
   }
 
-  body > #root {
+  /* Sakrij #root i sve AntD portale (modale, tooltipe, dropdowne) da ne šire print */
+  body > :not(.label-print-root) {
     display: none !important;
   }
 
   .label-print-root {
     display: block !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    scrollbar-width: none !important;
+  }
+
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 }
 
 .lp-sheet {
   width: 210mm;
+  max-width: 210mm;
   height: 296.8mm; /* ~297mm: sprječava "ghost" prazan list zbog zaokruživanja */
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
   page-break-after: always;
+  break-after: page;
   break-inside: avoid;
   background: #ffffff;
 }
 
 .lp-sheet:last-child {
   page-break-after: auto;
+  break-after: auto;
 }
 
 .lp-grid {
   display: grid;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .lp-cell {

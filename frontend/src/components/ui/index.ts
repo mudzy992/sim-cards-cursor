@@ -19,3 +19,4 @@ export { EmptyNotice, type EmptyNoticeProps } from './EmptyNotice';
 export { ErrorNotice, type ErrorNoticeProps } from './ErrorNotice';
 export { DensityToggle } from './DensityToggle';
 export { ThemeSwitcher } from './ThemeSwitcher';
+export * from './icons';

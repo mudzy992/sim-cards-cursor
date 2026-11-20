@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Dropdown, List, Typography } from 'antd';
-import { BellOutlined, CheckOutlined } from '@ant-design/icons';
 import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { notificationsApi } from '@/api/notifications.api';
 import { useTranslation } from '@/i18n';
+import { BellIcon, CheckIcon } from '@/components/ui/icons';
 
 export function NotificationBell() {
   const queryClient = useQueryClient();
@@ -61,7 +61,7 @@ export function NotificationBell() {
                       key="read"
                       type="text"
                       size="small"
-                      icon={<CheckOutlined />}
+                      icon={<CheckIcon />}
                       aria-label={t('layout.notifications.markAllRead')}
                       onClick={() => void markAsReadMutation(item.id)}
                     />,
@@ -109,7 +109,7 @@ export function NotificationBell() {
         size="small"
         aria-label={t('layout.notifications.title')}
         className="!px-2 text-fg-secondary hover:text-fg-primary"
-        icon={<BellOutlined />}
+        icon={<BellIcon />}
       >
         {unreadCount > 0 ? <Badge count={unreadCount} size="small" /> : null}
       </Button>

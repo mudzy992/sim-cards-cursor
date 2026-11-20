@@ -275,9 +275,12 @@ export default function ShipmentPrintPage() {
   const canPrint = !loading && cardsInRange.length > 0 && !overflowed;
 
   const openPrintDialog = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     setPrintModalOpen(false);
-    // malo zakašnjenje da se modal zatvori prije print dijaloga (Chrome blokira duple dijaloge)
-    setTimeout(() => window.print(), 50);
+    // sačekaj da se modal animacija potpuno završi prije Chrome print dijaloga
+    setTimeout(() => window.print(), 220);
   };
 
   const exampleCard: PrintableSimCard = cardsInRange[0] ?? {
@@ -739,7 +742,7 @@ export default function ShipmentPrintPage() {
               />
             </SectionCard>
           ) : (
-            <div className="space-y-8 pb-16">
+            <div className="space-y-8 overflow-x-auto pb-16">
               {sheets.length > PREVIEW_SHEETS_PER_PAGE ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-subtle bg-surface px-4 py-2.5">
                   <span className="text-xs text-fg-secondary">

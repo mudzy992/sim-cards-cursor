@@ -1,6 +1,6 @@
-import { GlobalOutlined } from '@ant-design/icons';
 import { Button, Dropdown, type MenuProps } from 'antd';
 import { SUPPORTED_LANGUAGES, useTranslation } from '@/i18n';
+import { GlobeIcon } from '@/components/ui/icons';
 
 export default function LanguageSwitcher() {
   const { language, setLanguage, t } = useTranslation();
@@ -22,7 +22,7 @@ export default function LanguageSwitcher() {
       <Button
         type="text"
         size="small"
-        icon={<GlobalOutlined />}
+        icon={<GlobeIcon />}
         aria-label={t('language.switchLanguage')}
         title={t('language.switchLanguage')}
         className="!px-2 text-fg-secondary hover:text-fg-primary"

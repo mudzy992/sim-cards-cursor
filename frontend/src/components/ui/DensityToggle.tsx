@@ -1,7 +1,7 @@
-import { ColumnHeightOutlined, CompressOutlined } from '@ant-design/icons';
 import { Button, Tooltip } from 'antd';
 import { useTranslation } from '@/i18n';
 import { useThemeStore } from '@/store/theme.store';
+import { DensityComfortableIcon, DensityCompactIcon } from './icons';
 
 export function DensityToggle() {
   const { t } = useTranslation();
@@ -22,7 +22,7 @@ export function DensityToggle() {
       <Button
         type="text"
         size="small"
-        icon={isCompact ? <CompressOutlined /> : <ColumnHeightOutlined />}
+        icon={isCompact ? <DensityCompactIcon /> : <DensityComfortableIcon />}
         onClick={() => setDensity(nextDensity)}
         aria-label={tooltip}
         aria-pressed={isCompact}

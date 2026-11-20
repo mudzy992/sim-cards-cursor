@@ -1,11 +1,3 @@
-import {
-  CrownOutlined,
-  LogoutOutlined,
-  MenuOutlined,
-  SafetyCertificateOutlined,
-  TeamOutlined,
-  UserOutlined,
-} from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Grid, Layout, Tooltip } from 'antd';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,7 +6,17 @@ import { branchModeratorsApi } from '@/api/branch-moderators.api';
 import { getUserRoleLabel } from '@/utils/labels.utils';
 import { useTranslation } from '@/i18n';
 import LanguageSwitcher from '@/components/common/LanguageSwitcher';
-import { DensityToggle, StatusBadge, ThemeSwitcher, getUserRoleTone } from '@/components/ui';
+import {
+  DensityToggle,
+  LogoutIcon,
+  MenuIcon,
+  OperatorRoleIcon,
+  OrgRoleIcon,
+  ShieldRoleIcon,
+  StatusBadge,
+  ThemeSwitcher,
+  getUserRoleTone,
+} from '@/components/ui';
 
 const { Header: AntHeader } = Layout;
 
@@ -48,7 +50,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       return (
         <StatusBadge
           tone={getUserRoleTone(user.role)}
-          icon={<CrownOutlined />}
+          icon={<ShieldRoleIcon />}
           label={t('layout.header.roleTagAdmin')}
         />
       );
@@ -57,7 +59,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       return (
         <StatusBadge
           tone={getUserRoleTone(user.role)}
-          icon={<TeamOutlined />}
+          icon={<OrgRoleIcon />}
           label={t('layout.header.roleTagDist')}
         />
       );
@@ -65,7 +67,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     return (
       <StatusBadge
         tone={getUserRoleTone(user.role)}
-        icon={<UserOutlined />}
+        icon={<OperatorRoleIcon />}
         label={hasMultipleRoles ? roleLabel : t('layout.header.roleTagOperator')}
       />
     );
@@ -83,7 +85,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
         <span>
           <StatusBadge
             tone="accent"
-            icon={<SafetyCertificateOutlined />}
+            icon={<ShieldRoleIcon />}
             label={t('layout.header.roleTagModerator')}
           />
         </span>
@@ -101,7 +103,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
             <Button
               type="text"
               size="small"
-              icon={<MenuOutlined />}
+              icon={<MenuIcon />}
               onClick={onMobileMenuClick}
               aria-label={t('layout.header.openMenu')}
               className="-ml-1"
@@ -148,7 +150,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           <Button
             type="text"
             size="small"
-            icon={<LogoutOutlined />}
+            icon={<LogoutIcon />}
             onClick={() => void logout()}
             aria-label={t('layout.header.logout')}
             className="!px-2.5 text-fg-secondary hover:text-fg-primary"

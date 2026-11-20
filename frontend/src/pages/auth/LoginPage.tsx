@@ -9,7 +9,7 @@ import { API_BASE_URL } from '@/api/axios.instance';
 import { useTranslation } from '@/i18n';
 import { ROUTES } from '@/config/routes';
 import LanguageSwitcher from '@/components/common/LanguageSwitcher';
-import { ThemeSwitcher } from '@/components/ui';
+import { SimChipIcon, ThemeSwitcher } from '@/components/ui';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -67,11 +67,7 @@ export default function LoginPage() {
             aria-hidden="true"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground"
           >
-            <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75">
-              <rect x="3" y="2.5" width="14" height="15" rx="2" />
-              <path d="M7 7.5h6v5H7z" />
-              <path d="M10 2.5v5M10 12.5v5M3 10h4M13 10h4" />
-            </svg>
+            <SimChipIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0 leading-tight">
             <div className="text-xs font-semibold uppercase tracking-[0.1em] text-fg-muted">

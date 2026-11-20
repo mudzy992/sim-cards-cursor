@@ -1,8 +1,8 @@
-import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
 import { Button, Dropdown, type MenuProps } from 'antd';
 import { useTranslation } from '@/i18n';
 import { useThemeStore } from '@/store/theme.store';
 import type { ThemePreference } from '@/styles/tokens';
+import { ThemeDarkIcon, ThemeLightIcon, ThemeSystemIcon } from './icons';
 
 export function ThemeSwitcher() {
   const { t } = useTranslation();
@@ -12,27 +12,27 @@ export function ThemeSwitcher() {
 
   const activeIcon =
     preference === 'system' ? (
-      <DesktopOutlined />
+      <ThemeSystemIcon />
     ) : resolvedTheme === 'dark' ? (
-      <MoonOutlined />
+      <ThemeDarkIcon />
     ) : (
-      <SunOutlined />
+      <ThemeLightIcon />
     );
 
   const items: MenuProps['items'] = [
     {
       key: 'system',
-      icon: <DesktopOutlined />,
+      icon: <ThemeSystemIcon />,
       label: t('layout.theme.system'),
     },
     {
       key: 'light',
-      icon: <SunOutlined />,
+      icon: <ThemeLightIcon />,
       label: t('layout.theme.light'),
     },
     {
       key: 'dark',
-      icon: <MoonOutlined />,
+      icon: <ThemeDarkIcon />,
       label: t('layout.theme.dark'),
     },
   ];

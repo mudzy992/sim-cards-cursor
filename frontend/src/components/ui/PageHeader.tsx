@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n';
+import { ArrowLeftIcon } from './icons';
 
 export interface PageHeaderProps {
   title: ReactNode;
@@ -32,7 +32,7 @@ export function PageHeader({
             <Button
               type="text"
               size="small"
-              icon={<ArrowLeftOutlined />}
+              icon={<ArrowLeftIcon />}
               onClick={() => navigate(backTo)}
               className="-ml-2 text-fg-secondary hover:text-fg-primary"
             >

@@ -1,22 +1,24 @@
-import {
-  UserOutlined,
-  DashboardOutlined,
-  InboxOutlined,
-  CreditCardOutlined,
-  ThunderboltOutlined,
-  FileTextOutlined,
-  MailOutlined,
-  NotificationOutlined,
-  UnorderedListOutlined,
-  SettingOutlined,
-  AreaChartOutlined,
-} from '@ant-design/icons';
 import { Drawer, Grid, Layout, Menu } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { useAppFeatures } from '@/hooks/useAppFeatures';
 import { useTranslation } from '@/i18n';
 import { ROUTES } from '@/config/routes';
+import {
+  NavActivityIcon,
+  NavAnalyticsIcon,
+  NavBroadcastIcon,
+  NavDashboardIcon,
+  NavMailIcon,
+  NavMetersIcon,
+  NavRecordsIcon,
+  NavReleaseIcon,
+  NavSettingsIcon,
+  NavShipmentsIcon,
+  NavSimCardIcon,
+  NavUsersIcon,
+  SimChipIcon,
+} from '@/components/ui/icons';
 
 const { Sider } = Layout;
 
@@ -32,11 +34,7 @@ function Brand({ subtitle }: { subtitle: string }) {
         aria-hidden="true"
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground"
       >
-        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75">
-          <rect x="3" y="2.5" width="14" height="15" rx="2" />
-          <path d="M7 7.5h6v5H7z" />
-          <path d="M10 2.5v5M10 12.5v5M3 10h4M13 10h4" />
-        </svg>
+        <SimChipIcon className="h-4 w-4" />
       </div>
       <div className="min-w-0 leading-tight">
         <div className="truncate text-sm font-semibold tracking-tight text-fg-primary">
@@ -64,29 +62,29 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const items = [
     {
       key: ROUTES.dashboard,
-      icon: <DashboardOutlined />,
+      icon: <NavDashboardIcon />,
       label: <Link to={ROUTES.dashboard}>{t('layout.sidebar.dashboard')}</Link>,
     },
     {
       key: ROUTES.analytics,
-      icon: <AreaChartOutlined />,
+      icon: <NavAnalyticsIcon />,
       label: <Link to={ROUTES.analytics}>{t('layout.sidebar.analytics')}</Link>,
     },
     ...(role === 'SYSTEM_ADMIN' || role === 'DIST_ADMIN'
       ? [
           {
             key: ROUTES.shipments,
-            icon: <InboxOutlined />,
+            icon: <NavShipmentsIcon />,
             label: <Link to={ROUTES.shipments}>{t('layout.sidebar.shipments')}</Link>,
           },
           {
             key: ROUTES.meters,
-            icon: <ThunderboltOutlined />,
+            icon: <NavMetersIcon />,
             label: <Link to={ROUTES.meters}>{t('layout.sidebar.meters')}</Link>,
           },
           {
             key: ROUTES.installationRecords,
-            icon: <FileTextOutlined />,
+            icon: <NavRecordsIcon />,
             label: (
               <Link to={ROUTES.installationRecords}>
                 {t('layout.sidebar.installationRecords')}
@@ -95,12 +93,12 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           },
           {
             key: ROUTES.users,
-            icon: <UserOutlined />,
+            icon: <NavUsersIcon />,
             label: <Link to={ROUTES.users}>{t('layout.sidebar.users')}</Link>,
           },
           {
             key: ROUTES.branchEmailRecipients,
-            icon: <MailOutlined />,
+            icon: <NavMailIcon />,
             label: (
               <Link to={ROUTES.branchEmailRecipients}>
                 {t('layout.sidebar.branchEmailRecipients')}
@@ -111,7 +109,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             ? [
                 {
                   key: ROUTES.pushCampaigns,
-                  icon: <NotificationOutlined />,
+                  icon: <NavBroadcastIcon />,
                   label: (
                     <Link to={ROUTES.pushCampaigns}>{t('layout.sidebar.pushCampaigns')}</Link>
                   ),
@@ -120,7 +118,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             : []),
           {
             key: ROUTES.activityLog,
-            icon: <UnorderedListOutlined />,
+            icon: <NavActivityIcon />,
             label: <Link to={ROUTES.activityLog}>{t('layout.sidebar.activityLog')}</Link>,
           },
         ]
@@ -129,12 +127,12 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       ? [
           {
             key: ROUTES.simCards,
-            icon: <CreditCardOutlined />,
+            icon: <NavSimCardIcon />,
             label: <Link to={ROUTES.simCards}>{t('layout.sidebar.simCards')}</Link>,
           },
           {
             key: ROUTES.meters,
-            icon: <ThunderboltOutlined />,
+            icon: <NavMetersIcon />,
             label: <Link to={ROUTES.meters}>{t('layout.sidebar.meters')}</Link>,
           },
         ]
@@ -143,7 +141,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       ? [
           {
             key: ROUTES.installationRecords,
-            icon: <FileTextOutlined />,
+            icon: <NavRecordsIcon />,
             label: (
               <Link to={ROUTES.installationRecords}>
                 {t('layout.sidebar.installationRecords')}
@@ -156,17 +154,17 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       ? [
           {
             key: ROUTES.settings,
-            icon: <SettingOutlined />,
+            icon: <NavSettingsIcon />,
             label: <Link to={ROUTES.settings}>{t('layout.sidebar.settings')}</Link>,
           },
           {
             key: ROUTES.settingsEmail,
-            icon: <MailOutlined />,
+            icon: <NavMailIcon />,
             label: <Link to={ROUTES.settingsEmail}>{t('layout.sidebar.emailSmtp')}</Link>,
           },
           {
             key: ROUTES.appReleases,
-            icon: <SettingOutlined />,
+            icon: <NavReleaseIcon />,
             label: <Link to={ROUTES.appReleases}>{t('layout.sidebar.appReleases')}</Link>,
           },
         ]

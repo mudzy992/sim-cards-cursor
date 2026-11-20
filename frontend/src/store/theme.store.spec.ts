@@ -45,7 +45,8 @@ describe('theme.store', () => {
     matchSpy.mockRestore();
   });
 
-  it('persists table density preference', () => {
+  it('defaults to comfortable density and persists table density preference', () => {
+    expect(useThemeStore.getState().density).toBe('comfortable');
     useThemeStore.getState().setDensity('compact');
     expect(useThemeStore.getState().density).toBe('compact');
     expect(window.localStorage.getItem(DENSITY_STORAGE_KEY)).toBe('compact');
