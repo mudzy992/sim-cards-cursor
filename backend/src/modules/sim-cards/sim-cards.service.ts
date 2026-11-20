@@ -106,24 +106,24 @@ export class SimCardsService {
   async create(dto: CreateSimCardDto, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
     await this.ensureShipmentExists(dto.shipmentId, scope);
 
-    const iccid = normalizeIccid(dto.iccid.trim());
-    const ipAddress = dto.ipAddress.trim();
-    const publicIpAddress = dto.publicIpAddress?.trim() || undefined;
-    const phoneNumber = dto.phoneNumber?.trim() || undefined;
-    const normalizedPhone = phoneNumber ? normalizePhoneNumber(phoneNumber) : undefined;
+    const simIccid = normalizeIccid(dto.iccid.trim());
+    const simIpAddress = dto.ipAddress.trim();
+    const simPublicIpAddress = dto.publicIpAddress?.trim() || undefined;
+    const simPhoneNumber = dto.phoneNumber?.trim() || undefined;
+    const normalizedPhone = simPhoneNumber ? normalizePhoneNumber(simPhoneNumber) : undefined;
 
     const duplicateChecks: Prisma.SimCardWhereInput[] = [
-      { iccid },
-      { ipAddress },
-      ...(publicIpAddress ? [{ publicIpAddress }] : []),
-      ...(phoneNumber
+      { iccid: simIccid },
+      { ipAddress: simIpAddress },
+      ...(simPublicIpAddress ? [{ publicIpAddress: simPublicIpAddress }] : []),
+      ...(simPhoneNumber
         ? [
             {
               phoneNumber: {
                 in:
-                  normalizedPhone && normalizedPhone !== phoneNumber
-                    ? [phoneNumber, normalizedPhone]
-                    : [phoneNumber],
+                  normalizedPhone && normalizedPhone !== simPhoneNumber
+                    ? [simPhoneNumber, normalizedPhone]
+                    : [simPhoneNumber],
               },
             },
           ]
@@ -135,13 +135,13 @@ export class SimCardsService {
       select: { iccid: true, ipAddress: true, publicIpAddress: true, phoneNumber: true },
     });
     if (existingDup) {
-      if (existingDup.iccid === iccid) {
+      if (existingDup.iccid === simIccid) {
         throw new ConflictException('SIM kartica sa ovim ICCID-om već postoji u bazi.');
       }
-      if (existingDup.ipAddress === ipAddress) {
+      if (existingDup.ipAddress === simIpAddress) {
         throw new ConflictException('SIM kartica sa ovom internom IP adresom već postoji u bazi.');
       }
-      if (publicIpAddress && existingDup.publicIpAddress === publicIpAddress) {
+      if (simPublicIpAddress && existingDup.publicIpAddress === simPublicIpAddress) {
         throw new ConflictException('SIM kartica sa ovom javnom IP adresom već postoji u bazi.');
       }
       if (
@@ -157,10 +157,10 @@ export class SimCardsService {
     try {
       const simCard = await this.prisma.simCard.create({
         data: {
-          iccid,
-          ipAddress,
-          publicIpAddress,
-          phoneNumber,
+          iccid: simIccid,
+          ipAddress: simIpAddress,
+          publicIpAddress: simPublicIpAddress,
+          phoneNumber: simPhoneNumber,
           apn: dto.apn?.trim() || undefined,
           shipmentId: dto.shipmentId,
           status: dto.status ?? SimCardStatus.AVAILABLE,
