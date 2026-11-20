@@ -40,7 +40,11 @@ export function AppLayout() {
       <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
       <Layout className="bg-canvas">
         <Header onMobileMenuClick={() => setMobileNavOpen(true)} />
-        <Content className="px-4 py-5 sm:px-6 lg:px-8">
+        <Content
+          id="main-content"
+          tabIndex={-1}
+          className="px-4 py-5 outline-none sm:px-6 lg:px-8"
+        >
           <div className="mx-auto w-full max-w-[1400px]">
             <Breadcrumb />
             {user?.role === 'SYSTEM_ADMIN' && featuresQuery.data?.missingKeys?.length ? (
@@ -63,18 +67,14 @@ export function AppLayout() {
                 showIcon
               />
             ) : null}
-            <main
-              id="main-content"
-              tabIndex={-1}
-              className="rounded-2xl border border-subtle bg-surface p-4 shadow-card outline-none sm:p-6"
-            >
+            <div className="rounded-2xl border border-subtle bg-surface p-4 shadow-card sm:p-6">
               <PageErrorBoundary
                 resetKey={location.pathname}
                 onGoHome={() => navigate(ROUTES.root)}
               >
                 <Outlet />
               </PageErrorBoundary>
-            </main>
+            </div>
           </div>
         </Content>
         <Footer />
