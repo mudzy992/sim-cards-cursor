@@ -16,6 +16,7 @@ import { CreateInstallTaskDto } from './dto/create-install-task.dto'
 import { CompleteInstallTaskDto } from './dto/complete-install-task.dto'
 import { assertMeterYearsPairIfPartial } from 'src/common/utils/meter-years.util'
 import { Prisma, type User } from '@prisma/client'
+import { ErrorCodes } from 'src/common/constants/error-codes'
 
 @Injectable()
 export class InstallTasksService {
@@ -50,16 +51,28 @@ export class InstallTasksService {
       },
     })
     if (!meter) {
-      throw new BadRequestException('Brojilo nije pronađeno.')
+      throw new BadRequestException({
+        message: 'Brojilo nije pronađeno.',
+        code: ErrorCodes.METER_NOT_FOUND,
+      })
     }
     if (meter.hasOpenInstallTask) {
-      throw new BadRequestException('Za ovo brojilo već postoji aktivan nalog za ugradnju SIM-a.')
+      throw new BadRequestException({
+        message: 'Za ovo brojilo već postoji aktivan nalog za ugradnju SIM-a.',
+        code: ErrorCodes.INSTALL_TASK_ALREADY_ACTIVE,
+      })
     }
     if (meter.simCardState !== MeterSimCardState.NO_SIM || meter.simCardId) {
-      throw new BadRequestException('Zadatak ugradnje SIM-a se može kreirati samo za brojilo bez SIM kartice.')
+      throw new BadRequestException({
+        message: 'Zadatak ugradnje SIM-a se može kreirati samo za brojilo bez SIM kartice.',
+        code: ErrorCodes.INSTALL_TASK_METER_HAS_SIM,
+      })
     }
     if (meter.status !== MeterStatus.ACTIVE) {
-      throw new BadRequestException('Zadatak ugradnje se ne može kreirati za brojilo koje nije aktivno.')
+      throw new BadRequestException({
+        message: 'Zadatak ugradnje se ne može kreirati za brojilo koje nije aktivno.',
+        code: ErrorCodes.INSTALL_TASK_METER_INACTIVE,
+      })
     }
     if (scope?.role === UserRole.USER) {
       const isModerator = await this.prisma.branchModerator.findUnique({
@@ -83,10 +96,16 @@ export class InstallTasksService {
       },
     })
     if (!assignedTo) {
-      throw new BadRequestException('Operator nije pronađen.')
+      throw new BadRequestException({
+        message: 'Operator nije pronađen.',
+        code: ErrorCodes.TASK_OPERATOR_NOT_FOUND,
+      })
     }
     if (assignedTo.role !== UserRole.USER) {
-      throw new BadRequestException('Zadatak se može dodijeliti samo operatoru.')
+      throw new BadRequestException({
+        message: 'Zadatak se može dodijeliti samo operatoru.',
+        code: ErrorCodes.TASK_ASSIGNEE_NOT_OPERATOR,
+      })
     }
     if (scope && scope.role === UserRole.USER) {
       if (!meter.branchId || assignedTo.branchId !== meter.branchId) {
@@ -98,7 +117,10 @@ export class InstallTasksService {
     if (scope && scope.role === UserRole.DIST_ADMIN && scope.distributionId) {
       const opDistributionId = assignedTo.distributionId ?? assignedTo.branch?.distributionId
       if (opDistributionId !== scope.distributionId) {
-        throw new BadRequestException('Možete dodijeliti zadatak samo operatorima iz svoje distribucije.')
+        throw new BadRequestException({
+          message: 'Možete dodijeliti zadatak samo operatorima iz svoje distribucije.',
+          code: ErrorCodes.TASK_ASSIGNEE_OUTSIDE_DISTRIBUTION,
+        })
       }
     }
 
@@ -181,16 +203,28 @@ export class InstallTasksService {
       include: { meter: { select: { id: true, serialNumber: true } } },
     })
     if (!task) {
-      throw new NotFoundException('Zadatak ugradnje nije pronađen.')
+      throw new NotFoundException({
+        message: 'Zadatak ugradnje nije pronađen.',
+        code: ErrorCodes.INSTALL_TASK_NOT_FOUND,
+      })
     }
     if (task.assignedToId !== userId) {
-      throw new BadRequestException('Samo operator kojem je zadatak dodijeljen može ažurirati status.')
+      throw new BadRequestException({
+        message: 'Samo operator kojem je zadatak dodijeljen može ažurirati status.',
+        code: ErrorCodes.TASK_ONLY_ASSIGNEE_CAN_UPDATE,
+      })
     }
     if (task.status === InstallTaskStatus.COMPLETED) {
-      throw new BadRequestException('Nalog je već završen.')
+      throw new BadRequestException({
+        message: 'Nalog je već završen.',
+        code: ErrorCodes.INSTALL_TASK_ALREADY_COMPLETED,
+      })
     }
     if (task.status === InstallTaskStatus.CANCELLED) {
-      throw new BadRequestException('Nalog je otkazan i ne može se mijenjati.')
+      throw new BadRequestException({
+        message: 'Nalog je otkazan i ne može se mijenjati.',
+        code: ErrorCodes.INSTALL_TASK_ALREADY_CANCELLED,
+      })
     }
     const allowed =
       (task.status === InstallTaskStatus.PENDING && status === InstallTaskStatus.IN_PROGRESS) ||
@@ -401,7 +435,10 @@ export class InstallTasksService {
       },
     })
     if (!task) {
-      throw new NotFoundException('Zadatak ugradnje nije pronađen.')
+      throw new NotFoundException({
+        message: 'Zadatak ugradnje nije pronađen.',
+        code: ErrorCodes.INSTALL_TASK_NOT_FOUND,
+      })
     }
     if (task.status === InstallTaskStatus.COMPLETED) {
       return this.prisma.installTask.findUniqueOrThrow({
@@ -415,13 +452,22 @@ export class InstallTasksService {
       })
     }
     if (task.status !== InstallTaskStatus.IN_PROGRESS) {
-      throw new BadRequestException('Zadatak mora biti u statusu U toku da bi se završio.')
+      throw new BadRequestException({
+        message: 'Zadatak mora biti u statusu U toku da bi se završio.',
+        code: ErrorCodes.INSTALL_TASK_MUST_BE_IN_PROGRESS,
+      })
     }
     if (task.meter.simCardState !== MeterSimCardState.NO_SIM || task.meter.simCardId) {
-      throw new BadRequestException('Brojilo više nije u stanju NO_SIM; zadatak se ne može završiti ovim tokom.')
+      throw new BadRequestException({
+        message: 'Brojilo više nije u stanju NO_SIM; zadatak se ne može završiti ovim tokom.',
+        code: ErrorCodes.INSTALL_TASK_METER_HAS_SIM,
+      })
     }
     if (task.meter.status !== MeterStatus.ACTIVE) {
-      throw new BadRequestException('Brojilo nije aktivno; ugradnja SIM-a nije dozvoljena.')
+      throw new BadRequestException({
+        message: 'Brojilo nije aktivno; ugradnja SIM-a nije dozvoljena.',
+        code: ErrorCodes.INSTALL_TASK_METER_INACTIVE,
+      })
     }
 
     const validatedDynamic = await this.meterTypeFieldsService.validateDynamicValues(

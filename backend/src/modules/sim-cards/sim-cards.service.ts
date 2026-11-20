@@ -10,6 +10,7 @@ import { scopeWhere, ScopeContext } from '../../common/utils/scope-filter.util';
 import { PaginatedResult } from '../../common/interfaces/paginated-result.interface';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ErrorCodes } from '../../common/constants/error-codes';
 import { AssignSimCardDto } from './dto/assign-sim-card.dto';
 import { CreateSimCardDto } from './dto/create-sim-card.dto';
 import { SimCardFilterDto } from './dto/sim-card-filter.dto';
@@ -136,22 +137,37 @@ export class SimCardsService {
     });
     if (existingDup) {
       if (existingDup.iccid === simIccid) {
-        throw new ConflictException('SIM kartica sa ovim ICCID-om već postoji u bazi.');
+        throw new ConflictException({
+          message: 'SIM kartica sa ovim ICCID-om već postoji u bazi.',
+          code: ErrorCodes.SIM_DUPLICATE_ICCID,
+        });
       }
       if (existingDup.ipAddress === simIpAddress) {
-        throw new ConflictException('SIM kartica sa ovom internom IP adresom već postoji u bazi.');
+        throw new ConflictException({
+          message: 'SIM kartica sa ovom internom IP adresom već postoji u bazi.',
+          code: ErrorCodes.SIM_DUPLICATE_IP,
+        });
       }
       if (simPublicIpAddress && existingDup.publicIpAddress === simPublicIpAddress) {
-        throw new ConflictException('SIM kartica sa ovom javnom IP adresom već postoji u bazi.');
+        throw new ConflictException({
+          message: 'SIM kartica sa ovom javnom IP adresom već postoji u bazi.',
+          code: ErrorCodes.SIM_DUPLICATE_PUBLIC_IP,
+        });
       }
       if (
         normalizedPhone &&
         existingDup.phoneNumber &&
         normalizePhoneNumber(existingDup.phoneNumber) === normalizedPhone
       ) {
-        throw new ConflictException('SIM kartica sa ovim brojem telefona već postoji u bazi.');
+        throw new ConflictException({
+          message: 'SIM kartica sa ovim brojem telefona već postoji u bazi.',
+          code: ErrorCodes.SIM_DUPLICATE_PHONE,
+        });
       }
-      throw new ConflictException('SIM kartica sa istim podacima već postoji u bazi.');
+      throw new ConflictException({
+        message: 'SIM kartica sa istim podacima već postoji u bazi.',
+        code: ErrorCodes.CONFLICT,
+      });
     }
 
     try {
@@ -304,11 +320,17 @@ export class SimCardsService {
     });
 
     if (!simCard) {
-      throw new NotFoundException('SIM card not found');
+      throw new NotFoundException({
+        message: 'SIM card not found',
+        code: ErrorCodes.SIM_NOT_FOUND,
+      });
     }
 
     if (simCard.meter) {
-      throw new BadRequestException('Ne možete obrisati SIM karticu koja je ugradjena u brojilo');
+      throw new BadRequestException({
+        message: 'Ne možete obrisati SIM karticu koja je ugradjena u brojilo',
+        code: ErrorCodes.SIM_DELETE_INSTALLED_FORBIDDEN,
+      });
     }
 
     await this.prisma.simCard.delete({ where: { id } });
@@ -426,7 +448,10 @@ export class SimCardsService {
           'Ova SIM kartica ne pripada vašoj distribuciji. Ne možete je zadužiti.',
         );
       }
-      throw new NotFoundException('SIM card not found');
+      throw new NotFoundException({
+        message: 'SIM card not found',
+        code: ErrorCodes.SIM_NOT_FOUND,
+      });
     }
 
     if (simCard.status === SimCardStatus.ASSIGNED && simCard.assignedToId === actorId) {
@@ -434,7 +459,10 @@ export class SimCardsService {
     }
 
     if (simCard.status !== SimCardStatus.AVAILABLE) {
-      throw new BadRequestException('Only AVAILABLE SIM cards can be claimed');
+      throw new BadRequestException({
+        message: 'Only AVAILABLE SIM cards can be claimed',
+        code: ErrorCodes.SIM_ALREADY_CLAIMED_OR_UNAVAILABLE,
+      });
     }
 
     const claimUpdate = await this.prisma.simCard.updateMany({
@@ -457,7 +485,10 @@ export class SimCardsService {
       if (latest?.status === SimCardStatus.ASSIGNED && latest.assignedToId === actorId) {
         return this.findOne(id, scope);
       }
-      throw new BadRequestException('Only AVAILABLE SIM cards can be claimed');
+      throw new BadRequestException({
+        message: 'Only AVAILABLE SIM cards can be claimed',
+        code: ErrorCodes.SIM_ALREADY_CLAIMED_OR_UNAVAILABLE,
+      });
     }
 
     const claimed = await this.findOne(id, scope);
@@ -482,11 +513,17 @@ export class SimCardsService {
     await this.ensureSimCardExists(id, scope);
     const simCard = await this.prisma.simCard.findUnique({ where: { id } });
     if (!simCard) {
-      throw new NotFoundException('SIM card not found');
+      throw new NotFoundException({
+        message: 'SIM card not found',
+        code: ErrorCodes.SIM_NOT_FOUND,
+      });
     }
 
     if (!simCard.assignedToId) {
-      throw new BadRequestException('SIM card is not assigned');
+      throw new BadRequestException({
+        message: 'SIM card is not assigned',
+        code: ErrorCodes.SIM_NOT_ASSIGNED,
+      });
     }
 
     if (simCard.status !== SimCardStatus.ASSIGNED) {

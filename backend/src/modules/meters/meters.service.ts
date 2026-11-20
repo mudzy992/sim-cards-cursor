@@ -21,6 +21,7 @@ import { UserRole } from '@prisma/client';
 import { DeleteMeterDto, MeterDeleteRecordsAction, MeterDeleteSimAction } from './dto/delete-meter.dto';
 import { AuthService } from '../auth/auth.service';
 import { ConfigService } from '@nestjs/config';
+import { ErrorCodes } from 'src/common/constants/error-codes';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -94,12 +95,18 @@ export class MetersService {
         select: { id: true, distributionId: true },
       });
       if (!branch) {
-        throw new BadRequestException('Odabrana podružnica ne postoji.');
+        throw new BadRequestException({
+          message: 'Odabrana podružnica ne postoji.',
+          code: ErrorCodes.METER_BRANCH_NOT_FOUND,
+        });
       }
       if (scope && scope.role === UserRole.DIST_ADMIN) {
         const distId = scope.distributionId;
         if (!distId || branch.distributionId !== distId) {
-          throw new ForbiddenException('Podružnica ne pripada vašoj distribuciji.');
+          throw new ForbiddenException({
+            message: 'Podružnica ne pripada vašoj distribuciji.',
+            code: ErrorCodes.METER_BRANCH_OUTSIDE_DISTRIBUTION,
+          });
         }
       }
     }
@@ -134,7 +141,10 @@ export class MetersService {
 
     if (createMeterDto.simCardState) {
       if (createMeterDto.simCardState === MeterSimCardState.INSTALLED) {
-        throw new BadRequestException('simCardState=INSTALLED nije dozvoljen bez procesa ugradnje SIM-a.');
+        throw new BadRequestException({
+          message: 'simCardState=INSTALLED nije dozvoljen bez procesa ugradnje SIM-a.',
+          code: ErrorCodes.METER_INSTALLED_WITHOUT_PROCESS,
+        });
       }
       data.simCardState = createMeterDto.simCardState;
       data.noSimReason =
@@ -269,7 +279,10 @@ export class MetersService {
     if (simCardId) {
       const existing = await this.prisma.meter.findUnique({ where: { id }, select: { status: true } })
       if (existing?.status && existing.status !== MeterStatus.ACTIVE) {
-        throw new BadRequestException('Nije dozvoljeno ugraditi SIM na brojilo koje nije aktivno.')
+        throw new BadRequestException({
+          message: 'Nije dozvoljeno ugraditi SIM na brojilo koje nije aktivno.',
+          code: ErrorCodes.METER_INACTIVE_FOR_SIM,
+        });
       }
       data.simCardState = MeterSimCardState.INSTALLED;
       data.noSimReason = null;
@@ -402,7 +415,10 @@ export class MetersService {
       select: { id: true, serialNumber: true, simCardId: true },
     });
     if (!meter) {
-      throw new NotFoundException(`Meter with ID ${id} not found`);
+      throw new NotFoundException({
+        message: `Meter with ID ${id} not found`,
+        code: ErrorCodes.METER_NOT_FOUND,
+      });
     }
 
     const records = await this.prisma.installationRecord.findMany({
@@ -412,7 +428,10 @@ export class MetersService {
     });
 
     if (records.length > 0 && dto.recordsAction === MeterDeleteRecordsAction.ABORT_IF_EXISTS) {
-      throw new BadRequestException('Brojilo ima zapisnike. Preuzmite zapisnike pa odaberite brisanje zapisnika.');
+      throw new BadRequestException({
+        message: 'Brojilo ima zapisnike. Preuzmite zapisnike pa odaberite brisanje zapisnika.',
+        code: ErrorCodes.METER_HAS_RECORDS_CANNOT_DELETE,
+      });
     }
 
     const baseDirsToCleanup = new Set<string>();

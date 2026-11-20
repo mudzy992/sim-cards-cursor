@@ -4,7 +4,7 @@
 **Status:** Implementacija je završena (Faza 1–4 kompletirane, uključujući naknadna poboljšanja za stabilnu paginaciju štampe, 4-poljnu provjeru duplikata, `ErrorBoundary`, `ErrorCodes`, `reorderFields` DTO, paginaciju pregleda naljepnica i `mobile/` typecheck/401 mutex). Ovaj dokument služi kao historijska referenca plana izvršenja.
 
 > **Napomena za VM produkcijski deploy:**
-> 1. `backend/Dockerfile.vm` svjesno ostavlja podrazumijevanog korisnika radi kompatibilnosti s postojećim host bind-mount direktorijem `/mnt/shared-app-files/sim-cards`; nakon `chown -R 1000:1000 /mnt/shared-app-files/sim-cards` na VM-u može se uključiti `USER node`.
+> 1. `backend/Dockerfile` i `backend/Dockerfile.vm` sada pokreću runtime pod non-root korisnikom `node` (UID/GID `1000`). Prije prvog starta na VM-u provjeriti da host bind-mount ima odgovarajuće vlasništvo: `chown -R 1000:1000 /mnt/shared-app-files/sim-cards`.
 > 2. Rotirati ranije committane tajne (Firebase Admin SDK ključ, DB/JWT/SMTP tajne iz ranijih `.env` fajlova) prije narednog produkcijskog izdanja.
 
 ---

@@ -40,11 +40,15 @@ COPY package*.json ./
 
 RUN npm ci --omit=dev
 
-COPY --from=build /usr/app/dist ./dist
-COPY --from=build /usr/app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /usr/app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY --from=build /usr/app/prisma ./prisma
-COPY --from=build /usr/app/src/templates ./templates
+COPY --from=build --chown=node:node /usr/app/dist ./dist
+COPY --from=build --chown=node:node /usr/app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build --chown=node:node /usr/app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=build --chown=node:node /usr/app/prisma ./prisma
+COPY --from=build --chown=node:node /usr/app/src/templates ./templates
+
+RUN mkdir -p /app/uploads && chown -R node:node /usr/app /app/uploads
+
+USER node
 
 EXPOSE 3003
 

@@ -10,6 +10,7 @@ import { scopeWhere, ScopeContext } from '../../common/utils/scope-filter.util';
 import { PaginatedResult } from '../../common/interfaces/paginated-result.interface';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ErrorCodes } from '../../common/constants/error-codes';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { ImportExcelDto } from './dto/import-excel.dto';
@@ -43,7 +44,10 @@ export class ShipmentsService {
     scope?: ScopeContext | null,
   ) {
     if (scope?.role === 'DIST_ADMIN' && !scope.distributionId) {
-      throw new BadRequestException('Distribution admin scope is missing.');
+      throw new BadRequestException({
+        message: 'Distribution admin scope is missing.',
+        code: ErrorCodes.SHIPMENT_DISTRIBUTION_MISSING,
+      });
     }
 
     const distributionId =
@@ -256,7 +260,10 @@ export class ShipmentsService {
     });
 
     if (!shipment) {
-      throw new NotFoundException('Shipment not found');
+      throw new NotFoundException({
+        message: 'Shipment not found',
+        code: ErrorCodes.SHIPMENT_NOT_FOUND,
+      });
     }
 
     return shipment;
@@ -276,7 +283,10 @@ export class ShipmentsService {
       dto.distributionId !== undefined &&
       dto.distributionId !== scope.distributionId
     ) {
-      throw new ForbiddenException('Cannot reassign shipment to another distribution');
+      throw new ForbiddenException({
+        message: 'Cannot reassign shipment to another distribution',
+        code: ErrorCodes.SHIPMENT_REASSIGN_FORBIDDEN,
+      });
     }
 
     const updated = await this.prisma.shipment.update({
@@ -549,7 +559,10 @@ export class ShipmentsService {
     await this.ensureShipmentExists(shipmentId, scope);
 
     if (!file?.buffer || file.size <= 0) {
-      throw new BadRequestException('Fajl je obavezan za import.');
+      throw new BadRequestException({
+        message: 'Fajl je obavezan za import.',
+        code: ErrorCodes.SHIPMENT_FILE_REQUIRED,
+      });
     }
 
     if (!this.isSupportedFile(file.originalname, file.mimetype)) {
@@ -799,7 +812,10 @@ export class ShipmentsService {
     });
 
     if (!shipment) {
-      throw new NotFoundException('Shipment not found');
+      throw new NotFoundException({
+        message: 'Shipment not found',
+        code: ErrorCodes.SHIPMENT_NOT_FOUND,
+      });
     }
   }
 

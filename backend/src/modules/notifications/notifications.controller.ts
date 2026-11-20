@@ -13,6 +13,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { NotificationsQueryDto } from './dto/notifications-query.dto';
 import { NotificationsService } from './notifications.service';
 
 @ApiTags('notifications')
@@ -27,12 +28,11 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Lista notifikacija trenutnog korisnika' })
   findByUser(
     @CurrentUser() user: { id: string },
-    @Query('unreadOnly') unreadOnly?: string,
-    @Query('limit') limit?: string,
+    @Query() query: NotificationsQueryDto,
   ) {
     return this.notificationsService.findByUser(user.id, {
-      unreadOnly: unreadOnly === 'true',
-      limit: limit ? parseInt(limit, 10) : 50,
+      unreadOnly: query.unreadOnly === true,
+      limit: query.limit,
     });
   }
 

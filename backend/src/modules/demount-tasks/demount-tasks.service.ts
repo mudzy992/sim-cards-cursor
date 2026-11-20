@@ -21,6 +21,7 @@ import {
 } from '@prisma/client';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ErrorCodes } from 'src/common/constants/error-codes';
 import type { User } from '@prisma/client';
 
 @Injectable()
@@ -53,29 +54,50 @@ export class DemountTasksService {
       },
     });
     if (!meter) {
-      throw new BadRequestException('Brojilo nije pronađeno.');
+      throw new BadRequestException({
+        message: 'Brojilo nije pronađeno.',
+        code: ErrorCodes.METER_NOT_FOUND,
+      });
     }
     if (meter.hasOpenDemountTask) {
-      throw new BadRequestException('Za ovo brojilo već postoji aktivan nalog za demontažu.')
+      throw new BadRequestException({
+        message: 'Za ovo brojilo već postoji aktivan nalog za demontažu.',
+        code: ErrorCodes.DEMOUNT_TASK_ALREADY_ACTIVE,
+      });
     }
     if (!meter.simCardId) {
-      throw new BadRequestException('Brojilo nema ugradjenu SIM karticu.');
+      throw new BadRequestException({
+        message: 'Brojilo nema ugradjenu SIM karticu.',
+        code: ErrorCodes.DEMOUNT_TASK_NO_SIM,
+      });
     }
     if (meter.simCardState !== MeterSimCardState.INSTALLED) {
-      throw new BadRequestException('Zadatak demontaže se može kreirati samo za brojilo sa ugrađenom SIM karticom.')
+      throw new BadRequestException({
+        message: 'Zadatak demontaže se može kreirati samo za brojilo sa ugrađenom SIM karticom.',
+        code: ErrorCodes.DEMOUNT_TASK_NO_SIM,
+      });
     }
     if (meter.status !== MeterStatus.ACTIVE) {
-      throw new BadRequestException('Zadatak demontaže se ne može kreirati za brojilo koje nije aktivno.')
+      throw new BadRequestException({
+        message: 'Zadatak demontaže se ne može kreirati za brojilo koje nije aktivno.',
+        code: ErrorCodes.DEMOUNT_TASK_METER_INACTIVE,
+      });
     }
     const assignedTo = await this.prisma.user.findUnique({
       where: { id: dto.assignedToId },
       include: { branch: { select: { distributionId: true } }, distribution: { select: { id: true } } },
     });
     if (!assignedTo) {
-      throw new BadRequestException('Operator nije pronađen.');
+      throw new BadRequestException({
+        message: 'Operator nije pronađen.',
+        code: ErrorCodes.TASK_OPERATOR_NOT_FOUND,
+      });
     }
     if (assignedTo.role !== UserRole.USER) {
-      throw new BadRequestException('Zadatak se može dodijeliti samo operatoru.')
+      throw new BadRequestException({
+        message: 'Zadatak se može dodijeliti samo operatoru.',
+        code: ErrorCodes.TASK_ASSIGNEE_NOT_OPERATOR,
+      });
     }
     if (scope?.role === UserRole.USER) {
       const isModerator = await this.prisma.branchModerator.findUnique({
@@ -192,10 +214,16 @@ export class DemountTasksService {
       include: { meter: { select: { id: true, serialNumber: true } } },
     });
     if (!task) {
-      throw new NotFoundException('Zadatak demontaže nije pronađen.');
+      throw new NotFoundException({
+        message: 'Zadatak demontaže nije pronađen.',
+        code: ErrorCodes.DEMOUNT_TASK_NOT_FOUND,
+      });
     }
     if (task.assignedToId !== userId) {
-      throw new BadRequestException('Samo operator kojem je zadatak dodijeljen može ažurirati status.');
+      throw new BadRequestException({
+        message: 'Samo operator kojem je zadatak dodijeljen može ažurirati status.',
+        code: ErrorCodes.TASK_ONLY_ASSIGNEE_CAN_UPDATE,
+      });
     }
     if (task.status === DemountTaskStatus.COMPLETED) {
       throw new BadRequestException('Nalog je već završen.');
@@ -391,7 +419,10 @@ export class DemountTasksService {
       },
     });
     if (!task) {
-      throw new NotFoundException('Zadatak demontaže nije pronađen.');
+      throw new NotFoundException({
+        message: 'Zadatak demontaže nije pronađen.',
+        code: ErrorCodes.DEMOUNT_TASK_NOT_FOUND,
+      });
     }
     if (task.status === DemountTaskStatus.COMPLETED) {
       return this.prisma.demountTask.findUniqueOrThrow({
@@ -404,12 +435,18 @@ export class DemountTasksService {
       })
     }
     if (task.status !== DemountTaskStatus.IN_PROGRESS) {
-      throw new BadRequestException('Zadatak mora biti u statusu U toku da bi se završio wizardom.');
+      throw new BadRequestException({
+        message: 'Zadatak mora biti u statusu U toku da bi se završio wizardom.',
+        code: ErrorCodes.DEMOUNT_TASK_MUST_BE_IN_PROGRESS,
+      });
     }
     const meter = task.meter;
     const oldSimId = meter.simCardId;
     if (!oldSimId) {
-      throw new BadRequestException('Brojilo više nema SIM karticu; zadatak se ne može završiti ovim tokom.');
+      throw new BadRequestException({
+        message: 'Brojilo više nema SIM karticu; zadatak se ne može završiti ovim tokom.',
+        code: ErrorCodes.DEMOUNT_TASK_NO_SIM,
+      });
     }
 
     const effectiveResolution = task.requestedResolution ?? dto.resolution
@@ -420,19 +457,31 @@ export class DemountTasksService {
       (dto.meterDemountCategory ?? null)) as MeterDemountCategory | null
 
     if (task.requestedResolution && dto.resolution !== task.requestedResolution) {
-      throw new BadRequestException('Rezolucija je zaključana od strane inicijatora naloga.')
+      throw new BadRequestException({
+        message: 'Rezolucija je zaključana od strane inicijatora naloga.',
+        code: ErrorCodes.DEMOUNT_TASK_FIELD_LOCKED,
+      });
     }
     if (task.requestedReason && dto.reason !== task.requestedReason) {
-      throw new BadRequestException('Obrazloženje je zaključano od strane inicijatora naloga.')
+      throw new BadRequestException({
+        message: 'Obrazloženje je zaključano od strane inicijatora naloga.',
+        code: ErrorCodes.DEMOUNT_TASK_FIELD_LOCKED,
+      });
     }
     if (task.requestedRemovedSimDisposition && dto.removedSimDisposition !== task.requestedRemovedSimDisposition) {
-      throw new BadRequestException('Ishod uklonjene SIM je zaključan od strane inicijatora naloga.')
+      throw new BadRequestException({
+        message: 'Ishod uklonjene SIM je zaključan od strane inicijatora naloga.',
+        code: ErrorCodes.DEMOUNT_TASK_FIELD_LOCKED,
+      });
     }
     if (
       task.requestedMeterDemountCategory &&
       (dto.meterDemountCategory ?? null) !== task.requestedMeterDemountCategory
     ) {
-      throw new BadRequestException('Kategorija demontaže je zaključana od strane inicijatora naloga.')
+      throw new BadRequestException({
+        message: 'Kategorija demontaže je zaključana od strane inicijatora naloga.',
+        code: ErrorCodes.DEMOUNT_TASK_FIELD_LOCKED,
+      });
     }
 
     const meterDistributionId = meter.branch?.distributionId ?? null;
@@ -441,10 +490,16 @@ export class DemountTasksService {
     );
     if (effectiveResolution === DemountCompletionResolution.REPLACE_SIM) {
       if (!dto.newSimCardId) {
-        throw new BadRequestException('Za zamjenu SIM-a navedite novu SIM karticu (newSimCardId).');
+        throw new BadRequestException({
+          message: 'Za zamjenu SIM-a navedite novu SIM karticu (newSimCardId).',
+          code: ErrorCodes.DEMOUNT_TASK_NEW_SIM_REQUIRED,
+        });
       }
       if (dto.newSimCardId === oldSimId) {
-        throw new BadRequestException('Nova SIM mora biti drugačija od trenutno ugrađene.');
+        throw new BadRequestException({
+          message: 'Nova SIM mora biti drugačija od trenutno ugrađene.',
+          code: ErrorCodes.DEMOUNT_TASK_NEW_SIM_SAME_AS_OLD,
+        });
       }
       await this.assertSimUsableForReplace(dto.newSimCardId, userId, meterDistributionId, scope);
       const newSimCardId = dto.newSimCardId;
@@ -461,7 +516,10 @@ export class DemountTasksService {
           data: { status: SimCardStatus.INSTALLED },
         });
         if (claimedNewSim.count === 0) {
-          throw new BadRequestException('Nova SIM kartica je u međuvremenu zauzeta.');
+          throw new BadRequestException({
+            message: 'Nova SIM kartica je u međuvremenu zauzeta.',
+            code: ErrorCodes.DEMOUNT_TASK_NEW_SIM_UNAVAILABLE,
+          });
         }
 
         const transitioned = await tx.demountTask.updateMany({
@@ -476,7 +534,10 @@ export class DemountTasksService {
           },
         });
         if (transitioned.count === 0) {
-          throw new BadRequestException('Zadatak je u međuvremenu već završen ili promijenjen.');
+          throw new BadRequestException({
+            message: 'Zadatak je u međuvremenu već završen ili promijenjen.',
+            code: ErrorCodes.DEMOUNT_TASK_CONCURRENT_CONFLICT,
+          });
         }
 
         await tx.meter.update({

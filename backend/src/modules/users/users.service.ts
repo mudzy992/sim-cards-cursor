@@ -12,6 +12,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { scopeWhere, ScopeContext } from '../../common/utils/scope-filter.util';
 import { baseUsername, generateUniqueUsername } from '../../common/utils/username-generator.util';
 import { normalizeEmail } from '../../common/utils/email-normalizer.util';
+import { ErrorCodes } from '../../common/constants/error-codes';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserFilterDto } from './dto/user-filter.dto';
@@ -47,7 +48,10 @@ export class UsersService {
     });
 
     if (exists) {
-      throw new ConflictException('User with this email already exists');
+      throw new ConflictException({
+        message: 'User with this email already exists',
+        code: ErrorCodes.USER_EMAIL_EXISTS,
+      });
     }
 
     const saltRounds = Number(this.configService.get('BCRYPT_SALT_ROUNDS', 12));
@@ -141,7 +145,10 @@ export class UsersService {
       include: { distribution: { select: { id: true, name: true, code: true } }, branch: { select: { id: true, name: true, code: true } } },
     });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException({
+        message: 'User not found',
+        code: ErrorCodes.USER_NOT_FOUND,
+      });
     }
 
     return this.toUserListItem(user);
@@ -158,18 +165,30 @@ export class UsersService {
     });
 
     if (!existing) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException({
+        message: 'User not found',
+        code: ErrorCodes.USER_NOT_FOUND,
+      });
     }
 
     if (scope && scope.role === UserRole.DIST_ADMIN) {
       if (existing.role === UserRole.SYSTEM_ADMIN) {
-        throw new ForbiddenException('Cannot modify a system administrator');
+        throw new ForbiddenException({
+          message: 'Cannot modify a system administrator',
+          code: ErrorCodes.USER_CANNOT_MODIFY_SYSTEM_ADMIN,
+        });
       }
       if (dto.role === UserRole.SYSTEM_ADMIN) {
-        throw new ForbiddenException('DIST_ADMIN cannot assign SYSTEM_ADMIN role');
+        throw new ForbiddenException({
+          message: 'DIST_ADMIN cannot assign SYSTEM_ADMIN role',
+          code: ErrorCodes.USER_CANNOT_ASSIGN_SYSTEM_ADMIN,
+        });
       }
       if (dto.distributionId !== undefined && dto.distributionId !== scope.distributionId) {
-        throw new ForbiddenException('Cannot reassign user outside your distribution');
+        throw new ForbiddenException({
+          message: 'Cannot reassign user outside your distribution',
+          code: ErrorCodes.USER_CANNOT_REASSIGN_DISTRIBUTION,
+        });
       }
       if (dto.branchId) {
         const branch = await this.prisma.branch.findUnique({
@@ -177,7 +196,10 @@ export class UsersService {
           select: { distributionId: true },
         });
         if (!branch || branch.distributionId !== scope.distributionId) {
-          throw new ForbiddenException('Target branch is outside your distribution');
+          throw new ForbiddenException({
+            message: 'Target branch is outside your distribution',
+            code: ErrorCodes.USER_BRANCH_OUTSIDE_DISTRIBUTION,
+          });
         }
       }
     }
@@ -191,7 +213,10 @@ export class UsersService {
           select: { id: true },
         });
         if (dup) {
-          throw new ConflictException('User with this email already exists');
+          throw new ConflictException({
+            message: 'User with this email already exists',
+            code: ErrorCodes.USER_EMAIL_EXISTS,
+          });
         }
       }
     }

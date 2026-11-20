@@ -41,6 +41,12 @@ describe('getApiErrorMessage', () => {
       message: 'Record with this unique value already exists',
     });
     expect(getApiErrorMessage(errEn, 'Fallback')).toContain('already exists');
+
+    const errSimEn = makeAxiosError(409, {
+      errorCode: 'SIM_DUPLICATE_ICCID',
+      message: 'SIM kartica sa ovim ICCID-om već postoji u bazi.',
+    });
+    expect(getApiErrorMessage(errSimEn, 'Fallback')).toBe('A SIM card with this ICCID already exists.');
   });
 
   it('returns localized network error when no response', () => {

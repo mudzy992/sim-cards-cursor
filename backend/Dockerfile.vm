@@ -13,15 +13,17 @@ WORKDIR /usr/app
 
 ENV NODE_ENV=production
 
-COPY --from=build /usr/app/dist ./dist
-COPY --from=build /usr/app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /usr/app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY --from=build /usr/app/prisma ./prisma
-COPY --from=build /usr/app/src/templates ./templates
+COPY --from=build --chown=node:node /usr/app/dist ./dist
+COPY --from=build --chown=node:node /usr/app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build --chown=node:node /usr/app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=build --chown=node:node /usr/app/prisma ./prisma
+COPY --from=build --chown=node:node /usr/app/src/templates ./templates
 
 # Napomena za VM bind-mount (/mnt/shared-app-files/sim-cards):
-# Trenutni runtime ostaje pod podrazumijevanim korisnikom kako ne bi došlo do EACCES
-# nad postojećim host fajlovima; nakon `chown -R 1000:1000 /mnt/shared-app-files/sim-cards`
-# na VM-u ovdje se može uključiti `USER node`.
+# Kontejner radi pod non-root korisnikom `node` (UID/GID 1000). Na VM-u
+# osigurati `chown -R 1000:1000 /mnt/shared-app-files/sim-cards`.
+RUN mkdir -p /app/uploads && chown -R node:node /usr/app /app/uploads
+USER node
+
 EXPOSE 3003
 CMD ["node", "dist/src/main.js"]
