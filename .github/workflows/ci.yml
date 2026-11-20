@@ -175,8 +175,7 @@ jobs:
             --build-arg VITE_API_BASE_URLS=/backend/api \
             -t simtracker-frontend:ci-test .
           docker build -f backend/Dockerfile \
-            --target build \
-            -t simtracker-backend:ci-build-test .
+            -t simtracker-backend:ci-test .
 
       - name: Verify offline VM Dockerfiles build (deps + vm)
         run: |
