@@ -14,6 +14,7 @@ import { branchModeratorsApi } from '@/api/branch-moderators.api'
 import { getUserRoleLabel } from '@/utils/labels.utils'
 import { useTranslation } from '@/i18n';
 import LanguageSwitcher from '@/components/common/LanguageSwitcher';
+import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher';
 
 const { Header: AntHeader } = Layout;
 
@@ -84,7 +85,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   const showMenuButton = Boolean(onMobileMenuClick) && isMobile
 
   return (
-    <AntHeader className="app-header !bg-surface/80 !px-4 sm:!px-6 border-b border-slate-200">
+    <AntHeader className="app-header !px-4 sm:!px-6">
       <div className="flex h-full items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {showMenuButton && (
@@ -122,6 +123,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           >
             <NotificationBell />
           </div>
+          <ThemeSwitcher />
           <LanguageSwitcher />
           <Button
             icon={<LogoutOutlined />}

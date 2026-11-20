@@ -1,10 +1,8 @@
+@import './tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  color-scheme: dark;
-}
 
 html,
 body,
@@ -15,6 +13,7 @@ body,
 
 body {
   font-family:
+    'Inter Variable',
     Inter,
     ui-sans-serif,
     system-ui,
@@ -22,21 +21,21 @@ body {
     'Segoe UI',
     Roboto,
     sans-serif;
-  background-color: #09090b;
-  color: #f4f4f6;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: rgba(99, 102, 241, 0.35);
-  color: #f8f8fa;
+  background: var(--selection-bg);
+  color: var(--text-primary);
 }
 
-/* Slim, dark-friendly scrollbars */
+/* Slim, theme-aware scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2b2c33 transparent;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -49,50 +48,48 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: #2b2c33;
+  background-color: var(--scrollbar-thumb);
   border-radius: 999px;
-  border: 2px solid #09090b;
+  border: 2px solid var(--bg-canvas);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: #3f3f46;
+  background-color: var(--scrollbar-thumb-hover);
 }
 
-/* Consistent focus ring across native + custom elements */
+/* Visok kontrast fokusa kroz cijelu aplikaciju (WCAG AAA) */
 a:focus-visible,
 button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/*
- * Print / label preview scope.
- *
- * ShipmentPrintPage (and the LabelSheetPreview it renders) simulate a
- * physical A4 sheet of labels. That preview must stay light regardless of
- * the app's dark theme — printing dark backgrounds wastes ink and the
- * on-screen preview should match the paper output. We restore the original
- * light neutral values here, scoped to `.print-preview-scope`, without
- * touching the component markup.
- */
-.print-preview-scope {
-  --pp-slate-50: #f8fafc;
-  --pp-slate-100: #f1f5f9;
-  --pp-slate-200: #e2e8f0;
-  --pp-slate-300: #cbd5e1;
-  --pp-slate-400: #94a3b8;
-  --pp-slate-500: #64748b;
-  --pp-slate-600: #475569;
-  --pp-slate-800: #1e293b;
+/* Poštovanje sistemske postavke za smanjenje pokreta */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
+/*
+ * Print / label preview scope: simulacija A4 papira ostaje svijetla
+ * bez obzira na aktivnu temu aplikacije.
+ */
 .print-preview-scope .bg-white {
-  background-color: #fff !important;
+  background-color: var(--pp-paper) !important;
 }
 .print-preview-scope .bg-white\/70 {
-  background-color: rgb(255 255 255 / 0.7) !important;
+  background-color: rgb(255 255 255 / 0.85) !important;
 }
 .print-preview-scope .bg-slate-50 {
   background-color: var(--pp-slate-50) !important;

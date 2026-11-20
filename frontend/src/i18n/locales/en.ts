@@ -190,6 +190,12 @@ const en: TranslationDictionary = {
       notFullyConfigured: 'System is not fully configured',
       missingKeysIntro: 'The following key settings are missing or unconfigured:',
     },
+    theme: {
+      system: 'System',
+      light: 'Light',
+      dark: 'Dark',
+      switchTheme: 'Switch theme (current: {{mode}})',
+    },
     errorBoundary: {
       title: 'An unexpected error occurred on this page',
       subtitle: 'Try reloading the view or return to the home page.',

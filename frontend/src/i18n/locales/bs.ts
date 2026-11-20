@@ -190,6 +190,12 @@ const bs: TranslationDictionary = {
       notFullyConfigured: 'Sistem nije potpuno podešen',
       missingKeysIntro: 'Nedostaju ili nisu podešene ključne postavke:',
     },
+    theme: {
+      system: 'Sistem',
+      light: 'Svijetla',
+      dark: 'Tamna',
+      switchTheme: 'Promijeni temu (trenutno: {{mode}})',
+    },
     errorBoundary: {
       title: 'Došlo je do neočekivane greške na stranici',
       subtitle: 'Pokušajte ponovo učitati prikaz ili se vratite na početnu stranicu.',

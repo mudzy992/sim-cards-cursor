@@ -2,18 +2,20 @@
   line-height: normal;
 }
 
-/* Sticky, translucent, blurred header — Next.js/Vercel-dashboard style */
+/* Sticky, translucent, blurred header using semantic CSS tokens */
 .app-header {
   position: sticky;
   top: 0;
   z-index: 20;
+  background-color: var(--bg-header-backdrop) !important;
+  border-bottom: 1px solid var(--border-subtle);
   backdrop-filter: saturate(160%) blur(10px);
   -webkit-backdrop-filter: saturate(160%) blur(10px);
 }
 
-/* Sidebar: subtle right hairline instead of a hard box shadow */
+/* Sidebar: subtle right hairline using semantic border token */
 .app-sider {
-  border-right: 1px solid #1e1f24;
+  border-right: 1px solid var(--border-subtle);
 }
 
 .app-sider .ant-menu {
@@ -34,6 +36,7 @@
 
 .ant-table {
   min-width: max-content;
+  font-variant-numeric: tabular-nums;
 }
 
 .ant-card-body {
@@ -45,16 +48,11 @@
   overflow-x: auto;
 }
 
-/* Slightly crisper card borders on dark surfaces */
 .ant-card {
-  border-color: #1e1f24;
+  border-color: var(--border-subtle);
 }
 
-.ant-table {
-  font-variant-numeric: tabular-nums;
-}
-
-/* Keep the physical A4 label preview literally white on screen */
+/* Keep the physical A4 label preview literally light on screen */
 .print-preview-scope .ant-card,
 .print-preview-scope .ant-tag {
   color-scheme: light;

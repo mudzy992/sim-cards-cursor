@@ -111,6 +111,9 @@ jobs:
       - name: Check i18n parity & keys
         run: npm run check:i18n
 
+      - name: Check WCAG AAA contrast tokens
+        run: npm run check:wcag
+
       - name: Check UI consistency
         run: npm run check:ui
 

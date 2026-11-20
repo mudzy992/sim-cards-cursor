@@ -1,106 +1,122 @@
 import { theme, type ThemeConfig } from 'antd';
+import { DESIGN_TOKENS, type ResolvedTheme, type TableDensity } from './tokens';
+
+const FONT_STACK =
+  "'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
 /**
- * Dark-only design tokens for Ant Design's ConfigProvider.
- * Kept in one place so the palette used by Tailwind (tailwind.config.js)
- * and the palette used by Antd components stay in sync.
+ * Dinamička konfiguracija Ant Design tokena za Light i Dark režim,
+ * u potpunosti sinhronizovana sa tokens.json / tokens.css (WCAG AAA).
  */
-export const antdTheme: ThemeConfig = {
-  algorithm: theme.darkAlgorithm,
-  token: {
-    colorPrimary: '#6366f1',
-    colorLink: '#818cf8',
-    colorLinkHover: '#a5b4fc',
-    colorInfo: '#6366f1',
-    colorSuccess: '#34d399',
-    colorWarning: '#fbbf24',
-    colorError: '#f87171',
+export function createAntdTheme(
+  mode: ResolvedTheme,
+  density: TableDensity = 'comfortable',
+): ThemeConfig {
+  const t = DESIGN_TOKENS[mode];
+  const algorithms = [
+    mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
+    ...(density === 'compact' ? [theme.compactAlgorithm] : []),
+  ];
 
-    colorBgBase: '#09090b',
-    colorBgLayout: '#09090b',
-    colorBgContainer: '#131316',
-    colorBgElevated: '#18191d',
-    colorBorder: '#26272c',
-    colorBorderSecondary: '#1e1f24',
+  return {
+    algorithm: algorithms,
+    token: {
+      colorPrimary: t.accentPrimary,
+      colorPrimaryHover: t.accentHover,
+      colorLink: t.accentLink,
+      colorLinkHover: t.accentLinkHover,
+      colorInfo: t.status.info.border,
+      colorSuccess: t.status.success.border,
+      colorWarning: t.status.warning.border,
+      colorError: t.status.danger.border,
 
-    colorText: '#f4f4f6',
-    colorTextSecondary: '#a1a1aa',
-    colorTextTertiary: '#71717a',
-    colorTextQuaternary: '#52525b',
+      colorBgBase: t.canvas,
+      colorBgLayout: t.canvas,
+      colorBgContainer: t.surface,
+      colorBgElevated: t.surfaceRaised,
+      colorBorder: t.borderDefault,
+      colorBorderSecondary: t.borderSubtle,
 
-    fontFamily:
-      "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-    fontSize: 14,
-    borderRadius: 10,
-    borderRadiusLG: 14,
-    borderRadiusSM: 8,
+      colorText: t.textPrimary,
+      colorTextSecondary: t.textSecondary,
+      colorTextTertiary: t.textMuted,
+      colorTextQuaternary: t.textMuted,
 
-    controlHeight: 36,
-    boxShadow:
-      '0 1px 0 0 rgba(255,255,255,0.03) inset, 0 8px 24px -12px rgba(0,0,0,0.55)',
-    boxShadowSecondary:
-      '0 1px 0 0 rgba(255,255,255,0.03) inset, 0 4px 16px -8px rgba(0,0,0,0.5)',
-  },
-  components: {
-    Layout: {
-      headerBg: 'rgba(9,9,11,0.72)',
-      bodyBg: '#09090b',
-      siderBg: '#0c0c0f',
-      footerBg: 'transparent',
-      headerHeight: 64,
-      headerPadding: '0 24px',
-    },
-    Menu: {
-      itemBg: 'transparent',
-      itemColor: '#a1a1aa',
-      itemHoverBg: 'rgba(255,255,255,0.04)',
-      itemHoverColor: '#f4f4f6',
-      itemSelectedBg: 'rgba(99,102,241,0.14)',
-      itemSelectedColor: '#a5b4fc',
-      itemActiveBg: 'rgba(255,255,255,0.04)',
-      itemBorderRadius: 8,
-      subMenuItemBg: 'transparent',
-    },
-    Card: {
-      colorBgContainer: '#131316',
-      colorBorderSecondary: '#1e1f24',
+      fontFamily: FONT_STACK,
+      fontSize: 14,
+      borderRadius: 10,
       borderRadiusLG: 14,
-      paddingLG: 20,
+      borderRadiusSM: 8,
+
+      controlHeight: density === 'compact' ? 32 : 36,
+      boxShadow: t.shadowCard,
+      boxShadowSecondary: t.shadowElevated,
     },
-    Table: {
-      colorBgContainer: '#131316',
-      headerBg: '#18191d',
-      headerColor: '#d1d2d8',
-      rowHoverBg: 'rgba(255,255,255,0.03)',
-      borderColor: '#1e1f24',
+    components: {
+      Layout: {
+        headerBg: t.headerBackdrop,
+        bodyBg: t.canvas,
+        siderBg: t.surfaceSunken,
+        footerBg: 'transparent',
+        headerHeight: 64,
+        headerPadding: '0 24px',
+      },
+      Menu: {
+        itemBg: 'transparent',
+        itemColor: t.textSecondary,
+        itemHoverBg: t.surfaceHover,
+        itemHoverColor: t.textPrimary,
+        itemSelectedBg: t.accentSoftBg,
+        itemSelectedColor: t.accentSoftFg,
+        itemActiveBg: t.surfaceHover,
+        itemBorderRadius: 8,
+        subMenuItemBg: 'transparent',
+      },
+      Card: {
+        colorBgContainer: t.surface,
+        colorBorderSecondary: t.borderSubtle,
+        borderRadiusLG: 14,
+        paddingLG: density === 'compact' ? 16 : 20,
+      },
+      Table: {
+        colorBgContainer: t.surface,
+        headerBg: t.surfaceSunken,
+        headerColor: t.textPrimary,
+        rowHoverBg: t.surfaceHover,
+        borderColor: t.borderSubtle,
+      },
+      Button: {
+        controlHeight: density === 'compact' ? 32 : 36,
+        borderRadius: 8,
+        primaryShadow: 'none',
+        colorPrimary: t.accentPrimary,
+        colorPrimaryHover: t.accentHover,
+        primaryColor: t.accentOnPrimary,
+      },
+      Input: {
+        colorBgContainer: t.surfaceSunken,
+        activeBorderColor: t.focusRing,
+        hoverBorderColor: t.borderStrong,
+      },
+      Select: {
+        colorBgContainer: t.surfaceSunken,
+        optionSelectedBg: t.accentSoftBg,
+        optionSelectedColor: t.accentSoftFg,
+      },
+      Modal: {
+        contentBg: t.surface,
+        headerBg: t.surface,
+      },
+      Drawer: {
+        colorBgElevated: t.surface,
+      },
+      Tag: {
+        defaultBg: t.status.neutral.bg,
+        defaultColor: t.status.neutral.fg,
+      },
+      Statistic: {
+        contentFontSize: 26,
+      },
     },
-    Button: {
-      controlHeight: 36,
-      borderRadius: 8,
-      primaryShadow: 'none',
-    },
-    Input: {
-      colorBgContainer: '#0e0e11',
-      activeBorderColor: '#6366f1',
-      hoverBorderColor: '#3f3f46',
-    },
-    Select: {
-      colorBgContainer: '#0e0e11',
-      optionSelectedBg: 'rgba(99,102,241,0.16)',
-    },
-    Modal: {
-      contentBg: '#131316',
-      headerBg: '#131316',
-    },
-    Drawer: {
-      colorBgElevated: '#0c0c0f',
-    },
-    Tag: {
-      defaultBg: 'rgba(255,255,255,0.06)',
-      defaultColor: '#d1d2d8',
-    },
-    Statistic: {
-      contentFontSize: 26,
-    },
-  },
-};
+  };
+}
