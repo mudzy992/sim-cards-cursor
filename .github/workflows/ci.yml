@@ -230,9 +230,9 @@ jobs:
             fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:3003/api/health
+          curl -fsS http://127.0.0.1:3003/api/health || { cat /tmp/backend-e2e.log; exit 1; }
 
-          npm run test:e2e:browser
+          npm run test:e2e:browser || { cat /tmp/backend-e2e.log; exit 1; }
 
   docker-compose-validate:
     name: Docker & Compose Config Validation

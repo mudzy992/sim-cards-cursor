@@ -55,11 +55,11 @@ test.describe('Frontend browser smoke', () => {
     await expect(langBtn).toBeVisible();
 
     await langBtn.click();
-    await page.getByRole('menuitem', { name: /english/i }).click();
+    await page.getByRole('menuitem', { name: /englesk|english/i }).click();
     await expect(page.getByRole('button', { name: /sign in|login/i })).toBeVisible();
 
     await langBtn.click();
-    await page.getByRole('menuitem', { name: /bosanski/i }).click();
+    await page.getByRole('menuitem', { name: /bosansk|bosnian/i }).click();
     await expect(page.getByRole('button', { name: /prijav/i })).toBeVisible();
 
     expect(errors).toEqual([]);

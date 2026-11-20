@@ -97,7 +97,19 @@ describe('DemountTasksService — lifecycle & completion resolutions', () => {
     });
 
     await expect(
-      service.create({ meterId: 'meter-1', assignedToId: 'op-1' }, 'admin-1', '127.0.0.1', adminScope),
+      service.create(
+        {
+          meterId: 'meter-1',
+          assignedToId: 'op-1',
+          requestedResolution: DemountCompletionResolution.REMOVE_SIM_ONLY,
+          requestedReason: 'Privremeno uklanjanje radi servisa',
+          requestedRemovedSimDisposition: 'RETURN_TO_STOCK',
+          requestedMeterDemountCategory: 'TEMPORARY_REMOVAL',
+        },
+        'admin-1',
+        '127.0.0.1',
+        adminScope,
+      ),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -120,7 +132,14 @@ describe('DemountTasksService — lifecycle & completion resolutions', () => {
     });
 
     const created = await service.create(
-      { meterId: 'meter-1', assignedToId: 'op-1' },
+      {
+        meterId: 'meter-1',
+        assignedToId: 'op-1',
+        requestedResolution: DemountCompletionResolution.REMOVE_SIM_ONLY,
+        requestedReason: 'Privremeno uklanjanje radi servisa',
+        requestedRemovedSimDisposition: 'RETURN_TO_STOCK',
+        requestedMeterDemountCategory: 'TEMPORARY_REMOVAL',
+      },
       'admin-1',
       '127.0.0.1',
       adminScope,
