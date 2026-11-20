@@ -39,6 +39,7 @@ test.describe('Frontend browser smoke', () => {
     await themeBtn.click();
     await page.getByRole('menuitem', { name: /tamn|dark/i }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.getByRole('menuitem', { name: /tamn|dark/i })).toBeHidden();
 
     await themeBtn.click();
     await page.getByRole('menuitem', { name: /svijetl|light/i }).click();
@@ -57,6 +58,7 @@ test.describe('Frontend browser smoke', () => {
     await langBtn.click();
     await page.getByRole('menuitem', { name: /englesk|english/i }).click();
     await expect(page.getByRole('button', { name: /sign in|login/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /englesk|english/i })).toBeHidden();
 
     await langBtn.click();
     await page.getByRole('menuitem', { name: /bosansk|bosnian/i }).click();
