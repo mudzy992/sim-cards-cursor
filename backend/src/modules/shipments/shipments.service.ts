@@ -17,7 +17,13 @@ import {
   ColumnMapperService,
   ImportDomainKey,
 } from './import/column-mapper.service';
-import { ExcelImportService } from './import/excel-import.service';
+import {
+  ExcelImportService,
+  ExistingIccidInfo,
+  ExistingSimFieldsMaps,
+  normalizeIccid,
+  normalizePhoneNumber,
+} from './import/excel-import.service';
 import { ShipmentFilterDto } from './dto/shipment-filter.dto';
 import { UpdateShipmentDto } from './dto/update-shipment.dto';
 
@@ -501,9 +507,11 @@ export class ShipmentsService {
             },
           },
         },
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy: [
+          { createdAt: 'desc' },
+          { iccid: 'asc' },
+          { id: 'asc' },
+        ],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -558,22 +566,54 @@ export class ShipmentsService {
     );
 
     const iccidCol = resolvedMapping.iccid;
+    const ipCol = resolvedMapping.ipAddress;
+    const publicIpCol = resolvedMapping.publicIpAddress;
+    const phoneCol = resolvedMapping.phoneNumber;
+
+    const cleanCell = (val: unknown) =>
+      String(val ?? '')
+        .replace(/^\uFEFF/, '')
+        .trim();
+
     const candidateIccids = iccidCol
       ? Array.from(
           new Set(
             parsed.rows
-              .map((r) =>
-                String(r[iccidCol] ?? '')
-                  .replace(/^\uFEFF/, '')
-                  .trim()
-                  .replace(/\s+/g, ''),
-              )
+              .map((r) => normalizeIccid(cleanCell(r[iccidCol])))
               .filter(Boolean),
           ),
         )
       : [];
 
-    const existing = await this.fetchExistingIccidMap(candidateIccids);
+    const candidateIps = ipCol
+      ? Array.from(new Set(parsed.rows.map((r) => cleanCell(r[ipCol])).filter(Boolean)))
+      : [];
+
+    const candidatePublicIps = publicIpCol
+      ? Array.from(new Set(parsed.rows.map((r) => cleanCell(r[publicIpCol])).filter(Boolean)))
+      : [];
+
+    const candidatePhones = phoneCol
+      ? Array.from(
+          new Set(
+            parsed.rows
+              .flatMap((r) => {
+                const raw = cleanCell(r[phoneCol]);
+                if (!raw) return [];
+                const norm = normalizePhoneNumber(raw);
+                return norm && norm !== raw ? [raw, norm] : [raw];
+              })
+              .filter(Boolean),
+          ),
+        )
+      : [];
+
+    const existing = await this.fetchExistingSimFields({
+      iccids: candidateIccids,
+      ipAddresses: candidateIps,
+      publicIpAddresses: candidatePublicIps,
+      phoneNumbers: candidatePhones,
+    });
 
     if (dto.applyImport !== 'true') {
       const preview = this.excelImportService.preview(
@@ -631,11 +671,71 @@ export class ShipmentsService {
     let inserted: { count: number };
 
     try {
-      inserted = await this.prisma.simCard.createMany({
-        data: data.map((item) => ({
-          ...item,
-          status: SimCardStatus.AVAILABLE,
-        })),
+      inserted = await this.prisma.$transaction(async (tx) => {
+        const txIccids = data.map((d) => d.iccid);
+        const txIps = data.map((d) => d.ipAddress);
+        const txPublicIps = data
+          .map((d) => d.publicIpAddress)
+          .filter((v): v is string => Boolean(v));
+        const txPhones = data
+          .flatMap((d) => {
+            if (!d.phoneNumber) return [];
+            const norm = normalizePhoneNumber(d.phoneNumber);
+            return norm && norm !== d.phoneNumber ? [d.phoneNumber, norm] : [d.phoneNumber];
+          })
+          .filter(Boolean);
+
+        const txExisting = await this.fetchExistingSimFields(
+          {
+            iccids: txIccids,
+            ipAddresses: txIps,
+            publicIpAddresses: txPublicIps,
+            phoneNumbers: txPhones,
+          },
+          tx,
+        );
+
+        const conflictingItem = data.find(
+          (item) =>
+            txExisting.byIccid.has(item.iccid) ||
+            txExisting.byIpAddress.has(item.ipAddress) ||
+            (item.publicIpAddress ? txExisting.byPublicIpAddress.has(item.publicIpAddress) : false) ||
+            (item.phoneNumber
+              ? txExisting.byPhoneNumber.has(normalizePhoneNumber(item.phoneNumber))
+              : false),
+        );
+
+        if (conflictingItem) {
+          throw new ConflictException(
+            'Import sadrži ICCID, IP adresu, javnu IP adresu ili broj telefona koji već postoji u bazi.',
+          );
+        }
+
+        const created = await tx.simCard.createMany({
+          data: data.map((item) => ({
+            ...item,
+            status: SimCardStatus.AVAILABLE,
+          })),
+        });
+
+        const shipmentSimTotal = await tx.simCard.count({
+          where: {
+            shipmentId,
+          },
+        });
+
+        await tx.shipment.update({
+          where: {
+            id: shipmentId,
+          },
+          data: {
+            totalCards: shipmentSimTotal,
+            status: ShipmentStatus.COMPLETED,
+            originalFileName: file.originalname,
+          },
+        });
+
+        return created;
       });
     } catch (error) {
       if (
@@ -649,23 +749,6 @@ export class ShipmentsService {
 
       throw error;
     }
-
-    const shipmentSimTotal = await this.prisma.simCard.count({
-      where: {
-        shipmentId,
-      },
-    });
-
-    await this.prisma.shipment.update({
-      where: {
-        id: shipmentId,
-      },
-      data: {
-        totalCards: shipmentSimTotal,
-        status: ShipmentStatus.COMPLETED,
-        originalFileName: file.originalname,
-      },
-    });
 
     await this.activityLogService.log({
       userId: actorId,
@@ -740,23 +823,45 @@ export class ShipmentsService {
     }
   }
 
-  private async fetchExistingIccidMap(iccids?: string[]): Promise<
-    Map<
-      string,
-      {
-        shipmentId: string;
-        shipmentName: string;
-        receivedDate: Date;
-      }
-    >
-  > {
-    if (iccids && iccids.length === 0) {
-      return new Map();
+  private async fetchExistingSimFields(
+    candidates: {
+      iccids: string[];
+      ipAddresses: string[];
+      publicIpAddresses: string[];
+      phoneNumbers: string[];
+    },
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<ExistingSimFieldsMaps> {
+    const orClauses: Prisma.SimCardWhereInput[] = [];
+    if (candidates.iccids.length > 0) {
+      orClauses.push({ iccid: { in: candidates.iccids } });
     }
-    const existing = await this.prisma.simCard.findMany({
-      where: iccids ? { iccid: { in: iccids } } : undefined,
+    if (candidates.ipAddresses.length > 0) {
+      orClauses.push({ ipAddress: { in: candidates.ipAddresses } });
+    }
+    if (candidates.publicIpAddresses.length > 0) {
+      orClauses.push({ publicIpAddress: { in: candidates.publicIpAddresses } });
+    }
+    if (candidates.phoneNumbers.length > 0) {
+      orClauses.push({ phoneNumber: { in: candidates.phoneNumbers } });
+    }
+
+    const byIccid = new Map<string, ExistingIccidInfo>();
+    const byIpAddress = new Map<string, ExistingIccidInfo>();
+    const byPublicIpAddress = new Map<string, ExistingIccidInfo>();
+    const byPhoneNumber = new Map<string, ExistingIccidInfo>();
+
+    if (orClauses.length === 0) {
+      return { byIccid, byIpAddress, byPublicIpAddress, byPhoneNumber };
+    }
+
+    const existing = await db.simCard.findMany({
+      where: { OR: orClauses },
       select: {
         iccid: true,
+        ipAddress: true,
+        publicIpAddress: true,
+        phoneNumber: true,
         shipment: {
           select: {
             id: true,
@@ -767,16 +872,28 @@ export class ShipmentsService {
       },
     });
 
-    return new Map(
-      existing.map((item) => [
-        item.iccid,
-        {
-          shipmentId: item.shipment.id,
-          shipmentName: item.shipment.name,
-          receivedDate: item.shipment.receivedDate,
-        },
-      ]),
-    );
+    for (const item of existing) {
+      const info: ExistingIccidInfo = {
+        shipmentId: item.shipment.id,
+        shipmentName: item.shipment.name,
+        receivedDate: item.shipment.receivedDate,
+      };
+      if (!byIccid.has(item.iccid)) byIccid.set(item.iccid, info);
+      if (item.ipAddress && !byIpAddress.has(item.ipAddress)) {
+        byIpAddress.set(item.ipAddress, info);
+      }
+      if (item.publicIpAddress && !byPublicIpAddress.has(item.publicIpAddress)) {
+        byPublicIpAddress.set(item.publicIpAddress, info);
+      }
+      if (item.phoneNumber) {
+        const normPhone = normalizePhoneNumber(item.phoneNumber);
+        if (normPhone && !byPhoneNumber.has(normPhone)) {
+          byPhoneNumber.set(normPhone, info);
+        }
+      }
+    }
+
+    return { byIccid, byIpAddress, byPublicIpAddress, byPhoneNumber };
   }
 
   private isSupportedFile(

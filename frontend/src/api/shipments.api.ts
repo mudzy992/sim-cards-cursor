@@ -40,13 +40,30 @@ export const shipmentsApi = {
   ): Promise<ShipmentSimCardsResponse['items']> => {
     const limit = 100;
     const first = await shipmentsApi.listSimCards(id, { page: 1, limit });
-    const all = [...first.items];
+    const all: ShipmentSimCardsResponse['items'] = [];
+    const seenIds = new Set<string>();
+    for (const item of first.items) {
+      if (!seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        all.push(item);
+      }
+    }
     onProgress?.(all.length, first.total);
-    while (all.length < first.total) {
-      const nextPage = Math.floor(all.length / limit) + 1;
-      const next = await shipmentsApi.listSimCards(id, { page: nextPage, limit });
-      all.push(...next.items);
+    let page = 2;
+    while (all.length < first.total && first.items.length > 0) {
+      const next = await shipmentsApi.listSimCards(id, { page, limit });
+      if (next.items.length === 0) break;
+      let added = 0;
+      for (const item of next.items) {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          all.push(item);
+          added += 1;
+        }
+      }
       onProgress?.(Math.min(all.length, first.total), first.total);
+      if (added === 0) break;
+      page += 1;
     }
     return all;
   },

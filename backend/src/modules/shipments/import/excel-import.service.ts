@@ -6,7 +6,7 @@ type RawRow = Record<string, string>;
 
 export type ParsedFile = { headers: string[]; rows: RawRow[] };
 
-/** Izvorna isporuka postojećeg ICCID-a (za duplikat info u preview-u). */
+/** Izvorna isporuka postojeće SIM kartice (za duplikat info u preview-u). */
 export type ExistingIccidInfo = {
   shipmentId: string;
   shipmentName: string;
@@ -14,6 +14,13 @@ export type ExistingIccidInfo = {
 };
 
 export type ExistingIccidMap = Map<string, ExistingIccidInfo>;
+
+export type ExistingSimFieldsMaps = {
+  byIccid: Map<string, ExistingIccidInfo>;
+  byIpAddress: Map<string, ExistingIccidInfo>;
+  byPublicIpAddress: Map<string, ExistingIccidInfo>;
+  byPhoneNumber: Map<string, ExistingIccidInfo>;
+};
 
 export type PreviewRow = {
   rowNumber: number;
@@ -26,9 +33,9 @@ export type PreviewRow = {
   };
   errors: string[];
   warning: string[];
-  /** popunjeno kad je ICCID duplikat iz ranije isporuke */
+  /** popunjeno kad je polje duplikat iz ranije isporuke */
   duplicateOf?: ExistingIccidInfo | null;
-  /** popunjeno kad je ICCID duplikat unutar istog fajla (broj reda originala) */
+  /** popunjeno kad je polje duplikat unutar istog fajla (broj reda originala) */
   duplicateInFileOfRow?: number | null;
   /** true ako red nema grešaka (upozorenja ne blokiraju) */
   importable: boolean;
@@ -66,8 +73,26 @@ function safeString(value: unknown): string {
   return String(value).replace(/^\uFEFF/, '').trim();
 }
 
-function normalizeIccid(value: string): string {
+export function normalizeIccid(value: string): string {
   return value.replace(/\s+/g, '');
+}
+
+export function normalizePhoneNumber(value: string): string {
+  return value.replace(/[\s\-()/]+/g, '').trim();
+}
+
+function normalizeExistingMaps(
+  existing: ExistingIccidMap | ExistingSimFieldsMaps,
+): ExistingSimFieldsMaps {
+  if (existing instanceof Map) {
+    return {
+      byIccid: existing,
+      byIpAddress: new Map(),
+      byPublicIpAddress: new Map(),
+      byPhoneNumber: new Map(),
+    };
+  }
+  return existing;
 }
 
 /** dd.mm.yyyy bez oslanjanja na serverski locale. */
@@ -122,13 +147,18 @@ export class ExcelImportService {
   validate(
     parsed: ParsedFile,
     mapping: Record<ImportDomainKey, string | null>,
-    existing: ExistingIccidMap,
+    existingInput: ExistingIccidMap | ExistingSimFieldsMaps,
   ): ValidationResult {
     if (!mapping.iccid || !mapping.ipAddress) {
       throw new BadRequestException('Column mapping must include iccid and ipAddress');
     }
 
-    const seenInFile = new Map<string, number>();
+    const existing = normalizeExistingMaps(existingInput);
+    const seenIccidInFile = new Map<string, number>();
+    const seenIpInFile = new Map<string, number>();
+    const seenPublicIpInFile = new Map<string, number>();
+    const seenPhoneInFile = new Map<string, number>();
+
     let duplicatesInFile = 0;
     let duplicatesInDatabase = 0;
 
@@ -144,6 +174,7 @@ export class ExcelImportService {
         ? safeString(row[mapping.publicIpAddress]) || null
         : null;
       const phoneNumber = mapping.phoneNumber ? safeString(row[mapping.phoneNumber]) || null : null;
+      const normalizedPhone = phoneNumber ? normalizePhoneNumber(phoneNumber) : null;
       const apn = mapping.apn ? safeString(row[mapping.apn]) || null : null;
 
       if (!iccid) {
@@ -164,28 +195,97 @@ export class ExcelImportService {
 
       let duplicateInFileOfRow: number | null = null;
       let duplicateOf: ExistingIccidInfo | null = null;
+      let hasFileDuplicate = false;
+      let hasDbDuplicate = false;
 
       if (iccid) {
-        // duplikat unutar fajla → uz redni broj prvog pojavljivanja
-        const firstRow = seenInFile.get(iccid);
+        const firstRow = seenIccidInFile.get(iccid);
         if (firstRow !== undefined) {
-          duplicatesInFile += 1;
-          duplicateInFileOfRow = firstRow;
+          hasFileDuplicate = true;
+          if (duplicateInFileOfRow === null) duplicateInFileOfRow = firstRow;
           errors.push(`Duplikat unutar fajla — isti ICCID je već u redu ${firstRow}`);
         } else {
-          seenInFile.set(iccid, rowNumber);
+          seenIccidInFile.set(iccid, rowNumber);
         }
 
-        // duplikat iz baze → uz naziv isporuke i datum prijema
-        const hit = existing.get(iccid);
+        const hit = existing.byIccid.get(iccid);
         if (hit) {
-          duplicatesInDatabase += 1;
-          duplicateOf = hit;
+          hasDbDuplicate = true;
+          if (!duplicateOf) duplicateOf = hit;
           errors.push(
             `ICCID već postoji u isporuci „${hit.shipmentName}" (prijem ${formatBsDate(hit.receivedDate)})`,
           );
         }
       }
+
+      if (ipAddress) {
+        const firstRow = seenIpInFile.get(ipAddress);
+        if (firstRow !== undefined) {
+          hasFileDuplicate = true;
+          if (duplicateInFileOfRow === null) duplicateInFileOfRow = firstRow;
+          errors.push(
+            `Duplikat unutar fajla — ista interna IP adresa (${ipAddress}) je već u redu ${firstRow}`,
+          );
+        } else {
+          seenIpInFile.set(ipAddress, rowNumber);
+        }
+
+        const hit = existing.byIpAddress.get(ipAddress);
+        if (hit) {
+          hasDbDuplicate = true;
+          if (!duplicateOf) duplicateOf = hit;
+          errors.push(
+            `Interna IP adresa (${ipAddress}) već postoji u isporuci „${hit.shipmentName}" (prijem ${formatBsDate(hit.receivedDate)})`,
+          );
+        }
+      }
+
+      if (publicIpAddress) {
+        const firstRow = seenPublicIpInFile.get(publicIpAddress);
+        if (firstRow !== undefined) {
+          hasFileDuplicate = true;
+          if (duplicateInFileOfRow === null) duplicateInFileOfRow = firstRow;
+          errors.push(
+            `Duplikat unutar fajla — ista javna IP adresa (${publicIpAddress}) je već u redu ${firstRow}`,
+          );
+        } else {
+          seenPublicIpInFile.set(publicIpAddress, rowNumber);
+        }
+
+        const hit = existing.byPublicIpAddress.get(publicIpAddress);
+        if (hit) {
+          hasDbDuplicate = true;
+          if (!duplicateOf) duplicateOf = hit;
+          errors.push(
+            `Javna IP adresa (${publicIpAddress}) već postoji u isporuci „${hit.shipmentName}" (prijem ${formatBsDate(hit.receivedDate)})`,
+          );
+        }
+      }
+
+      if (phoneNumber && normalizedPhone) {
+        const firstRow = seenPhoneInFile.get(normalizedPhone);
+        if (firstRow !== undefined) {
+          hasFileDuplicate = true;
+          if (duplicateInFileOfRow === null) duplicateInFileOfRow = firstRow;
+          errors.push(
+            `Duplikat unutar fajla — isti broj telefona (${phoneNumber}) je već u redu ${firstRow}`,
+          );
+        } else {
+          seenPhoneInFile.set(normalizedPhone, rowNumber);
+        }
+
+        const hit = existing.byPhoneNumber.get(normalizedPhone);
+        if (hit) {
+          hasDbDuplicate = true;
+          if (!duplicateOf) duplicateOf = hit;
+          errors.push(
+            `Broj telefona (${phoneNumber}) već postoji u isporuci „${hit.shipmentName}" (prijem ${formatBsDate(hit.receivedDate)})`,
+          );
+        }
+      }
+
+      if (hasFileDuplicate) duplicatesInFile += 1;
+      if (hasDbDuplicate) duplicatesInDatabase += 1;
 
       return {
         rowNumber,
@@ -215,7 +315,7 @@ export class ExcelImportService {
   preview(
     parsed: ParsedFile,
     mapping: Record<ImportDomainKey, string | null>,
-    existing: ExistingIccidMap,
+    existing: ExistingIccidMap | ExistingSimFieldsMaps,
   ): PreviewResponse {
     const validation = this.validate(parsed, mapping, existing);
 

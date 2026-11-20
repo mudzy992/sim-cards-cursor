@@ -109,6 +109,13 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
       ),
     },
     {
+      title: t('common.labels.phone'),
+      key: 'phoneNumber',
+      render: (_, row) => (
+        <span className="font-mono text-xs text-slate-500">{row.data.phoneNumber ?? '—'}</span>
+      ),
+    },
+    {
       title: t('shipments.importReview.issueColumn'),
       key: 'issues',
       width: '38%',
