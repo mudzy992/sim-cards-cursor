@@ -148,7 +148,7 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {MAPPING_KEYS.map(({ key, label }) => (
                 <div key={key}>
-                  <div className="mb-1 text-xs text-slate-500">{label}</div>
+                  <div className="mb-1 text-xs text-fg-secondary">{label}</div>
                   <Select size="small" allowClear className="w-full" placeholder={t('shipments.import.columnPlaceholder')}
                     value={mappingDraft[key] ?? null}
                     options={(preview.headers ?? []).map((h) => ({ label: h, value: h }))}

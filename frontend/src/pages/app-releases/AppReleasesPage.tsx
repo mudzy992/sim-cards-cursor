@@ -115,12 +115,12 @@ export default function AppReleasesPage() {
       </div>
 
       {latest && (
-        <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <Typography.Text strong>{t('appReleases.activeVersion')}</Typography.Text>{' '}
-          <Typography.Text>
+        <div className="rounded border border-status-success-border bg-status-success-bg px-4 py-3 text-status-success-fg">
+          <span className="font-semibold">{t('appReleases.activeVersion')}</span>{' '}
+          <span>
             {latest.versionName} ({t('appReleases.codeLabel')}: {latest.versionCode}) – {t('appReleases.publishedOn')}{' '}
             {dayjs(latest.publishedAt).format('YYYY-MM-DD HH:mm')}
-          </Typography.Text>
+          </span>
         </div>
       )}
 

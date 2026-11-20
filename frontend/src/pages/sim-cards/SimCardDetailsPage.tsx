@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Card, Descriptions, Space, Tag, Timeline, Typography } from 'antd';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Descriptions, Space, Timeline, Typography } from 'antd';
+import { Link, useParams } from 'react-router-dom';
 import { simCardsApi } from '@/api/sim-cards.api';
-import { useAuthStore } from '@/store/auth.store'
+import { useAuthStore } from '@/store/auth.store';
 import {
   getDemountResolutionLabel,
   getMeterDemountCategoryLabel,
@@ -11,25 +11,25 @@ import {
   getSimEventTypeLabel,
 } from '@/utils/labels.utils';
 import { useTranslation } from '@/i18n';
-
-const statusColor: Record<string, string> = {
-  AVAILABLE: 'green',
-  ASSIGNED: 'orange',
-  INSTALLED: 'blue',
-  DEFECTIVE: 'red',
-  DEMOUNTED: 'purple',
-  RETURNED: 'gold',
-  DEACTIVATED: 'default',
-};
+import {
+  EmptyNotice,
+  PageHeader,
+  PageShell,
+  SectionCard,
+  StatusBadge,
+  type StatusTone,
+  getSimCardStatusTone,
+} from '@/components/ui';
+import { FALLBACK_DASH } from '@/constants/ui';
+import { ROUTES } from '@/config/routes';
+import { formatDateTime } from '@/utils/formatters';
 
 export default function SimCardDetailsPage() {
-  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const user = useAuthStore((s) => s.user)
-  const role = user?.role
-  const isModerator = role === 'USER' && (user?.branchModeratorBranchIds?.length ?? 0) > 0
+  const user = useAuthStore((s) => s.user);
+  const role = user?.role;
+  const isModerator = role === 'USER' && (user?.branchModeratorBranchIds?.length ?? 0) > 0;
   const { t, language } = useTranslation();
-  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
 
   const simCardQuery = useQuery({
     queryKey: ['sim-cards', 'details', id],
@@ -46,120 +46,147 @@ export default function SimCardDetailsPage() {
   const simCard = simCardQuery.data;
 
   const renderMetadata = (metadata: unknown) => {
-    if (!metadata || typeof metadata !== 'object') return null
-    const m = metadata as Record<string, unknown>
-    const meterId = typeof m.meterId === 'string' ? m.meterId : null
-    const recordId = typeof m.recordId === 'string' ? m.recordId : null
-    const demountTaskId = typeof m.demountTaskId === 'string' ? m.demountTaskId : null
-    const resolution = typeof m.resolution === 'string' ? m.resolution : null
+    if (!metadata || typeof metadata !== 'object') return null;
+    const m = metadata as Record<string, unknown>;
+    const meterId = typeof m.meterId === 'string' ? m.meterId : null;
+    const recordId = typeof m.recordId === 'string' ? m.recordId : null;
+    const demountTaskId = typeof m.demountTaskId === 'string' ? m.demountTaskId : null;
+    const resolution = typeof m.resolution === 'string' ? m.resolution : null;
     const meterDemountCategory =
-      typeof m.meterDemountCategory === 'string' ? m.meterDemountCategory : null
+      typeof m.meterDemountCategory === 'string' ? m.meterDemountCategory : null;
     const removedSimDisposition =
-      typeof m.removedSimDisposition === 'string' ? m.removedSimDisposition : null
+      typeof m.removedSimDisposition === 'string' ? m.removedSimDisposition : null;
 
-    const tags: Array<{ key: string; color?: string; label: string }> = []
-    if (resolution)
+    const tags: Array<{ key: string; tone: StatusTone; label: string }> = [];
+    if (resolution) {
       tags.push({
         key: 'resolution',
-        color: 'blue',
+        tone: 'info',
         label: getDemountResolutionLabel(resolution, t),
-      })
-    if (removedSimDisposition)
+      });
+    }
+    if (removedSimDisposition) {
       tags.push({
         key: 'removedSimDisposition',
-        color: 'geekblue',
+        tone: 'accent',
         label: getRemovedSimDispositionLabel(removedSimDisposition, t),
-      })
-    if (meterDemountCategory)
+      });
+    }
+    if (meterDemountCategory) {
       tags.push({
         key: 'meterDemountCategory',
-        color: 'gold',
+        tone: 'warning',
         label: getMeterDemountCategoryLabel(meterDemountCategory, t),
-      })
+      });
+    }
 
-    const hasAny = Boolean(meterId) || Boolean(recordId) || Boolean(demountTaskId) || tags.length > 0
-    if (!hasAny) return null
+    const hasAny =
+      Boolean(meterId) || Boolean(recordId) || Boolean(demountTaskId) || tags.length > 0;
+    if (!hasAny) return null;
 
     return (
       <div className="mt-2 flex flex-col gap-2">
         {tags.length > 0 ? (
           <Space size={[6, 6]} wrap>
             {tags.map((tag) => (
-              <Tag key={tag.key} color={tag.color}>
-                {tag.label}
-              </Tag>
+              <StatusBadge key={tag.key} tone={tag.tone} label={tag.label} />
             ))}
           </Space>
         ) : null}
         <Space size={[10, 8]} wrap>
           {meterId ? (
-            <Typography.Text type="secondary" className="text-xs">
-              {t('simCards.details.meter')}: <Link to={`/meters/${meterId}`}>{t('common.actions.view')}</Link>
-            </Typography.Text>
+            <span className="text-xs text-fg-secondary">
+              {t('simCards.details.meter')}:{' '}
+              <Link to={ROUTES.meterDetail(meterId)} className="text-accent-fg hover:underline">
+                {t('common.actions.view')}
+              </Link>
+            </span>
           ) : null}
           {recordId ? (
-            <Typography.Text type="secondary" className="text-xs">
-              {t('simCards.details.record')}: <Link to={`/installation-records/${recordId}`}>{recordId.slice(0, 8)}…</Link>
-            </Typography.Text>
+            <span className="text-xs text-fg-secondary">
+              {t('simCards.details.record')}:{' '}
+              <Link
+                to={ROUTES.installationRecordDetail(recordId)}
+                className="font-mono text-accent-fg hover:underline"
+              >
+                {recordId.slice(0, 8)}…
+              </Link>
+            </span>
           ) : null}
           {demountTaskId ? (
-            <Typography.Text type="secondary" className="text-xs">
-              {t('simCards.details.task')}: <Typography.Text code copyable={{ text: demountTaskId }}>{demountTaskId.slice(0, 8)}…</Typography.Text>
-            </Typography.Text>
+            <span className="text-xs text-fg-secondary">
+              {t('simCards.details.task')}:{' '}
+              <Typography.Text code copyable={{ text: demountTaskId }}>
+                {demountTaskId.slice(0, 8)}…
+              </Typography.Text>
+            </span>
           ) : null}
         </Space>
       </div>
-    )
-  }
+    );
+  };
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-      <Space>
-        <Button onClick={() => navigate(isModerator ? '/sim-cards' : '/shipments')}>{t('common.actions.back')}</Button>
-        <Typography.Title level={3} className="!mb-0">
-          {t('simCards.details.title')}
-        </Typography.Title>
-      </Space>
+    <PageShell>
+      <PageHeader
+        title={t('simCards.details.title')}
+        backTo={isModerator ? ROUTES.simCards : ROUTES.shipments}
+        badge={
+          simCard ? (
+            <StatusBadge
+              tone={getSimCardStatusTone(simCard.status)}
+              label={getSimCardStatusLabel(simCard.status, t)}
+            />
+          ) : undefined
+        }
+      />
 
-      <Card loading={simCardQuery.isLoading}>
+      <SectionCard loading={simCardQuery.isLoading}>
         {simCard ? (
           <Descriptions column={2} bordered>
-            <Descriptions.Item label="ICCID">{simCard.iccid}</Descriptions.Item>
+            <Descriptions.Item label="ICCID">
+              <span className="font-mono">{simCard.iccid}</span>
+            </Descriptions.Item>
             <Descriptions.Item label={t('common.labels.status')}>
-              <Tag color={statusColor[simCard.status] ?? 'default'}>
-                {getSimCardStatusLabel(simCard.status, t)}
-              </Tag>
+              <StatusBadge
+                tone={getSimCardStatusTone(simCard.status)}
+                label={getSimCardStatusLabel(simCard.status, t)}
+              />
             </Descriptions.Item>
-            <Descriptions.Item label={t('simCards.details.ipAddress')}>{simCard.ipAddress}</Descriptions.Item>
+            <Descriptions.Item label={t('simCards.details.ipAddress')}>
+              <span className="font-mono">{simCard.ipAddress}</span>
+            </Descriptions.Item>
             <Descriptions.Item label={t('simCards.details.publicIp')}>
-              {simCard.publicIpAddress ?? '-'}
+              <span className="font-mono">{simCard.publicIpAddress ?? FALLBACK_DASH}</span>
             </Descriptions.Item>
-            <Descriptions.Item label={t('common.labels.phone')}>{simCard.phoneNumber ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="APN">{simCard.apn ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('common.labels.phone')}>
+              {simCard.phoneNumber ?? FALLBACK_DASH}
+            </Descriptions.Item>
+            <Descriptions.Item label="APN">{simCard.apn ?? FALLBACK_DASH}</Descriptions.Item>
             <Descriptions.Item label={t('simCards.details.shipment')}>
               {simCard.shipment.name} ({simCard.shipment.provider})
             </Descriptions.Item>
             <Descriptions.Item label={t('simCards.details.assignedTo')}>
               {simCard.assignedTo
                 ? `${simCard.assignedTo.firstName} ${simCard.assignedTo.lastName}`
-                : '-'}
+                : FALLBACK_DASH}
             </Descriptions.Item>
             <Descriptions.Item label={t('simCards.details.assignedAt')}>
-              {simCard.assignedAt ? new Date(simCard.assignedAt).toLocaleString() : '-'}
+              {formatDateTime(simCard.assignedAt, language)}
             </Descriptions.Item>
             <Descriptions.Item label={t('common.labels.createdAt')}>
-              {new Date(simCard.createdAt).toLocaleString()}
+              {formatDateTime(simCard.createdAt, language)}
             </Descriptions.Item>
             <Descriptions.Item label={t('common.labels.updatedAt')}>
-              {new Date(simCard.updatedAt).toLocaleString()}
+              {formatDateTime(simCard.updatedAt, language)}
             </Descriptions.Item>
           </Descriptions>
         ) : null}
-      </Card>
+      </SectionCard>
 
-      <Card title={t('simCards.details.historyTitle')} loading={eventsQuery.isLoading}>
+      <SectionCard title={t('simCards.details.historyTitle')} loading={eventsQuery.isLoading}>
         {eventsQuery.data && eventsQuery.data.length === 0 ? (
-          <Typography.Text type="secondary">{t('simCards.details.noEvents')}</Typography.Text>
+          <EmptyNotice title={t('simCards.details.noEvents')} />
         ) : null}
         {eventsQuery.data && eventsQuery.data.length > 0 ? (
           <Timeline
@@ -167,24 +194,24 @@ export default function SimCardDetailsPage() {
               key: ev.id,
               children: (
                 <div>
-                  <Typography.Text strong>{getSimEventTypeLabel(ev.type, t)}</Typography.Text>
-                  <div className="text-slate-500 text-sm">
-                    {new Date(ev.createdAt).toLocaleString(dateLocale)}
-                    {ev.user
-                      ? ` · ${ev.user.firstName} ${ev.user.lastName}`
-                      : ''}
+                  <div className="font-semibold text-fg-primary">
+                    {getSimEventTypeLabel(ev.type, t)}
+                  </div>
+                  <div className="text-sm text-fg-secondary">
+                    {formatDateTime(ev.createdAt, language)}
+                    {ev.user ? ` · ${ev.user.firstName} ${ev.user.lastName}` : ''}
                   </div>
                   {renderMetadata(ev.metadata) ?? (
-                    <Typography.Text type="secondary" className="text-xs">
+                    <span className="text-xs text-fg-muted">
                       {t('simCards.details.noExtraDetails')}
-                    </Typography.Text>
+                    </span>
                   )}
                 </div>
               ),
             }))}
           />
         ) : null}
-      </Card>
-    </Space>
+      </SectionCard>
+    </PageShell>
   );
 }

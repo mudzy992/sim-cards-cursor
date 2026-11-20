@@ -359,9 +359,9 @@ function TemplatesCard() {
             </Typography.Text>
             {previewHtml ? (
               <iframe
-                title="template-preview"
+                title={t('common.placeholders.templatePreview')}
                 sandbox=""
-                className="w-full min-h-[420px] rounded border"
+                className="w-full min-h-[420px] rounded border border-subtle"
                 srcDoc={previewHtml}
               />
             ) : (

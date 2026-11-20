@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Drawer, Form, Input, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
+import { Button, Drawer, Form, Input, Select, Space, Switch, Table, Typography, message } from 'antd'
+import { StatusBadge } from '@/components/ui'
 import { useMemo, useState } from 'react'
 import { branchEmailRecipientsApi } from '@/api/branch-email-recipients.api'
 import { branchModeratorsApi } from '@/api/branch-moderators.api'
@@ -176,27 +177,25 @@ export default function BranchEmailRecipientsPage() {
         <Button onClick={() => setBranchIdFilter(undefined)}>{t('common.actions.reset')}</Button>
       </Space>
 
-      <div className="rounded-md border border-slate-200 p-3">
-        <div className="font-medium mb-2">{t('branchEmailRecipients.moderatorsHeading')}</div>
+      <div className="rounded-md border border-subtle bg-surface-sunken p-3">
+        <div className="mb-2 font-medium text-fg-primary">{t('branchEmailRecipients.moderatorsHeading')}</div>
         {moderatorsQuery.isLoading ? (
-          <div className="text-sm text-slate-500">{t('common.states.loading')}</div>
+          <div className="text-sm text-fg-secondary">{t('common.states.loading')}</div>
         ) : (moderatorsQuery.data ?? []).length === 0 ? (
-          <div className="text-sm text-slate-500">{t('branchEmailRecipients.noModerators')}</div>
+          <div className="text-sm text-fg-secondary">{t('branchEmailRecipients.noModerators')}</div>
         ) : (
           <div className="space-y-2">
             {groupedModerators.map((m) => (
               <div key={m.key} className="text-sm">
-                <div className="font-medium text-slate-900">{m.userLabel}</div>
+                <div className="font-medium text-fg-primary">{m.userLabel}</div>
                 {m.branches.length > 0 ? (
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {m.branches.map((b) => (
-                      <Tag key={b.id} className="!m-0">
-                        {b.label}
-                      </Tag>
+                      <StatusBadge key={b.id} tone="neutral" label={b.label} />
                     ))}
                   </div>
                 ) : (
-                  <div className="text-slate-500">–</div>
+                  <div className="text-fg-muted">–</div>
                 )}
               </div>
             ))}
@@ -307,7 +306,7 @@ export default function BranchEmailRecipientsPage() {
             <Input placeholder="email@example.com" />
           </Form.Item>
           <Form.Item name="label" label={t('branchEmailRecipients.labelFieldLabel')}>
-            <Input placeholder="npr. Podrška" />
+            <Input placeholder={t('common.placeholders.recipientNameExample')} />
           </Form.Item>
           {editing && (
             <Form.Item name="isActive" label={t('common.labels.active')} valuePropName="checked">

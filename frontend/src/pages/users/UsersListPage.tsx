@@ -9,10 +9,10 @@ import {
   Select,
   Table,
   Tabs,
-  Tag,
   Typography,
   message,
 } from 'antd';
+import { StatusBadge, getUserRoleTone, getUserStatusTone } from '@/components/ui';
 import { PlusOutlined, EditOutlined, UserOutlined, ApartmentOutlined, BankOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { usersApi, type CreateUserInput, type UpdateUserInput } from '@/api/users.api';
@@ -392,15 +392,17 @@ export default function UsersListPage() {
           {
             title: t('common.labels.role'),
             dataIndex: 'role',
-            render: (r: UserRole) => <Tag>{getUserRoleLabel(r, t)}</Tag>,
+            render: (r: UserRole) => (
+              <StatusBadge tone={getUserRoleTone(r)} label={getUserRoleLabel(r, t)} />
+            ),
           },
           {
             title: t('users.columns.distributionOrBranch'),
             render: (_, row) =>
               row.distributionId ? (
-                <Tag color="blue">{t('users.distributionTag')}</Tag>
+                <StatusBadge tone="info" label={t('users.distributionTag')} />
               ) : row.branchId ? (
-                <Tag color="green">{t('users.branchTag')}</Tag>
+                <StatusBadge tone="success" label={t('users.branchTag')} />
               ) : (
                 '-'
               ),
@@ -409,9 +411,7 @@ export default function UsersListPage() {
             title: t('common.labels.status'),
             dataIndex: 'status',
             render: (s) => (
-              <Tag color={s === 'ACTIVE' ? 'green' : s === 'SUSPENDED' ? 'red' : 'orange'}>
-                {getUserStatusLabel(s, t)}
-              </Tag>
+              <StatusBadge tone={getUserStatusTone(s)} label={getUserStatusLabel(s, t)} />
             ),
           },
           ...(canEdit
@@ -773,10 +773,10 @@ export default function UsersListPage() {
       >
         <Form form={distForm} layout="vertical">
           <Form.Item name="name" label={t('common.labels.name')} rules={[{ required: true }]}>
-            <Input placeholder="npr. ED Zenica" />
+            <Input placeholder={t('common.placeholders.distributionNameExample')} />
           </Form.Item>
           <Form.Item name="code" label={t('users.codeColumn')} rules={[{ required: true }]}>
-            <Input placeholder="npr. EDZ" disabled={!!editingDist} />
+            <Input placeholder={t('common.placeholders.distributionCodeExample')} disabled={!!editingDist} />
           </Form.Item>
         </Form>
       </Drawer>
@@ -824,10 +824,10 @@ export default function UsersListPage() {
             />
           </Form.Item>
           <Form.Item name="name" label={t('common.labels.name')} rules={[{ required: true }]}>
-            <Input placeholder="npr. Zenica" />
+            <Input placeholder={t('common.placeholders.branchNameExample')} />
           </Form.Item>
           <Form.Item name="code" label={t('users.codeColumn')} rules={[{ required: true }]}>
-            <Input placeholder="npr. ZEN" disabled={!!editingBranch} />
+            <Input placeholder={t('common.placeholders.branchCodeExample')} disabled={!!editingBranch} />
           </Form.Item>
         </Form>
       </Drawer>

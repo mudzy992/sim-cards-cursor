@@ -11,11 +11,11 @@ import {
   Space,
   Switch,
   Table,
-  Tag,
   Tabs,
   Typography,
   message,
 } from 'antd';
+import { StatusBadge, getMeterStatusTone } from '@/components/ui';
 import { useState } from 'react';
 import { PlusOutlined, ThunderboltOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
@@ -488,15 +488,12 @@ export default function MetersListPage() {
                         width: 160,
                         render: (_: unknown, row: MeterItem) => {
                           const status = row.status ?? 'ACTIVE'
-                          const color =
-                            status === 'ACTIVE'
-                              ? 'success'
-                              : status === 'DEFECTIVE'
-                                ? 'error'
-                                : status === 'IN_CALIBRATION'
-                                  ? 'warning'
-                                  : 'default'
-                          return <Tag color={color}>{getMeterStatusLabel(status, t)}</Tag>
+                          return (
+                            <StatusBadge
+                              tone={getMeterStatusTone(status)}
+                              label={getMeterStatusLabel(status, t)}
+                            />
+                          )
                         },
                       },
                       {
@@ -506,9 +503,10 @@ export default function MetersListPage() {
                         render: (_: unknown, row: MeterItem) => {
                           const noSim = row.simCardState === 'NO_SIM' || !row.simCard;
                           return (
-                            <Tag color={noSim ? 'warning' : 'success'}>
-                              {noSim ? t('meters.noSimOption') : t('meters.simInstalledOption')}
-                            </Tag>
+                            <StatusBadge
+                              tone={noSim ? 'warning' : 'success'}
+                              label={noSim ? t('meters.noSimOption') : t('meters.simInstalledOption')}
+                            />
                           );
                         },
                       },
@@ -524,9 +522,10 @@ export default function MetersListPage() {
                             ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
                             : '—'
                           return (
-                            <Tag color="gold">
-                              {t('meters.columns.orderLabel')} {date} • {op}
-                            </Tag>
+                            <StatusBadge
+                              tone="warning"
+                              label={`${t('meters.columns.orderLabel')} ${date} • ${op}`}
+                            />
                           )
                         },
                       },
@@ -810,7 +809,7 @@ export default function MetersListPage() {
               label={t('installationRecords.form.meterSerialLabel')}
               rules={[{ required: true, message: t('installationRecords.form.serialNumberRequired') }]}
             >
-              <Input placeholder="npr. AMM-12345" />
+              <Input placeholder={t('common.placeholders.meterSerialExample')} />
             </Form.Item>
             <Form.Item
               name="meterTypeDefinitionId"
@@ -841,7 +840,7 @@ export default function MetersListPage() {
               <Input.TextArea rows={2} placeholder={t('installationRecords.form.addressPlaceholder')} />
             </Form.Item>
             <Form.Item name="installationDate" label={t('installationRecords.list.columns.installationDate')}>
-              <Input type="date" placeholder="YYYY-MM-DD" />
+              <Input type="date" placeholder={t('common.placeholders.dateFormat')} />
             </Form.Item>
             <Form.Item name="city" label={t('meters.cityPlaceLabel')}>
               <Input placeholder={t('common.labels.optional')} />
@@ -857,7 +856,7 @@ export default function MetersListPage() {
             </Form.Item>
 
             {selectedEditMeterTypeDefinitionId && (
-              <div className="rounded-md border border-slate-200 p-3">
+              <div className="rounded-md border border-subtle p-3">
                 <div className="font-medium mb-2">{t('installationRecords.form.extraFields')}</div>
                 {(meterTypeFieldsQuery.data ?? [])
                   .slice()
@@ -879,7 +878,7 @@ export default function MetersListPage() {
                     </Form.Item>
                   ))}
                 {meterTypeFieldsQuery.isLoading && (
-                  <div className="text-sm text-slate-500">{t('installationRecords.form.loadingFields')}</div>
+                  <div className="text-sm text-fg-secondary">{t('installationRecords.form.loadingFields')}</div>
                 )}
               </div>
             )}

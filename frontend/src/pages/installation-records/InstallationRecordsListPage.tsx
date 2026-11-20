@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Select, Space, Table, Tag, Typography } from 'antd';
+import { Button, Select, Space, Table, Typography } from 'antd';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { installationRecordsApi } from '@/api/installation-records.api';
@@ -10,14 +10,7 @@ import type {
   RecordStatus,
 } from '@/types/installation-record.types';
 import { useTranslation } from '@/i18n';
-
-const statusColor: Record<string, string> = {
-  DRAFT: 'default',
-  SENT: 'blue',
-  SEND_FAILED: 'error',
-  SEP_ACTIVATED: 'success',
-  LEGACY_COMPLETED: 'default',
-};
+import { StatusBadge, getRecordStatusTone } from '@/components/ui';
 
 const statusLabelKey: Record<string, string> = {
   DRAFT: 'installationRecords.status.draft',
@@ -179,9 +172,10 @@ export default function InstallationRecordsListPage() {
             dataIndex: 'status',
             key: 'status',
             render: (status: RecordStatus) => (
-              <Tag color={statusColor[status] ?? 'default'}>
-                {statusLabelKey[status] ? t(statusLabelKey[status]) : status}
-              </Tag>
+              <StatusBadge
+                tone={getRecordStatusTone(status)}
+                label={statusLabelKey[status] ? t(statusLabelKey[status]) : status}
+              />
             ),
           },
         ]}

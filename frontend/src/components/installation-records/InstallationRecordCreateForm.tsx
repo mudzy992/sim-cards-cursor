@@ -231,7 +231,7 @@ export default function InstallationRecordCreateForm({
     <>
       {messageContextHolder}
       {!embedded && (
-        <p className="text-slate-500 mb-4">
+        <p className="text-fg-secondary mb-4">
           {t('installationRecords.form.intro')}
         </p>
       )}
@@ -314,7 +314,7 @@ export default function InstallationRecordCreateForm({
                   <Input placeholder={t('installationRecords.form.serialNumberPlaceholder')} />
                 </Form.Item>
                 {demountedMeterTypeDefinitionId && (
-                  <div className="rounded-md border border-slate-200 p-3 mb-3">
+                  <div className="rounded-md border border-subtle p-3 mb-3">
                     <div className="font-medium mb-2">{t('installationRecords.form.extraFieldsDemounted')}</div>
                     {(demountedMeterTypeFieldsQuery.data ?? [])
                       .slice()
@@ -336,7 +336,7 @@ export default function InstallationRecordCreateForm({
                         </Form.Item>
                       ))}
                     {demountedMeterTypeFieldsQuery.isLoading && (
-                      <div className="text-sm text-slate-500">{t('installationRecords.form.loadingFields')}</div>
+                      <div className="text-sm text-fg-secondary">{t('installationRecords.form.loadingFields')}</div>
                     )}
                   </div>
                 )}
@@ -442,7 +442,7 @@ export default function InstallationRecordCreateForm({
             </div>
 
             {selectedMeterTypeDefinitionId && (
-              <div className="rounded-md border border-slate-200 p-3">
+              <div className="rounded-md border border-subtle p-3">
                 <div className="font-medium mb-2">{t('installationRecords.form.extraFields')}</div>
                 {(meterTypeFieldsQuery.data ?? [])
                   .slice()
@@ -464,7 +464,7 @@ export default function InstallationRecordCreateForm({
                     </Form.Item>
                   ))}
                 {meterTypeFieldsQuery.isLoading && (
-                  <div className="text-sm text-slate-500">{t('installationRecords.form.loadingFields')}</div>
+                  <div className="text-sm text-fg-secondary">{t('installationRecords.form.loadingFields')}</div>
                 )}
               </div>
             )}
@@ -476,10 +476,10 @@ export default function InstallationRecordCreateForm({
             </Form.Item>
             <div className="grid grid-cols-2 gap-4">
               <Form.Item name="latitude" label={t('installationRecords.form.gpsLatLabel')}>
-                <Input type="number" step="any" placeholder="npr. 43.85" />
+                <Input type="number" step="any" placeholder={t('common.placeholders.latitudeExample')} />
               </Form.Item>
               <Form.Item name="longitude" label={t('installationRecords.form.gpsLngLabel')}>
-                <Input type="number" step="any" placeholder="npr. 18.41" />
+                <Input type="number" step="any" placeholder={t('common.placeholders.longitudeExample')} />
               </Form.Item>
             </div>
           </>

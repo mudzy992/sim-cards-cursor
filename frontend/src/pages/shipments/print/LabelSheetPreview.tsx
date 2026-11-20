@@ -9,26 +9,18 @@ import type {
 import { MM_TO_PX, filledInSheet, formatMm } from './label-formats';
 import { SimLabelContent } from './SimLabelContent';
 import { useTranslation } from '@/i18n';
+import { StatusBadge } from '@/components/ui';
 
-/**
- * Ekranski pregled jednog A4 lista — geometrijski identičan printu,
- * samo skaliran u px. Klik na etiketu na PRVOM listu postavlja početnu
- * poziciju printa (sve ispred nje se tretiraju kao već iskorištene).
- * U zaglavlju lista prikazuje i brojač popunjenosti (npr. 80/80).
- */
 export interface LabelSheetPreviewProps {
   cells: LabelSlot<PrintableSimCard>[];
   layout: LabelSheetLayout;
   scale: number;
   sheetNumber: number;
   totalSheets: number;
-  /** true samo za prvi list — omogućava klik za startnu poziciju */
   interactive: boolean;
   showGuides: boolean;
-  /** gradi linije etikete (ista funkcija se koristi i za print) */
   makeLines: (sim: PrintableSimCard) => LabelLineSpec[];
   lineGapMm: number;
-  /** poziva se klikom na ćeliju prvog lista (index ćelije u mreži) */
   onPickStart?: (cellIndex: number) => void;
 }
 
@@ -65,18 +57,15 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
 
   return (
     <div className="select-none">
-      <div className="mb-2 flex items-center justify-between px-1 text-xs text-slate-500">
-        <span className="font-medium">
-          {t('shipments.print.sheetOf', { sheet: sheetNumber, total: totalSheets })}
-          <span
-            className={`ms-2 rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-              filled === cells.length
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-slate-100 text-slate-500'
-            }`}
-            title={t('shipments.print.filledLabelsOnSheet')}
-          >
-            {filled}/{cells.length}
+      <div className="mb-2 flex items-center justify-between px-1 text-xs text-fg-secondary">
+        <span className="inline-flex items-center gap-2 font-medium text-fg-primary">
+          <span>{t('shipments.print.sheetOf', { sheet: sheetNumber, total: totalSheets })}</span>
+          <span title={t('shipments.print.filledLabelsOnSheet')}>
+            <StatusBadge
+              tone={filled === cells.length ? 'success' : 'neutral'}
+              label={`${filled}/${cells.length}`}
+              mono
+            />
           </span>
         </span>
         <span>
@@ -84,12 +73,11 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
         </span>
       </div>
 
-      {/* vanjski okvir fiksne (skalirane) veličine */}
+      {/* vanjski okvir fiksne (skalirane) veličine; A4 papir je uvijek svijetli print-preview-scope */}
       <div
         style={{ width: sheetW * scale, height: sheetH * scale }}
-        className="relative overflow-hidden"
+        className="print-preview-scope relative overflow-hidden"
       >
-        {/* papir u punoj px veličini, skaliran transformom */}
         <div
           style={{
             width: sheetW,
@@ -97,12 +85,13 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
           }}
-          className="absolute left-0 top-0 bg-white shadow-[0_10px_40px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-300/70"
+          className="lp-preview-sheet absolute left-0 top-0"
         >
           <div className="grid" style={gridStyle}>
             {cells.map((cell, i) => {
               const classes = [
                 'lp-preview-cell',
+                showGuides ? 'lp-preview-cell--guides' : '',
                 interactive ? 'lp-preview-cell--clickable' : '',
                 cell.used ? 'lp-preview-cell--used' : '',
               ]
@@ -114,11 +103,6 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
                   key={i}
                   type="button"
                   className={`${classes} appearance-none border-0 bg-transparent p-0 text-left`}
-                  style={{
-                    boxShadow: showGuides
-                      ? 'inset 0 0 0 0.6px rgba(148, 163, 184, 0.55)'
-                      : undefined,
-                  }}
                   title={
                     cell.used
                       ? t('shipments.print.labelMarkedUsed', { index: i + 1 })
@@ -131,7 +115,7 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
                   ) : cell.used ? (
                     <div className="flex h-full w-full items-center justify-center">
                       <span
-                        className="font-medium uppercase tracking-widest text-slate-400"
+                        className="lp-used-label-text font-medium uppercase tracking-widest"
                         style={{ fontSize: 9 }}
                       >
                         {t('shipments.print.usedLabel')}
@@ -140,21 +124,13 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
                   ) : null}
                 </button>
               ) : (
-                <div
-                  key={i}
-                  className={classes}
-                  style={{
-                    boxShadow: showGuides
-                      ? 'inset 0 0 0 0.6px rgba(148, 163, 184, 0.55)'
-                      : undefined,
-                  }}
-                >
+                <div key={i} className={classes}>
                   {cell.sim && !cell.used ? (
                     <SimLabelContent lines={makeLines(cell.sim)} gapMm={lineGapMm} />
                   ) : cell.used ? (
                     <div className="flex h-full w-full items-center justify-center">
                       <span
-                        className="font-medium uppercase tracking-widest text-slate-400"
+                        className="lp-used-label-text font-medium uppercase tracking-widest"
                         style={{ fontSize: 9 }}
                       >
                         {t('shipments.print.usedLabel')}

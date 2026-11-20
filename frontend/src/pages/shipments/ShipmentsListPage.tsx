@@ -7,8 +7,6 @@ import {
   Space,
   Table,
   Tabs,
-  Tag,
-  Typography,
   message,
 } from 'antd';
 import { useMemo, useState } from 'react';
@@ -25,10 +23,7 @@ import { simCardsApi } from '@/api/sim-cards.api';
 import { usersApi } from '@/api/users.api';
 import { useAuthStore } from '@/store/auth.store';
 import { getSimCardStatusLabel } from '@/utils/labels.utils';
-import type {
-  ShipmentItem,
-  ShipmentStatus,
-} from '@/types/shipment.types';
+import type { ShipmentItem, ShipmentStatus } from '@/types/shipment.types';
 import type {
   SimCardItem,
   SimCardListParams,
@@ -36,22 +31,18 @@ import type {
 } from '@/types/sim-card.types';
 import { ShipmentDeleteButton } from './ShipmentDeleteButton';
 import { useTranslation } from '@/i18n';
-
-const shipmentStatusColor: Record<string, string> = {
-  RECEIVED: 'blue',
-  PROCESSING: 'orange',
-  COMPLETED: 'green',
-};
-
-const simStatusColor: Record<string, string> = {
-  AVAILABLE: 'green',
-  ASSIGNED: 'orange',
-  INSTALLED: 'blue',
-  DEMOUNTED: 'cyan',
-  DEFECTIVE: 'red',
-  RETURNED: 'gold',
-  DEACTIVATED: 'default',
-};
+import {
+  EmptyNotice,
+  FilterBar,
+  PageHeader,
+  PageShell,
+  StatusBadge,
+  getShipmentStatusTone,
+  getSimCardStatusTone,
+} from '@/components/ui';
+import { DEFAULT_PAGE_SIZE, FALLBACK_DASH } from '@/constants/ui';
+import { ROUTES } from '@/config/routes';
+import { formatDate, formatNumber } from '@/utils/formatters';
 
 const shipmentStatusOptions: ShipmentStatus[] = [
   'RECEIVED',
@@ -79,12 +70,12 @@ const simStatusOptions: SimCardStatus[] = [
 
 const defaultShipmentFilters: ShipmentListParams = {
   page: 1,
-  limit: 20,
+  limit: DEFAULT_PAGE_SIZE,
 };
 
 export default function ShipmentsListPage() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState<string>('shipments');
@@ -100,7 +91,7 @@ export default function ShipmentsListPage() {
 
   const [simFilters, setSimFilters] = useState<SimCardListParams>({
     page: 1,
-    limit: 20,
+    limit: DEFAULT_PAGE_SIZE,
   });
   const [simSearchInput, setSimSearchInput] = useState('');
   const [assignTarget, setAssignTarget] = useState<SimCardItem | null>(null);
@@ -137,13 +128,8 @@ export default function ShipmentsListPage() {
       setAssignTarget(null);
       setSelectedUserId(null);
 
-      await queryClient.invalidateQueries({
-        queryKey: ['sim-cards', 'list'],
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ['shipments', 'list'],
-      });
+      await queryClient.invalidateQueries({ queryKey: ['sim-cards', 'list'] });
+      await queryClient.invalidateQueries({ queryKey: ['shipments', 'list'] });
     },
     onError: () => {
       messageApi.error(t('shipments.list.assignFailed'));
@@ -154,14 +140,8 @@ export default function ShipmentsListPage() {
     mutationFn: (simCardId: string) => simCardsApi.unassign(simCardId),
     onSuccess: async () => {
       messageApi.success(t('shipments.list.unassignSuccess'));
-
-      await queryClient.invalidateQueries({
-        queryKey: ['sim-cards', 'list'],
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ['shipments', 'list'],
-      });
+      await queryClient.invalidateQueries({ queryKey: ['sim-cards', 'list'] });
+      await queryClient.invalidateQueries({ queryKey: ['shipments', 'list'] });
     },
     onError: () => {
       messageApi.error(t('shipments.list.unassignFailed'));
@@ -202,31 +182,25 @@ export default function ShipmentsListPage() {
     const total = row._count?.simCards ?? 0;
 
     if (total === 0) {
-      return (
-        <Typography.Text type="secondary">
-          {t('shipments.list.noCards')}
-        </Typography.Text>
-      );
+      return <span className="text-xs text-fg-muted">{t('shipments.list.noCards')}</span>;
     }
 
     return (
       <div className="min-w-[240px]">
-        <div className="flex items-center gap-2 mb-1">
-          <Typography.Text strong>{total}</Typography.Text>
-          <Typography.Text type="secondary">
-            {t('shipments.list.cardsUnit')}
-          </Typography.Text>
+        <div className="mb-1 flex items-center gap-2">
+          <span className="font-semibold tabular-nums text-fg-primary">
+            {formatNumber(total, language)}
+          </span>
+          <span className="text-xs text-fg-secondary">{t('shipments.list.cardsUnit')}</span>
         </div>
 
         <Space size={[4, 4]} wrap>
           {statuses.map(({ status, count }) => (
-            <Tag
+            <StatusBadge
               key={status}
-              color={simStatusColor[status] ?? 'default'}
-              className="m-0"
-            >
-              {count} {getSimCardStatusLabel(status, t)}
-            </Tag>
+              tone={getSimCardStatusTone(status)}
+              label={`${formatNumber(count, language)} ${getSimCardStatusLabel(status, t)}`}
+            />
           ))}
         </Space>
       </div>
@@ -248,6 +222,13 @@ export default function ShipmentsListPage() {
     setShipmentFilters(defaultShipmentFilters);
   };
 
+  const hasShipmentFilters = Boolean(
+    searchInput || providerInput || shipmentFilters.search || shipmentFilters.provider || shipmentFilters.status,
+  );
+  const hasSimFilters = Boolean(
+    simSearchInput || simFilters.search || simFilters.status || simFilters.shipmentId,
+  );
+
   const tabItems = [
     {
       key: 'shipments',
@@ -262,76 +243,68 @@ export default function ShipmentsListPage() {
             className="flex flex-wrap items-center justify-between gap-4"
             data-tour-id="shipments-header"
           >
-            <Typography.Text type="secondary">
-              {t('shipments.list.tabIntro')}
-            </Typography.Text>
+            <span className="text-sm text-fg-secondary">{t('shipments.list.tabIntro')}</span>
 
-            {canManageShipments && (
+            {canManageShipments ? (
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                onClick={() => navigate('/shipments/new')}
+                onClick={() => navigate(ROUTES.shipmentsNew)}
                 data-tour-id="shipments-new-button"
               >
                 {t('shipments.list.newShipment')}
               </Button>
-            )}
+            ) : null}
           </div>
 
-          <Space
-            wrap
-            className="w-full"
-            data-tour-id="shipments-filters"
+          <FilterBar
+            hasActiveFilters={hasShipmentFilters}
+            onReset={handleShipmentReset}
           >
-            <Input
-              placeholder={t('shipments.list.searchNamePlaceholder')}
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onPressEnter={handleShipmentSearch}
-              style={{ width: 220 }}
-            />
+            <div className="flex flex-wrap items-center gap-3" data-tour-id="shipments-filters">
+              <Input
+                placeholder={t('shipments.list.searchNamePlaceholder')}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onPressEnter={handleShipmentSearch}
+                className="w-56"
+              />
 
-            <Input
-              placeholder={t('shipments.list.providerPlaceholder')}
-              value={providerInput}
-              onChange={(e) => setProviderInput(e.target.value)}
-              onPressEnter={handleShipmentSearch}
-              style={{ width: 220 }}
-            />
+              <Input
+                placeholder={t('shipments.list.providerPlaceholder')}
+                value={providerInput}
+                onChange={(e) => setProviderInput(e.target.value)}
+                onPressEnter={handleShipmentSearch}
+                className="w-56"
+              />
 
-            <Select
-              allowClear
-              placeholder={t('common.labels.status')}
-              style={{ width: 160 }}
-              value={shipmentFilters.status}
-              onChange={(value) =>
-                setShipmentFilters(
-                  (prev: ShipmentListParams) => ({
+              <Select
+                allowClear
+                placeholder={t('common.labels.status')}
+                className="w-40"
+                value={shipmentFilters.status}
+                onChange={(value) =>
+                  setShipmentFilters((prev: ShipmentListParams) => ({
                     ...prev,
                     page: 1,
                     status: value,
-                  }),
-                )
-              }
-              options={shipmentStatusOptions.map((s) => ({
-                label: s,
-                value: s,
-              }))}
-            />
+                  }))
+                }
+                options={shipmentStatusOptions.map((s) => ({
+                  label: s,
+                  value: s,
+                }))}
+              />
 
-            <Button onClick={handleShipmentSearch}>
-              {t('common.actions.search')}
-            </Button>
-
-            <Button onClick={handleShipmentReset}>
-              {t('common.actions.reset')}
-            </Button>
-          </Space>
+              <Button onClick={handleShipmentSearch}>{t('common.actions.search')}</Button>
+            </div>
+          </FilterBar>
 
           <Table<ShipmentItem>
             rowKey="id"
             loading={shipmentsQuery.isLoading}
             dataSource={shipmentRows}
+            locale={{ emptyText: <EmptyNotice /> }}
             pagination={{
               current: shipmentsQuery.data?.page,
               pageSize: shipmentsQuery.data?.limit,
@@ -339,13 +312,11 @@ export default function ShipmentsListPage() {
               showSizeChanger: true,
               showTotal: (total) => t('common.pagination.totalItems', { count: total }),
               onChange: (page, pageSize) =>
-                setShipmentFilters(
-                  (prev: ShipmentListParams) => ({
-                    ...prev,
-                    page,
-                    limit: pageSize ?? 20,
-                  }),
-                ),
+                setShipmentFilters((prev: ShipmentListParams) => ({
+                  ...prev,
+                  page,
+                  limit: pageSize ?? DEFAULT_PAGE_SIZE,
+                })),
             }}
             columns={[
               {
@@ -353,9 +324,7 @@ export default function ShipmentsListPage() {
                 render: (_, row) => (
                   <Button
                     type="link"
-                    onClick={() =>
-                      navigate(`/shipments/${row.id}`)
-                    }
+                    onClick={() => navigate(ROUTES.shipmentDetail(row.id))}
                     className="p-0"
                   >
                     {row.name}
@@ -369,28 +338,18 @@ export default function ShipmentsListPage() {
               {
                 title: t('shipments.details.receivedDate'),
                 dataIndex: 'receivedDate',
-                render: (val: string) =>
-                  val
-                    ? new Date(val).toLocaleDateString()
-                    : '–',
+                render: (val: string) => formatDate(val, language),
               },
               {
                 title: t('shipments.list.columns.cards'),
                 width: 330,
-                render: (_, row) =>
-                  renderCardStatusSummary(row),
+                render: (_, row) => renderCardStatusSummary(row),
               },
               {
                 title: t('common.labels.status'),
                 dataIndex: 'status',
                 render: (status: string) => (
-                  <Tag
-                    color={
-                      shipmentStatusColor[status] ?? 'default'
-                    }
-                  >
-                    {status}
-                  </Tag>
+                  <StatusBadge tone={getShipmentStatusTone(status)} label={status} />
                 ),
               },
               {
@@ -401,11 +360,7 @@ export default function ShipmentsListPage() {
                     <Button
                       size="small"
                       icon={<PrinterOutlined />}
-                      onClick={() =>
-                        navigate(
-                          `/shipments/${row.id}/print`,
-                        )
-                      }
+                      onClick={() => navigate(ROUTES.shipmentPrint(row.id))}
                     >
                       {t('shipments.list.labelsShort')}
                     </Button>
@@ -414,8 +369,7 @@ export default function ShipmentsListPage() {
                       shipment={{
                         id: row.id,
                         name: row.name,
-                        simCardsCount:
-                          row._count?.simCards ?? 0,
+                        simCardsCount: row._count?.simCards ?? 0,
                       }}
                       role={currentUserRole}
                     />
@@ -423,11 +377,7 @@ export default function ShipmentsListPage() {
                     <Button
                       size="small"
                       icon={<EditOutlined />}
-                      onClick={() =>
-                        navigate(
-                          `/shipments/${row.id}/edit`,
-                        )
-                      }
+                      onClick={() => navigate(ROUTES.shipmentEdit(row.id))}
                     >
                       {t('common.actions.edit')}
                     </Button>
@@ -449,81 +399,71 @@ export default function ShipmentsListPage() {
       ),
       children: (
         <div className="space-y-4">
-          <Typography.Text type="secondary">
-            {t('shipments.list.simTabIntro')}
-          </Typography.Text>
+          <div className="text-sm text-fg-secondary">{t('shipments.list.simTabIntro')}</div>
 
-          <Space
-            wrap
-            data-tour-id="shipments-sim-filters"
+          <FilterBar
+            hasActiveFilters={hasSimFilters}
+            onReset={() => {
+              setSimSearchInput('');
+              setSimFilters({ page: 1, limit: DEFAULT_PAGE_SIZE });
+            }}
           >
-            <Input.Search
-              allowClear
-              placeholder={t('simCards.list.searchPlaceholder')}
-              value={simSearchInput}
-              onChange={(e) =>
-                setSimSearchInput(e.target.value)
-              }
-              onSearch={(value) =>
-                setSimFilters((prev) => ({
-                  ...prev,
-                  page: 1,
-                  search: value.trim() || undefined,
-                }))
-              }
-              style={{ width: 280 }}
-            />
+            <div className="flex flex-wrap items-center gap-3" data-tour-id="shipments-sim-filters">
+              <Input.Search
+                allowClear
+                placeholder={t('simCards.list.searchPlaceholder')}
+                value={simSearchInput}
+                onChange={(e) => setSimSearchInput(e.target.value)}
+                onSearch={(value) =>
+                  setSimFilters((prev) => ({
+                    ...prev,
+                    page: 1,
+                    search: value.trim() || undefined,
+                  }))
+                }
+                className="w-72"
+              />
 
-            <Select
-              allowClear
-              placeholder={t('common.labels.status')}
-              style={{ width: 180 }}
-              value={simFilters.status}
-              onChange={(value) =>
-                setSimFilters((prev) => ({
-                  ...prev,
-                  page: 1,
-                  status: value,
-                }))
-              }
-              options={simStatusOptions.map((s) => ({
-                label: getSimCardStatusLabel(s, t),
-                value: s,
-              }))}
-            />
+              <Select
+                allowClear
+                placeholder={t('common.labels.status')}
+                className="w-44"
+                value={simFilters.status}
+                onChange={(value) =>
+                  setSimFilters((prev) => ({
+                    ...prev,
+                    page: 1,
+                    status: value,
+                  }))
+                }
+                options={simStatusOptions.map((s) => ({
+                  label: getSimCardStatusLabel(s, t),
+                  value: s,
+                }))}
+              />
 
-            <Select
-              allowClear
-              placeholder={t('shipments.details.title').split(' ')[0]}
-              style={{ width: 220 }}
-              value={simFilters.shipmentId}
-              onChange={(value) =>
-                setSimFilters((prev) => ({
-                  ...prev,
-                  page: 1,
-                  shipmentId: value,
-                }))
-              }
-              options={shipmentOptions}
-            />
-
-            <Button
-              onClick={() => {
-                setSimSearchInput('');
-                setSimFilters({
-                  page: 1,
-                  limit: 20,
-                });
-              }}
-            >
-              {t('common.actions.reset')}
-            </Button>
-          </Space>
+              <Select
+                allowClear
+                placeholder={t('shipments.details.title').split(' ')[0]}
+                className="w-56"
+                value={simFilters.shipmentId}
+                onChange={(value) =>
+                  setSimFilters((prev) => ({
+                    ...prev,
+                    page: 1,
+                    shipmentId: value,
+                  }))
+                }
+                options={shipmentOptions}
+              />
+            </div>
+          </FilterBar>
 
           <Table<SimCardItem>
             rowKey="id"
             loading={simCardsQuery.isLoading}
             dataSource={simRows}
+            locale={{ emptyText: <EmptyNotice /> }}
             pagination={{
               current: simCardsQuery.data?.page,
               pageSize: simCardsQuery.data?.limit,
@@ -533,7 +473,7 @@ export default function ShipmentsListPage() {
                 setSimFilters((prev) => ({
                   ...prev,
                   page,
-                  limit: pageSize ?? 20,
+                  limit: pageSize ?? DEFAULT_PAGE_SIZE,
                 })),
             }}
             columns={[
@@ -542,9 +482,8 @@ export default function ShipmentsListPage() {
                 render: (_, row) => (
                   <Button
                     type="link"
-                    onClick={() =>
-                      navigate(`/sim-cards/${row.id}`)
-                    }
+                    onClick={() => navigate(ROUTES.simCardDetail(row.id))}
+                    className="p-0 font-mono"
                   >
                     {row.iccid}
                   </Button>
@@ -556,22 +495,16 @@ export default function ShipmentsListPage() {
               },
               {
                 title: t('simCards.details.publicIp'),
-                render: (_, row) =>
-                  row.publicIpAddress ?? '-',
+                render: (_, row) => row.publicIpAddress ?? FALLBACK_DASH,
               },
               {
                 title: t('common.labels.status'),
                 dataIndex: 'status',
                 render: (status: string) => (
-                  <Tag
-                    color={
-                      simStatusColor[status] ?? 'default'
-                    }
-                  >
-                    {getSimCardStatusLabel(
-                      status as SimCardStatus, t,
-                    )}
-                  </Tag>
+                  <StatusBadge
+                    tone={getSimCardStatusTone(status)}
+                    label={getSimCardStatusLabel(status as SimCardStatus, t)}
+                  />
                 ),
               },
               {
@@ -583,7 +516,7 @@ export default function ShipmentsListPage() {
                 render: (_, row) =>
                   row.assignedTo
                     ? `${row.assignedTo.firstName} ${row.assignedTo.lastName}`
-                    : '-',
+                    : FALLBACK_DASH,
               },
               {
                 title: t('common.actions.actions'),
@@ -593,9 +526,7 @@ export default function ShipmentsListPage() {
                       size="small"
                       onClick={() => {
                         setAssignTarget(row);
-                        setSelectedUserId(
-                          row.assignedTo?.id ?? null,
-                        );
+                        setSelectedUserId(row.assignedTo?.id ?? null);
                       }}
                       disabled={row.status !== 'AVAILABLE'}
                     >
@@ -605,9 +536,7 @@ export default function ShipmentsListPage() {
                     <Button
                       size="small"
                       danger
-                      onClick={() =>
-                        void unassignMutation.mutate(row.id)
-                      }
+                      onClick={() => void unassignMutation.mutate(row.id)}
                       disabled={row.status !== 'ASSIGNED'}
                       loading={unassignMutation.isPending}
                     >
@@ -625,92 +554,78 @@ export default function ShipmentsListPage() {
   ];
 
   return (
-    <div
-      className="space-y-4"
-      data-tour-id="admin-shipments-sim"
-      data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
-    >
-      {messageContextHolder}
-
-      <Typography.Title level={3} className="!mb-0">
-        {t('layout.sidebar.shipments')}
-      </Typography.Title>
-
-      <Typography.Paragraph
-        type="secondary"
-        className="!mb-4"
+    <PageShell>
+      <div
+        className="space-y-4"
+        data-tour-id="admin-shipments-sim"
+        data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
       >
-        {t('shipments.list.pageIntro')}
-      </Typography.Paragraph>
+        {messageContextHolder}
 
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={tabItems}
-      />
+        <PageHeader
+          title={t('layout.sidebar.shipments')}
+          subtitle={t('shipments.list.pageIntro')}
+        />
 
-      <Drawer
-        title={t('shipments.list.assignDrawerTitle')}
-        open={Boolean(assignTarget)}
-        width={520}
-        onClose={() => {
-          setAssignTarget(null);
-          setSelectedUserId(null);
-        }}
-        destroyOnClose
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button
-              onClick={() => {
-                setAssignTarget(null);
-                setSelectedUserId(null);
-              }}
-            >
-              {t('common.actions.cancel')}
-            </Button>
+        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
 
-            <Button
-              type="primary"
-              loading={assignMutation.isPending}
-              onClick={() => {
-                if (!assignTarget || !selectedUserId) {
-                  messageApi.warning(
-                    t('shipments.list.selectUserWarning'),
-                  );
-                  return;
-                }
+        <Drawer
+          title={t('shipments.list.assignDrawerTitle')}
+          open={Boolean(assignTarget)}
+          width={520}
+          onClose={() => {
+            setAssignTarget(null);
+            setSelectedUserId(null);
+          }}
+          destroyOnClose
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button
+                onClick={() => {
+                  setAssignTarget(null);
+                  setSelectedUserId(null);
+                }}
+              >
+                {t('common.actions.cancel')}
+              </Button>
 
-                void assignMutation.mutate({
-                  simCardId: assignTarget.id,
-                  userId: selectedUserId,
-                });
-              }}
-            >
-              {t('shipments.list.assign')}
-            </Button>
-          </div>
-        }
-      >
-        <Space
-          direction="vertical"
-          style={{ width: '100%' }}
+              <Button
+                type="primary"
+                loading={assignMutation.isPending}
+                onClick={() => {
+                  if (!assignTarget || !selectedUserId) {
+                    messageApi.warning(t('shipments.list.selectUserWarning'));
+                    return;
+                  }
+
+                  void assignMutation.mutate({
+                    simCardId: assignTarget.id,
+                    userId: selectedUserId,
+                  });
+                }}
+              >
+                {t('shipments.list.assign')}
+              </Button>
+            </div>
+          }
         >
-          <Typography.Text>
-            {t('shipments.list.simColon')} {assignTarget?.iccid}
-          </Typography.Text>
+          <Space direction="vertical" className="w-full">
+            <div className="text-sm text-fg-primary">
+              {t('shipments.list.simColon')}{' '}
+              <span className="font-mono">{assignTarget?.iccid}</span>
+            </div>
 
-          <Select
-            showSearch
-            optionFilterProp="label"
-            placeholder={t('shipments.list.selectUserPlaceholder')}
-            value={selectedUserId ?? undefined}
-            onChange={(value) =>
-              setSelectedUserId(value)
-            }
-            options={userOptions}
-          />
-        </Space>
-      </Drawer>
-    </div>
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder={t('shipments.list.selectUserPlaceholder')}
+              value={selectedUserId ?? undefined}
+              onChange={(value) => setSelectedUserId(value)}
+              options={userOptions}
+            />
+          </Space>
+        </Drawer>
+      </div>
+    </PageShell>
   );
 }

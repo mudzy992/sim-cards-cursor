@@ -7,11 +7,11 @@ import {
   Grid,
   Image,
   Space,
-  Tag,
   Timeline,
   Typography,
   message,
 } from 'antd';
+import { StatusBadge, getRecordStatusTone, getSimCardStatusTone } from '@/components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { installationRecordsApi } from '@/api/installation-records.api';
@@ -31,14 +31,6 @@ const statusLabelKey: Record<string, string> = {
   SEND_FAILED: 'installationRecords.status.sendFailed',
   SEP_ACTIVATED: 'installationRecords.status.sepActivated',
   LEGACY_COMPLETED: 'installationRecords.status.legacyCompleted',
-};
-
-const statusColor: Record<string, string> = {
-  DRAFT: 'default',
-  SENT: 'blue',
-  SEND_FAILED: 'error',
-  SEP_ACTIVATED: 'success',
-  LEGACY_COMPLETED: 'default',
 };
 
 export default function InstallationRecordDetailPage() {
@@ -270,7 +262,10 @@ export default function InstallationRecordDetailPage() {
             </Descriptions.Item>
           )}
           <Descriptions.Item label={t('common.labels.status')}>
-            <Tag color={statusColor[record.status]}>{statusLabelKey[record.status] ? t(statusLabelKey[record.status]) : record.status}</Tag>
+            <StatusBadge
+              tone={getRecordStatusTone(record.status)}
+              label={statusLabelKey[record.status] ? t(statusLabelKey[record.status]) : record.status}
+            />
           </Descriptions.Item>
           <Descriptions.Item label={t('installationRecords.list.columns.installedBy')}>
             {record.installedBy
@@ -417,9 +412,10 @@ export default function InstallationRecordDetailPage() {
                     <span>{(record.simCard ?? record.meter?.simCard)?.iccid ?? '–'}</span>
                   )}
                   {record.simCard?.id && currentSimQuery.data ? (
-                    <Tag color="blue">
-                      {t('installationRecords.detail.currentlyLabel')} {getSimCardStatusLabel(currentSimQuery.data.status, t)}
-                    </Tag>
+                    <StatusBadge
+                      tone={getSimCardStatusTone(currentSimQuery.data.status)}
+                      label={`${t('installationRecords.detail.currentlyLabel')} ${getSimCardStatusLabel(currentSimQuery.data.status, t)}`}
+                    />
                   ) : null}
                 </Space>
               </Descriptions.Item>

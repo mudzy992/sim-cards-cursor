@@ -1,23 +1,25 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Button,
-  Card,
-  Col,
-  Row,
-  Segmented,
-  Table,
-  Tag,
-  Typography,
-} from 'antd';
+import { Button, Col, Row, Segmented, Table } from 'antd';
 import {
   analyticsApi,
   type AnalyticsRange,
   type TimeRangeParams,
 } from '@/api/analytics.api';
 import { useTranslation } from '@/i18n';
-import { getSimCardStatusLabel } from '@/utils/labels.utils'
-import type { SimCardStatus } from '@/types/sim-card.types'
+import { getSimCardStatusLabel, getUserRoleLabel } from '@/utils/labels.utils';
+import type { SimCardStatus } from '@/types/sim-card.types';
+import type { UserRole } from '@/types/auth.types';
+import {
+  EmptyNotice,
+  PageHeader,
+  PageShell,
+  SectionCard,
+  StatusBadge,
+  getUserRoleTone,
+} from '@/components/ui';
+import { FALLBACK_DASH } from '@/constants/ui';
+import { formatNumber, getActiveIntlLocale } from '@/utils/formatters';
 
 const statusLabelKey: Record<string, string> = {
   DRAFT: 'installationRecords.status.draft',
@@ -43,7 +45,7 @@ function useTimeRange(): [TimeRangeParams, (r: AnalyticsRange) => void] {
 
 export default function AnalyticsPage() {
   const { t, language } = useTranslation();
-  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
+  const dateLocale = getActiveIntlLocale(language);
   const rangeOptions = getRangeOptions(t);
   const [rangeParams, setRangeRange] = useTimeRange();
 
@@ -84,115 +86,142 @@ export default function AnalyticsPage() {
   const sim = simQuery.data;
   const users = usersQuery.data ?? [];
 
+  const maxSimCount = Math.max(
+    1,
+    ...Object.values(sim?.byStatus ?? {}).map((c) => c ?? 0),
+  );
+  const maxFunnelCount = Math.max(
+    1,
+    ...Object.values(records?.funnel ?? {}).map((c) => c ?? 0),
+  );
+  const maxTimelineCount = Math.max(
+    1,
+    ...(records?.timeline ?? []).map((c) => c.count ?? 0),
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <Typography.Title level={3} className="!mb-0">
-          {t('layout.sidebar.analytics')}
-        </Typography.Title>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
-          <Typography.Text type="secondary" className="text-xs sm:text-sm">
-            {t('analytics.timeRangeLabel')}
-          </Typography.Text>
-          <Segmented
-            options={rangeOptions}
-            value={rangeParams.range ?? '30_DAYS'}
-            onChange={(v) => setRangeRange(v as AnalyticsRange)}
-          />
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title={t('layout.sidebar.analytics')}
+        actions={
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <span className="text-xs text-fg-secondary sm:text-sm">
+              {t('analytics.timeRangeLabel')}
+            </span>
+            <Segmented
+              options={rangeOptions}
+              value={rangeParams.range ?? '30_DAYS'}
+              onChange={(v) => setRangeRange(v as AnalyticsRange)}
+            />
+          </div>
+        }
+      />
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
-          <Card
+          <SectionCard
             title={t('analytics.overviewCardTitle')}
             loading={overviewQuery.isLoading}
-            extra={
+            actions={
               <Button size="small" onClick={() => void handleDownloadCsv('overview')}>
                 CSV
               </Button>
             }
           >
-            <div className="space-y-2 text-sm">
-              <div>
-                <Typography.Text strong>{t('analytics.recordsTotal')}: </Typography.Text>
-                <Typography.Text>
-                  {overview?.installationRecords.total ?? 0}
-                </Typography.Text>
+            <div className="space-y-2 text-sm text-fg-primary">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-fg-secondary">
+                  {t('analytics.recordsTotal')}:
+                </span>
+                <span className="font-semibold tabular-nums">
+                  {formatNumber(overview?.installationRecords.total ?? 0, language)}
+                </span>
               </div>
-              <div>
-                <Typography.Text strong>{t('analytics.simCardsTotal')}: </Typography.Text>
-                <Typography.Text>{overview?.simCards.total ?? 0}</Typography.Text>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-fg-secondary">
+                  {t('analytics.simCardsTotal')}:
+                </span>
+                <span className="font-semibold tabular-nums">
+                  {formatNumber(overview?.simCards.total ?? 0, language)}
+                </span>
               </div>
-              <div>
-                <Typography.Text strong>{t('layout.sidebar.meters')}: </Typography.Text>
-                <Typography.Text>{overview?.metersTotal ?? 0}</Typography.Text>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-fg-secondary">
+                  {t('layout.sidebar.meters')}:
+                </span>
+                <span className="font-semibold tabular-nums">
+                  {formatNumber(overview?.metersTotal ?? 0, language)}
+                </span>
               </div>
-              <div className="mt-2">
-                <Typography.Text strong>{t('analytics.activationSpeed')}</Typography.Text>
-                <div className="grid grid-cols-2 gap-x-4 text-xs mt-1">
+              <div className="mt-3 border-t border-subtle pt-3">
+                <div className="mb-1.5 text-xs font-semibold text-fg-primary">
+                  {t('analytics.activationSpeed')}
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-fg-secondary">
                   <span>{t('analytics.sampleCount')}</span>
-                  <span>{overview?.activationKpi.count ?? 0}</span>
+                  <span className="text-right font-mono tabular-nums text-fg-primary">
+                    {formatNumber(overview?.activationKpi.count ?? 0, language)}
+                  </span>
                   <span>{t('analytics.average')}</span>
-                  <span>{overview?.activationKpi.avgSeconds?.toFixed(0) ?? '–'}</span>
+                  <span className="text-right font-mono tabular-nums text-fg-primary">
+                    {overview?.activationKpi.avgSeconds?.toFixed(0) ?? FALLBACK_DASH}
+                  </span>
                   <span>{t('analytics.median')}</span>
-                  <span>{overview?.activationKpi.p50Seconds?.toFixed(0) ?? '–'}</span>
+                  <span className="text-right font-mono tabular-nums text-fg-primary">
+                    {overview?.activationKpi.p50Seconds?.toFixed(0) ?? FALLBACK_DASH}
+                  </span>
                   <span>p90:</span>
-                  <span>{overview?.activationKpi.p90Seconds?.toFixed(0) ?? '–'}</span>
+                  <span className="text-right font-mono tabular-nums text-fg-primary">
+                    {overview?.activationKpi.p90Seconds?.toFixed(0) ?? FALLBACK_DASH}
+                  </span>
                 </div>
               </div>
             </div>
-          </Card>
+          </SectionCard>
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card
+          <SectionCard
             title={t('analytics.simByStatusTitle')}
             loading={simQuery.isLoading}
-            extra={
+            actions={
               <Button size="small" onClick={() => void handleDownloadCsv('sim-cards')}>
                 CSV
               </Button>
             }
           >
             <div className="space-y-2">
-              {sim?.byStatus &&
+              {sim?.byStatus ? (
                 Object.entries(sim.byStatus).map(([status, count]) => (
                   <div key={status} className="flex items-center gap-2 text-xs">
-                    <span className="w-28">{getSimCardStatusLabel(status as SimCardStatus, t)}</span>
-                    <div className="flex-1 h-3 bg-slate-100 rounded">
+                    <span className="w-28 truncate text-fg-secondary">
+                      {getSimCardStatusLabel(status as SimCardStatus, t)}
+                    </span>
+                    <div className="h-3 flex-1 overflow-hidden rounded border border-subtle bg-surface-sunken">
                       <div
-                        className="h-full bg-emerald-500 rounded"
+                        className="h-full rounded bg-status-success-fg"
                         style={{
-                          width: `${Math.min(
-                            100,
-                            (count /
-                              Math.max(
-                                1,
-                                ...Object.values(sim.byStatus ?? {}).map((c) => c ?? 0),
-                              )) *
-                              100,
-                          )}%`,
+                          width: `${Math.min(100, ((count ?? 0) / maxSimCount) * 100)}%`,
                         }}
                       />
                     </div>
-                    <span className="w-8 text-right">{count}</span>
+                    <span className="w-8 text-right font-mono tabular-nums text-fg-primary">
+                      {formatNumber(count ?? 0, language)}
+                    </span>
                   </div>
-                ))}
-              {!sim?.byStatus && (
-                <Typography.Text type="secondary" className="text-xs">
-                  {t('common.states.noData')}
-                </Typography.Text>
+                ))
+              ) : (
+                <span className="text-xs text-fg-muted">{t('common.states.noData')}</span>
               )}
             </div>
-          </Card>
+          </SectionCard>
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card
+          <SectionCard
             title={t('analytics.recordsFunnelTitle')}
             loading={recordsQuery.isLoading}
-            extra={
+            actions={
               <Button
                 size="small"
                 onClick={() => void handleDownloadCsv('installation-records')}
@@ -202,52 +231,43 @@ export default function AnalyticsPage() {
             }
           >
             <div className="space-y-2">
-              {records?.funnel &&
+              {records?.funnel ? (
                 Object.entries(records.funnel).map(([status, count]) => (
                   <div key={status} className="flex items-center gap-2 text-xs">
-                    <span className="w-32">
+                    <span className="w-32 truncate text-fg-secondary">
                       {statusLabelKey[status] ? t(statusLabelKey[status]) : status}
                     </span>
-                    <div className="flex-1 h-3 bg-slate-100 rounded">
+                    <div className="h-3 flex-1 overflow-hidden rounded border border-subtle bg-surface-sunken">
                       <div
-                        className="h-full bg-sky-500 rounded"
+                        className="h-full rounded bg-status-info-fg"
                         style={{
-                          width: `${Math.min(
-                            100,
-                            (count /
-                              Math.max(
-                                1,
-                                ...Object.values(records.funnel ?? {}).map(
-                                  (c) => c ?? 0,
-                                ),
-                              )) *
-                              100,
-                          )}%`,
+                          width: `${Math.min(100, ((count ?? 0) / maxFunnelCount) * 100)}%`,
                         }}
                       />
                     </div>
-                    <span className="w-8 text-right">{count}</span>
+                    <span className="w-8 text-right font-mono tabular-nums text-fg-primary">
+                      {formatNumber(count ?? 0, language)}
+                    </span>
                   </div>
-                ))}
-              {!records?.funnel && (
-                <Typography.Text type="secondary" className="text-xs">
-                  {t('common.states.noData')}
-                </Typography.Text>
+                ))
+              ) : (
+                <span className="text-xs text-fg-muted">{t('common.states.noData')}</span>
               )}
             </div>
-          </Card>
+          </SectionCard>
         </Col>
       </Row>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
-          <Card title={t('analytics.simByDistributionTitle')} loading={simQuery.isLoading}>
+          <SectionCard title={t('analytics.simByDistributionTitle')} loading={simQuery.isLoading}>
             <div className="-mx-4 overflow-x-auto px-4">
               <Table
                 dataSource={sim?.byDistribution ?? []}
                 rowKey="distributionId"
                 size="small"
                 pagination={false}
+                locale={{ emptyText: <EmptyNotice /> }}
                 scroll={{ x: 'max-content' }}
                 columns={[
                   { title: t('analytics.distributionColumn'), dataIndex: 'distributionName' },
@@ -255,16 +275,17 @@ export default function AnalyticsPage() {
                 ]}
               />
             </div>
-          </Card>
+          </SectionCard>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title={t('analytics.simByBranchTitle')} loading={simQuery.isLoading}>
+          <SectionCard title={t('analytics.simByBranchTitle')} loading={simQuery.isLoading}>
             <div className="-mx-4 overflow-x-auto px-4">
               <Table
                 dataSource={sim?.byBranch ?? []}
                 rowKey="branchId"
                 size="small"
                 pagination={false}
+                locale={{ emptyText: <EmptyNotice /> }}
                 scroll={{ x: 'max-content' }}
                 columns={[
                   { title: t('analytics.distributionColumn'), dataIndex: 'distributionName' },
@@ -273,19 +294,20 @@ export default function AnalyticsPage() {
                 ]}
               />
             </div>
-          </Card>
+          </SectionCard>
         </Col>
       </Row>
 
       <Row gutter={[16, 16]}>
         <Col xs={24}>
-          <Card title={t('analytics.simByOperatorTitle')} loading={simQuery.isLoading}>
+          <SectionCard title={t('analytics.simByOperatorTitle')} loading={simQuery.isLoading}>
             <div className="-mx-4 overflow-x-auto px-4">
               <Table
                 dataSource={sim?.byOperator ?? []}
                 rowKey="userId"
                 size="small"
                 pagination={false}
+                locale={{ emptyText: <EmptyNotice /> }}
                 scroll={{ x: 'max-content' }}
                 columns={[
                   {
@@ -299,57 +321,48 @@ export default function AnalyticsPage() {
                 ]}
               />
             </div>
-          </Card>
+          </SectionCard>
         </Col>
       </Row>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
-          <Card title={t('analytics.timelineTitle')} loading={recordsQuery.isLoading}>
-            <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
-              {records?.timeline.map(({ date, count }) => (
-                <div key={date} className="flex items-center gap-2">
-                  <Typography.Text className="w-24 text-xs">
-                    {new Date(date).toLocaleDateString(dateLocale, {
-                      day: '2-digit',
-                      month: '2-digit',
-                    })}
-                  </Typography.Text>
-                  <div className="flex-1 h-4 bg-slate-100 rounded overflow-hidden">
-                    <div
-                      className="h-full bg-indigo-500 rounded"
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          (count /
-                            Math.max(
-                              1,
-                              ...records.timeline.map((c) => c.count ?? 0),
-                            )) *
-                            100,
-                        )}%`,
-                      }}
-                    />
+          <SectionCard title={t('analytics.timelineTitle')} loading={recordsQuery.isLoading}>
+            {records?.timeline?.length ? (
+              <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto pr-1">
+                {records.timeline.map(({ date, count }) => (
+                  <div key={date} className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 font-mono text-xs text-fg-secondary tabular-nums">
+                      {new Date(date).toLocaleDateString(dateLocale, {
+                        day: '2-digit',
+                        month: '2-digit',
+                      })}
+                    </span>
+                    <div className="h-4 flex-1 overflow-hidden rounded border border-subtle bg-surface-sunken">
+                      <div
+                        className="h-full rounded bg-accent"
+                        style={{
+                          width: `${Math.min(100, ((count ?? 0) / maxTimelineCount) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="w-8 shrink-0 text-right font-mono text-xs text-fg-primary tabular-nums">
+                      {formatNumber(count ?? 0, language)}
+                    </span>
                   </div>
-                  <Typography.Text className="w-8 text-xs text-right">
-                    {count}
-                  </Typography.Text>
-                </div>
-              ))}
-              {!records?.timeline?.length && (
-                <Typography.Text type="secondary" className="text-xs">
-                  {t('analytics.noDataForRange')}
-                </Typography.Text>
-              )}
-            </div>
-          </Card>
+                ))}
+              </div>
+            ) : (
+              <span className="text-xs text-fg-muted">{t('analytics.noDataForRange')}</span>
+            )}
+          </SectionCard>
         </Col>
 
         <Col xs={24} lg={12}>
-          <Card
+          <SectionCard
             title={t('analytics.userActivityTitle')}
             loading={usersQuery.isLoading}
-            extra={
+            actions={
               <Button size="small" onClick={() => void handleDownloadCsv('users')}>
                 CSV
               </Button>
@@ -361,6 +374,7 @@ export default function AnalyticsPage() {
                 rowKey="userId"
                 size="small"
                 pagination={false}
+                locale={{ emptyText: <EmptyNotice /> }}
                 scroll={{ x: 'max-content' }}
                 columns={[
                   {
@@ -371,17 +385,21 @@ export default function AnalyticsPage() {
                   {
                     title: t('common.labels.role'),
                     dataIndex: 'role',
-                    render: (r: string) => <Tag>{r}</Tag>,
+                    render: (r: string) => (
+                      <StatusBadge
+                        tone={getUserRoleTone(r)}
+                        label={getUserRoleLabel(r as UserRole, t)}
+                      />
+                    ),
                   },
                   { title: t('analytics.createdRecordsColumn'), dataIndex: 'created' },
                   { title: t('analytics.approvedRecordsColumn'), dataIndex: 'approved' },
                 ]}
               />
             </div>
-          </Card>
+          </SectionCard>
         </Col>
       </Row>
-    </div>
+    </PageShell>
   );
 }
-

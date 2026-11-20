@@ -120,7 +120,7 @@ export function ShipmentDeleteButton(props: ShipmentDeleteButtonProps) {
               }
             />
             <div>
-              <Typography.Text className="text-xs text-slate-500">
+              <Typography.Text className="text-xs text-fg-secondary">
                 {t('shipments.deleteButton.typeToConfirm')}{' '}
                 <Typography.Text code strong>
                   {CONFIRM_WORD}

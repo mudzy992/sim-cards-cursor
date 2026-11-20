@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
-  Card,
   DatePicker,
   Form,
   Input,
@@ -11,22 +10,17 @@ import {
   Skeleton,
   Space,
   Tabs,
-  Tag,
-  Typography,
   message,
 } from 'antd';
-import { ArrowLeftOutlined, PrinterOutlined, SaveOutlined } from '@ant-design/icons';
+import { PrinterOutlined, SaveOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { shipmentsApi } from '@/api/shipments.api';
 import { ShipmentImportPanel } from './import/ShipmentImportPanel';
 import { useTranslation } from '@/i18n';
+import { PageHeader, PageShell, SectionCard, StatusBadge } from '@/components/ui';
+import { ROUTES } from '@/config/routes';
 
-/**
- * Izmjena POSTOJEĆE isporuke:
- *  - tab "Podaci": izmjena meta podataka (naziv, dobavljač, datum, napomena)
- *  - tab "Import kartica": dodavanje novih kartica u istu isporuku (isti review tok)
- */
 type FormValues = {
   name: string;
   provider: string;
@@ -86,7 +80,7 @@ export default function ShipmentEditPage() {
         status="404"
         title={t('shipments.edit.notFound')}
         extra={
-          <Button type="primary" onClick={() => navigate('/shipments')}>
+          <Button type="primary" onClick={() => navigate(ROUTES.shipments)}>
             {t('shipments.edit.backToShipments')}
           </Button>
         }
@@ -95,39 +89,39 @@ export default function ShipmentEditPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1200px]">
+    <PageShell className="mx-auto max-w-[1200px]">
       {contextHolder}
 
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/shipments')}>
-          {t('common.actions.back')}
-        </Button>
-        <div className="min-w-0">
-          <Typography.Title level={3} className="!mb-0 truncate">
-            {t('shipments.edit.title', { name: shipment?.name ?? '…' })}
-          </Typography.Title>
-          {shipment ? (
-            <Space size={8} className="mt-1" wrap>
-              <Tag color="geekblue">{shipment.provider}</Tag>
-              <Tag>{t('shipments.edit.cardsCount', { count: shipment._count?.simCards ?? 0 })}</Tag>
+      <PageHeader
+        title={t('shipments.edit.title', { name: shipment?.name ?? '…' })}
+        backTo={ROUTES.shipments}
+        badge={
+          shipment ? (
+            <Space size={8} wrap>
+              <StatusBadge tone="accent" label={shipment.provider} />
+              <StatusBadge
+                tone="neutral"
+                label={t('shipments.edit.cardsCount', { count: shipment._count?.simCards ?? 0 })}
+              />
             </Space>
-          ) : null}
-        </div>
-        {shipment ? (
-          <Button
-            className="ms-auto"
-            icon={<PrinterOutlined />}
-            onClick={() => navigate(`/shipments/${shipment.id}/print`)}
-          >
-            {t('shipments.details.printLabels')}
-          </Button>
-        ) : null}
-      </div>
+          ) : undefined
+        }
+        actions={
+          shipment ? (
+            <Button
+              icon={<PrinterOutlined />}
+              onClick={() => navigate(ROUTES.shipmentPrint(shipment.id))}
+            >
+              {t('shipments.details.printLabels')}
+            </Button>
+          ) : undefined
+        }
+      />
 
       {shipmentQuery.isLoading || !shipment ? (
-        <Card className="shadow-sm">
+        <SectionCard>
           <Skeleton active paragraph={{ rows: 6 }} />
-        </Card>
+        </SectionCard>
       ) : (
         <Tabs
           defaultActiveKey="meta"
@@ -136,7 +130,7 @@ export default function ShipmentEditPage() {
               key: 'meta',
               label: t('shipments.edit.metaTabLabel'),
               children: (
-                <Card className="shadow-sm">
+                <SectionCard>
                   <Form<FormValues>
                     form={form}
                     layout="vertical"
@@ -156,7 +150,9 @@ export default function ShipmentEditPage() {
                       <Form.Item
                         name="provider"
                         label={t('shipments.details.provider')}
-                        rules={[{ required: true, message: t('shipments.edit.providerRequired') }]}
+                        rules={[
+                          { required: true, message: t('shipments.edit.providerRequired') },
+                        ]}
                       >
                         <Input />
                       </Form.Item>
@@ -182,10 +178,12 @@ export default function ShipmentEditPage() {
                       >
                         {t('shipments.edit.saveChanges')}
                       </Button>
-                      <Button onClick={() => navigate('/shipments')}>{t('common.actions.cancel')}</Button>
+                      <Button onClick={() => navigate(ROUTES.shipments)}>
+                        {t('common.actions.cancel')}
+                      </Button>
                     </Space>
                   </Form>
-                </Card>
+                </SectionCard>
               ),
             },
             {
@@ -196,7 +194,9 @@ export default function ShipmentEditPage() {
                   shipmentId={shipment.id}
                   shipmentName={shipment.name}
                   onImported={() => {
-                    void queryClient.invalidateQueries({ queryKey: ['shipments', 'details', id] });
+                    void queryClient.invalidateQueries({
+                      queryKey: ['shipments', 'details', id],
+                    });
                   }}
                 />
               ),
@@ -204,6 +204,6 @@ export default function ShipmentEditPage() {
           ]}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

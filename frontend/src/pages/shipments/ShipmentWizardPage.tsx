@@ -234,7 +234,7 @@ export default function ShipmentWizardPage() {
         <Card className="shadow-sm">
           <Result
             status="success"
-            icon={<CheckOutlined className="text-emerald-600" />}
+            icon={<CheckOutlined className="text-status-success-fg" />}
             title={t('shipments.wizard.readyTitle')}
             subTitle={
               importedCount !== null

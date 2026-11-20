@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Alert, Button, Card, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Space, Table, Tooltip } from 'antd';
 import {
-  CheckCircleTwoTone,
-  CloseCircleTwoTone,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
   DownloadOutlined,
   PrinterOutlined,
 } from '@ant-design/icons';
@@ -10,14 +10,10 @@ import type { ColumnsType } from 'antd/es/table';
 import type { ImportPreviewRow, ShipmentImportPreview } from '@/types/import.types';
 import { exportIssuesToCsv, printIssuesReport } from './import-report.utils';
 import { useTranslation } from '@/i18n';
+import { StatusBadge } from '@/components/ui';
+import { FALLBACK_DASH } from '@/constants/ui';
+import { formatDate, formatNumber, getActiveIntlLocale } from '@/utils/formatters';
 
-/**
- * Review importa: pregled svih redova sa greškama/upozorenjima,
- * čekiranje redova koji idu u isporuku, te izvještaji (CSV / print).
- *
- * Selekcija je kontrolisana izvana (parent drži listu rowNumber-a),
- * kako bi "Uvezi" dugme moglo biti u wizard footeru.
- */
 export interface ImportReviewTableProps {
   preview: ShipmentImportPreview;
   shipmentName: string;
@@ -30,7 +26,7 @@ type FilterKey = 'all' | 'valid' | 'errors' | 'dupFile' | 'dupDb';
 export function ImportReviewTable(props: ImportReviewTableProps) {
   const { preview, shipmentName, selectedRowNumbers, onChangeSelection } = props;
   const { t, language } = useTranslation();
-  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
+  const dateLocale = getActiveIntlLocale(language);
   const [filter, setFilter] = useState<FilterKey>('all');
 
   const rows = preview.previewRows;
@@ -69,7 +65,7 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
       dataIndex: 'rowNumber',
       width: 60,
       align: 'right',
-      render: (n: number) => <span className="text-xs text-slate-400">{n}</span>,
+      render: (n: number) => <span className="font-mono text-xs text-fg-muted">{n}</span>,
     },
     {
       title: t('common.labels.status'),
@@ -79,11 +75,17 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
       render: (_, row) =>
         row.importable ? (
           <Tooltip title={t('shipments.importReview.rowValid')}>
-            <CheckCircleTwoTone twoToneColor="#16a34a" />
+            <CheckCircleOutlined
+              className="text-base text-status-success-fg"
+              aria-label={t('shipments.importReview.rowValid')}
+            />
           </Tooltip>
         ) : (
           <Tooltip title={t('shipments.importReview.rowInvalid')}>
-            <CloseCircleTwoTone twoToneColor="#dc2626" />
+            <CloseCircleOutlined
+              className="text-base text-status-danger-fg"
+              aria-label={t('shipments.importReview.rowInvalid')}
+            />
           </Tooltip>
         ),
     },
@@ -91,28 +93,36 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
       title: 'ICCID',
       key: 'iccid',
       render: (_, row) => (
-        <span className={`font-mono text-xs ${row.importable ? '' : 'text-red-600'}`}>
-          {row.data.iccid ?? '—'}
+        <span className={`font-mono text-xs ${row.importable ? 'text-fg-primary' : 'text-status-danger-fg'}`}>
+          {row.data.iccid ?? FALLBACK_DASH}
         </span>
       ),
     },
     {
       title: t('shipments.importReview.internalIp'),
       key: 'ip',
-      render: (_, row) => <span className="font-mono text-xs">{row.data.ipAddress ?? '—'}</span>,
+      render: (_, row) => (
+        <span className="font-mono text-xs text-fg-primary">
+          {row.data.ipAddress ?? FALLBACK_DASH}
+        </span>
+      ),
     },
     {
       title: t('simCards.details.publicIp'),
       key: 'publicIp',
       render: (_, row) => (
-        <span className="font-mono text-xs text-slate-500">{row.data.publicIpAddress ?? '—'}</span>
+        <span className="font-mono text-xs text-fg-secondary">
+          {row.data.publicIpAddress ?? FALLBACK_DASH}
+        </span>
       ),
     },
     {
       title: t('common.labels.phone'),
       key: 'phoneNumber',
       render: (_, row) => (
-        <span className="font-mono text-xs text-slate-500">{row.data.phoneNumber ?? '—'}</span>
+        <span className="font-mono text-xs text-fg-secondary">
+          {row.data.phoneNumber ?? FALLBACK_DASH}
+        </span>
       ),
     },
     {
@@ -121,28 +131,36 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
       width: '38%',
       render: (_, row) =>
         row.issues.length === 0 ? (
-          <span className="text-xs text-slate-400">—</span>
+          <span className="text-xs text-fg-muted">{FALLBACK_DASH}</span>
         ) : (
           <div className="space-y-1">
             {row.issues.map((issue, i) => (
-              <div key={i} className="text-xs leading-snug">
-                <Tag
-                  color={issue.severity === 'error' ? 'red' : 'gold'}
-                  className="!me-1 !text-[10px]"
+              <div key={i} className="flex flex-wrap items-baseline gap-1.5 text-xs leading-snug">
+                <StatusBadge
+                  tone={issue.severity === 'error' ? 'danger' : 'warning'}
+                  label={
+                    issue.severity === 'error'
+                      ? t('shipments.importReview.error')
+                      : t('shipments.importReview.warning')
+                  }
+                />
+                <span
+                  className={
+                    issue.severity === 'error'
+                      ? 'text-status-danger-fg'
+                      : 'text-status-warning-fg'
+                  }
                 >
-                  {issue.severity === 'error' ? t('shipments.importReview.error') : t('shipments.importReview.warning')}
-                </Tag>
-                <span className={issue.severity === 'error' ? 'text-red-700' : 'text-amber-700'}>
                   {issue.message}
                 </span>
               </div>
             ))}
             {row.duplicateOf ? (
-              <div className="mt-1 rounded bg-red-50 px-2 py-1 text-[11px] text-red-800">
-                {t('shipments.importReview.originalShipment')} <strong>{row.duplicateOf.shipmentName}</strong> · {t('shipments.details.receivedDate').toLowerCase()}{' '}
-                <strong>
-                  {new Date(row.duplicateOf.receivedDate).toLocaleDateString(dateLocale)}
-                </strong>
+              <div className="mt-1 rounded border border-status-danger-border bg-status-danger-bg px-2 py-1 text-[11px] text-status-danger-fg">
+                {t('shipments.importReview.originalShipment')}{' '}
+                <strong>{row.duplicateOf.shipmentName}</strong> ·{' '}
+                {t('shipments.details.receivedDate').toLowerCase()}{' '}
+                <strong>{formatDate(row.duplicateOf.receivedDate, language)}</strong>
               </div>
             ) : null}
           </div>
@@ -153,20 +171,43 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
   const filterButtons: Array<{ key: FilterKey; label: string; count: number; danger?: boolean }> = [
     { key: 'all', label: t('shipments.importReview.filterAll'), count: rows.length },
     { key: 'valid', label: t('shipments.importReview.filterValid'), count: importableCount },
-    { key: 'errors', label: t('shipments.importReview.filterErrors'), count: errorRows.length, danger: true },
+    {
+      key: 'errors',
+      label: t('shipments.importReview.filterErrors'),
+      count: errorRows.length,
+      danger: true,
+    },
     { key: 'dupFile', label: t('shipments.importReview.filterDupFile'), count: dupFileRows.length },
     { key: 'dupDb', label: t('shipments.importReview.filterDupDb'), count: dupDbRows.length },
   ];
 
   return (
     <div className="space-y-4">
-      {/* sažetak */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <SummaryBox label={t('shipments.importReview.summaryTotal')} value={preview.summary.totalRows} />
-        <SummaryBox label={t('shipments.importReview.summaryValid')} value={preview.summary.validRows} tone="ok" />
-        <SummaryBox label={t('shipments.importReview.summaryInvalid')} value={preview.summary.invalidRows} tone="err" />
-        <SummaryBox label={t('shipments.importReview.summaryDupFile')} value={preview.summary.duplicatesInFile} tone="warn" />
-        <SummaryBox label={t('shipments.importReview.summaryDupDb')} value={preview.summary.duplicatesInDatabase} tone="warn" />
+        <SummaryBox
+          label={t('shipments.importReview.summaryTotal')}
+          value={formatNumber(preview.summary.totalRows, language)}
+        />
+        <SummaryBox
+          label={t('shipments.importReview.summaryValid')}
+          value={formatNumber(preview.summary.validRows, language)}
+          tone="ok"
+        />
+        <SummaryBox
+          label={t('shipments.importReview.summaryInvalid')}
+          value={formatNumber(preview.summary.invalidRows, language)}
+          tone="err"
+        />
+        <SummaryBox
+          label={t('shipments.importReview.summaryDupFile')}
+          value={formatNumber(preview.summary.duplicatesInFile, language)}
+          tone="warn"
+        />
+        <SummaryBox
+          label={t('shipments.importReview.summaryDupDb')}
+          value={formatNumber(preview.summary.duplicatesInDatabase, language)}
+          tone="warn"
+        />
       </div>
 
       {errorRows.length > 0 ? (
@@ -188,7 +229,12 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
                 size="small"
                 icon={<PrinterOutlined />}
                 onClick={() =>
-                  printIssuesReport(errorRows, { fileName: preview.fileName, shipmentName }, t, dateLocale)
+                  printIssuesReport(
+                    errorRows,
+                    { fileName: preview.fileName, shipmentName },
+                    t,
+                    dateLocale,
+                  )
                 }
               >
                 {t('common.actions.print')}
@@ -200,8 +246,7 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
         <Alert type="success" showIcon message={t('shipments.importReview.allRowsValid')} />
       )}
 
-      {/* filteri + masovna selekcija */}
-      <Card size="small" className="shadow-sm">
+      <Card size="small" className="border-subtle bg-surface shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           {filterButtons.map((btn) => (
             <Button
@@ -215,12 +260,16 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
             </Button>
           ))}
           <div className="ms-auto flex items-center gap-2">
-            <Typography.Text className="text-xs text-slate-500">
-              {t('shipments.importReview.selectedLabel')} <strong>{selectedRowNumbers.length}</strong> / {importableCount}
-            </Typography.Text>
+            <span className="text-xs text-fg-secondary">
+              {t('shipments.importReview.selectedLabel')}{' '}
+              <strong className="text-fg-primary">{selectedRowNumbers.length}</strong> /{' '}
+              {importableCount}
+            </span>
             <Button
               size="small"
-              onClick={() => onChangeSelection(rows.filter((r) => r.importable).map((r) => r.rowNumber))}
+              onClick={() =>
+                onChangeSelection(rows.filter((r) => r.importable).map((r) => r.rowNumber))
+              }
             >
               {t('shipments.importReview.selectAllValid')}
             </Button>
@@ -238,7 +287,7 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
         columns={columns}
         scroll={{ y: 420 }}
         pagination={{ pageSize: 50, showSizeChanger: true, pageSizeOptions: ['25', '50', '100'] }}
-        rowClassName={(row) => (row.importable ? '' : 'bg-red-50/60')}
+        rowClassName={(row) => (row.importable ? '' : 'bg-status-danger-bg')}
         rowSelection={{
           selectedRowKeys: visibleRows
             .filter((r) => selectedSet.has(r.rowNumber))
@@ -268,19 +317,19 @@ export function ImportReviewTable(props: ImportReviewTableProps) {
   );
 }
 
-function SummaryBox(props: { label: string; value: number; tone?: 'ok' | 'err' | 'warn' }) {
+function SummaryBox(props: { label: string; value: string; tone?: 'ok' | 'err' | 'warn' }) {
   const tone =
     props.tone === 'ok'
-      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+      ? 'border-status-success-border bg-status-success-bg text-status-success-fg'
       : props.tone === 'err'
-        ? 'bg-red-50 text-red-700 ring-red-200'
+        ? 'border-status-danger-border bg-status-danger-bg text-status-danger-fg'
         : props.tone === 'warn'
-          ? 'bg-amber-50 text-amber-700 ring-amber-200'
-          : 'bg-slate-50 text-slate-700 ring-slate-200';
+          ? 'border-status-warning-border bg-status-warning-bg text-status-warning-fg'
+          : 'border-subtle bg-surface-sunken text-fg-primary';
   return (
-    <div className={`rounded-md px-3 py-2 ring-1 ${tone}`}>
-      <div className="text-[11px] uppercase tracking-wide opacity-70">{props.label}</div>
-      <div className="text-xl font-semibold">{props.value.toLocaleString()}</div>
+    <div className={`rounded-md border px-3 py-2 ${tone}`}>
+      <div className="text-[11px] uppercase tracking-wide opacity-85">{props.label}</div>
+      <div className="text-xl font-semibold tabular-nums">{props.value}</div>
     </div>
   );
 }

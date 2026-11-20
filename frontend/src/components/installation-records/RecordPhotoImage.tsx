@@ -53,7 +53,7 @@ export function RecordPhotoImage({
   if (error) {
     return (
       <div
-        className="flex items-center justify-center rounded-lg bg-slate-800/70 text-slate-400 text-xs border border-slate-700"
+        className="flex items-center justify-center rounded-lg border border-default bg-surface-sunken text-xs text-fg-muted"
         style={{ width, height }}
       >
         {t('common.states.error')}
@@ -64,7 +64,7 @@ export function RecordPhotoImage({
   if (!objectUrl) {
     return (
       <div
-        className="flex items-center justify-center rounded-lg bg-slate-800/70 text-slate-400 text-xs border border-slate-700"
+        className="flex items-center justify-center rounded-lg border border-default bg-surface-sunken text-xs text-fg-muted"
         style={{ width, height }}
       >
         …

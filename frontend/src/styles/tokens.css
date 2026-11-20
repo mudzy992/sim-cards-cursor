@@ -52,18 +52,6 @@
   --status-neutral-bg: #f1f5f9;
   --status-neutral-fg: #1e293b;
   --status-neutral-border: #475569;
-
-  /* Privremeni bridge za postojeće slate klase dok se ne migriraju u Fazi 4 */
-  --tw-slate-50: #f8fafc;
-  --tw-slate-100: #f1f5f9;
-  --tw-slate-200: #cbd5e1;
-  --tw-slate-300: #94a3b8;
-  --tw-slate-400: #475569;
-  --tw-slate-500: #334155;
-  --tw-slate-600: #1e293b;
-  --tw-slate-700: #1e293b;
-  --tw-slate-800: #0f172a;
-  --tw-slate-900: #09090b;
 }
 
 :root[data-theme='dark'] {
@@ -119,18 +107,6 @@
   --status-neutral-bg: #1c1d22;
   --status-neutral-fg: #e2e8f0;
   --status-neutral-border: #818596;
-
-  /* Privremeni bridge za postojeće slate klase dok se ne migriraju u Fazi 4 */
-  --tw-slate-50: #09090b;
-  --tw-slate-100: #111114;
-  --tw-slate-200: #1e1f24;
-  --tw-slate-300: #2b2c33;
-  --tw-slate-400: #9a9ba5;
-  --tw-slate-500: #c2c6d4;
-  --tw-slate-600: #d1d2d8;
-  --tw-slate-700: #e2e8f0;
-  --tw-slate-800: #f1f5f9;
-  --tw-slate-900: #f8fafc;
 }
 
 .print-preview-scope {

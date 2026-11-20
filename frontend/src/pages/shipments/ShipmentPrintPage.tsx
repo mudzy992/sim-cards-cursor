@@ -17,17 +17,18 @@ import {
   Slider,
   Space,
   Spin,
-  Tag,
   Tooltip,
-  Typography,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   CompressOutlined,
   InfoCircleOutlined,
   PrinterOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
+import { PageHeader, PageShell, SectionCard, StatusBadge } from '@/components/ui';
+import { ROUTES } from '@/config/routes';
+import { FALLBACK_DASH } from '@/constants/ui';
+import { formatDate, formatNumber } from '@/utils/formatters';
 import { shipmentsApi } from '@/api/shipments.api';
 import {
   A4_WIDTH_MM,
@@ -293,7 +294,7 @@ export default function ShipmentPrintPage() {
         status="404"
         title={t('shipments.edit.notFound')}
         extra={
-          <Button type="primary" onClick={() => navigate('/shipments')}>
+          <Button type="primary" onClick={() => navigate(ROUTES.shipments)}>
             {t('shipments.edit.backToShipments')}
           </Button>
         }
@@ -302,26 +303,26 @@ export default function ShipmentPrintPage() {
   }
 
   return (
-    <div className="print-preview-scope mx-auto max-w-[1500px]">
-      {/* zaglavlje */}
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
-          {t('common.actions.back')}
-        </Button>
-        <div className="min-w-0">
-          <Typography.Title level={3} className="!mb-0 truncate">
-            {t('shipments.printPage.headerTitle', { name: shipment?.name ?? '…' })}
-          </Typography.Title>
-          {shipment ? (
-            <Space size={8} className="mt-1" wrap>
-              <Tag color="geekblue">{shipment.provider}</Tag>
-              <Tag>{new Date(shipment.receivedDate).toLocaleDateString(dateLocale)}</Tag>
-              <Tag color="default">{t('shipments.edit.cardsCount', { count: totalCards })}</Tag>
-              {testSheetOnly ? <Tag color="orange">{t('shipments.printPage.testSheetTag')}</Tag> : null}
+    <PageShell className="mx-auto max-w-[1500px]">
+      <PageHeader
+        title={t('shipments.printPage.headerTitle', { name: shipment?.name ?? '…' })}
+        backTo={id ? ROUTES.shipmentDetail(id) : ROUTES.shipments}
+        badge={
+          shipment ? (
+            <Space size={8} wrap>
+              <StatusBadge tone="accent" label={shipment.provider} />
+              <StatusBadge tone="neutral" label={formatDate(shipment.receivedDate, language)} />
+              <StatusBadge
+                tone="neutral"
+                label={t('shipments.edit.cardsCount', { count: totalCards })}
+              />
+              {testSheetOnly ? (
+                <StatusBadge tone="warning" label={t('shipments.printPage.testSheetTag')} />
+              ) : null}
             </Space>
-          ) : null}
-        </div>
-        <div className="ms-auto">
+          ) : undefined
+        }
+        actions={
           <Tooltip title={!canPrint ? t('shipments.printPage.cannotPrintTooltip') : undefined}>
             <Button
               type="primary"
@@ -333,14 +334,14 @@ export default function ShipmentPrintPage() {
               {t('shipments.printPage.preparePrint')}
             </Button>
           </Tooltip>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[440px_minmax(0,1fr)]">
         {/* ------------------------------- lijevi panel ------------------------------- */}
         <div className="print-settings-scroll space-y-4 self-start xl:sticky xl:top-4 xl:max-h-[calc(100vh-110px)] xl:overflow-y-auto xl:pe-1">
           {/* format */}
-          <Card size="small" title={t('shipments.printPage.step1Title')} className="shadow-sm">
+          <SectionCard size="small" title={t('shipments.printPage.step1Title')}>
             <div className="grid grid-cols-2 gap-3">
               {LABEL_FORMAT_PRESETS.map((preset) => {
                 const active = preset.id === formatId;
@@ -353,27 +354,27 @@ export default function ShipmentPrintPage() {
                     className={[
                       'rounded-lg border p-3 text-left transition-all',
                       active
-                        ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-600/30'
-                        : 'border-slate-200 bg-white hover:border-slate-400',
+                        ? 'border-accent bg-accent-soft ring-2 ring-accent'
+                        : 'border-subtle bg-surface hover:border-strong',
                     ].join(' ')}
                   >
                     <span
-                      className="mb-2 block rounded border border-dashed border-slate-400 bg-slate-50"
+                      className="mb-2 block rounded border border-dashed border-default bg-surface-sunken"
                       style={{
                         width: '100%',
                         paddingBottom: `${(preset.labelHeightMm / preset.labelWidthMm) * 100}%`,
                         height: 0,
                       }}
                     />
-                    <span className="block text-sm font-semibold text-slate-800">{preset.name}</span>
-                    <span className="block text-xs text-slate-500">
+                    <span className="block text-sm font-semibold text-fg-primary">{preset.name}</span>
+                    <span className="block text-xs text-fg-secondary">
                       {t('shipments.printPage.presetDescription', {
                         columns: preset.columns,
                         rows: preset.rows,
                         count: preset.columns * preset.rows,
                       })}
                     </span>
-                    <span className="mt-1 block text-xs font-medium text-blue-700">
+                    <span className="mt-1 block text-xs font-medium text-accent-fg">
                       {t('shipments.printPage.labelsPerSheet', { count: per })}
                     </span>
                   </button>
@@ -382,7 +383,7 @@ export default function ShipmentPrintPage() {
             </div>
 
             {/* brzi razmaci — uvijek vidljivi */}
-            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-subtle pt-3">
               <LabeledNumber
                 label={t('shipments.printPage.gapXLabel')}
                 value={layout.gapXMm}
@@ -400,19 +401,19 @@ export default function ShipmentPrintPage() {
                 onChange={(v) => updateLayout({ gapYMm: v })}
               />
             </div>
-            <div className={`mt-2 text-[11px] ${overflowed ? 'text-red-600' : 'text-slate-500'}`}>
+            <div className={`mt-2 text-[11px] ${overflowed ? 'text-status-danger-fg' : 'text-fg-muted'}`}>
               {overflowed
                 ? t('shipments.printPage.gridOverflowWarning')
                 : t('shipments.printPage.marginsSummary', { right: formatMm(rightMarginMm(layout)), bottom: formatMm(bottomMarginMm(layout)) })}
             </div>
-          </Card>
+          </SectionCard>
 
           {/* obuhvat + kopije */}
-          <Card size="small" title={t('shipments.printPage.step2Title')} className="shadow-sm">
+          <SectionCard size="small" title={t('shipments.printPage.step2Title')}>
             <div className="space-y-3">
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <div className="mb-1 text-xs text-slate-500">{t('shipments.printPage.cardsFromLabel')}</div>
+                  <div className="mb-1 text-xs text-fg-secondary">{t('shipments.printPage.cardsFromLabel')}</div>
                   <InputNumber
                     min={1}
                     max={Math.max(1, totalCards)}
@@ -423,12 +424,12 @@ export default function ShipmentPrintPage() {
                   />
                 </div>
                 <div className="flex-1">
-                  <div className="mb-1 text-xs text-slate-500">{t('shipments.printPage.toLabel')}</div>
+                  <div className="mb-1 text-xs text-fg-secondary">{t('shipments.printPage.toLabel')}</div>
                   <InputNumber
                     min={effectiveFrom}
                     max={Math.max(1, totalCards)}
                     value={rangeTo === RANGE_TO_END ? null : effectiveTo}
-                    placeholder={totalCards > 0 ? t('shipments.printPage.allCount', { count: totalCards }) : '—'}
+                    placeholder={totalCards > 0 ? t('shipments.printPage.allCount', { count: totalCards }) : FALLBACK_DASH}
                     onChange={(v) => setRangeTo(typeof v === 'number' ? v : RANGE_TO_END)}
                     className="w-full"
                     disabled={totalCards === 0}
@@ -449,7 +450,7 @@ export default function ShipmentPrintPage() {
 
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <div className="mb-1 text-xs text-slate-500">{t('shipments.printPage.copiesPerCardLabel')}</div>
+                  <div className="mb-1 text-xs text-fg-secondary">{t('shipments.printPage.copiesPerCardLabel')}</div>
                   <InputNumber
                     min={1}
                     max={10}
@@ -459,7 +460,7 @@ export default function ShipmentPrintPage() {
                   />
                 </div>
                 <div className="flex-1">
-                  <div className="mb-1 text-xs text-slate-500">{t('shipments.printPage.startPositionLabel')}</div>
+                  <div className="mb-1 text-xs text-fg-secondary">{t('shipments.printPage.startPositionLabel')}</div>
                   <InputNumber
                     min={1}
                     max={perSheet}
@@ -482,10 +483,10 @@ export default function ShipmentPrintPage() {
                 }
               />
             </div>
-          </Card>
+          </SectionCard>
 
           {/* sadržaj etikete */}
-          <Card size="small" title={t('shipments.printPage.step3Title')} className="shadow-sm">
+          <SectionCard size="small" title={t('shipments.printPage.step3Title')}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 <Checkbox checked disabled>
@@ -512,7 +513,7 @@ export default function ShipmentPrintPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">{t('shipments.printPage.iccidDisplayLabel')}</span>
+                <span className="text-xs text-fg-secondary">{t('shipments.printPage.iccidDisplayLabel')}</span>
                 <Segmented
                   size="small"
                   value={persisted.iccidGrouping}
@@ -527,7 +528,7 @@ export default function ShipmentPrintPage() {
               </div>
 
               <div>
-                <div className="mb-1 flex justify-between text-xs text-slate-500">
+                <div className="mb-1 flex justify-between text-xs text-fg-secondary">
                   <span>{t('shipments.printPage.fontSizeLabel')}</span>
                   <span>{persisted.fontScale}%</span>
                 </div>
@@ -539,12 +540,12 @@ export default function ShipmentPrintPage() {
                 />
               </div>
 
-              {/* živi primjer etikete */}
-              <div className="rounded-md bg-slate-50 p-3">
-                <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-400">{t('shipments.printPage.labelPreview')}</div>
+              {/* živi primjer etikete — ostaje A4 bijeli papir (.print-preview-scope) */}
+              <div className="print-preview-scope rounded-md border border-subtle bg-surface-sunken p-3">
+                <div className="mb-2 text-[11px] uppercase tracking-wide text-fg-muted">{t('shipments.printPage.labelPreview')}</div>
                 <div className="flex justify-center overflow-hidden">
                   <div
-                    className="relative rounded-[3px] bg-white shadow ring-1 ring-slate-300"
+                    className="lp-preview-sample relative rounded-[3px]"
                     style={{
                       width: `${layout.labelWidthMm * 2.4}mm`,
                       height: `${layout.labelHeightMm * 2.4}mm`,
@@ -567,10 +568,10 @@ export default function ShipmentPrintPage() {
                 </div>
               </div>
             </div>
-          </Card>
+          </SectionCard>
 
           {/* napredna geometrija */}
-          <Card size="small" className="shadow-sm">
+          <SectionCard size="small">
             <Collapse
               ghost
               items={[
@@ -590,7 +591,13 @@ export default function ShipmentPrintPage() {
                         <LabeledNumber label={t('shipments.printPage.gapYLabel')} value={layout.gapYMm} step={0.1} min={0} max={30} onChange={(v) => updateLayout({ gapYMm: v })} />
                       </div>
 
-                      <div className={`rounded-md p-2 text-xs ${overflowed ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                      <div
+                        className={`rounded-md border p-2 text-xs ${
+                          overflowed
+                            ? 'border-status-danger-border bg-status-danger-bg text-status-danger-fg'
+                            : 'border-status-success-border bg-status-success-bg text-status-success-fg'
+                        }`}
+                      >
                         {overflowed ? (
                           <>
                             {t('shipments.printPage.overflowMessage1')} <strong>{t('shipments.printPage.overflowMessage2')}</strong>: {t('shipments.printPage.rightMarginLabel')} {formatMm(rightMarginMm(layout))} mm,
@@ -613,7 +620,7 @@ export default function ShipmentPrintPage() {
                         </Button>
                       </Space>
 
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-fg-muted">
                         {t('shipments.printPage.settingsPersistedHint')}
                       </div>
                     </div>
@@ -621,10 +628,10 @@ export default function ShipmentPrintPage() {
                 },
               ]}
             />
-          </Card>
+          </SectionCard>
 
           {/* priprema i print */}
-          <Card size="small" title={t('shipments.printPage.step4Title')} className="shadow-sm">
+          <SectionCard size="small" title={t('shipments.printPage.step4Title')}>
             <div className="space-y-3">
               <Checkbox
                 checked={persisted.showOutlines}
@@ -637,9 +644,9 @@ export default function ShipmentPrintPage() {
               </Checkbox>
 
               <div className="grid grid-cols-2 gap-2">
-                <StatBox label={t('shipments.printPage.statCardsInRange')} value={cardsInRange.length} />
-                <StatBox label={t('shipments.printPage.statLabelsToPrint')} value={totalLabels} />
-                <StatBox label={t('shipments.printPage.statSheetsA4')} value={printSheets.length} suffix={testSheetOnly ? `/ ${sheets.length}` : undefined} />
+                <StatBox label={t('shipments.printPage.statCardsInRange')} value={formatNumber(cardsInRange.length, language)} />
+                <StatBox label={t('shipments.printPage.statLabelsToPrint')} value={formatNumber(totalLabels, language)} />
+                <StatBox label={t('shipments.printPage.statSheetsA4')} value={formatNumber(printSheets.length, language)} suffix={testSheetOnly ? `/ ${sheets.length}` : undefined} />
                 <StatBox label={t('shipments.printPage.statStartAtLabel')} value={`#${effectiveStartOffset + 1}`} />
               </div>
 
@@ -654,12 +661,12 @@ export default function ShipmentPrintPage() {
                 {testSheetOnly ? t('shipments.printPage.printTestSheet') : t('shipments.printPage.printNSheets', { count: printSheets.length })}
               </Button>
             </div>
-          </Card>
+          </SectionCard>
         </div>
 
         {/* -------------------------------- desni pregled ------------------------------- */}
         <div ref={previewContainerRef} className="min-w-0">
-          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg px-3 py-2 shadow-sm bg-slate-300">
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface-sunken px-3 py-2">
             <Segmented
               size="small"
               value={zoomMode}
@@ -669,9 +676,12 @@ export default function ShipmentPrintPage() {
                 { label: '100%', value: 'full' },
               ]}
             />
-            <Tag color="default" className="ms-auto">
-              {t('shipments.printPage.sheetsSummary', { sheets: sheets.length, labels: totalLabels, perSheet })}
-            </Tag>
+            <span className="ms-auto">
+              <StatusBadge
+                tone="neutral"
+                label={t('shipments.printPage.sheetsSummary', { sheets: sheets.length, labels: totalLabels, perSheet })}
+              />
+            </span>
           </div>
 
           {/* vidljivo upozorenje o aktivnoj početnoj poziciji (izbjegava zabunu 79/80) */}
@@ -696,11 +706,11 @@ export default function ShipmentPrintPage() {
           ) : null}
 
           {loading ? (
-            <Card className="flex min-h-[400px] items-center justify-center shadow-sm">
+            <Card className="flex min-h-[400px] items-center justify-center border-subtle bg-surface">
               <div className="flex flex-col items-center gap-4 py-16">
                 <Spin size="large" />
                 <div className="w-72">
-                  <div className="mb-1 text-center text-sm text-slate-600">
+                  <div className="mb-1 text-center text-sm text-fg-secondary">
                     {t('shipments.printPage.loadingCards')}{' '}
                     {loadProgress && loadProgress.total > 0
                       ? `${loadProgress.fetched}/${loadProgress.total}`
@@ -719,7 +729,7 @@ export default function ShipmentPrintPage() {
               </div>
             </Card>
           ) : cardsInRange.length === 0 ? (
-            <Card className="shadow-sm">
+            <SectionCard>
               <Empty
                 description={
                   totalCards === 0
@@ -727,12 +737,12 @@ export default function ShipmentPrintPage() {
                     : t('shipments.printPage.noCardsInRange')
                 }
               />
-            </Card>
+            </SectionCard>
           ) : (
             <div className="space-y-8 pb-16">
               {sheets.length > PREVIEW_SHEETS_PER_PAGE ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
-                  <span className="text-xs text-slate-600">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-subtle bg-surface px-4 py-2.5">
+                  <span className="text-xs text-fg-secondary">
                     {t('shipments.printPage.previewPaginationInfo', {
                       from: (effectivePreviewPage - 1) * PREVIEW_SHEETS_PER_PAGE + 1,
                       to: Math.min(effectivePreviewPage * PREVIEW_SHEETS_PER_PAGE, sheets.length),
@@ -803,8 +813,8 @@ export default function ShipmentPrintPage() {
         onOk={openPrintDialog}
         onCancel={() => setPrintModalOpen(false)}
       >
-        <div className="space-y-2 text-sm">
-          <p className="text-slate-600">
+        <div className="space-y-2 text-sm text-fg-primary">
+          <p className="text-fg-secondary">
             {t('shipments.printPage.checklistIntro')}
           </p>
           <ul className="list-disc space-y-1 ps-5">
@@ -829,7 +839,7 @@ export default function ShipmentPrintPage() {
           />
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 }
 
@@ -837,11 +847,11 @@ export default function ShipmentPrintPage() {
 
 function StatBox(props: { label: string; value: number | string; suffix?: string }) {
   return (
-    <div className="rounded-md bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
-      <div className="text-[11px] uppercase tracking-wide text-slate-400">{props.label}</div>
-      <div className="text-lg font-semibold text-slate-800">
-        {typeof props.value === 'number' ? props.value.toLocaleString() : props.value}
-        {props.suffix ? <span className="text-xs font-normal text-slate-400"> {props.suffix}</span> : null}
+    <div className="rounded-md border border-subtle bg-surface-sunken px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-fg-muted">{props.label}</div>
+      <div className="text-lg font-semibold tabular-nums text-fg-primary">
+        {props.value}
+        {props.suffix ? <span className="text-xs font-normal text-fg-muted"> {props.suffix}</span> : null}
       </div>
     </div>
   );
@@ -858,7 +868,7 @@ function LabeledNumber(props: {
 }) {
   return (
     <div>
-      <div className="mb-1 text-[11px] text-slate-500">{props.label}</div>
+      <div className="mb-1 text-[11px] text-fg-secondary">{props.label}</div>
       <InputNumber
         size="small"
         className="w-full"

@@ -365,7 +365,7 @@ export default function MeterTypeUpsertPage() {
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Form.Item name="name" label={t('common.labels.name')} rules={[{ required: true, message: t('meterTypes.nameRequired') }]}>
-                <Input placeholder="npr. AMM 3.0" />
+                <Input placeholder={t('common.placeholders.meterTypeNameExample')} />
               </Form.Item>
               <Form.Item name="type" label={t('common.labels.type')}>
                 <Select allowClear placeholder={t('common.actions.select')} options={meterTypeOptions} />
@@ -468,10 +468,10 @@ export default function MeterTypeUpsertPage() {
           }}
         >
           <Form.Item name="name" label={t('meterTypeFields.columns.name')} rules={[{ required: true }]}>
-            <Input placeholder="npr. transformer_ratio" />
+            <Input placeholder={t('common.placeholders.fieldKeyExample')} />
           </Form.Item>
           <Form.Item name="label" label={t('meterTypeFields.columns.label')} rules={[{ required: true }]}>
-            <Input placeholder="npr. Prijenosni omjer" />
+            <Input placeholder={t('common.placeholders.fieldLabelExample')} />
           </Form.Item>
           <Form.Item name="fieldType" label={t('common.labels.type')} rules={[{ required: true }]}>
             <Select options={FIELD_TYPE_OPTIONS} />

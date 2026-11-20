@@ -15,11 +15,10 @@ function SimLabelContentBase({ lines, gapMm = 0.5 }: SimLabelContentProps) {
       {lines.map((line, i) => (
         <div
           key={i}
-          className="lp-label__line"
+          className={line.muted ? 'lp-label__line lp-label__line--muted' : 'lp-label__line'}
           style={{
             fontSize: `${line.fontMm}mm`,
             fontWeight: line.weight,
-            color: line.muted ? '#475569' : undefined,
           }}
         >
           {line.text}

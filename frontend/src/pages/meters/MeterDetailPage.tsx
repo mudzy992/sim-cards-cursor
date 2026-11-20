@@ -13,10 +13,10 @@ import {
   Select,
   Space,
   Switch,
-  Tag,
   Typography,
   message,
 } from 'antd'
+import { StatusBadge, getMeterStatusTone, getTaskStatusTone } from '@/components/ui'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { metersApi } from '@/api/meters.api'
@@ -478,10 +478,10 @@ export default function MeterDetailPage() {
           meter ? (
             <Space>
               {openDemountLabel ? (
-                <Tag color="gold">
-                  {t('meters.detail.demountOrderCreated')} {openDemountLabel.date} • {openDemountLabel.operator} •{' '}
-                  {openDemountLabel.resolution}
-                </Tag>
+                <StatusBadge
+                  tone="warning"
+                  label={`${t('meters.detail.demountOrderCreated')} ${openDemountLabel.date} • ${openDemountLabel.operator} • ${openDemountLabel.resolution}`}
+                />
               ) : null}
               {openDemountTask &&
               (openDemountTask.status === 'PENDING' || openDemountTask.status === 'IN_PROGRESS') ? (
@@ -530,10 +530,10 @@ export default function MeterDetailPage() {
               ) : null}
               {meter.simCardState === 'NO_SIM' || !meter.simCard ? (
                 openInstallTask ? (
-                  <Tag color={openInstallTask.status === 'IN_PROGRESS' ? 'gold' : 'blue'}>
-                    {t('meters.detail.installOrderCreated')} {openInstallLabel?.date} • {openInstallLabel?.operator} (
-                    {openInstallLabel?.status})
-                  </Tag>
+                  <StatusBadge
+                    tone={getTaskStatusTone(openInstallTask.status)}
+                    label={`${t('meters.detail.installOrderCreated')} ${openInstallLabel?.date} • ${openInstallLabel?.operator} (${openInstallLabel?.status})`}
+                  />
                 ) : (
                   <Button
                     disabled={!isActiveMeter || !canCreateInstallTask}
@@ -605,9 +605,10 @@ export default function MeterDetailPage() {
             <Descriptions.Item label={t('installationRecords.form.meterSerialLabel')}>{meter.serialNumber}</Descriptions.Item>
             <Descriptions.Item label={t('meters.columns.meterStatus')}>
               {meter.status ? (
-                <Tag color={meter.status === 'ACTIVE' ? 'success' : meter.status === 'DEFECTIVE' ? 'error' : 'warning'}>
-                  {meterStatusLabel(meter.status, t)}
-                </Tag>
+                <StatusBadge
+                  tone={getMeterStatusTone(meter.status)}
+                  label={meterStatusLabel(meter.status, t)}
+                />
               ) : (
                 '–'
               )}
@@ -631,9 +632,9 @@ export default function MeterDetailPage() {
             <Descriptions.Item label={t('common.labels.notes')}>{meter.notes ?? '–'}</Descriptions.Item>
             <Descriptions.Item label={t('installationRecords.detail.simStatusLabel')}>
               {meter.simCardState === 'NO_SIM' || !meter.simCard ? (
-                <Tag color="warning">{t('meters.noSimOption')}</Tag>
+                <StatusBadge tone="warning" label={t('meters.noSimOption')} />
               ) : (
-                <Tag color="success">{t('meters.simInstalledOption')}</Tag>
+                <StatusBadge tone="success" label={t('meters.simInstalledOption')} />
               )}
               {meter.simCardState === 'NO_SIM' && meter.noSimReason ? (
                 <Typography.Text type="secondary" className="ml-2 text-xs">
@@ -1008,7 +1009,7 @@ export default function MeterDetailPage() {
       >
         <Form form={meterForm} layout="vertical" onFinish={handleMeterSubmit} className="mt-4">
           <Form.Item name="serialNumber" label={t('installationRecords.form.meterSerialLabel')} rules={[{ required: true, message: t('installationRecords.form.serialNumberRequired') }]}>
-            <Input placeholder="npr. AMM-12345" />
+            <Input placeholder={t('common.placeholders.meterSerialExample')} />
           </Form.Item>
           <Form.Item
             name="meterTypeDefinitionId"
@@ -1041,7 +1042,7 @@ export default function MeterDetailPage() {
             <Input.TextArea rows={2} placeholder={t('installationRecords.form.addressPlaceholder')} />
           </Form.Item>
           <Form.Item name="installationDate" label={t('installationRecords.list.columns.installationDate')}>
-            <Input type="date" placeholder="YYYY-MM-DD" />
+            <Input type="date" placeholder={t('common.placeholders.dateFormat')} />
           </Form.Item>
           <Form.Item name="city" label={t('meters.cityPlaceLabel')}>
             <Input placeholder={t('common.labels.optional')} />
@@ -1057,7 +1058,7 @@ export default function MeterDetailPage() {
           </Form.Item>
 
           {meter?.meterTypeDefinitionId ? (
-            <div className="rounded-md border border-slate-200 p-3">
+            <div className="rounded-md border border-subtle p-3">
               <div className="font-medium mb-2">{t('installationRecords.form.extraFields')}</div>
               {(meterTypeFieldsQuery.data ?? [])
                 .slice()
@@ -1079,7 +1080,7 @@ export default function MeterDetailPage() {
                   </Form.Item>
                 ))}
               {meterTypeFieldsQuery.isLoading ? (
-                <div className="text-sm text-slate-500">{t('installationRecords.form.loadingFields')}</div>
+                <div className="text-sm text-fg-secondary">{t('installationRecords.form.loadingFields')}</div>
               ) : null}
             </div>
           ) : null}

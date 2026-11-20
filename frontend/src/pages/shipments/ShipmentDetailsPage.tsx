@@ -1,34 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd';
+import { Button, Descriptions, Table } from 'antd';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { shipmentsApi } from '@/api/shipments.api';
-import { getSimCardStatusLabel } from '@/utils/labels.utils'
+import { getSimCardStatusLabel } from '@/utils/labels.utils';
 import type { ShipmentSimCardsResponse } from '@/types/shipment.types';
 import type { SimCardStatus } from '@/types/sim-card.types';
 import { PrinterOutlined } from '@ant-design/icons';
 import { useTranslation } from '@/i18n';
+import {
+  EmptyNotice,
+  PageHeader,
+  PageShell,
+  SectionCard,
+  StatusBadge,
+  getShipmentStatusTone,
+  getSimCardStatusTone,
+} from '@/components/ui';
+import { FALLBACK_DASH } from '@/constants/ui';
+import { ROUTES } from '@/config/routes';
+import { formatDate, formatNumber } from '@/utils/formatters';
+
 type ShipmentSimCard = ShipmentSimCardsResponse['items'][number];
-
-const statusColor: Record<string, string> = {
-  RECEIVED: 'blue',
-  PROCESSING: 'orange',
-  COMPLETED: 'green',
-};
-
-const simStatusColor: Record<string, string> = {
-  AVAILABLE: 'green',
-  ASSIGNED: 'orange',
-  INSTALLED: 'blue',
-  DEFECTIVE: 'red',
-  RETURNED: 'gold',
-  DEACTIVATED: 'default',
-};
 
 export default function ShipmentDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [pagination, setPagination] = useState({ page: 1, limit: 100 });
 
   const shipmentQuery = useQuery({
@@ -48,46 +46,67 @@ export default function ShipmentDetailsPage() {
   const cards = shipmentCardsQuery.data?.items ?? [];
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-      <Space>
-        <Button onClick={() => navigate('/shipments')}>{t('common.actions.back')}</Button>
-        <Button
-        icon={<PrinterOutlined />}
-        onClick={() => navigate(`/shipments/${id}/print`)}
-        >
-        {t('shipments.details.printLabels')}
-        </Button>
-        <Typography.Title level={3} className="!mb-0">
-          {t('shipments.details.title')}
-        </Typography.Title>
-      </Space>
+    <PageShell>
+      <PageHeader
+        title={t('shipments.details.title')}
+        backTo={ROUTES.shipments}
+        badge={
+          shipment ? (
+            <StatusBadge
+              tone={getShipmentStatusTone(shipment.status)}
+              label={shipment.status}
+            />
+          ) : undefined
+        }
+        actions={
+          id ? (
+            <Button
+              icon={<PrinterOutlined />}
+              onClick={() => navigate(ROUTES.shipmentPrint(id))}
+            >
+              {t('shipments.details.printLabels')}
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <Card loading={shipmentQuery.isLoading}>
+      <SectionCard loading={shipmentQuery.isLoading}>
         {shipment ? (
           <Descriptions column={2} bordered>
             <Descriptions.Item label={t('common.labels.name')}>{shipment.name}</Descriptions.Item>
             <Descriptions.Item label={t('common.labels.status')}>
-              <Tag color={statusColor[shipment.status] ?? 'default'}>{shipment.status}</Tag>
+              <StatusBadge
+                tone={getShipmentStatusTone(shipment.status)}
+                label={shipment.status}
+              />
             </Descriptions.Item>
-            <Descriptions.Item label={t('shipments.details.provider')}>{shipment.provider}</Descriptions.Item>
+            <Descriptions.Item label={t('shipments.details.provider')}>
+              {shipment.provider}
+            </Descriptions.Item>
             <Descriptions.Item label={t('shipments.details.receivedDate')}>
-              {new Date(shipment.receivedDate).toLocaleDateString()}
+              {formatDate(shipment.receivedDate, language)}
             </Descriptions.Item>
-            <Descriptions.Item label={t('shipments.details.totalCards')}>{shipment.totalCards}</Descriptions.Item>
+            <Descriptions.Item label={t('shipments.details.totalCards')}>
+              {formatNumber(shipment.totalCards, language)}
+            </Descriptions.Item>
             <Descriptions.Item label={t('shipments.details.importedBy')}>
               {shipment.importedBy.firstName} {shipment.importedBy.lastName}
             </Descriptions.Item>
             <Descriptions.Item label={t('common.labels.notes')} span={2}>
-              {shipment.notes ?? '-'}
+              {shipment.notes ?? FALLBACK_DASH}
             </Descriptions.Item>
           </Descriptions>
         ) : null}
-      </Card>
+      </SectionCard>
 
-      <Card title={t('shipments.details.cardsInShipment')} loading={shipmentCardsQuery.isLoading}>
+      <SectionCard
+        title={t('shipments.details.cardsInShipment')}
+        loading={shipmentCardsQuery.isLoading}
+      >
         <Table<ShipmentSimCard>
           rowKey="id"
           dataSource={cards}
+          locale={{ emptyText: <EmptyNotice /> }}
           pagination={{
             current: shipmentCardsQuery.data?.page,
             pageSize: shipmentCardsQuery.data?.limit,
@@ -102,7 +121,11 @@ export default function ShipmentDetailsPage() {
             {
               title: 'ICCID',
               render: (_, row) => (
-                <Button type="link" onClick={() => navigate(`/sim-cards/${row.id}`)}>
+                <Button
+                  type="link"
+                  className="p-0 font-mono"
+                  onClick={() => navigate(ROUTES.simCardDetail(row.id))}
+                >
                   {row.iccid}
                 </Button>
               ),
@@ -110,14 +133,15 @@ export default function ShipmentDetailsPage() {
             { title: 'IP', dataIndex: 'ipAddress' },
             {
               title: t('simCards.details.publicIp'),
-              render: (_, row) => row.publicIpAddress ?? '-',
+              render: (_, row) => row.publicIpAddress ?? FALLBACK_DASH,
             },
             {
               title: t('common.labels.status'),
               render: (_, row) => (
-                <Tag color={simStatusColor[row.status] ?? 'default'}>
-                  {getSimCardStatusLabel(row.status as SimCardStatus, t)}
-                </Tag>
+                <StatusBadge
+                  tone={getSimCardStatusTone(row.status)}
+                  label={getSimCardStatusLabel(row.status as SimCardStatus, t)}
+                />
               ),
             },
             {
@@ -125,11 +149,11 @@ export default function ShipmentDetailsPage() {
               render: (_, row) =>
                 row.assignedTo
                   ? `${row.assignedTo.firstName} ${row.assignedTo.lastName}`
-                  : '-',
+                  : FALLBACK_DASH,
             },
           ]}
         />
-      </Card>
-    </Space>
+      </SectionCard>
+    </PageShell>
   );
 }

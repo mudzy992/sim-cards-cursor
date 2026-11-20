@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Drawer, Form, Input, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Drawer, Form, Input, Select, Space, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { pushCampaignsApi, type PushCampaign, type PushCampaignAudienceType, type PushCampaignStatus, type PushDeliveryListItem } from '@/api/push-campaigns.api';
@@ -9,13 +9,14 @@ import type { UserListItem } from '@/types/user.types';
 import { useAppFeatures } from '@/hooks/useAppFeatures';
 import { Alert } from 'antd';
 import { useTranslation } from '@/i18n';
+import { StatusBadge, type StatusTone } from '@/components/ui';
 
-const statusColor: Record<PushCampaignStatus, string> = {
-  DRAFT: 'default',
-  SENDING: 'processing',
+const statusToneMap: Record<PushCampaignStatus, StatusTone> = {
+  DRAFT: 'neutral',
+  SENDING: 'info',
   SENT: 'success',
   PARTIAL: 'warning',
-  FAILED: 'error',
+  FAILED: 'danger',
 };
 
 export default function PushCampaignsPage() {
@@ -88,7 +89,7 @@ export default function PushCampaignsPage() {
         title: t('common.labels.status'),
         dataIndex: 'status',
         key: 'status',
-        render: (s: PushCampaignStatus) => <Tag color={statusColor[s]}>{s}</Tag>,
+        render: (s: PushCampaignStatus) => <StatusBadge tone={statusToneMap[s]} label={s} />,
         width: 120,
       },
       {
@@ -178,7 +179,7 @@ export default function PushCampaignsPage() {
             <div className="font-medium">
               {r.user.firstName} {r.user.lastName}
             </div>
-            <div className="text-xs text-slate-500">{r.user.email}</div>
+            <div className="text-xs text-fg-secondary">{r.user.email}</div>
           </div>
         ),
       },
@@ -187,7 +188,12 @@ export default function PushCampaignsPage() {
         dataIndex: 'status',
         key: 'status',
         width: 140,
-        render: (s: string) => <Tag>{s}</Tag>,
+        render: (s: string) => (
+          <StatusBadge
+            tone={s === 'DELIVERED' || s === 'SENT' ? 'success' : s === 'FAILED' ? 'danger' : 'neutral'}
+            label={s}
+          />
+        ),
       },
       {
         title: t('common.states.error'),
@@ -354,9 +360,10 @@ export default function PushCampaignsPage() {
               <div>
                 <Typography.Text type="secondary">{t('common.labels.status')}</Typography.Text>
                 <div>
-                  <Tag color={statusColor[selectedCampaign.status]}>
-                    {selectedCampaign.status}
-                  </Tag>
+                  <StatusBadge
+                    tone={statusToneMap[selectedCampaign.status]}
+                    label={selectedCampaign.status}
+                  />
                 </div>
               </div>
               <div>
@@ -375,13 +382,13 @@ export default function PushCampaignsPage() {
 
             <div>
               <Typography.Title level={5}>{t('pushCampaigns.deliveryStatsTitle')}</Typography.Title>
-              <Space>
-                <Tag>total: {stats?.total ?? '-'}</Tag>
-                <Tag>queued: {stats?.queued ?? '-'}</Tag>
-                <Tag>sent: {stats?.sent ?? '-'}</Tag>
-                <Tag color="green">delivered: {stats?.delivered ?? '-'}</Tag>
-                <Tag color="red">failed: {stats?.failed ?? '-'}</Tag>
-                <Tag>invalid: {stats?.invalid ?? '-'}</Tag>
+              <Space wrap>
+                <StatusBadge tone="neutral" label={`total: ${stats?.total ?? '-'}`} />
+                <StatusBadge tone="neutral" label={`queued: ${stats?.queued ?? '-'}`} />
+                <StatusBadge tone="info" label={`sent: ${stats?.sent ?? '-'}`} />
+                <StatusBadge tone="success" label={`delivered: ${stats?.delivered ?? '-'}`} />
+                <StatusBadge tone="danger" label={`failed: ${stats?.failed ?? '-'}`} />
+                <StatusBadge tone="warning" label={`invalid: ${stats?.invalid ?? '-'}`} />
               </Space>
             </div>
 

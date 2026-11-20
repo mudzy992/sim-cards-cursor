@@ -81,46 +81,15 @@ textarea:focus-visible,
   }
 }
 
-/*
- * Print / label preview scope: simulacija A4 papira ostaje svijetla
- * bez obzira na aktivnu temu aplikacije.
- */
-.print-preview-scope .bg-white {
-  background-color: var(--pp-paper) !important;
+.auth-grid-backdrop {
+  background-image:
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+  background-size: 44px 44px;
+  opacity: 0.45;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, var(--text-primary) 35%, transparent 90%);
 }
-.print-preview-scope .bg-white\/70 {
-  background-color: rgb(255 255 255 / 0.85) !important;
-}
-.print-preview-scope .bg-slate-50 {
-  background-color: var(--pp-slate-50) !important;
-}
-.print-preview-scope .bg-slate-100 {
-  background-color: var(--pp-slate-100) !important;
-}
-.print-preview-scope .border-slate-100 {
-  border-color: var(--pp-slate-100) !important;
-}
-.print-preview-scope .border-slate-200 {
-  border-color: var(--pp-slate-200) !important;
-}
-.print-preview-scope .border-slate-400 {
-  border-color: var(--pp-slate-400) !important;
-}
-.print-preview-scope .ring-slate-200 {
-  --tw-ring-color: var(--pp-slate-200) !important;
-}
-.print-preview-scope .ring-slate-300 {
-  --tw-ring-color: var(--pp-slate-300) !important;
-}
-.print-preview-scope .text-slate-400 {
-  color: var(--pp-slate-400) !important;
-}
-.print-preview-scope .text-slate-500 {
-  color: var(--pp-slate-500) !important;
-}
-.print-preview-scope .text-slate-600 {
-  color: var(--pp-slate-600) !important;
-}
-.print-preview-scope .text-slate-800 {
-  color: var(--pp-slate-800) !important;
+
+.auth-ambient-glow {
+  background: radial-gradient(closest-side, var(--accent-soft-bg), transparent);
 }

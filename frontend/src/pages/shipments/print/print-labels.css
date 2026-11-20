@@ -80,12 +80,36 @@
   max-width: 100%;
 }
 
+.lp-label__line--muted {
+  color: var(--pp-slate-500, #475569);
+}
+
 /* ----------------------- ekranski pregled (preview) ----------------------- */
+
+.lp-preview-sheet {
+  background-color: var(--pp-paper, #ffffff);
+  box-shadow: 0 10px 40px -12px rgba(15, 23, 42, 0.35);
+  border: 1px solid var(--pp-slate-200, #cbd5e1);
+}
+
+.lp-preview-sample {
+  background-color: var(--pp-paper, #ffffff);
+  border: 1px solid var(--pp-slate-200, #cbd5e1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.lp-used-label-text {
+  color: var(--pp-slate-400, #64748b);
+}
 
 .lp-preview-cell {
   position: relative;
   overflow: hidden;
   transition: box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.lp-preview-cell--guides {
+  box-shadow: inset 0 0 0 0.6px rgba(148, 163, 184, 0.55);
 }
 
 .lp-preview-cell--clickable {
