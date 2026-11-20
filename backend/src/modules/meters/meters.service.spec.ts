@@ -18,10 +18,12 @@ describe('MetersService', () => {
         findFirst: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
-      } as any,
-      $transaction: jest.fn().mockImplementation((operations: any[]) =>
-        Promise.all(operations.map((op) => op)),
-      ),
+      } as unknown as PrismaService['meter'],
+      $transaction: jest
+        .fn()
+        .mockImplementation((operations: Promise<unknown>[]) =>
+          Promise.all(operations),
+        ) as unknown as PrismaService['$transaction'],
     } as Partial<PrismaService>;
 
     const module: TestingModule = await Test.createTestingModule({

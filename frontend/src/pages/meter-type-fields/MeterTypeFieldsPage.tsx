@@ -3,7 +3,7 @@ import { Button, Drawer, Form, Input, InputNumber, Select, Space, Switch, Table,
 import { useMemo, useState } from 'react'
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import type { MeterTypeDefinitionItem } from '@/types/meter-type-definition.types'
-import type { MeterFieldType, MeterTypeFieldItem } from '@/types/meter-type-field.types'
+import type { CreateMeterTypeFieldInput, MeterFieldType, MeterTypeFieldItem, UpdateMeterTypeFieldInput } from '@/types/meter-type-field.types'
 import { useTranslation } from '@/i18n'
 
 export default function MeterTypeFieldsPage() {
@@ -60,8 +60,8 @@ export default function MeterTypeFieldsPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { id: string; data: Record<string, unknown> }) =>
-      meterTypeDefinitionsApi.updateField(selectedTypeId!, payload.id, payload.data as any),
+    mutationFn: (payload: { id: string; data: UpdateMeterTypeFieldInput }) =>
+      meterTypeDefinitionsApi.updateField(selectedTypeId!, payload.id, payload.data),
     onSuccess: async () => {
       messageApi.success(t('meterTypeFields.messages.updated'))
       setDrawerOpen(false)
@@ -262,7 +262,7 @@ export default function MeterTypeFieldsPage() {
           form={form}
           layout="vertical"
           onFinish={(values) => {
-            const payload = {
+            const payload: CreateMeterTypeFieldInput = {
               name: values.name.trim(),
               label: values.label.trim(),
               fieldType: values.fieldType,
@@ -275,7 +275,7 @@ export default function MeterTypeFieldsPage() {
               updateMutation.mutate({ id: editing.id, data: payload })
               return
             }
-            createMutation.mutate(payload as any)
+            createMutation.mutate(payload)
           }}
         >
           <Form.Item name="name" label={t('meterTypeFields.columns.name')} rules={[{ required: true }]}>

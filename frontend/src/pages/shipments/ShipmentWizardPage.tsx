@@ -152,7 +152,7 @@ export default function ShipmentWizardPage() {
               label={t('shipments.edit.nameLabel')}
               rules={[{ required: true, message: t('shipments.edit.nameRequired') }]}
             >
-              <Input placeholder={t('shipments.wizard.namePlaceholder')} autoFocus />
+              <Input placeholder={t('shipments.wizard.namePlaceholder')} />
             </Form.Item>
 
             <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">

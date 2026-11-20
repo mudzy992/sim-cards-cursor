@@ -70,7 +70,7 @@ type MeterFormValues = {
   city?: string
   municipality?: string
   measuringPoint?: string
-  dynamicFieldValues?: Record<string, {}>
+  dynamicFieldValues?: Record<string, string | number | boolean | null | undefined>
 }
 
 export default function MeterDetailPage() {
@@ -282,11 +282,13 @@ export default function MeterDetailPage() {
   const createInstallMutation = useMutation({
     mutationFn: (payload: { meterId: string; assignedToId: string; notes?: string }) =>
       installTasksApi.create(payload),
-    onSuccess: () => {
+    onSuccess: async () => {
       messageApi.success(t('meters.install.taskCreated'))
       setInstallDrawerOpen(false)
       setInstallOperatorId('')
       setInstallNotes('')
+      await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['meters'] })
     },
     onError: (err: unknown) => {
       messageApi.error(
@@ -407,7 +409,10 @@ export default function MeterDetailPage() {
       city: meter.city ?? undefined,
       municipality: meter.municipality ?? undefined,
       measuringPoint: meter.measuringPoint ?? undefined,
-      dynamicFieldValues: (meter.dynamicFieldValues ?? undefined) as any,
+      dynamicFieldValues:
+        (meter.dynamicFieldValues as
+          | Record<string, string | number | boolean | null | undefined>
+          | undefined) ?? undefined,
     })
     setEditDrawerOpen(true)
   }
@@ -416,7 +421,7 @@ export default function MeterDetailPage() {
     const payload: UpdateMeterInput = {
       serialNumber: values.serialNumber,
       meterTypeDefinitionId: values.meterTypeDefinitionId,
-      status: values.status as any,
+      status: values.status,
       year: values.year,
       calibrationYear: values.calibrationYear,
       notes: values.notes,
@@ -425,7 +430,7 @@ export default function MeterDetailPage() {
       city: values.city,
       municipality: values.municipality,
       measuringPoint: values.measuringPoint,
-      dynamicFieldValues: values.dynamicFieldValues as any,
+      dynamicFieldValues: values.dynamicFieldValues,
     }
     updateMeterMutation.mutate({ payload })
   }

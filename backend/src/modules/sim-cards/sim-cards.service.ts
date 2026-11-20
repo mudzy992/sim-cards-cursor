@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -35,6 +36,24 @@ export class SimCardsService {
     const limit = filter.limit ?? 20
 
     const branchIds = this.getModeratedBranchIds(scope)
+    if (scope?.role === 'DIST_ADMIN' && !scope.distributionId) {
+      return {
+        items: [],
+        page,
+        limit,
+        total: 0,
+        totalPages: 1,
+      }
+    }
+    if (scope?.role === 'USER' && !branchIds) {
+      return {
+        items: [],
+        page,
+        limit,
+        total: 0,
+        totalPages: 1,
+      }
+    }
 
     const where: Prisma.SimCardWhereInput = {
       status: SimCardStatus.INSTALLED,
@@ -190,7 +209,7 @@ export class SimCardsService {
     await this.ensureSimCardExists(id, scope);
 
     if (dto.shipmentId) {
-      await this.ensureShipmentExists(dto.shipmentId);
+      await this.ensureShipmentExists(dto.shipmentId, scope);
     }
 
     const updated = await this.prisma.simCard.update({
@@ -307,7 +326,7 @@ export class SimCardsService {
       throw new BadRequestException('Only AVAILABLE or ASSIGNED SIM cards can be assigned');
     }
 
-    await this.ensureUserExists(dto.userId);
+    await this.ensureUserExists(dto.userId, scope);
 
     const updated = await this.prisma.simCard.update({
       where: { id },
@@ -362,22 +381,37 @@ export class SimCardsService {
     }
 
     if (simCard.status === SimCardStatus.ASSIGNED && simCard.assignedToId === actorId) {
-      return this.findOne(id);
+      return this.findOne(id, scope);
     }
 
     if (simCard.status !== SimCardStatus.AVAILABLE) {
       throw new BadRequestException('Only AVAILABLE SIM cards can be claimed');
     }
 
-    const claimed = await this.prisma.simCard.update({
-      where: { id },
+    const claimUpdate = await this.prisma.simCard.updateMany({
+      where: {
+        id,
+        status: SimCardStatus.AVAILABLE,
+      },
       data: {
         assignedToId: actorId,
         assignedAt: new Date(),
         status: SimCardStatus.ASSIGNED,
       },
-      include: this.simCardInclude(),
     });
+
+    if (claimUpdate.count === 0) {
+      const latest = await this.prisma.simCard.findUnique({
+        where: { id },
+        select: { status: true, assignedToId: true },
+      });
+      if (latest?.status === SimCardStatus.ASSIGNED && latest.assignedToId === actorId) {
+        return this.findOne(id, scope);
+      }
+      throw new BadRequestException('Only AVAILABLE SIM cards can be claimed');
+    }
+
+    const claimed = await this.findOne(id, scope);
 
     await this.activityLogService.log({
       userId: actorId,
@@ -523,14 +557,18 @@ export class SimCardsService {
     }
   }
 
-  private async ensureUserExists(id: string): Promise<void> {
-    const exists = await this.prisma.user.findUnique({
-      where: { id },
+  private async ensureUserExists(id: string, scope?: ScopeContext | null): Promise<void> {
+    const scopeClause = scopeWhere(scope, { userScope: true });
+    const exists = await this.prisma.user.findFirst({
+      where: {
+        id,
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+      },
       select: { id: true },
     });
 
     if (!exists) {
-      throw new NotFoundException('User not found');
+      throw new ForbiddenException('User not found or outside your distribution scope');
     }
   }
 

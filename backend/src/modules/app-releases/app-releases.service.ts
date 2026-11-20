@@ -23,6 +23,16 @@ export class AppReleasesService {
     this.graceDays = Number(this.config.get<string>('ANDROID_UPDATE_GRACE_DAYS') ?? '7');
   }
 
+  private async computeFileSha256(filePath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash('sha256');
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', reject);
+    });
+  }
+
   async uploadAndroidRelease(input: {
     actorId: string;
     versionName: string;
@@ -33,8 +43,11 @@ export class AppReleasesService {
     const file = input.file;
     if (!file) throw new BadRequestException('Missing file');
 
-    const originalName = (file.originalname ?? 'release.apk').replace(/[^\w.\-]+/g, '_');
+    const originalName = (file.originalname ?? 'release.apk').replace(/[^\w.-]+/g, '_');
     if (!originalName.toLowerCase().endsWith('.apk')) {
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
       throw new BadRequestException('Only .apk files are allowed');
     }
 
@@ -45,8 +58,21 @@ export class AppReleasesService {
     const fileBase = `${input.versionCode}_${Date.now()}_${originalName}`;
     const absPath = path.join(absDir, fileBase);
 
-    const sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
-    fs.writeFileSync(absPath, file.buffer);
+    let sha256: string;
+    if (file.path) {
+      sha256 = await this.computeFileSha256(file.path);
+      try {
+        fs.renameSync(file.path, absPath);
+      } catch {
+        fs.copyFileSync(file.path, absPath);
+        fs.unlinkSync(file.path);
+      }
+    } else if (file.buffer) {
+      sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
+      fs.writeFileSync(absPath, file.buffer);
+    } else {
+      throw new BadRequestException('Uploaded file content is unavailable');
+    }
 
     const publishedAt = new Date();
     const mandatoryAfterAt = new Date(
@@ -126,4 +152,3 @@ export class AppReleasesService {
     };
   }
 }
-

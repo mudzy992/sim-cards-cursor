@@ -16,14 +16,13 @@ import {
   Typography,
   message,
 } from 'antd';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { PlusOutlined, ThunderboltOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { metersApi } from '@/api/meters.api';
 import { usersApi } from '@/api/users.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
-import { installationRecordsApi } from '@/api/installation-records.api';
 import {
   demountTasksApi,
   type DemountCompletionResolution,
@@ -43,7 +42,6 @@ import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 import type {
   MeterTypeDefinitionItem,
 } from '@/types/meter-type-definition.types';
-import { buildOsmEmbedUrl } from '@/utils/osm.utils'
 import { useTranslation } from '@/i18n';
 import {
   getDemountResolutionLabel,
@@ -51,13 +49,6 @@ import {
   getMeterStatusLabel,
   getRemovedSimDispositionLabel,
 } from '@/utils/labels.utils'
-
-function getMeterTypeOptions(t: (key: string) => string): { label: string; value: MeterType }[] {
-  return [
-    { label: t('meterTypes.phaseSingle'), value: 'SINGLE_PHASE' },
-    { label: t('meterTypes.phaseThree'), value: 'THREE_PHASE' },
-  ]
-}
 
 type MeterFormValues = {
   serialNumber: string;
@@ -72,7 +63,7 @@ type MeterFormValues = {
   measuringPoint?: string;
   simCardIccid?: string;
   simCardId?: string;
-  dynamicFieldValues?: Record<string, {}>;
+  dynamicFieldValues?: Record<string, unknown>;
 };
 
 const defaultPagination = { page: 1, limit: 20 };
@@ -80,7 +71,6 @@ const defaultPagination = { page: 1, limit: 20 };
 export default function MetersListPage() {
   const { t, language } = useTranslation();
   const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
-  const meterTypeOptions = getMeterTypeOptions(t)
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -95,7 +85,6 @@ export default function MetersListPage() {
   const [meterDrawerOpen, setMeterDrawerOpen] = useState(false);
   const [editingMeter, setEditingMeter] = useState<MeterItem | null>(null);
   const [detailMeter, setDetailMeter] = useState<MeterItem | null>(null);
-  const [isQuickDetail, setIsQuickDetail] = useState(false)
   const [demountDrawerOpen, setDemountDrawerOpen] = useState(false);
   const [demountMeter, setDemountMeter] = useState<MeterItem | null>(null);
   const [demountOperatorId, setDemountOperatorId] = useState<string>('');
@@ -115,7 +104,6 @@ export default function MetersListPage() {
 
   const [meterForm] = Form.useForm<MeterFormValues>();
   const userRole = useAuthStore((s) => s.user?.role);
-  const user = useAuthStore((s) => s.user);
 
   const selectedEditMeterTypeDefinitionId = Form.useWatch('meterTypeDefinitionId', meterForm) as
     | string
@@ -208,17 +196,6 @@ export default function MetersListPage() {
     },
   });
 
-  const recordsByMeterQuery = useQuery({
-    queryKey: ['installation-records', 'by-meter', detailMeter?.id],
-    queryFn: () =>
-      installationRecordsApi.list({
-        page: 1,
-        limit: 50,
-        meterId: detailMeter?.id,
-      }),
-    enabled: Boolean(detailMeter?.id),
-  });
-
   const createMeterMutation = useMutation({
     mutationFn: (payload: CreateMeterInput) => metersApi.create(payload),
     onSuccess: () => {
@@ -279,27 +256,8 @@ export default function MetersListPage() {
     setMeterDrawerOpen(true);
   }
 
-  function openMeterEdit(record: MeterItem) {
-    setEditingMeter(record);
-    meterForm.setFieldsValue({
-      serialNumber: record.serialNumber,
-      meterTypeDefinitionId: record.meterTypeDefinitionId ?? undefined,
-      year: record.year ?? undefined,
-      calibrationYear: record.calibrationYear ?? undefined,
-      notes: record.notes ?? undefined,
-      installationAddress: (record as MeterItem & { installationAddress?: string }).installationAddress ?? undefined,
-      installationDate: (record as MeterItem & { installationDate?: string }).installationDate?.slice(0, 10),
-      city: (record as MeterItem & { city?: string }).city ?? undefined,
-      municipality: (record as MeterItem & { municipality?: string }).municipality ?? undefined,
-      measuringPoint: (record as MeterItem & { measuringPoint?: string }).measuringPoint ?? undefined,
-      dynamicFieldValues: (record.dynamicFieldValues as Record<string, {}> | null) ?? undefined,
-    });
-    setMeterDrawerOpen(true);
-  }
-
   function openMeterDetail(record: MeterItem) {
     setDetailMeter(record);
-    setIsQuickDetail(true)
   }
 
   function openTypeCreate() {
@@ -362,19 +320,8 @@ export default function MetersListPage() {
 
   const meterRows = listQuery.data?.items ?? [];
   const typeRows = typesListQuery.data ?? [];
-  const recordsForMeter = recordsByMeterQuery.data?.items ?? [];
   const renderType = (mt: MeterType) =>
     mt === 'SINGLE_PHASE' ? t('meterTypes.phaseSingle') : mt === 'THREE_PHASE' ? t('meterTypes.phaseThree') : mt;
-
-  const canCreateInstallTaskForMeter = (m: MeterItem | null) => {
-    if (!m) return false
-    const isNoSim = m.simCardState === 'NO_SIM' || !m.simCard
-    if (!isNoSim) return false
-    if (userRole === 'SYSTEM_ADMIN' || userRole === 'DIST_ADMIN') return true
-    const moderated = user?.branchModeratorBranchIds ?? []
-    const branchId = m.branchId ?? ''
-    return Boolean(branchId) && moderated.includes(branchId)
-  }
 
   return (
     <div
@@ -413,7 +360,10 @@ export default function MetersListPage() {
                       placeholder={t('meters.filterByType')}
                       options={meterTypeDefinitionOptions}
                       value={filterTypeId}
-                      onChange={setFilterTypeId}
+                      onChange={(v) => {
+                        setFilterTypeId(v);
+                        setPagination((p) => ({ ...p, page: 1 }));
+                      }}
                       style={{ minWidth: 220 }}
                     />
                     <Select
@@ -713,7 +663,6 @@ export default function MetersListPage() {
         open={Boolean(detailMeter)}
         onClose={() => {
           setDetailMeter(null)
-          setIsQuickDetail(false)
         }}
       >
         {detailMeter && (

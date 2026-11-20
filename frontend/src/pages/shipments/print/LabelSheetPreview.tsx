@@ -109,7 +109,37 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
                 .filter(Boolean)
                 .join(' ');
 
-              return (
+              return interactive ? (
+                <button
+                  key={i}
+                  type="button"
+                  className={`${classes} appearance-none border-0 bg-transparent p-0 text-left`}
+                  style={{
+                    boxShadow: showGuides
+                      ? 'inset 0 0 0 0.6px rgba(148, 163, 184, 0.55)'
+                      : undefined,
+                  }}
+                  title={
+                    cell.used
+                      ? t('shipments.print.labelMarkedUsed', { index: i + 1 })
+                      : t('shipments.print.clickToStartFrom', { index: i + 1 })
+                  }
+                  onClick={onPickStart ? () => onPickStart(i) : undefined}
+                >
+                  {cell.sim && !cell.used ? (
+                    <SimLabelContent lines={makeLines(cell.sim)} gapMm={lineGapMm} />
+                  ) : cell.used ? (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <span
+                        className="font-medium uppercase tracking-widest text-slate-400"
+                        style={{ fontSize: 9 }}
+                      >
+                        {t('shipments.print.usedLabel')}
+                      </span>
+                    </div>
+                  ) : null}
+                </button>
+              ) : (
                 <div
                   key={i}
                   className={classes}
@@ -118,14 +148,6 @@ export function LabelSheetPreview(props: LabelSheetPreviewProps) {
                       ? 'inset 0 0 0 0.6px rgba(148, 163, 184, 0.55)'
                       : undefined,
                   }}
-                  title={
-                    interactive
-                      ? cell.used
-                        ? t('shipments.print.labelMarkedUsed', { index: i + 1 })
-                        : t('shipments.print.clickToStartFrom', { index: i + 1 })
-                      : undefined
-                  }
-                  onClick={interactive && onPickStart ? () => onPickStart(i) : undefined}
                 >
                   {cell.sim && !cell.used ? (
                     <SimLabelContent lines={makeLines(cell.sim)} gapMm={lineGapMm} />

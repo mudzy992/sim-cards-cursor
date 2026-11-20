@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
+import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateDemountTaskDto } from './dto/create-demount-task.dto';
 import { CompleteDemountTaskDto } from './dto/complete-demount-task.dto';
@@ -129,8 +130,8 @@ export class DemountTasksService {
         },
         include: {
           meter: { include: { simCard: true, meterTypeDefinition: true } },
-          assignedTo: true,
-          createdBy: true,
+          assignedTo: { select: SAFE_USER_SELECT },
+          createdBy: { select: SAFE_USER_SELECT },
         },
       })
     })
@@ -166,8 +167,8 @@ export class DemountTasksService {
       orderBy: { createdAt: 'desc' },
       include: {
         meter: { include: { simCard: true, meterTypeDefinition: true } },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: { select: SAFE_USER_SELECT },
+        createdBy: { select: SAFE_USER_SELECT },
       },
     });
   }
@@ -220,8 +221,8 @@ export class DemountTasksService {
       },
       include: {
         meter: { include: { simCard: true, meterTypeDefinition: true } },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: { select: SAFE_USER_SELECT },
+        createdBy: { select: SAFE_USER_SELECT },
       },
     });
 
@@ -267,8 +268,8 @@ export class DemountTasksService {
         data: { status: DemountTaskStatus.CANCELLED },
         include: {
           meter: { include: { simCard: true, meterTypeDefinition: true } },
-          assignedTo: true,
-          createdBy: true,
+          assignedTo: { select: SAFE_USER_SELECT },
+          createdBy: { select: SAFE_USER_SELECT },
         },
       })
       await tx.meter.update({
@@ -344,8 +345,8 @@ export class DemountTasksService {
       },
       include: {
         meter: { include: { simCard: true, meterTypeDefinition: true } },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: { select: SAFE_USER_SELECT },
+        createdBy: { select: SAFE_USER_SELECT },
       },
     });
     await this.activityLogService.log({
@@ -397,8 +398,8 @@ export class DemountTasksService {
         where: { id },
         include: {
           meter: { include: { simCard: true, meterTypeDefinition: true } },
-          assignedTo: true,
-          createdBy: true,
+          assignedTo: { select: SAFE_USER_SELECT },
+          createdBy: { select: SAFE_USER_SELECT },
         },
       })
     }
@@ -446,26 +447,25 @@ export class DemountTasksService {
         throw new BadRequestException('Nova SIM mora biti drugačija od trenutno ugrađene.');
       }
       await this.assertSimUsableForReplace(dto.newSimCardId, userId, meterDistributionId, scope);
+      const newSimCardId = dto.newSimCardId;
+      const branchId = meter.branchId ?? undefined;
       await this.prisma.$transaction(async (tx) => {
-        await tx.meter.update({
-          where: { id: meter.id },
-          data: {
-            simCardId: dto.newSimCardId,
-            simCardState: MeterSimCardState.INSTALLED,
-            noSimReason: null,
-            hasOpenDemountTask: false,
+        const claimedNewSim = await tx.simCard.updateMany({
+          where: {
+            id: newSimCardId,
+            OR: [
+              { status: SimCardStatus.AVAILABLE },
+              { status: SimCardStatus.ASSIGNED, assignedToId: userId },
+            ],
           },
-        });
-        await tx.simCard.update({
-          where: { id: oldSimId },
-          data: oldSimRemoval,
-        });
-        await tx.simCard.update({
-          where: { id: dto.newSimCardId },
           data: { status: SimCardStatus.INSTALLED },
         });
-        await tx.demountTask.update({
-          where: { id: task.id },
+        if (claimedNewSim.count === 0) {
+          throw new BadRequestException('Nova SIM kartica je u međuvremenu zauzeta.');
+        }
+
+        const transitioned = await tx.demountTask.updateMany({
+          where: { id: task.id, status: DemountTaskStatus.IN_PROGRESS },
           data: {
             status: DemountTaskStatus.COMPLETED,
             completedAt: new Date(),
@@ -475,35 +475,51 @@ export class DemountTasksService {
             meterDemountCategory: effectiveMeterDemountCategory,
           },
         });
-      });
-      const branchId = meter.branchId ?? undefined;
-      await this.prisma.simEvent.create({
-        data: {
-          simCardId: oldSimId,
-          type: 'DEMOUNTED',
-          userId,
-          branchId: branchId ?? null,
-          metadata: {
-            resolution: effectiveResolution,
-            demountTaskId: task.id,
-            replacedBySimCardId: dto.newSimCardId,
-            removedSimDisposition: effectiveRemovedSimDisposition,
-          } as Prisma.InputJsonValue,
-        },
-      });
-      await this.prisma.simEvent.create({
-        data: {
-          simCardId: dto.newSimCardId,
-          type: 'INSTALLED',
-          userId,
-          branchId: branchId ?? null,
-          metadata: {
-            resolution: effectiveResolution,
-            demountTaskId: task.id,
-            replacedSimCardId: oldSimId,
-            meterId: meter.id,
-          } as Prisma.InputJsonValue,
-        },
+        if (transitioned.count === 0) {
+          throw new BadRequestException('Zadatak je u međuvremenu već završen ili promijenjen.');
+        }
+
+        await tx.meter.update({
+          where: { id: meter.id },
+          data: {
+            simCardId: newSimCardId,
+            simCardState: MeterSimCardState.INSTALLED,
+            noSimReason: null,
+            hasOpenDemountTask: false,
+          },
+        });
+        await tx.simCard.update({
+          where: { id: oldSimId },
+          data: oldSimRemoval,
+        });
+        await tx.simEvent.create({
+          data: {
+            simCardId: oldSimId,
+            type: 'DEMOUNTED',
+            userId,
+            branchId: branchId ?? null,
+            metadata: {
+              resolution: effectiveResolution,
+              demountTaskId: task.id,
+              replacedBySimCardId: newSimCardId,
+              removedSimDisposition: effectiveRemovedSimDisposition,
+            } as Prisma.InputJsonValue,
+          },
+        });
+        await tx.simEvent.create({
+          data: {
+            simCardId: newSimCardId,
+            type: 'INSTALLED',
+            userId,
+            branchId: branchId ?? null,
+            metadata: {
+              resolution: effectiveResolution,
+              demountTaskId: task.id,
+              replacedSimCardId: oldSimId,
+              meterId: meter.id,
+            } as Prisma.InputJsonValue,
+          },
+        });
       });
     } else {
       if (!effectiveMeterDemountCategory) {
@@ -525,8 +541,24 @@ export class DemountTasksService {
             ? MeterStatus.DEFECTIVE
             : effectiveMeterDemountCategory === MeterDemountCategory.MAINTENANCE
               ? MeterStatus.IN_CALIBRATION
-              : MeterStatus.ACTIVE
+              : MeterStatus.ACTIVE;
+      const branchId = meter.branchId ?? undefined;
       await this.prisma.$transaction(async (tx) => {
+        const transitioned = await tx.demountTask.updateMany({
+          where: { id: task.id, status: DemountTaskStatus.IN_PROGRESS },
+          data: {
+            status: DemountTaskStatus.COMPLETED,
+            completedAt: new Date(),
+            completionResolution: effectiveResolution,
+            completionReason: effectiveReason,
+            removedSimDisposition: effectiveRemovedSimDisposition,
+            meterDemountCategory: effectiveMeterDemountCategory,
+          },
+        });
+        if (transitioned.count === 0) {
+          throw new BadRequestException('Zadatak je u međuvremenu već završen ili promijenjen.');
+        }
+
         await tx.meter.update({
           where: { id: meter.id },
           data: {
@@ -543,34 +575,22 @@ export class DemountTasksService {
           where: { id: oldSimId },
           data: oldSimRemoval,
         });
-        await tx.demountTask.update({
-          where: { id: task.id },
+        await tx.simEvent.create({
           data: {
-            status: DemountTaskStatus.COMPLETED,
-            completedAt: new Date(),
-            completionResolution: effectiveResolution,
-            completionReason: effectiveReason,
-            removedSimDisposition: effectiveRemovedSimDisposition,
-            meterDemountCategory: effectiveMeterDemountCategory,
+            simCardId: oldSimId,
+            type: 'DEMOUNTED',
+            userId,
+            branchId: branchId ?? null,
+            metadata: {
+              resolution: effectiveResolution,
+              demountTaskId: task.id,
+              meterId: meter.id,
+              removedSimDisposition: effectiveRemovedSimDisposition,
+              meterDemountCategory: effectiveMeterDemountCategory,
+              demountedFromLocation,
+            } as Prisma.InputJsonValue,
           },
         });
-      });
-      const branchId = meter.branchId ?? undefined;
-      await this.prisma.simEvent.create({
-        data: {
-          simCardId: oldSimId,
-          type: 'DEMOUNTED',
-          userId,
-          branchId: branchId ?? null,
-          metadata: {
-            resolution: effectiveResolution,
-            demountTaskId: task.id,
-            meterId: meter.id,
-            removedSimDisposition: effectiveRemovedSimDisposition,
-            meterDemountCategory: effectiveMeterDemountCategory,
-            demountedFromLocation,
-          } as Prisma.InputJsonValue,
-        },
       });
     }
 
@@ -590,8 +610,8 @@ export class DemountTasksService {
       where: { id },
       include: {
         meter: { include: { simCard: true, meterTypeDefinition: true } },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: { select: SAFE_USER_SELECT },
+        createdBy: { select: SAFE_USER_SELECT },
       },
     });
 

@@ -1,8 +1,9 @@
 import type { AxiosError } from 'axios';
 import type { ApiEnvelope } from '@/types/common.types';
+import { translateCurrent } from '@/i18n/standalone';
 
 type ApiErrorEnvelope<T = unknown> = ApiEnvelope<T> & {
-  message?: string;
+  message?: string | string[];
   errorCode?: string;
   details?: unknown;
 };
@@ -17,23 +18,28 @@ export function getApiErrorMessage(
     const response = maybeAxiosError.response;
     const data = response?.data;
 
-    if (data && typeof data.message === 'string') {
-      return data.message;
+    if (data) {
+      if (typeof data.message === 'string' && data.message.trim().length > 0) {
+        return data.message;
+      }
+      if (Array.isArray(data.message) && data.message.length > 0) {
+        const firstMsg = data.message.find((m) => typeof m === 'string' && m.trim().length > 0);
+        if (firstMsg) return firstMsg;
+      }
     }
 
     if (!response) {
-      return 'Backend nije dostupan. Provjeri API adresu i mrežnu konekciju.';
+      return translateCurrent('common.messages.networkError');
     }
 
     if (response.status === 401) {
-      return 'Nemaš ovlaštenje za ovu radnju ili je sesija istekla.';
+      return translateCurrent('common.messages.sessionExpired');
     }
 
     if (response.status >= 500) {
-      return 'Došlo je do greške na serveru. Pokušaj ponovo ili kontaktiraj podršku.';
+      return translateCurrent('common.messages.genericError');
     }
   }
 
   return fallbackMessage;
 }
-

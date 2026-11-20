@@ -1,36 +1,60 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, createBrowserRouter } from 'react-router-dom';
+import { Spin } from 'antd';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { RoleGuard } from '@/components/common/RoleGuard';
+import { MetersAccessGuard } from '@/components/common/MetersAccessGuard';
 import { AppLayout } from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/auth/LoginPage';
-import DashboardPage from '@/pages/dashboard/DashboardPage';
 import ForbiddenPage from '@/pages/errors/ForbiddenPage';
 import NotFoundPage from '@/pages/errors/NotFoundPage';
-import ShipmentCreatePage from '@/pages/shipments/ShipmentCreatePage';
-import ShipmentDetailsPage from '@/pages/shipments/ShipmentDetailsPage';
-import ShipmentsListPage from '@/pages/shipments/ShipmentsListPage';
-import SimCardsIndexPage from '@/pages/sim-cards/SimCardsIndexPage'
-import SimCardDetailsPage from '@/pages/sim-cards/SimCardDetailsPage';
-import UsersListPage from '@/pages/users/UsersListPage';
-import MetersListPage from '@/pages/meters/MetersListPage';
-import MeterDetailPage from '@/pages/meters/MeterDetailPage'
-import InstallationRecordsListPage from '@/pages/installation-records/InstallationRecordsListPage';
-import InstallationRecordCreatePage from '@/pages/installation-records/InstallationRecordCreatePage';
-import InstallationRecordDetailPage from '@/pages/installation-records/InstallationRecordDetailPage';
-import ActivityLogPage from '@/pages/activity-log/ActivityLogPage';
-import SettingsPage from '@/pages/settings/SettingsPage';
-import EmailSettingsPage from '@/pages/settings/EmailSettingsPage';
-import AnalyticsPage from '@/pages/analytics/AnalyticsPage';
-import AppReleasesPage from '@/pages/app-releases/AppReleasesPage';
-import PushCampaignsPage from '@/pages/push-campaigns/PushCampaignsPage';
-import BranchModeratorsPage from '@/pages/branch-moderators/BranchModeratorsPage'
-import BranchEmailRecipientsPage from '@/pages/branch-email-recipients/BranchEmailRecipientsPage'
-import MeterTypeFieldsPage from '@/pages/meter-type-fields/MeterTypeFieldsPage'
-import MeterTypeUpsertPage from '@/pages/meter-types/MeterTypeUpsertPage'
-import { MetersAccessGuard } from '@/components/common/MetersAccessGuard'
-import ShipmentPrintPage from '@/pages/shipments/ShipmentPrintPage';
-import ShipmentWizardPage from '@/pages/shipments/ShipmentWizardPage';
-import ShipmentEditPage from '@/pages/shipments/ShipmentEditPage';
+
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
+const ShipmentDetailsPage = lazy(() => import('@/pages/shipments/ShipmentDetailsPage'));
+const ShipmentsListPage = lazy(() => import('@/pages/shipments/ShipmentsListPage'));
+const ShipmentPrintPage = lazy(() => import('@/pages/shipments/ShipmentPrintPage'));
+const ShipmentWizardPage = lazy(() => import('@/pages/shipments/ShipmentWizardPage'));
+const ShipmentEditPage = lazy(() => import('@/pages/shipments/ShipmentEditPage'));
+const SimCardsIndexPage = lazy(() => import('@/pages/sim-cards/SimCardsIndexPage'));
+const SimCardDetailsPage = lazy(() => import('@/pages/sim-cards/SimCardDetailsPage'));
+const UsersListPage = lazy(() => import('@/pages/users/UsersListPage'));
+const MetersListPage = lazy(() => import('@/pages/meters/MetersListPage'));
+const MeterDetailPage = lazy(() => import('@/pages/meters/MeterDetailPage'));
+const InstallationRecordsListPage = lazy(
+  () => import('@/pages/installation-records/InstallationRecordsListPage'),
+);
+const InstallationRecordCreatePage = lazy(
+  () => import('@/pages/installation-records/InstallationRecordCreatePage'),
+);
+const InstallationRecordDetailPage = lazy(
+  () => import('@/pages/installation-records/InstallationRecordDetailPage'),
+);
+const ActivityLogPage = lazy(() => import('@/pages/activity-log/ActivityLogPage'));
+const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'));
+const EmailSettingsPage = lazy(() => import('@/pages/settings/EmailSettingsPage'));
+const AnalyticsPage = lazy(() => import('@/pages/analytics/AnalyticsPage'));
+const AppReleasesPage = lazy(() => import('@/pages/app-releases/AppReleasesPage'));
+const PushCampaignsPage = lazy(() => import('@/pages/push-campaigns/PushCampaignsPage'));
+const BranchModeratorsPage = lazy(() => import('@/pages/branch-moderators/BranchModeratorsPage'));
+const BranchEmailRecipientsPage = lazy(
+  () => import('@/pages/branch-email-recipients/BranchEmailRecipientsPage'),
+);
+const MeterTypeFieldsPage = lazy(() => import('@/pages/meter-type-fields/MeterTypeFieldsPage'));
+const MeterTypeUpsertPage = lazy(() => import('@/pages/meter-types/MeterTypeUpsertPage'));
+
+function withSuspense(element: JSX.Element) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[240px] items-center justify-center">
+          <Spin size="large" />
+        </div>
+      }
+    >
+      {element}
+    </Suspense>
+  );
+}
 
 export const router = createBrowserRouter([
   {
@@ -53,13 +77,13 @@ export const router = createBrowserRouter([
           },
           {
             path: '/dashboard',
-            element: <DashboardPage />,
+            element: withSuspense(<DashboardPage />),
           },
           {
             path: '/users',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
-                <UsersListPage />
+                {withSuspense(<UsersListPage />)}
               </RoleGuard>
             ),
           },
@@ -67,36 +91,47 @@ export const router = createBrowserRouter([
             path: '/shipments',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
-                <ShipmentsListPage />
+                {withSuspense(<ShipmentsListPage />)}
               </RoleGuard>
             ),
           },
-          { path: '/shipments/new',
-            element:
-            <RoleGuard allow={['SYSTEM_ADMIN','DIST_ADMIN']}>
-                <ShipmentWizardPage />
-                </RoleGuard>
+          {
+            path: '/shipments/new',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+                {withSuspense(<ShipmentWizardPage />)}
+              </RoleGuard>
+            ),
           },
-          { path: '/shipments/:id/edit',
-            element:
-            <RoleGuard allow={['SYSTEM_ADMIN','DIST_ADMIN']}>
-                <ShipmentEditPage />
-                </RoleGuard>
+          {
+            path: '/shipments/:id/edit',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+                {withSuspense(<ShipmentEditPage />)}
+              </RoleGuard>
+            ),
           },
           {
             path: '/shipments/:id',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
-                <ShipmentDetailsPage />
+                {withSuspense(<ShipmentDetailsPage />)}
               </RoleGuard>
             ),
           },
-          { path: '/shipments/:id/print', element: <ShipmentPrintPage /> },
+          {
+            path: '/shipments/:id/print',
+            element: (
+              <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
+                {withSuspense(<ShipmentPrintPage />)}
+              </RoleGuard>
+            ),
+          },
           {
             path: '/meters',
             element: (
               <MetersAccessGuard>
-                <MetersListPage />
+                {withSuspense(<MetersListPage />)}
               </MetersAccessGuard>
             ),
           },
@@ -104,7 +139,7 @@ export const router = createBrowserRouter([
             path: '/meters/:id',
             element: (
               <MetersAccessGuard>
-                <MeterDetailPage />
+                {withSuspense(<MeterDetailPage />)}
               </MetersAccessGuard>
             ),
           },
@@ -112,7 +147,7 @@ export const router = createBrowserRouter([
             path: '/meter-types/new',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN']}>
-                <MeterTypeUpsertPage />
+                {withSuspense(<MeterTypeUpsertPage />)}
               </RoleGuard>
             ),
           },
@@ -120,19 +155,19 @@ export const router = createBrowserRouter([
             path: '/meter-types/:id',
             element: (
               <MetersAccessGuard>
-                <MeterTypeUpsertPage />
+                {withSuspense(<MeterTypeUpsertPage />)}
               </MetersAccessGuard>
             ),
           },
           {
             path: '/sim-cards',
-            element: <SimCardsIndexPage />,
+            element: withSuspense(<SimCardsIndexPage />),
           },
           {
             path: '/sim-cards/:id',
             element: (
               <MetersAccessGuard>
-                <SimCardDetailsPage />
+                {withSuspense(<SimCardDetailsPage />)}
               </MetersAccessGuard>
             ),
           },
@@ -140,7 +175,7 @@ export const router = createBrowserRouter([
             path: '/installation-records',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN', 'USER']}>
-                <InstallationRecordsListPage />
+                {withSuspense(<InstallationRecordsListPage />)}
               </RoleGuard>
             ),
           },
@@ -148,7 +183,7 @@ export const router = createBrowserRouter([
             path: '/installation-records/new',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN', 'USER']}>
-                <InstallationRecordCreatePage />
+                {withSuspense(<InstallationRecordCreatePage />)}
               </RoleGuard>
             ),
           },
@@ -156,7 +191,7 @@ export const router = createBrowserRouter([
             path: '/installation-records/:id',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN', 'USER']}>
-                <InstallationRecordDetailPage />
+                {withSuspense(<InstallationRecordDetailPage />)}
               </RoleGuard>
             ),
           },
@@ -164,7 +199,7 @@ export const router = createBrowserRouter([
             path: '/push-campaigns',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
-                <PushCampaignsPage />
+                {withSuspense(<PushCampaignsPage />)}
               </RoleGuard>
             ),
           },
@@ -172,7 +207,7 @@ export const router = createBrowserRouter([
             path: '/activity-log',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
-                <ActivityLogPage />
+                {withSuspense(<ActivityLogPage />)}
               </RoleGuard>
             ),
           },
@@ -180,7 +215,7 @@ export const router = createBrowserRouter([
             path: '/settings',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN']}>
-                <SettingsPage />
+                {withSuspense(<SettingsPage />)}
               </RoleGuard>
             ),
           },
@@ -188,7 +223,7 @@ export const router = createBrowserRouter([
             path: '/settings/email',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN']}>
-                <EmailSettingsPage />
+                {withSuspense(<EmailSettingsPage />)}
               </RoleGuard>
             ),
           },
@@ -196,7 +231,7 @@ export const router = createBrowserRouter([
             path: '/app-releases',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN']}>
-                <AppReleasesPage />
+                {withSuspense(<AppReleasesPage />)}
               </RoleGuard>
             ),
           },
@@ -204,7 +239,7 @@ export const router = createBrowserRouter([
             path: '/analytics',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN', 'USER']}>
-                <AnalyticsPage />
+                {withSuspense(<AnalyticsPage />)}
               </RoleGuard>
             ),
           },
@@ -212,7 +247,7 @@ export const router = createBrowserRouter([
             path: '/branch-moderators',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
-                <BranchModeratorsPage />
+                {withSuspense(<BranchModeratorsPage />)}
               </RoleGuard>
             ),
           },
@@ -220,7 +255,7 @@ export const router = createBrowserRouter([
             path: '/branch-email-recipients',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN', 'DIST_ADMIN']}>
-                <BranchEmailRecipientsPage />
+                {withSuspense(<BranchEmailRecipientsPage />)}
               </RoleGuard>
             ),
           },
@@ -228,7 +263,7 @@ export const router = createBrowserRouter([
             path: '/meter-type-fields',
             element: (
               <RoleGuard allow={['SYSTEM_ADMIN']}>
-                <MeterTypeFieldsPage />
+                {withSuspense(<MeterTypeFieldsPage />)}
               </RoleGuard>
             ),
           },

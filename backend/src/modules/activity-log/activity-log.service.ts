@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { PaginatedResult } from '../../common/interfaces/paginated-result.interface';
+import { ScopeContext } from '../../common/utils/scope-filter.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActivityLogFilterDto } from './dto/activity-log-filter.dto';
 
@@ -30,11 +31,31 @@ export class ActivityLogService {
     });
   }
 
-  async findAll(filter: ActivityLogFilterDto): Promise<PaginatedResult<unknown>> {
+  async findAll(
+    filter: ActivityLogFilterDto,
+    scope?: ScopeContext | null,
+  ): Promise<PaginatedResult<unknown>> {
     const page = filter.page ?? 1;
     const limit = filter.limit ?? 20;
 
+    if (scope?.role === UserRole.DIST_ADMIN && !scope.distributionId) {
+      return { items: [], page, limit, total: 0, totalPages: 1 };
+    }
+
+    const tenantFilter: Prisma.ActivityLogWhereInput =
+      scope?.role === UserRole.DIST_ADMIN && scope.distributionId
+        ? {
+            user: {
+              OR: [
+                { distributionId: scope.distributionId },
+                { branch: { distributionId: scope.distributionId } },
+              ],
+            },
+          }
+        : {};
+
     const where: Prisma.ActivityLogWhereInput = {
+      ...tenantFilter,
       ...(filter.action ? { action: { contains: filter.action } } : {}),
       ...(filter.entity ? { entity: { contains: filter.entity } } : {}),
       ...(filter.userId ? { userId: filter.userId } : {}),

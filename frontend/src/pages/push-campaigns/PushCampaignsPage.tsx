@@ -22,16 +22,6 @@ export default function PushCampaignsPage() {
   const { t } = useTranslation();
   const featuresQuery = useAppFeatures();
   const pushEnabled = featuresQuery.data?.pushCampaignsEnabled ?? true;
-  if (!pushEnabled) {
-    return (
-      <Alert
-        type="warning"
-        message={t('pushCampaigns.disabledTitle')}
-        description={t('pushCampaigns.disabledDescription')}
-        showIcon
-      />
-    );
-  }
 
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
@@ -51,6 +41,7 @@ export default function PushCampaignsPage() {
   const { data: listData, isLoading } = useQuery({
     queryKey: ['push-campaigns', 'list'],
     queryFn: () => pushCampaignsApi.list({ page: 1, limit: 50 }),
+    enabled: pushEnabled,
   });
 
   const createMutation = useMutation({
@@ -145,7 +136,7 @@ export default function PushCampaignsPage() {
         ),
       },
     ],
-    [sendMutation],
+    [sendMutation, t],
   );
 
   const openCreate = useCallback(() => {
@@ -159,24 +150,22 @@ export default function PushCampaignsPage() {
       const res = await usersApi.list({
         page: 1,
         limit: 20,
-        // simple search by first/last/email – API already supports `search` in UsersPage;
-        // if not present, this will be ignored server-side.
-        // We keep it optional to avoid breaking existing backend.
-      } as any);
+      });
       return res.items as UserListItem[];
     },
+    enabled: pushEnabled,
   });
 
   const { data: stats } = useQuery({
     queryKey: ['push-campaigns', 'stats', selectedCampaign?.id],
     queryFn: () => pushCampaignsApi.stats(selectedCampaign!.id),
-    enabled: !!selectedCampaign && detailsOpen,
+    enabled: pushEnabled && !!selectedCampaign && detailsOpen,
   });
 
   const { data: recipientsData, isLoading: recipientsLoading } = useQuery({
     queryKey: ['push-campaigns', 'recipients', selectedCampaign?.id],
     queryFn: () => pushCampaignsApi.recipients(selectedCampaign!.id, { page: 1, limit: 200 }),
-    enabled: !!selectedCampaign && detailsOpen,
+    enabled: pushEnabled && !!selectedCampaign && detailsOpen,
   });
 
   const recipientColumns: ColumnsType<PushDeliveryListItem> = useMemo(
@@ -214,8 +203,19 @@ export default function PushCampaignsPage() {
         render: (v: string | null) => (v ? <span className="font-mono text-xs">{v}</span> : ''),
       },
     ],
-    [],
+    [t],
   );
+
+  if (!pushEnabled) {
+    return (
+      <Alert
+        type="warning"
+        message={t('pushCampaigns.disabledTitle')}
+        description={t('pushCampaigns.disabledDescription')}
+        showIcon
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">

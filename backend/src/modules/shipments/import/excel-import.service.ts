@@ -63,7 +63,7 @@ function safeString(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }
-  return String(value).replace(/^﻿/, '').trim();
+  return String(value).replace(/^\uFEFF/, '').trim();
 }
 
 function normalizeIccid(value: string): string {

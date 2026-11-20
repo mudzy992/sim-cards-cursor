@@ -5,16 +5,19 @@ const config: Config = {
   testEnvironment: 'node',
   rootDir: '.',
   moduleFileExtensions: ['ts', 'js', 'json'],
-  testMatch: ['**/*.spec.ts'],
+  testRegex: '.*\\.spec\\.ts$',
   moduleNameMapper: {
     '^src/(.*)$': '<rootDir>/src/$1',
   },
-  globals: {
-    'ts-jest': {
-      tsconfig: '<rootDir>/tsconfig.json',
-    },
+  transform: {
+    '^.+\\.ts$': [
+      'ts-jest',
+      {
+        tsconfig: '<rootDir>/tsconfig.json',
+      },
+    ],
   },
+  coveragePathIgnorePatterns: ['/node_modules/', '/dist/', '/prisma/'],
 };
 
 export default config;
-

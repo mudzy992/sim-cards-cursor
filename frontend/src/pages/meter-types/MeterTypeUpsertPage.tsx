@@ -15,12 +15,12 @@ import {
   Typography,
   message,
 } from 'antd'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import type { CreateMeterTypeDefinitionInput, MeterType, MeterTypeDefinitionItem } from '@/types/meter-type-definition.types'
-import type { MeterFieldType, MeterTypeFieldItem } from '@/types/meter-type-field.types'
+import type { CreateMeterTypeFieldInput, MeterFieldType, MeterTypeFieldItem, UpdateMeterTypeFieldInput } from '@/types/meter-type-field.types'
 import { useTranslation } from '@/i18n'
 
 function getMeterTypeOptions(t: (key: string) => string): { label: string; value: MeterType }[] {
@@ -140,8 +140,8 @@ export default function MeterTypeUpsertPage() {
   })
 
   const updateFieldMutation = useMutation({
-    mutationFn: (payload: { id: string; data: Record<string, unknown> }) =>
-      meterTypeDefinitionsApi.updateField(definitionId!, payload.id, payload.data as any),
+    mutationFn: (payload: { id: string; data: UpdateMeterTypeFieldInput }) =>
+      meterTypeDefinitionsApi.updateField(definitionId!, payload.id, payload.data),
     onSuccess: async () => {
       messageApi.success(t('meterTypeFields.messages.updated'))
       setFieldDrawerOpen(false)
@@ -181,6 +181,19 @@ export default function MeterTypeUpsertPage() {
       )
     },
   })
+
+  useEffect(() => {
+    if (typeQuery.data) {
+      typeForm.setFieldsValue({
+        name: typeQuery.data.name,
+        manufacturer: typeQuery.data.manufacturer ?? '',
+        model: typeQuery.data.model ?? '',
+        type: typeQuery.data.type,
+        maxCurrent: typeQuery.data.maxCurrent ?? '',
+        notes: typeQuery.data.notes ?? '',
+      })
+    }
+  }, [typeQuery.data, typeForm])
 
   const fields = useMemo(() => {
     return (fieldsQuery.data ?? []).slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -349,18 +362,6 @@ export default function MeterTypeUpsertPage() {
               maxCurrent: '',
               notes: '',
             }}
-            fields={
-              typeQuery.data
-                ? ([
-                    { name: 'name', value: typeQuery.data.name },
-                    { name: 'manufacturer', value: typeQuery.data.manufacturer ?? '' },
-                    { name: 'model', value: typeQuery.data.model ?? '' },
-                    { name: 'type', value: typeQuery.data.type },
-                    { name: 'maxCurrent', value: typeQuery.data.maxCurrent ?? '' },
-                    { name: 'notes', value: typeQuery.data.notes ?? '' },
-                  ] as any)
-                : undefined
-            }
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Form.Item name="name" label={t('common.labels.name')} rules={[{ required: true, message: t('meterTypes.nameRequired') }]}>
@@ -450,7 +451,7 @@ export default function MeterTypeUpsertPage() {
           form={fieldForm}
           layout="vertical"
           onFinish={(values) => {
-            const payload = {
+            const payload: CreateMeterTypeFieldInput = {
               name: values.name.trim(),
               label: values.label.trim(),
               fieldType: values.fieldType,
@@ -463,7 +464,7 @@ export default function MeterTypeUpsertPage() {
               updateFieldMutation.mutate({ id: editingField.id, data: payload })
               return
             }
-            createFieldMutation.mutate(payload as any)
+            createFieldMutation.mutate(payload)
           }}
         >
           <Form.Item name="name" label={t('meterTypeFields.columns.name')} rules={[{ required: true }]}>

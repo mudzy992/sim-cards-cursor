@@ -1,4 +1,8 @@
-const buildDateFormatter = new Intl.DateTimeFormat('bs-BA', {
+import { getActiveLanguage } from '@/i18n/standalone';
+
+const activeLocale = getActiveLanguage() === 'en' ? 'en-US' : 'bs-BA';
+
+const buildDateFormatter = new Intl.DateTimeFormat(activeLocale, {
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',

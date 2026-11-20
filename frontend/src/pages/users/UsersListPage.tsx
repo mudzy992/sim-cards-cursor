@@ -48,6 +48,8 @@ export default function UsersListPage() {
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState<string>('users');
+  const [userPage, setUserPage] = useState(1);
+  const [userLimit, setUserLimit] = useState(20);
   const [userDrawerOpen, setUserDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<UserListItem | null>(null);
   const [form] = Form.useForm<CreateUserInput & { confirmPassword?: string }>();
@@ -66,8 +68,8 @@ export default function UsersListPage() {
   } | null>(null)
 
   const usersQuery = useQuery({
-    queryKey: ['users', 'list'],
-    queryFn: () => usersApi.list(),
+    queryKey: ['users', 'list', userPage, userLimit],
+    queryFn: () => usersApi.list({ page: userPage, limit: userLimit }),
   });
 
   const distributionsQuery = useQuery({
@@ -364,7 +366,17 @@ export default function UsersListPage() {
         rowKey="id"
         loading={usersQuery.isLoading}
         dataSource={rows}
-        pagination={false}
+        pagination={{
+          current: userPage,
+          pageSize: userLimit,
+          total: usersQuery.data?.total ?? 0,
+          showSizeChanger: true,
+          pageSizeOptions: ['20', '50', '100'],
+          onChange: (p, l) => {
+            setUserPage(p);
+            setUserLimit(Math.min(l, 100));
+          },
+        }}
         scroll={{ x: 900 }}
         columns={[
           {

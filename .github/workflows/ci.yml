@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['main']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Lint, Typecheck, Build, Unit & E2E)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: simtracker_ci
+          POSTGRES_PASSWORD: ci_password_only
+          POSTGRES_DB: simtracker_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U simtracker_ci -d simtracker_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://simtracker_ci:ci_password_only@localhost:5432/simtracker_ci?schema=public
+      JWT_SECRET: ci-only-jwt-secret-key-min-32-chars-012345
+      JWT_REFRESH_SECRET: ci-only-jwt-refresh-secret-min-32-chars-6789
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy migrations to ephemeral PostgreSQL
+        run: npx prisma migrate deploy
+
+      - name: Seed ephemeral database
+        env:
+          SEED_ADMIN_PASSWORD: CiSeedPassword!123
+        run: npm run prisma:seed
+
+      - name: Run unit tests
+        run: npm run test:ci
+
+      - name: Run E2E tests against ephemeral PostgreSQL
+        run: npm run test:e2e
+
+  frontend:
+    name: Frontend (Lint, Typecheck, i18n, UI, Unit/A11y, Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint & A11y rules
+        run: npm run lint
+
+      - name: Check i18n parity & keys
+        run: npm run check:i18n
+
+      - name: Check UI consistency
+        run: npm run check:ui
+
+      - name: Run unit & accessibility tests
+        run: npm test
+
+      - name: Build production bundle
+        run: npm run build
+
+  docker-compose-validate:
+    name: Docker & Compose Config Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose files
+        env:
+          POSTGRES_PASSWORD: ci_placeholder_password
+          PGADMIN_DEFAULT_PASSWORD: ci_placeholder_pgadmin_password
+          JWT_SECRET: ci_placeholder_jwt_secret_min_32_characters
+          JWT_REFRESH_SECRET: ci_placeholder_jwt_refresh_min_32_characters
+          FRONTEND_URLS: https://example.com
+          VITE_API_URL: /api
+          ACME_EMAIL: ci@example.com
+          APP_DOMAIN: example.com
+          BACKEND_DOMAIN: api.example.com
+          UPLOAD_DIR: /app/uploads
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.vm.db.yml config -q
+          docker compose -f docker-compose.vm.app.yml config -q
+          docker compose -f docker-compose.vm.traefik.yml config -q

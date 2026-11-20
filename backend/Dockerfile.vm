@@ -1,15 +1,3 @@
-# =====================================================================
-# APP IMAGE za VM (offline build) — backend
-# =====================================================================
-# Svakodnevni build kada se mijenja SAMO kod (nema novih zavisnosti).
-# Builda se DIREKTNO NA VM-u, bez interneta — pod uslovom da je
-# `simtracker-backend-deps:<tag>` (backend/Dockerfile.deps) već učitan
-# lokalno na VM (docker load), i da je taj tag proslijeđen kao DEPS_IMAGE
-# build-arg (vidi scripts/vm-backend-build.sh i docker-compose.vm.app.yml).
-#
-# Ne radi nikakav `npm ci`/`npm install` — sve zavisnosti (uključujući
-# devDependencies, namjerno) već postoje u deps image-u.
-# =====================================================================
 ARG DEPS_IMAGE=simtracker-backend-deps:latest
 
 FROM ${DEPS_IMAGE} AS build
@@ -22,6 +10,8 @@ RUN npm run build
 
 FROM ${DEPS_IMAGE} AS runtime
 WORKDIR /usr/app
+
+ENV NODE_ENV=production
 
 COPY --from=build /usr/app/dist ./dist
 COPY --from=build /usr/app/node_modules/.prisma ./node_modules/.prisma

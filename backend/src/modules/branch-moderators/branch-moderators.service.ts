@@ -68,9 +68,20 @@ export class BranchModeratorsService {
     })
   }
 
-  async findByUser(userId: string) {
+  async findByUser(
+    userId: string,
+    actor?: { role: UserRole; distributionId: string | null },
+  ) {
+    if (actor?.role === UserRole.DIST_ADMIN && !actor.distributionId) {
+      return []
+    }
+    const where =
+      actor?.role === UserRole.DIST_ADMIN && actor.distributionId
+        ? { userId, branch: { distributionId: actor.distributionId } }
+        : { userId }
+
     return this.prisma.branchModerator.findMany({
-      where: { userId },
+      where,
       include: {
         branch: {
           select: { id: true, name: true, code: true, distributionId: true },
@@ -81,9 +92,13 @@ export class BranchModeratorsService {
   }
 
   async findAll(actor: { role: UserRole; distributionId: string | null }) {
-    const where = actor.role === UserRole.DIST_ADMIN && actor.distributionId
-      ? { branch: { distributionId: actor.distributionId } }
-      : {}
+    if (actor.role === UserRole.DIST_ADMIN && !actor.distributionId) {
+      return []
+    }
+    const where =
+      actor.role === UserRole.DIST_ADMIN && actor.distributionId
+        ? { branch: { distributionId: actor.distributionId } }
+        : {}
 
     return this.prisma.branchModerator.findMany({
       where,

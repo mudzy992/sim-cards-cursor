@@ -1,32 +1,24 @@
-
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class RecordNumberGenerator {
   constructor(private readonly prisma: PrismaService) {}
 
-  async generate(): Promise<string> {
+  async generate(tx: Prisma.TransactionClient = this.prisma): Promise<string> {
     const year = new Date().getUTCFullYear();
     const prefix = `ZAP-${year}-`;
 
-    const lastRecord = await this.prisma.installationRecord.findFirst({
-      where: {
-        recordNumber: {
-          startsWith: prefix,
-        },
-      },
-      orderBy: {
-        recordNumber: 'desc',
-      },
-    });
+    const rows = await tx.$queryRaw<Array<{ max_seq: number | null }>>`
+      SELECT MAX(
+        NULLIF(regexp_replace(split_part(record_number, '-', 3), '[^0-9]', '', 'g'), '')::int
+      ) AS max_seq
+      FROM installation_records
+      WHERE record_number LIKE ${`${prefix}%`}
+    `;
 
-    let sequence = 1;
-    if (lastRecord) {
-      const lastSequence = parseInt(lastRecord.recordNumber.split('-')[2], 10);
-      sequence = lastSequence + 1;
-    }
-
+    const sequence = (rows[0]?.max_seq ?? 0) + 1;
     const paddedSequence = String(sequence).padStart(5, '0');
     return `${prefix}${paddedSequence}`;
   }

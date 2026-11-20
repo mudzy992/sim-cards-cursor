@@ -40,18 +40,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     let branchModeratorBranchIds: string[] = [];
+    let moderatorDistributionId: string | null = null;
     if (user.role === UserRole.USER) {
       const moderatorEntries = await this.prisma.branchModerator.findMany({
         where: { userId: user.id },
-        select: { branchId: true },
+        select: {
+          branchId: true,
+          branch: { select: { distributionId: true } },
+        },
       });
       branchModeratorBranchIds = moderatorEntries.map((e) => e.branchId);
+      moderatorDistributionId = moderatorEntries[0]?.branch?.distributionId ?? null;
     }
 
     const { branch, ...rest } = user;
     return {
       ...rest,
-      distributionId: rest.distributionId ?? branch?.distributionId ?? null,
+      distributionId: rest.distributionId ?? branch?.distributionId ?? moderatorDistributionId,
       branchId: rest.branchId ?? null,
       branchModeratorBranchIds,
     };

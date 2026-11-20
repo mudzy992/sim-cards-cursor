@@ -8,9 +8,15 @@ import {
   UseInterceptors,
   UploadedFile,
   Body,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { randomUUID } from 'crypto';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -19,7 +25,8 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { UploadAndroidReleaseDto } from './dto/upload-android-release.dto';
 import { AppReleasesService } from './app-releases.service';
-import { ParseUUIDPipe } from '@nestjs/common';
+
+const apkTempDir = path.join(os.tmpdir(), 'sim-tracker-apk-uploads');
 
 @ApiTags('app-releases')
 @Controller('app-releases')
@@ -33,7 +40,17 @@ export class AppReleasesController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: 250 * 1024 * 1024 }, // 250MB
+      storage: diskStorage({
+        destination: (_req, _file, cb) => {
+          fs.mkdirSync(apkTempDir, { recursive: true });
+          cb(null, apkTempDir);
+        },
+        filename: (_req, file, cb) => {
+          const safe = (file.originalname ?? 'release.apk').replace(/[^\w.-]+/g, '_');
+          cb(null, `${randomUUID()}_${safe}`);
+        },
+      }),
+      limits: { fileSize: 250 * 1024 * 1024 },
     }),
   )
   @ApiOperation({ summary: 'Upload Android APK release (SYSTEM_ADMIN)' })
@@ -76,7 +93,13 @@ export class AppReleasesController {
       'Content-Disposition',
       `attachment; filename="sim-tracker-${release.versionName}.apk"`,
     );
+    stream.on('error', () => {
+      if (!res.headersSent) {
+        res.status(404).send('File not found');
+      } else {
+        res.destroy();
+      }
+    });
     return stream.pipe(res);
   }
 }
-

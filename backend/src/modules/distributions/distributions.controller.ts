@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -30,13 +31,28 @@ export class DistributionsController {
 
   @Get()
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
-  findAll(@CurrentUser() user?: { role: string; distributionId?: string | null }) {
-    return this.service.findAll(user?.role === 'DIST_ADMIN' ? user.distributionId ?? undefined : undefined);
+  findAll(@CurrentUser() user: { role: UserRole; distributionId?: string | null }) {
+    if (user.role === UserRole.DIST_ADMIN) {
+      if (!user.distributionId) {
+        return [];
+      }
+      return this.service.findAll(user.distributionId);
+    }
+    return this.service.findAll(undefined);
   }
 
   @Get(':id')
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
-  findOne(@Param('id') id: string) {
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: { role: UserRole; distributionId?: string | null },
+  ) {
+    if (
+      user.role === UserRole.DIST_ADMIN &&
+      (!user.distributionId || id !== user.distributionId)
+    ) {
+      throw new ForbiddenException('Distribution is outside your scope');
+    }
     return this.service.findOne(id);
   }
 

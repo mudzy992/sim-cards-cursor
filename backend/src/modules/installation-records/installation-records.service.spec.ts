@@ -37,15 +37,46 @@ const mockRecord = {
   approvedBy: null,
 };
 
+type PrismaMockShape = {
+  $transaction: jest.Mock;
+  installationRecord: {
+    findMany: jest.Mock;
+    count: jest.Mock;
+    findFirst: jest.Mock;
+    findUnique: jest.Mock;
+    update: jest.Mock;
+    create: jest.Mock;
+    delete: jest.Mock;
+  };
+  meter: {
+    findUnique: jest.Mock;
+    findFirst: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+  };
+  meterTypeDefinition: { findUnique: jest.Mock };
+  simCard: {
+    findUnique: jest.Mock;
+    findFirst: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
+  simEvent: { create: jest.Mock };
+  branchModerator: { findUnique: jest.Mock; findMany: jest.Mock };
+  branchEmailRecipient: { findMany: jest.Mock };
+  user: { findFirst: jest.Mock };
+  branch: { findUnique: jest.Mock };
+};
+
 describe('InstallationRecordsService', () => {
   let service: InstallationRecordsService;
-  let prismaMock: Record<string, any>;
+  let prismaMock: PrismaMockShape;
 
   beforeEach(async () => {
     prismaMock = {
       $transaction: jest.fn((args) => {
         if (Array.isArray(args)) return Promise.resolve(args);
-        return args(prismaMock);
+        return (args as (tx: PrismaMockShape) => unknown)(prismaMock);
       }),
       installationRecord: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -56,12 +87,24 @@ describe('InstallationRecordsService', () => {
         create: jest.fn(),
         delete: jest.fn(),
       },
-      meter: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+      meter: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
       meterTypeDefinition: { findUnique: jest.fn() },
-      simCard: { findUnique: jest.fn(), update: jest.fn() },
+      simCard: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       simEvent: { create: jest.fn() },
       branchModerator: { findUnique: jest.fn(), findMany: jest.fn() },
       branchEmailRecipient: { findMany: jest.fn() },
+      user: { findFirst: jest.fn() },
+      branch: { findUnique: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -174,15 +217,14 @@ describe('InstallationRecordsService', () => {
       prismaMock.meterTypeDefinition.findUnique.mockImplementation((args: { where: { id: string } }) =>
         Promise.resolve({ id: args.where.id, name: 'Type' }),
       );
-      prismaMock.meter.findUnique
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ simCardId: null });
+      prismaMock.meter.findUnique.mockResolvedValue(null);
       prismaMock.meter.create.mockResolvedValue({ id: 'meter-new' });
-      prismaMock.simCard.findUnique.mockResolvedValue({
+      prismaMock.simCard.findFirst.mockResolvedValue({
         id: 'sim-1',
         status: 'AVAILABLE',
         assignedToId: null,
       });
+      prismaMock.simCard.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.installationRecord.create.mockResolvedValue({
         id: 'rec-x',
         recordNumber: 'REC-001',

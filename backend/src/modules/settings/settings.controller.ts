@@ -10,6 +10,7 @@ import { SettingsService } from './settings.service';
 import { Request } from 'express';
 import { UpdateMySettingsDto } from './dto/update-my-settings.dto';
 import { UpdateNotificationChannelsDto } from './dto/update-notification-channels.dto';
+import { UpdateMobilePushDto } from './dto/update-mobile-push.dto';
 
 @ApiTags('settings')
 @ApiBearerAuth()
@@ -60,7 +61,7 @@ export class SettingsController {
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Postavi globalni status mobilnih push notifikacija' })
   async setMobilePush(
-    @Body() body: { enabled: boolean },
+    @Body() body: UpdateMobilePushDto,
     @CurrentUser() user: { id: string },
     @Req() req: Request,
   ) {

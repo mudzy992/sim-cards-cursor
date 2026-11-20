@@ -6,7 +6,6 @@ import {
   Col,
   Row,
   Segmented,
-  Space,
   Table,
   Tag,
   Typography,
@@ -26,14 +25,6 @@ const statusLabelKey: Record<string, string> = {
   SEND_FAILED: 'installationRecords.status.sendFailed',
   SEP_ACTIVATED: 'installationRecords.status.sepActivated',
   LEGACY_COMPLETED: 'installationRecords.status.legacyCompleted',
-};
-
-const statusColor: Record<string, string> = {
-  DRAFT: 'default',
-  SENT: 'blue',
-  SEND_FAILED: 'error',
-  SEP_ACTIVATED: 'success',
-  LEGACY_COMPLETED: 'default',
 };
 
 function getRangeOptions(t: (key: string) => string): { label: string; value: AnalyticsRange }[] {

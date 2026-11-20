@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common'
 import { InstallTaskStatus, MeterSimCardState, MeterStatus, UserRole } from '@prisma/client'
 import { scopeWhere, type ScopeContext } from 'src/common/utils/scope-filter.util'
+import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { ActivityLogService } from '../activity-log/activity-log.service'
 import { InstallationRecordsService } from '../installation-records/installation-records.service'
@@ -124,8 +125,8 @@ export class InstallTasksService {
         },
         include: {
           meter: { include: { meterTypeDefinition: true, simCard: true } },
-          assignedTo: true,
-          createdBy: true,
+          assignedTo: { select: SAFE_USER_SELECT },
+          createdBy: { select: SAFE_USER_SELECT },
         },
       })
     })
@@ -161,8 +162,8 @@ export class InstallTasksService {
       orderBy: { createdAt: 'desc' },
       include: {
         meter: { include: { meterTypeDefinition: true, simCard: true } },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: { select: SAFE_USER_SELECT },
+        createdBy: { select: SAFE_USER_SELECT },
         installationRecord: true,
       },
     })
@@ -206,8 +207,8 @@ export class InstallTasksService {
       data: { status, ...(isReturnToInitiator ? { assignedToId: null } : {}) },
       include: {
         meter: { include: { meterTypeDefinition: true, simCard: true } },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: { select: SAFE_USER_SELECT },
+        createdBy: { select: SAFE_USER_SELECT },
         installationRecord: true,
       },
     })
@@ -271,8 +272,8 @@ export class InstallTasksService {
       data: { status: InstallTaskStatus.CANCELLED },
       include: {
         meter: { include: { meterTypeDefinition: true, simCard: true } },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: { select: SAFE_USER_SELECT },
+        createdBy: { select: SAFE_USER_SELECT },
         installationRecord: true,
       },
     })
@@ -347,8 +348,8 @@ export class InstallTasksService {
       },
       include: {
         meter: { include: { meterTypeDefinition: true, simCard: true } },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: { select: SAFE_USER_SELECT },
+        createdBy: { select: SAFE_USER_SELECT },
         installationRecord: true,
       },
     })
@@ -407,8 +408,8 @@ export class InstallTasksService {
         where: { id: task.id },
         include: {
           meter: { include: { meterTypeDefinition: true, simCard: true } },
-          assignedTo: true,
-          createdBy: true,
+          assignedTo: { select: SAFE_USER_SELECT },
+          createdBy: { select: SAFE_USER_SELECT },
           installationRecord: true,
         },
       })
@@ -480,27 +481,41 @@ export class InstallTasksService {
         installedById: userId,
         notes: dto.recordNotes,
       },
-      { userId, ipAddress },
+      {
+        userId,
+        ipAddress,
+        role: scope?.role,
+        distributionId: scope?.distributionId ?? null,
+        branchId: scope?.branchId ?? null,
+        branchModeratorBranchIds: scope?.branchModeratorBranchIds ?? [],
+      },
     )
 
-    const updated = await this.prisma.installTask.update({
-      where: { id: task.id },
-      data: {
-        status: InstallTaskStatus.COMPLETED,
-        completedAt: new Date(),
-        installationRecordId: record.id,
-      },
-      include: {
-        meter: { include: { meterTypeDefinition: true, simCard: true } },
-        assignedTo: true,
-        createdBy: true,
-        installationRecord: true,
-      },
-    })
-
-    await this.prisma.meter.update({
-      where: { id: task.meter.id },
-      data: { hasOpenInstallTask: false },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const transitioned = await tx.installTask.updateMany({
+        where: { id: task.id, status: InstallTaskStatus.IN_PROGRESS },
+        data: {
+          status: InstallTaskStatus.COMPLETED,
+          completedAt: new Date(),
+          installationRecordId: record.id,
+        },
+      })
+      if (transitioned.count === 0) {
+        throw new BadRequestException('Zadatak je u međuvremenu već završen ili promijenjen.')
+      }
+      await tx.meter.update({
+        where: { id: task.meter.id },
+        data: { hasOpenInstallTask: false },
+      })
+      return tx.installTask.findUniqueOrThrow({
+        where: { id: task.id },
+        include: {
+          meter: { include: { meterTypeDefinition: true, simCard: true } },
+          assignedTo: { select: SAFE_USER_SELECT },
+          createdBy: { select: SAFE_USER_SELECT },
+          installationRecord: true,
+        },
+      })
     })
 
     await this.activityLogService.log({

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Image } from 'antd';
 import { installationRecordsApi } from '@/api/installation-records.api';
+import { useTranslation } from '@/i18n';
 
 type RecordPhotoImageProps = {
   path: string;
@@ -12,27 +13,39 @@ type RecordPhotoImageProps = {
 
 export function RecordPhotoImage({
   path,
-  alt = 'Fotografija',
+  alt,
   width = 120,
   height = 120,
   style,
 }: RecordPhotoImageProps) {
+  const { t } = useTranslation();
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    let active = true;
     let url: string | null = null;
+    setObjectUrl(null);
+    setError(false);
+
     installationRecordsApi
       .getPhotoBlob(path)
       .then((blob) => {
         url = URL.createObjectURL(blob);
+        if (!active) {
+          URL.revokeObjectURL(url);
+          url = null;
+          return;
+        }
         setObjectUrl(url);
         setError(false);
       })
       .catch(() => {
-        setError(true);
+        if (active) setError(true);
       });
+
     return () => {
+      active = false;
       if (url) URL.revokeObjectURL(url);
     };
   }, [path]);
@@ -40,19 +53,10 @@ export function RecordPhotoImage({
   if (error) {
     return (
       <div
-        style={{
-          width,
-          height,
-          backgroundColor: '#f5f5f5',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 8,
-          color: '#999',
-          fontSize: 12,
-        }}
+        className="flex items-center justify-center rounded-lg bg-slate-800/70 text-slate-400 text-xs border border-slate-700"
+        style={{ width, height }}
       >
-        Greška učitavanja
+        {t('common.states.error')}
       </div>
     );
   }
@@ -60,16 +64,8 @@ export function RecordPhotoImage({
   if (!objectUrl) {
     return (
       <div
-        style={{
-          width,
-          height,
-          backgroundColor: '#f5f5f5',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 8,
-          color: '#999',
-        }}
+        className="flex items-center justify-center rounded-lg bg-slate-800/70 text-slate-400 text-xs border border-slate-700"
+        style={{ width, height }}
       >
         …
       </div>
@@ -79,7 +75,7 @@ export function RecordPhotoImage({
   return (
     <Image
       src={objectUrl}
-      alt={alt}
+      alt={alt ?? t('meters.detail.photoLabel')}
       width={width}
       height={height}
       style={{ objectFit: 'cover', borderRadius: 8, ...style }}

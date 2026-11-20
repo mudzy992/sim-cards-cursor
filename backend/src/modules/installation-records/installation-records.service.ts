@@ -4,7 +4,8 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
+import { scopeWhere, toScopeContext, ScopeContext } from 'src/common/utils/scope-filter.util';
+import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateInstallationRecordDto } from './dto/create-installation-record.dto';
 import { UpdateInstallationRecordDto } from './dto/update-installation-record.dto';
@@ -15,6 +16,7 @@ import {
   InstallationRecordKind,
   RecordStatus,
   SimCardStatus,
+  UserRole,
 } from '@prisma/client';
 import { assertMeterYearsRequired } from 'src/common/utils/meter-years.util';
 import { InstallationRecordFilterDto } from './dto/installation-record-filter.dto';
@@ -30,9 +32,12 @@ import * as path from 'path';
 
 export type InstallationRecordContext = {
   userId?: string;
+  role?: UserRole;
+  distributionId?: string | null;
   ipAddress?: string;
   /** branchId trenutnog korisnika – za operatora se postavlja na meter pri kreiranju novog brojila */
   branchId?: string | null;
+  branchModeratorBranchIds?: string[];
 };
 
 @Injectable()
@@ -132,16 +137,94 @@ export class InstallationRecordsService {
       } as Prisma.InputJsonValue;
     }
 
-    let meterId: string;
+    let effectiveInstalledById = createInstallationRecordDto.installedById;
+    const actorScope = ctx?.role
+      ? toScopeContext({
+          role: ctx.role,
+          distributionId: ctx.distributionId ?? null,
+          branchId: ctx.branchId ?? null,
+          branchModeratorBranchIds: ctx.branchModeratorBranchIds ?? [],
+        })
+      : null;
+
+    if (ctx?.role === UserRole.USER && ctx.userId) {
+      effectiveInstalledById = ctx.userId;
+    } else if (
+      ctx?.role === UserRole.DIST_ADMIN &&
+      createInstallationRecordDto.installedById &&
+      createInstallationRecordDto.installedById !== ctx.userId
+    ) {
+      const targetScope = scopeWhere(actorScope, { userScope: true });
+      const targetUser = await this.prisma.user.findFirst({
+        where: {
+          id: createInstallationRecordDto.installedById,
+          ...(targetScope ? { AND: [targetScope] } : {}),
+        },
+        select: { id: true },
+      });
+      if (!targetUser) {
+        throw new ForbiddenException('Odabrani monter nije u vašoj distribuciji.');
+      }
+    }
+
+    const simCardId = createInstallationRecordDto.simCardId;
+    const simScopeClause = actorScope ? scopeWhere(actorScope, { viaShipment: true }) : undefined;
+    const simCard = await this.prisma.simCard.findFirst({
+      where: {
+        id: simCardId,
+        ...(simScopeClause ? { AND: [simScopeClause] } : {}),
+      },
+    });
+    if (!simCard) {
+      throw new BadRequestException('SIM kartica nije pronađena ili nije u vašem opsegu.');
+    }
+    const canUseSim =
+      simCard.status === SimCardStatus.AVAILABLE ||
+      (simCard.status === SimCardStatus.ASSIGNED &&
+        simCard.assignedToId === effectiveInstalledById);
+    if (!canUseSim) {
+      throw new BadRequestException('SIM kartica nije dostupna za ugradnju.');
+    }
+
+    let existingMeterSimCardId: string | null = null;
+    let meterIdForLookup: string | null = null;
+    let newMeterData:
+      | {
+          serialNumber: string;
+          meterTypeDefinitionId: string;
+          branchId?: string;
+          year?: number;
+          calibrationYear?: number;
+          installationAddress?: string;
+          installationDate?: Date;
+          city?: string;
+          municipality?: string;
+          measuringPoint?: string;
+          latitude?: number;
+          longitude?: number;
+          dynamicFieldValues?: Prisma.InputJsonValue;
+        }
+      | null = null;
 
     if (createInstallationRecordDto.meterId) {
-      const meter = await this.prisma.meter.findUnique({
-        where: { id: createInstallationRecordDto.meterId },
+      const meterScopeClause = actorScope
+        ? scopeWhere(actorScope, { branchIdField: 'branchId' })
+        : undefined;
+      const existingMeter = await this.prisma.meter.findFirst({
+        where: {
+          id: createInstallationRecordDto.meterId,
+          ...(meterScopeClause ? { AND: [meterScopeClause] } : {}),
+        },
+        select: { id: true, simCardId: true, status: true },
       });
-      if (!meter) {
-        throw new BadRequestException('Brojilo nije pronađeno.');
+      if (!existingMeter) {
+        throw new BadRequestException('Brojilo nije pronađeno ili nije u vašem opsegu.');
       }
-      meterId = meter.id;
+      if (existingMeter.status && existingMeter.status !== 'ACTIVE') {
+        throw new BadRequestException('Brojilo nije aktivno; ugradnja SIM-a nije dozvoljena.');
+      }
+      meterIdForLookup = existingMeter.id;
+      existingMeterSimCardId = existingMeter.simCardId;
     } else if (
       createInstallationRecordDto.meterTypeDefinitionId &&
       createInstallationRecordDto.serialNumber
@@ -157,133 +240,177 @@ export class InstallationRecordsService {
         createInstallationRecordDto.calibrationYear,
         'novo brojilo',
       );
-      const existing = await this.prisma.meter.findUnique({
+      const existingBySerial = await this.prisma.meter.findUnique({
         where: { serialNumber: createInstallationRecordDto.serialNumber.trim() },
       });
-      if (existing) {
+      if (existingBySerial) {
         throw new BadRequestException(
           `Brojilo sa serijskim brojem "${createInstallationRecordDto.serialNumber}" već postoji.`,
         );
       }
       const branchId =
         createInstallationRecordDto.branchId ?? ctx?.branchId ?? undefined;
+      if (branchId && ctx?.role === UserRole.DIST_ADMIN) {
+        const branch = await this.prisma.branch.findUnique({
+          where: { id: branchId },
+          select: { distributionId: true },
+        });
+        if (!branch || branch.distributionId !== ctx.distributionId) {
+          throw new ForbiddenException('Podružnica ne pripada vašoj distribuciji.');
+        }
+      }
 
       const validatedDynamic = await this.meterTypeFieldsService.validateDynamicValues(
         createInstallationRecordDto.meterTypeDefinitionId,
         createInstallationRecordDto.dynamicFieldValues ?? null,
       );
 
-      const meter = await this.prisma.meter.create({
-        data: {
-          serialNumber: createInstallationRecordDto.serialNumber.trim(),
-          meterTypeDefinitionId: createInstallationRecordDto.meterTypeDefinitionId,
-          branchId,
-          year: createInstallationRecordDto.year ?? undefined,
-          calibrationYear: createInstallationRecordDto.calibrationYear ?? undefined,
-          installationAddress: createInstallationRecordDto.installationAddress ?? undefined,
-          installationDate: createInstallationRecordDto.installationDate
-            ? new Date(createInstallationRecordDto.installationDate)
-            : undefined,
-          city: createInstallationRecordDto.city ?? undefined,
-          municipality: createInstallationRecordDto.municipality ?? undefined,
-          measuringPoint: createInstallationRecordDto.measuringPoint ?? undefined,
-          latitude: createInstallationRecordDto.latitude ?? undefined,
-          longitude: createInstallationRecordDto.longitude ?? undefined,
-          ...(Object.keys(validatedDynamic).length > 0 && { dynamicFieldValues: validatedDynamic as Prisma.InputJsonValue }),
-        },
-      });
-      meterId = meter.id;
+      newMeterData = {
+        serialNumber: createInstallationRecordDto.serialNumber.trim(),
+        meterTypeDefinitionId: createInstallationRecordDto.meterTypeDefinitionId,
+        branchId,
+        year: createInstallationRecordDto.year ?? undefined,
+        calibrationYear: createInstallationRecordDto.calibrationYear ?? undefined,
+        installationAddress: createInstallationRecordDto.installationAddress ?? undefined,
+        installationDate: createInstallationRecordDto.installationDate
+          ? new Date(createInstallationRecordDto.installationDate)
+          : undefined,
+        city: createInstallationRecordDto.city ?? undefined,
+        municipality: createInstallationRecordDto.municipality ?? undefined,
+        measuringPoint: createInstallationRecordDto.measuringPoint ?? undefined,
+        latitude: createInstallationRecordDto.latitude ?? undefined,
+        longitude: createInstallationRecordDto.longitude ?? undefined,
+        ...(Object.keys(validatedDynamic).length > 0 && {
+          dynamicFieldValues: validatedDynamic as Prisma.InputJsonValue,
+        }),
+      };
     } else {
       throw new BadRequestException(
         'Navedite ili postojeće brojilo (meterId) ili tip brojila + serijski broj (meterTypeDefinitionId, serialNumber).',
       );
     }
 
-    const simCardId = createInstallationRecordDto.simCardId;
-    const simCard = await this.prisma.simCard.findUnique({
-      where: { id: simCardId },
-    });
-    if (!simCard) {
-      throw new BadRequestException('SIM kartica nije pronađena.');
-    }
-    const canUseSim =
-      simCard.status === SimCardStatus.AVAILABLE ||
-      (simCard.status === SimCardStatus.ASSIGNED &&
-        simCard.assignedToId === createInstallationRecordDto.installedById);
-    if (!canUseSim) {
-      throw new BadRequestException('SIM kartica nije dostupna za ugradnju.');
-    }
+    let record: InstallationRecord | null = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        record = await this.prisma.$transaction(async (tx) => {
+          const claimedSim = await tx.simCard.updateMany({
+            where: {
+              id: simCardId,
+              OR: [
+                { status: SimCardStatus.AVAILABLE },
+                { status: SimCardStatus.ASSIGNED, assignedToId: effectiveInstalledById },
+              ],
+            },
+            data: { status: SimCardStatus.INSTALLED },
+          });
+          if (claimedSim.count === 0) {
+            throw new BadRequestException('SIM kartica je u međuvremenu zauzeta.');
+          }
 
-    const meter = await this.prisma.meter.findUnique({
-      where: { id: meterId },
-      select: { simCardId: true, status: true },
-    });
-    if (meter?.status && meter.status !== 'ACTIVE') {
-      throw new BadRequestException('Brojilo nije aktivno; ugradnja SIM-a nije dozvoljena.');
-    }
-    await this.prisma.$transaction(async (tx) => {
-      await tx.meter.update({
-        where: { id: meterId },
-        data: {
-          simCardId,
-          simCardState: MeterSimCardState.INSTALLED,
-          noSimReason: null,
-        },
-      });
-      await tx.simCard.update({
-        where: { id: simCardId },
-        data: { status: SimCardStatus.INSTALLED },
-      });
-      if (meter?.simCardId && meter.simCardId !== simCardId) {
-        await tx.simCard.update({
-          where: { id: meter.simCardId },
-          data: { status: SimCardStatus.DEMOUNTED },
+          let resolvedMeterId = meterIdForLookup;
+          if (!resolvedMeterId && newMeterData) {
+            const createdMeter = await tx.meter.create({
+              data: {
+                ...newMeterData,
+                simCardId,
+                simCardState: MeterSimCardState.INSTALLED,
+                noSimReason: null,
+              },
+            });
+            resolvedMeterId = createdMeter.id;
+          } else if (resolvedMeterId) {
+            await tx.meter.update({
+              where: { id: resolvedMeterId },
+              data: {
+                simCardId,
+                simCardState: MeterSimCardState.INSTALLED,
+                noSimReason: null,
+              },
+            });
+          }
+
+          if (!resolvedMeterId) {
+            throw new BadRequestException('Brojilo nije pronađeno.');
+          }
+
+          if (existingMeterSimCardId && existingMeterSimCardId !== simCardId) {
+            await tx.simCard.update({
+              where: { id: existingMeterSimCardId },
+              data: { status: SimCardStatus.DEMOUNTED },
+            });
+          }
+
+          const recordNumber = await this.recordNumberGenerator.generate(tx);
+          const createdRecord = await tx.installationRecord.create({
+            data: {
+              recordNumber,
+              clientRequestId: createInstallationRecordDto.clientRequestId ?? undefined,
+              kind,
+              ...(demountedMeterSnapshot !== undefined
+                ? { demountedMeterSnapshot }
+                : {}),
+              meterId: resolvedMeterId,
+              simCardId,
+              installedById: effectiveInstalledById,
+              notes: createInstallationRecordDto.notes,
+              photos: createInstallationRecordDto.photos
+                ? (createInstallationRecordDto.photos as string[])
+                : undefined,
+            },
+          });
+
+          await tx.simEvent.create({
+            data: {
+              simCardId,
+              type: 'INSTALLED',
+              recordId: createdRecord.id,
+              userId: effectiveInstalledById ?? ctx?.userId,
+              branchId: ctx?.branchId ?? null,
+              metadata: {
+                recordNumber: createdRecord.recordNumber,
+                type: 'INSTALLED',
+              },
+            },
+          });
+
+          if (existingMeterSimCardId && existingMeterSimCardId !== simCardId) {
+            await tx.simEvent.create({
+              data: {
+                simCardId: existingMeterSimCardId,
+                type: 'DEMOUNTED',
+                userId: effectiveInstalledById ?? ctx?.userId,
+                metadata: { replacedBySimCardId: simCardId },
+              },
+            });
+          }
+
+          return createdRecord;
         });
+        break;
+      } catch (err) {
+        const isRecordNumberCollision =
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002' &&
+          String(err.meta?.target ?? '').includes('record_number');
+        if (!isRecordNumberCollision || attempt === 4) {
+          throw err;
+        }
       }
-    });
+    }
 
-    const recordNumber = await this.recordNumberGenerator.generate();
-    const record = await this.prisma.installationRecord.create({
-      data: {
-        recordNumber,
-        clientRequestId: createInstallationRecordDto.clientRequestId ?? undefined,
-        kind,
-        ...(demountedMeterSnapshot !== undefined
-          ? { demountedMeterSnapshot }
-          : {}),
-        meterId,
-        simCardId,
-        installedById: createInstallationRecordDto.installedById,
-        notes: createInstallationRecordDto.notes,
-        photos: createInstallationRecordDto.photos
-          ? (createInstallationRecordDto.photos as string[])
-          : undefined,
-      },
-    });
+    if (!record) {
+      throw new BadRequestException('Kreiranje zapisnika nije uspjelo.');
+    }
+
     await this.activityLogService.log({
-      userId: createInstallationRecordDto.installedById ?? ctx?.userId,
+      userId: effectiveInstalledById ?? ctx?.userId,
       action: 'CREATE',
       entity: 'installation_record',
       entityId: record.id,
       details: { recordNumber: record.recordNumber, status: record.status },
       ipAddress: ctx?.ipAddress,
     });
-    await this.createSimEventFromInstallationRecord(
-      record.id,
-      'INSTALLED',
-      createInstallationRecordDto.installedById ?? ctx?.userId,
-      ctx,
-    );
-    if (meter?.simCardId && meter.simCardId !== simCardId) {
-      await this.prisma.simEvent.create({
-        data: {
-          simCardId: meter.simCardId,
-          type: 'DEMOUNTED',
-          userId: createInstallationRecordDto.installedById ?? ctx?.userId,
-          metadata: { replacedBySimCardId: simCardId },
-        },
-      });
-    }
     this.autoSendRecordEmail(record.id, ctx).catch(() => {});
     return record;
   }
@@ -330,7 +457,12 @@ export class InstallationRecordsService {
     scope?: ScopeContext | null,
     additionalWhere?: Record<string, unknown>,
   ): Promise<PaginatedResult<InstallationRecord>> {
-    if (scope?.role === 'USER' && !scope.branchId && !additionalWhere) {
+    if (
+      scope?.role === 'USER' &&
+      !scope.branchId &&
+      !(scope.branchModeratorBranchIds?.length) &&
+      !additionalWhere
+    ) {
       throw new ForbiddenException(
         'Korisnik mora biti vezan za podružnicu da bi pristupio listi zapisnika.',
       );
@@ -358,11 +490,11 @@ export class InstallationRecordsService {
           meter: {
             include: {
               meterTypeDefinition: true,
-              simCard: { include: { assignedTo: true } },
+              simCard: { include: { assignedTo: { select: SAFE_USER_SELECT } } },
             },
           },
-          installedBy: true,
-          approvedBy: true,
+          installedBy: { select: SAFE_USER_SELECT },
+          approvedBy: { select: SAFE_USER_SELECT },
         },
       }),
       this.prisma.installationRecord.count({ where }),
@@ -378,7 +510,11 @@ export class InstallationRecordsService {
   }
 
   async findOne(id: string, scope?: ScopeContext | null): Promise<InstallationRecord> {
-    if (scope?.role === 'USER' && !scope.branchId) {
+    if (
+      scope?.role === 'USER' &&
+      !scope.branchId &&
+      !(scope.branchModeratorBranchIds?.length)
+    ) {
       throw new ForbiddenException(
         'Korisnik mora biti vezan za podružnicu da bi pristupio zapisniku.',
       );
@@ -390,15 +526,15 @@ export class InstallationRecordsService {
         ...(scopeClause ? { AND: [scopeClause] } : {}),
       },
       include: {
-        simCard: { include: { assignedTo: true } },
+        simCard: { include: { assignedTo: { select: SAFE_USER_SELECT } } },
         meter: {
           include: {
             meterTypeDefinition: true,
-            simCard: { include: { assignedTo: true } },
+            simCard: { include: { assignedTo: { select: SAFE_USER_SELECT } } },
           },
         },
-        installedBy: true,
-        approvedBy: true,
+        installedBy: { select: SAFE_USER_SELECT },
+        approvedBy: { select: SAFE_USER_SELECT },
       },
     });
 
@@ -470,7 +606,9 @@ export class InstallationRecordsService {
     id: string,
     updateInstallationRecordDto: UpdateInstallationRecordDto,
     ctx?: InstallationRecordContext,
+    scope?: ScopeContext | null,
   ): Promise<InstallationRecord> {
+    await this.findOne(id, scope);
     try {
       const record = await this.prisma.installationRecord.update({
         where: { id },

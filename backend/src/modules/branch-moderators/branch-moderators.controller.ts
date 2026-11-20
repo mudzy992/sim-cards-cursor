@@ -53,7 +53,7 @@ export class BranchModeratorsController {
       return this.service.findByBranch(branchId, user)
     }
     if (userId) {
-      return this.service.findByUser(userId)
+      return this.service.findByUser(userId, user)
     }
     return this.service.findAll(user)
   }

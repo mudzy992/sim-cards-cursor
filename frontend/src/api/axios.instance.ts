@@ -14,14 +14,14 @@ export const getApiBaseUrls = (): string[] => {
     const parsed = envBaseUrls
       .split(',')
       .map((s) => s.trim())
-      .filter(Boolean)
-    if (parsed.length > 0) return parsed
+      .filter(Boolean);
+    if (parsed.length > 0) return parsed;
   }
 
   const envBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  if (envBaseUrl) return [envBaseUrl]
+  if (envBaseUrl) return [envBaseUrl];
 
-  return ['/backend/api']
+  return ['/backend/api'];
 };
 
 export const API_BASE_URL = getApiBaseUrls()[0] ?? '/backend/api';
@@ -30,6 +30,40 @@ export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: false,
 });
+
+let refreshInFlight: Promise<string> | null = null;
+
+async function performSingleFlightRefresh(
+  refreshToken: string,
+  baseURL: string,
+): Promise<string> {
+  if (!refreshInFlight) {
+    refreshInFlight = axios
+      .post<ApiEnvelope<LoginResponse>>(
+        `${baseURL.replace(/\/$/, '')}/auth/refresh`,
+        { refreshToken },
+      )
+      .then((refreshResponse) => {
+        const payload = refreshResponse.data.data;
+        useAuthStore.getState().setSession({
+          user: payload.user,
+          tokens: {
+            accessToken: payload.accessToken,
+            refreshToken: payload.refreshToken,
+          },
+        });
+        return payload.accessToken;
+      })
+      .catch((err) => {
+        useAuthStore.getState().clearSession();
+        throw err;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
 
 axiosInstance.interceptors.request.use((config) => {
   const requestConfig = config as RetriableConfig;
@@ -72,6 +106,11 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    if (originalRequest.url?.includes('/auth/refresh')) {
+      useAuthStore.getState().clearSession();
+      return Promise.reject(error);
+    }
+
     const authState = useAuthStore.getState();
     const refreshToken = authState.tokens?.refreshToken;
 
@@ -82,28 +121,12 @@ axiosInstance.interceptors.response.use(
 
     originalRequest._retry = true;
 
-    try {
-      const refreshBaseUrl = originalRequest.baseURL ?? API_BASE_URL;
-      const refreshResponse = await axiosInstance.post<ApiEnvelope<LoginResponse>>(
-        '/auth/refresh',
-        { refreshToken },
-        { baseURL: refreshBaseUrl },
-      );
-
-      const payload = refreshResponse.data.data;
-      authState.setSession({
-        user: payload.user,
-        tokens: {
-          accessToken: payload.accessToken,
-          refreshToken: payload.refreshToken,
-        },
-      });
-
-      originalRequest.headers.Authorization = `Bearer ${payload.accessToken}`;
-      return axiosInstance(originalRequest);
-    } catch (refreshError) {
-      authState.clearSession();
-      return Promise.reject(refreshError);
-    }
+    const refreshBaseUrl = originalRequest.baseURL ?? API_BASE_URL;
+    const newAccessToken = await performSingleFlightRefresh(
+      refreshToken,
+      refreshBaseUrl,
+    );
+    originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+    return axiosInstance(originalRequest);
   },
 );

@@ -55,7 +55,6 @@ function SmtpWizardCard(props: { settings: SettingRow[] }) {
   const saveMutation = useMutation({
     mutationFn: async (entries: { key: string; value: string }[]) => {
       for (const e of entries) {
-        // eslint-disable-next-line no-await-in-loop
         await settingsApi.update(e.key, { value: e.value });
       }
     },
@@ -218,7 +217,7 @@ function TemplatesCard() {
       { key: 'recordNumber', description: t('emailSettings.templates.fieldRecordNumber'), example: 'TEST-001' },
       { key: 'recordId', description: t('emailSettings.templates.fieldRecordId'), example: 'test' },
     ],
-    [],
+    [t],
   );
 
   const previewMutation = useMutation({
@@ -360,6 +359,7 @@ function TemplatesCard() {
             {previewHtml ? (
               <iframe
                 title="template-preview"
+                sandbox=""
                 className="w-full min-h-[420px] rounded border"
                 srcDoc={previewHtml}
               />

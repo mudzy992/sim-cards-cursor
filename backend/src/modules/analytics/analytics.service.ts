@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, RecordStatus, SimCardStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
@@ -46,9 +46,22 @@ export class AnalyticsService {
 
     const { range, from, to } = params;
 
-    if (range === 'CUSTOM' && from && to) {
+    if (range === 'CUSTOM') {
+      if (!from || !to) {
+        throw new BadRequestException('CUSTOM range requires both "from" and "to" dates');
+      }
       const fromDate = new Date(from);
       const toDate = new Date(to);
+      if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+        throw new BadRequestException('Invalid date format for "from" or "to"');
+      }
+      if (fromDate.getTime() > toDate.getTime()) {
+        throw new BadRequestException('"from" date must be earlier than or equal to "to" date');
+      }
+      const maxSpanMs = 366 * 24 * 60 * 60 * 1000;
+      if (toDate.getTime() - fromDate.getTime() > maxSpanMs) {
+        throw new BadRequestException('CUSTOM date range cannot exceed 366 days');
+      }
       return { from: fromDate, to: toDate };
     }
 
@@ -492,6 +505,15 @@ export class AnalyticsService {
     }));
   }
 
+  private escapeCsvCell(value: string | number | null | undefined): string {
+    const raw = value === null || value === undefined ? '' : String(value);
+    const neutralized = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+    if (/[",\n\r]/.test(neutralized)) {
+      return `"${neutralized.replace(/"/g, '""')}"`;
+    }
+    return neutralized;
+  }
+
   async getExportCsv(
     report: 'overview' | 'sim-cards' | 'installation-records' | 'users',
     params: TimeRangeParams,
@@ -566,11 +588,7 @@ export class AnalyticsService {
             r.created,
             r.approved,
           ]
-            .map((v) =>
-              typeof v === 'string' && v.includes(',')
-                ? `"${v.replace(/"/g, '""')}"`
-                : v,
-            )
+            .map((v) => this.escapeCsvCell(v))
             .join(','),
         );
       }
@@ -580,7 +598,7 @@ export class AnalyticsService {
       };
     }
 
-    throw new Error('Unsupported report type');
+    throw new BadRequestException('Unsupported report type');
   }
 }
 

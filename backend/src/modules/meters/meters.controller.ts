@@ -46,11 +46,17 @@ export class MetersController {
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   async create(
     @Body() createMeterDto: CreateMeterDto,
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null },
+    @CurrentUser()
+    user: User & {
+      distributionId?: string | null;
+      branchId?: string | null;
+      branchModeratorBranchIds?: string[];
+    },
     @Req() req: Request,
   ): Promise<Meter> {
+    const scope = toScopeContext(user);
     const { simCardId, ...meterData } = createMeterDto;
-    const meter = await this.metersService.create(meterData as CreateMeterDto);
+    const meter = await this.metersService.create(meterData as CreateMeterDto, scope);
     if (simCardId && user?.id) {
       const ipAddress =
         (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
@@ -61,7 +67,14 @@ export class MetersController {
           meterId: meter.id,
           installedById: user.id,
         },
-        { userId: user.id, ipAddress },
+        {
+          userId: user.id,
+          ipAddress,
+          role: user.role,
+          distributionId: user.distributionId ?? null,
+          branchId: user.branchId ?? null,
+          branchModeratorBranchIds: user.branchModeratorBranchIds ?? [],
+        },
       );
     }
     return meter;
@@ -129,9 +142,15 @@ export class MetersController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateMeterDto: UpdateMeterDto,
-    @CurrentUser() user?: { role: string; distributionId?: string | null; branchId?: string | null },
+    @CurrentUser()
+    user?: {
+      role: string;
+      distributionId?: string | null;
+      branchId?: string | null;
+      branchModeratorBranchIds?: string[];
+    },
   ): Promise<Meter> {
-    const scope = user ? { role: user.role as UserRole, distributionId: user.distributionId ?? null, branchId: user.branchId ?? null } : null;
+    const scope = toScopeContext(user ? { ...user, role: user.role as UserRole } : null);
     return this.metersService.update(id, updateMeterDto, scope);
   }
 

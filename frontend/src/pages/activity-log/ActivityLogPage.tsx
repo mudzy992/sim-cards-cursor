@@ -5,7 +5,8 @@ import { activityLogApi } from '@/api/activity-log.api';
 import { useTranslation } from '@/i18n';
 
 export default function ActivityLogPage() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'bs' ? 'bs-BA' : 'en-US';
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [actionFilter, setActionFilter] = useState('');
@@ -36,14 +37,20 @@ export default function ActivityLogPage() {
           <Input
             placeholder={t('activityLog.filters.actionPlaceholder')}
             value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
+            onChange={(e) => {
+              setActionFilter(e.target.value);
+              setPage(1);
+            }}
             allowClear
             style={{ width: 200 }}
           />
           <Input
             placeholder={t('activityLog.filters.entityPlaceholder')}
             value={entityFilter}
-            onChange={(e) => setEntityFilter(e.target.value)}
+            onChange={(e) => {
+              setEntityFilter(e.target.value);
+              setPage(1);
+            }}
             allowClear
             style={{ width: 200 }}
           />
@@ -65,7 +72,7 @@ export default function ActivityLogPage() {
               dataIndex: 'createdAt',
               width: 180,
               render: (d: string) =>
-                d ? new Date(d).toLocaleString() : '–',
+                d ? new Date(d).toLocaleString(dateLocale) : '–',
             },
             { title: t('activityLog.columns.action'), dataIndex: 'action', width: 120 },
             { title: t('activityLog.columns.entity'), dataIndex: 'entity', width: 160 },

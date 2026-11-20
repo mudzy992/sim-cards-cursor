@@ -1,0 +1,16 @@
+export const SAFE_USER_SELECT = {
+  id: true,
+  email: true,
+  username: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  role: true,
+  status: true,
+  avatar: true,
+  distributionId: true,
+  branchId: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+} as const;

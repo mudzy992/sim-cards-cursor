@@ -226,7 +226,6 @@ export class MailService {
     const names = [...this.allowedTemplateNames];
     const result = [];
     for (const name of names) {
-      // eslint-disable-next-line no-await-in-loop
       const { source, sourceType } = await this.getTemplateSource(name);
       result.push({ name, key: this.getTemplateSettingKey(name), sourceType, content: source });
     }

@@ -33,10 +33,21 @@ export class SettingsService {
     private readonly activityLogService: ActivityLogService,
   ) {}
 
+  private sanitizeSetting(setting: AppSetting): AppSetting {
+    if (setting.key === SETTINGS_KEYS.smtpPass) {
+      return {
+        ...setting,
+        value: setting.value ? '••••••••' : '',
+      };
+    }
+    return setting;
+  }
+
   async findAll(): Promise<AppSetting[]> {
-    return this.prisma.appSetting.findMany({
+    const items = await this.prisma.appSetting.findMany({
       orderBy: { key: 'asc' },
     });
+    return items.map((s) => this.sanitizeSetting(s));
   }
 
   async findByKey(key: string): Promise<AppSetting> {
@@ -46,7 +57,7 @@ export class SettingsService {
     if (!setting) {
       throw new NotFoundException(`Setting with key "${key}" not found`);
     }
-    return setting;
+    return this.sanitizeSetting(setting);
   }
 
   async getValue(key: string): Promise<string> {
@@ -143,7 +154,7 @@ export class SettingsService {
       select: { key: true },
     });
     const existingSet = new Set(existing.map((e) => e.key));
-    let missingKeys: string[] = requiredKeys.filter((k) => !existingSet.has(k));
+    const missingKeys: string[] = requiredKeys.filter((k) => !existingSet.has(k));
 
     if (emailEnabled && provider !== 'disabled' && (!smtpUser?.trim() || !smtpPass?.trim())) {
       missingKeys.push(SETTINGS_KEYS.smtpUser, SETTINGS_KEYS.smtpPass);
@@ -360,6 +371,10 @@ export class SettingsService {
     const existing = await this.prisma.appSetting.findUnique({
       where: { key },
     });
+
+    if (key === SETTINGS_KEYS.smtpPass && dto.value === '••••••••' && existing) {
+      return this.sanitizeSetting(existing);
+    }
 
     const setting = await this.prisma.appSetting.upsert({
       where: { key },

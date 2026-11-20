@@ -1,6 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
+import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
 import { CreateMeterDto } from './dto/create-meter.dto';
 import { UpdateMeterDto } from './dto/update-meter.dto';
 import { Meter, MeterSimCardState, MeterStatus, Prisma } from '@prisma/client';
@@ -76,16 +82,32 @@ export class MetersService {
     fs.rmSync(resolved, { recursive: true, force: true });
   }
 
-  async create(createMeterDto: CreateMeterDto): Promise<Meter> {
+  async create(createMeterDto: CreateMeterDto, scope?: ScopeContext | null): Promise<Meter> {
     assertMeterYearsRequired(
       createMeterDto.year,
       createMeterDto.calibrationYear,
       'brojilo',
     );
+    if (createMeterDto.branchId) {
+      const branch = await this.prisma.branch.findUnique({
+        where: { id: createMeterDto.branchId },
+        select: { id: true, distributionId: true },
+      });
+      if (!branch) {
+        throw new BadRequestException('Odabrana podružnica ne postoji.');
+      }
+      if (
+        scope?.role === UserRole.DIST_ADMIN &&
+        (!scope.distributionId || branch.distributionId !== scope.distributionId)
+      ) {
+        throw new ForbiddenException('Podružnica ne pripada vašoj distribuciji.');
+      }
+    }
     const data: Record<string, unknown> = {
       serialNumber: createMeterDto.serialNumber,
       meterTypeDefinitionId: createMeterDto.meterTypeDefinitionId,
     };
+    if (createMeterDto.branchId) data.branchId = createMeterDto.branchId;
     if (createMeterDto.status) data.status = createMeterDto.status
     if (createMeterDto.year != null) data.year = createMeterDto.year;
     if (createMeterDto.calibrationYear != null) data.calibrationYear = createMeterDto.calibrationYear;
@@ -189,7 +211,7 @@ export class MetersService {
       },
       include: {
         meterTypeDefinition: true,
-        simCard: { include: { assignedTo: true } },
+        simCard: { include: { assignedTo: { select: SAFE_USER_SELECT } } },
         installTasks: {
           where: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
           orderBy: { createdAt: 'desc' },
@@ -294,7 +316,7 @@ export class MetersService {
     }
   }
 
-  async remove(id: string, scope?: ScopeContext | null): Promise<Meter> {
+  async remove(_id: string, _scope?: ScopeContext | null): Promise<Meter> {
     throw new BadRequestException(
       'Brisanje brojila nije dozvoljeno. Ispravke se rade kroz izmjene uz logovanje i proceduru demontaže.',
     );

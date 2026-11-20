@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -147,7 +148,53 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto, actorId?: string, scope?: ScopeContext | null): Promise<UserListItem> {
-    await this.ensureExists(id, scope);
+    const scopeClause = scopeWhere(scope, { userScope: true });
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        id,
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+      },
+      select: { id: true, role: true, email: true, distributionId: true, branchId: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (scope?.role === UserRole.DIST_ADMIN) {
+      if (existing.role === UserRole.SYSTEM_ADMIN) {
+        throw new ForbiddenException('Cannot modify a system administrator');
+      }
+      if (dto.role === UserRole.SYSTEM_ADMIN) {
+        throw new ForbiddenException('DIST_ADMIN cannot assign SYSTEM_ADMIN role');
+      }
+      if (dto.distributionId !== undefined && dto.distributionId !== scope.distributionId) {
+        throw new ForbiddenException('Cannot reassign user outside your distribution');
+      }
+      if (dto.branchId) {
+        const branch = await this.prisma.branch.findUnique({
+          where: { id: dto.branchId },
+          select: { distributionId: true },
+        });
+        if (!branch || branch.distributionId !== scope.distributionId) {
+          throw new ForbiddenException('Target branch is outside your distribution');
+        }
+      }
+    }
+
+    let nextEmail: string | undefined;
+    if (dto.email !== undefined) {
+      nextEmail = normalizeEmail(dto.email);
+      if (nextEmail !== existing.email) {
+        const dup = await this.prisma.user.findUnique({
+          where: { email: nextEmail },
+          select: { id: true },
+        });
+        if (dup) {
+          throw new ConflictException('User with this email already exists');
+        }
+      }
+    }
 
     let password: string | undefined;
     if (dto.password) {
@@ -158,7 +205,7 @@ export class UsersService {
     const updated = await this.prisma.user.update({
       where: { id },
       data: {
-        email: dto.email !== undefined ? normalizeEmail(dto.email) : undefined,
+        email: nextEmail,
         firstName: dto.firstName,
         lastName: dto.lastName,
         phone: dto.phone,

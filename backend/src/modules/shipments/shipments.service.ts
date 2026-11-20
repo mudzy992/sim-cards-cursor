@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -263,6 +264,14 @@ export class ShipmentsService {
     scope?: ScopeContext | null,
   ) {
     await this.ensureShipmentExists(id, scope);
+
+    if (
+      scope?.role === 'DIST_ADMIN' &&
+      dto.distributionId !== undefined &&
+      dto.distributionId !== scope.distributionId
+    ) {
+      throw new ForbiddenException('Cannot reassign shipment to another distribution');
+    }
 
     const updated = await this.prisma.shipment.update({
       where: { id },
@@ -548,7 +557,23 @@ export class ShipmentsService {
       this.parseMappingInput(dto.columnMapping),
     );
 
-    const existing = await this.fetchExistingIccidMap();
+    const iccidCol = resolvedMapping.iccid;
+    const candidateIccids = iccidCol
+      ? Array.from(
+          new Set(
+            parsed.rows
+              .map((r) =>
+                String(r[iccidCol] ?? '')
+                  .replace(/^\uFEFF/, '')
+                  .trim()
+                  .replace(/\s+/g, ''),
+              )
+              .filter(Boolean),
+          ),
+        )
+      : [];
+
+    const existing = await this.fetchExistingIccidMap(candidateIccids);
 
     if (dto.applyImport !== 'true') {
       const preview = this.excelImportService.preview(
@@ -715,7 +740,7 @@ export class ShipmentsService {
     }
   }
 
-  private async fetchExistingIccidMap(): Promise<
+  private async fetchExistingIccidMap(iccids?: string[]): Promise<
     Map<
       string,
       {
@@ -725,7 +750,11 @@ export class ShipmentsService {
       }
     >
   > {
+    if (iccids && iccids.length === 0) {
+      return new Map();
+    }
     const existing = await this.prisma.simCard.findMany({
+      where: iccids ? { iccid: { in: iccids } } : undefined,
       select: {
         iccid: true,
         shipment: {

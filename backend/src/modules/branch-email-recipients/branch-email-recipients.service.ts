@@ -70,6 +70,9 @@ export class BranchEmailRecipientsService {
   }
 
   async findAll(actor: Actor) {
+    if (actor.role === UserRole.DIST_ADMIN && !actor.distributionId) {
+      return []
+    }
     const where =
       actor.role === UserRole.DIST_ADMIN && actor.distributionId
         ? { branch: { distributionId: actor.distributionId } }

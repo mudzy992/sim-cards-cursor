@@ -1,5 +1,22 @@
 # Node
 node_modules/
+coverage/
+.eslintcache
+
+# Secrets & Environment
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*firebase-adminsdk*.json
+*.pem
+*.key
+
+# Binaries
+*.apk
+*.aab
 
 # Build
 backend/dist/

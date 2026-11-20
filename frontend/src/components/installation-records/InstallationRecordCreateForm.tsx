@@ -141,7 +141,7 @@ export default function InstallationRecordCreateForm({
     if (isOperator && userBranch && createMode === 'new') {
       form.setFieldsValue({ municipality: userBranch.name, branchId: userBranch.id });
     }
-  }, [isOperator, userBranch?.name, userBranch?.id, createMode, form]);
+  }, [isOperator, userBranch, createMode, form]);
 
   const handleFinish = (values: Record<string, unknown>) => {
     if (!userId) return;

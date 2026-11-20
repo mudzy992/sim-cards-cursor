@@ -5,43 +5,30 @@ services:
       context: ./backend
       dockerfile: Dockerfile.vm
       args:
-        # Tag deps image-a koji je već učitan lokalno na VM-u (docker load) —
-        # vidi scripts/vm-deps-build.sh / vm-deps-load.sh i
-        # backend/Dockerfile.deps. Podesiti kroz .env (DEPS_IMAGE_TAG) ili
-        # override-ovati u komandnoj liniji (--build-arg).
         - DEPS_IMAGE=${DEPS_IMAGE_TAG:-simtracker-backend-deps:latest}
+    init: true
     restart: unless-stopped
+    mem_limit: 1536m
     env_file:
       - ./backend/.env.prod
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-sim_app}:${POSTGRES_PASSWORD:-nije,kikiriki}@sim-tracker-postgres:5432/${POSTGRES_DB:-sim_cards}
-    # NEMA depends_on ka postgres/dbadmin — ti servisi su definisani u
-    # docker-compose.vm.db.yml (odvojen fajl/projekat). `depends_on` u
-    # Compose-u referencira servis unutar ISTOG seta -f fajlova koji se
-    # zajedno prosljeđuju datoj komandi; kad se ovaj fajl pokreće sam
-    # (`docker compose -f docker-compose.vm.app.yml up -d backend`), Compose
-    # ne vidi "postgres" servis uopšte i baca "undefined service" grešku
-    # (bez obzira na naziv/hostname). U praksi Postgres je dugotrajno
-    # pokrenut i rijetko se restartuje, pa ovo nije problem u svakodnevnom
-    # radu. Ako ipak treba garantovano čekanje na zdrav Postgres prije
-    # starta backend-a, pokrenuti oba fajla zajedno u jednoj komandi:
-    #   docker compose -f docker-compose.vm.db.yml -f docker-compose.vm.app.yml up -d backend
-    # (tada depends_on iz app.yml postaje validan jer Compose spaja oba
-    # fajla u jedan projekat).
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sim_app}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@sim-tracker-postgres:5432/${POSTGRES_DB:-sim_cards}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3003/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>fetch('http://127.0.0.1:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1)))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
     volumes:
-      # Globalno pravilo za upload mount
       - /mnt/shared-app-files/sim-cards:/usr/app/uploads
     networks:
       - sim-tracker-net
-    # UKLONJEN healthcheck (gađao /api/docs). Public docker-compose.yml
-    # (koji radi ispravno) nema healthcheck na backend servisu — Traefik-ov
-    # Docker provider po defaultu poštuje Docker health status kontejnera:
-    # ako healthcheck ne prođe (npr. Swagger /api/docs nije dostupan kad je
-    # APP_ENV=production), kontejner postaje "unhealthy" i Traefik ga
-    # PRESTAJE rutirati, iako je kontejner inače potpuno funkcionalan
-    # iznutra (baza radi, login endpoint radi) — to je uzrok "nema
-    # komunikacije sa backend-om" simptoma. Uklanjanjem se vraća paritet
-    # sa public setupom koji radi.
     labels:
       - traefik.enable=true
 
@@ -71,14 +58,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.vm
-      # Nema build args ovdje — VITE_API_BASE_URL/VITE_API_BASE_URLS su već
-      # "upečeni" u ./frontend/dist prilikom `npm run build` koraka koji se
-      # radi UNAPRIJED na mašini sa internetom (scripts/vm-frontend-build.sh).
-      # Ovaj build korak samo kopira taj gotov dist/ u nginx image — bez
-      # interneta, bez node-a.
+    init: true
     restart: unless-stopped
+    mem_limit: 256m
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - sim-tracker-net
     labels:
@@ -87,10 +72,6 @@ services:
       - traefik.http.routers.sim_frontend.entrypoints=web
       - traefik.http.routers.sim_frontend.priority=1
       - traefik.http.routers.sim_frontend.service=sim_frontend_svc
-      # nginx unutar kontejnera sluša na 80 (vidi frontend/nginx.conf +
-      # frontend/Dockerfile.vm) — port ovdje MORA biti isti, inače Traefik
-      # gađa pogrešan port i frontend je nedostupan (502) iako je kontejner
-      # zdrav.
       - traefik.http.services.sim_frontend_svc.loadbalancer.server.port=80
 
 networks:

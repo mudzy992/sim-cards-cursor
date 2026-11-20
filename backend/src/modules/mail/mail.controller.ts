@@ -5,6 +5,11 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { MailService } from './mail.service';
+import {
+  PreviewMailTemplateDto,
+  SendTestEmailDto,
+  UpdateMailTemplateDto,
+} from './dto/mail.dto';
 
 @ApiTags('mail')
 @ApiBearerAuth()
@@ -30,7 +35,7 @@ export class MailController {
   @Put('templates/:name')
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Update email template content (stored in DB)' })
-  updateTemplate(@Param('name') name: string, @Body() body: { content: string }) {
+  updateTemplate(@Param('name') name: string, @Body() body: UpdateMailTemplateDto) {
     return this.mail.updateTemplate(name, body.content ?? '');
   }
 
@@ -39,7 +44,7 @@ export class MailController {
   @ApiOperation({ summary: 'Render template HTML preview (no send)' })
   previewTemplate(
     @Param('name') name: string,
-    @Body() body: { context?: Record<string, unknown> },
+    @Body() body: PreviewMailTemplateDto,
   ) {
     return this.mail.previewTemplate(name, body.context ?? {});
   }
@@ -47,16 +52,7 @@ export class MailController {
   @Put('test')
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Send test email using current SMTP settings' })
-  sendTestEmail(
-    @Body()
-    body: {
-      to: string;
-      template: string;
-      subject?: string;
-      context?: Record<string, unknown>;
-    },
-  ) {
+  sendTestEmail(@Body() body: SendTestEmailDto) {
     return this.mail.sendTestEmail(body);
   }
 }
-

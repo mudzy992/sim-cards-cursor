@@ -1,5 +1,7 @@
+import type { AxiosError } from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Form, Input, InputNumber, Space, Table, Typography, Upload, message } from 'antd';
+import type { UploadFile } from 'antd/es/upload/interface';
 import type { ColumnsType } from 'antd/es/table';
 import { UploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -35,9 +37,10 @@ export default function AppReleasesPage() {
       form.resetFields();
     },
     onError: (e: unknown) => {
+      const err = e as AxiosError<{ message?: string }>;
       const msg =
-        (e as any)?.response?.data?.message ??
-        (e as Error).message ??
+        err?.response?.data?.message ??
+        (e instanceof Error ? e.message : undefined) ??
         t('appReleases.messages.uploadFailed');
       message.error(msg);
     },
@@ -139,7 +142,7 @@ export default function AppReleasesPage() {
           form={form}
           layout="vertical"
           onFinish={(values) => {
-            const fileList = (values as any).file as { originFileObj?: File }[] | undefined;
+            const fileList = values.file as unknown as UploadFile[] | undefined;
             const first = fileList && fileList[0]?.originFileObj;
             if (!first) {
               message.error(t('appReleases.messages.selectFile'));

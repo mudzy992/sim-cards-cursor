@@ -3,7 +3,8 @@ import type { Locale } from 'antd/es/locale';
 import bsBA from './antd-locale-bs';
 import type { SupportedLanguage } from './types';
 
-export { I18nProvider, useTranslation } from './I18nProvider';
+export { I18nProvider } from './I18nProvider';
+export { useTranslation } from './useTranslation';
 export type { SupportedLanguage } from './types';
 export { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE, FALLBACK_LANGUAGE } from './types';
 

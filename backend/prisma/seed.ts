@@ -198,7 +198,7 @@ const DEFAULT_APP_SETTINGS: SeedSetting[] = [
 ];
 
 async function main() {
-  console.log(`[seed] DATABASE_URL=${process.env.DATABASE_URL ?? '(missing)'}`);
+  console.log('[seed] Starting database seed...');
 
   let createdSettings = 0;
   let updatedDescriptions = 0;
@@ -249,7 +249,15 @@ async function main() {
   });
 
   const email = process.env.ADMIN_EMAIL ?? 'admin@simtracker.local';
-  const password = process.env.ADMIN_PASSWORD ?? 'ChangeMe123!';
+  const password =
+    process.env.SEED_ADMIN_PASSWORD ??
+    process.env.ADMIN_PASSWORD ??
+    (process.env.NODE_ENV === 'production' ? '' : 'ChangeMe123!');
+  if (!password) {
+    throw new Error(
+      'SEED_ADMIN_PASSWORD or ADMIN_PASSWORD must be set in production',
+    );
+  }
   const firstName = process.env.ADMIN_FIRST_NAME ?? 'System';
   const lastName = process.env.ADMIN_LAST_NAME ?? 'Admin';
   const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS ?? 12);

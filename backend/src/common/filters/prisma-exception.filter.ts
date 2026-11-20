@@ -14,13 +14,16 @@ export class PrismaExceptionFilter implements ExceptionFilter {
 
     if (exception.code === 'P2002') {
       statusCode = HttpStatus.CONFLICT;
-      message = `Unique constraint failed on: ${String(exception.meta?.target ?? 'unknown field')}`;
-    }
-
-    if (exception.code === 'P2025') {
+      message = 'Record with this unique value already exists';
+    } else if (exception.code === 'P2025') {
       statusCode = HttpStatus.NOT_FOUND;
       message = 'Requested record not found';
+    } else if (exception.code === 'P2003') {
+      statusCode = HttpStatus.BAD_REQUEST;
+      message = 'Referenced record does not exist';
     }
+
+    const isProd = process.env.NODE_ENV === 'production';
 
     response.status(statusCode).json({
       success: false,
@@ -29,8 +32,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       message,
       errorCode: exception.code,
-      details: exception.meta,
-      prismaCode: exception.code,
+      ...(isProd ? {} : { details: exception.meta }),
     });
   }
 }

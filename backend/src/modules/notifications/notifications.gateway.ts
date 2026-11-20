@@ -13,12 +13,27 @@ const USER_SOCKET_MAP = new Map<string, Set<string>>();
 interface AuthenticatedSocket {
   id: string;
   disconnect: () => void;
-  handshake?: { auth?: { token?: string }; query?: { token?: string } };
+  handshake?: { auth?: { token?: string } };
   data?: { userId?: string };
 }
 
+function resolveSocketCorsOrigins(): string[] | boolean {
+  const raw = process.env.FRONTEND_URLS || process.env.FRONTEND_URL;
+  if (!raw) {
+    return process.env.NODE_ENV === 'production' ? false : true;
+  }
+  const list = raw
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  return list.length > 0 ? list : false;
+}
+
 @WebSocketGateway({
-  cors: { origin: '*' },
+  cors: {
+    origin: resolveSocketCorsOrigins(),
+    credentials: true,
+  },
   path: '/api/socket.io',
   namespace: '/notifications',
 })
@@ -34,8 +49,7 @@ export class NotificationsGateway
   ) {}
 
   handleConnection(client: AuthenticatedSocket): void {
-    const token =
-      client.handshake?.auth?.token ?? client.handshake?.query?.token;
+    const token = client.handshake?.auth?.token;
     if (!token) {
       if (typeof client.disconnect === 'function') client.disconnect();
       return;

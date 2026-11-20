@@ -13,7 +13,7 @@ import {
   message,
 } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { activityLogApi } from '@/api/activity-log.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
@@ -158,12 +158,7 @@ export default function InstallationRecordDetailPage() {
     } catch {
       messageApi.error(t('installationRecords.detail.pdfDownloadFailed'));
     }
-  }, [id, recordQuery.data?.recordNumber, messageApi]);
-
-  if (pdfQuery.data && !pdfObjectUrl) {
-    const url = URL.createObjectURL(pdfQuery.data);
-    setPdfObjectUrl(url);
-  }
+  }, [id, recordQuery.data?.recordNumber, messageApi, t]);
 
   const record = recordQuery.data;
   const currentSimQuery = useQuery({
@@ -178,8 +173,16 @@ export default function InstallationRecordDetailPage() {
   const isMobile = !screens.sm
 
   if (!id) {
-    navigate('/installation-records');
-    return null;
+    return <Navigate to="/installation-records" replace />;
+  }
+
+  if (recordQuery.isError) {
+    return (
+      <Typography.Text type="danger">
+        {(recordQuery.error as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? t('installationRecords.detail.notFound')}
+      </Typography.Text>
+    );
   }
 
   if (recordQuery.isLoading || !record) {
@@ -200,15 +203,6 @@ export default function InstallationRecordDetailPage() {
       return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString(dateLocale)
     }
     return String(raw)
-  }
-
-  if (recordQuery.isError) {
-    return (
-      <Typography.Text type="danger">
-        {(recordQuery.error as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? t('installationRecords.detail.notFound')}
-      </Typography.Text>
-    );
   }
 
   return (

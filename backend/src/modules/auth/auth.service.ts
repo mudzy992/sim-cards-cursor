@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { UserRole, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import { PrismaService } from '../../prisma/prisma.service';
 import { baseUsername, generateUniqueUsername } from '../../common/utils/username-generator.util';
@@ -173,7 +174,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token rejected');
     }
 
-    const tokenMatches = await bcrypt.compare(refreshToken, user.refreshToken);
+    const tokenMatches = await this.verifyTokenHash(refreshToken, user.refreshToken);
     if (!tokenMatches) {
       throw new UnauthorizedException('Refresh token mismatch');
     }
@@ -299,9 +300,20 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
+  private preHashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
   private async hashToken(token: string): Promise<string> {
     const saltRounds = Number(this.configService.get('BCRYPT_SALT_ROUNDS', 12));
-    return bcrypt.hash(token, saltRounds);
+    return bcrypt.hash(this.preHashToken(token), saltRounds);
+  }
+
+  private async verifyTokenHash(token: string, storedHash: string): Promise<boolean> {
+    const shaMatches = await bcrypt.compare(this.preHashToken(token), storedHash);
+    if (shaMatches) return true;
+    // Fallback for legacy tokens hashed directly before SHA-256 pre-hashing
+    return bcrypt.compare(token, storedHash);
   }
 
   private async findUserByEmailOrUsername(emailOrUsername: string) {

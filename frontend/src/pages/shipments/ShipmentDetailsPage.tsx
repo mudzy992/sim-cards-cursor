@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { shipmentsApi } from '@/api/shipments.api';
 import { getSimCardStatusLabel } from '@/utils/labels.utils'
 import type { ShipmentSimCardsResponse } from '@/types/shipment.types';
+import type { SimCardStatus } from '@/types/sim-card.types';
 import { PrinterOutlined } from '@ant-design/icons';
 import { useTranslation } from '@/i18n';
 type ShipmentSimCard = ShipmentSimCardsResponse['items'][number];
@@ -115,7 +116,7 @@ export default function ShipmentDetailsPage() {
               title: t('common.labels.status'),
               render: (_, row) => (
                 <Tag color={simStatusColor[row.status] ?? 'default'}>
-                  {getSimCardStatusLabel(row.status as any, t)}
+                  {getSimCardStatusLabel(row.status as SimCardStatus, t)}
                 </Tag>
               ),
             },

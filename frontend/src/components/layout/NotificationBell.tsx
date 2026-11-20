@@ -99,7 +99,11 @@ export function NotificationBell() {
       trigger={['click']}
       placement="bottomRight"
     >
-      <Button type="text" icon={<BellOutlined className="text-lg" />}>
+      <Button
+        type="text"
+        aria-label={t('layout.notifications.title')}
+        icon={<BellOutlined className="text-lg" />}
+      >
         <Badge count={unreadCount} size="small" />
       </Button>
     </Dropdown>

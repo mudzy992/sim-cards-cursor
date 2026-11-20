@@ -3,14 +3,22 @@ import { io } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { getApiBaseUrls } from '@/api/axios.instance';
-import { notification as antdNotification } from 'antd'
-import type { Notification } from '@/api/notifications.api'
+import { notification as antdNotification } from 'antd';
+import type { Notification } from '@/api/notifications.api';
 
-const getSocketUrls = (): string[] => {
+const getSocketOrigins = (): string[] => {
   const baseUrls = getApiBaseUrls();
-  return baseUrls
-    .map((base) => base.replace(/\/api\/?$/, ''))
+  const origins = baseUrls
+    .map((base) => {
+      try {
+        const parsed = new URL(base, window.location.origin);
+        return parsed.origin;
+      } catch {
+        return '';
+      }
+    })
     .filter(Boolean);
+  return origins.length > 0 ? [...new Set(origins)] : [window.location.origin];
 };
 
 export function useNotificationSocket() {
@@ -21,13 +29,17 @@ export function useNotificationSocket() {
   useEffect(() => {
     if (!isLoggedIn || !token) return;
 
-    const socketUrls = getSocketUrls();
+    const socketOrigins = getSocketOrigins();
     let socketIndex = 0;
-    let socket = io(`${socketUrls[socketIndex]}/notifications`, {
-      path: '/api/socket.io',
-      auth: { token },
-      transports: ['websocket', 'polling'],
-    });
+
+    const connectTo = (origin: string) =>
+      io(`${origin}/notifications`, {
+        path: '/api/socket.io',
+        auth: { token },
+        transports: ['websocket', 'polling'],
+      });
+
+    let socket = connectTo(socketOrigins[socketIndex]);
 
     const onNotification = (payload?: Notification) => {
       void queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
@@ -38,30 +50,32 @@ export function useNotificationSocket() {
           description: payload.message,
           placement: 'topRight',
           duration: 4,
-        })
+        });
       }
     };
 
-    socket.on('notification', onNotification);
-    socket.on('connect_error', (err) => {
+    const onConnectError = (err: Error) => {
       const nextIndex = socketIndex + 1;
-      if (nextIndex >= socketUrls.length) {
+      if (nextIndex >= socketOrigins.length) {
         console.warn('[Notifications] WebSocket connect error:', err.message);
         return;
       }
 
       socketIndex = nextIndex;
+      socket.off('notification', onNotification);
+      socket.off('connect_error', onConnectError);
       socket.disconnect();
-      socket = io(`${socketUrls[socketIndex]}/notifications`, {
-        path: '/api/socket.io',
-        auth: { token },
-        transports: ['websocket', 'polling'],
-      });
+      socket = connectTo(socketOrigins[socketIndex]);
       socket.on('notification', onNotification);
-    });
+      socket.on('connect_error', onConnectError);
+    };
+
+    socket.on('notification', onNotification);
+    socket.on('connect_error', onConnectError);
 
     return () => {
       socket.off('notification', onNotification);
+      socket.off('connect_error', onConnectError);
       socket.disconnect();
     };
   }, [isLoggedIn, token, queryClient]);
