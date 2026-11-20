@@ -19,13 +19,13 @@ import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ApiPaginated } from '../../common/decorators/api-paginated.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { PaginationDto } from '../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { toScopeContext } from '../../common/utils/scope-filter.util';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { ImportExcelDto } from './dto/import-excel.dto';
 import { ShipmentFilterDto } from './dto/shipment-filter.dto';
+import { ShipmentSimCardsQueryDto } from './dto/shipment-sim-cards-query.dto';
 import { UpdateShipmentDto } from './dto/update-shipment.dto';
 import { ShipmentsService } from './shipments.service';
 
@@ -97,7 +97,11 @@ export class ShipmentsController {
 
   @Get(':id/sim-cards')
   @ApiPaginated('SIM kartice po isporuci')
-  findShipmentSimCards(@Param('id') id: string, @Query() pagination: PaginationDto, @CurrentUser() user?: ScopedUser) {
+  findShipmentSimCards(
+    @Param('id') id: string,
+    @Query() pagination: ShipmentSimCardsQueryDto,
+    @CurrentUser() user?: ScopedUser,
+  ) {
     const scope = toScopeContext(user ? { ...user, role: user.role as UserRole } : null);
     return this.shipmentsService.findShipmentSimCards(id, pagination, scope);
   }

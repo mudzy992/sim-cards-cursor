@@ -37,8 +37,9 @@ export const shipmentsApi = {
   listAllSimCards: async (
     id: string,
     onProgress?: (fetched: number, total: number) => void,
+    pageLimit = 100,
   ): Promise<ShipmentSimCardsResponse['items']> => {
-    const limit = 100;
+    const limit = Math.max(1, Math.min(250, Math.floor(pageLimit)));
     const first = await shipmentsApi.listSimCards(id, { page: 1, limit });
     const all: ShipmentSimCardsResponse['items'] = [];
     const seenIds = new Set<string>();

@@ -36,6 +36,7 @@ import {
   bottomMarginMm,
   buildLabelLines,
   buildSheets,
+  cardsForSheets,
   centeredLayout,
   clamp,
   displayLength,
@@ -107,6 +108,11 @@ export default function ShipmentPrintPage() {
   /* ------------------------------------ podaci --------------------------------------- */
   const [loadProgress, setLoadProgress] = useState<{ fetched: number; total: number } | null>(null);
 
+  const perSheet = labelsPerSheet(layout);
+  const fetchLimit = clamp(perSheet, 20, 250);
+  const overflowed = layoutOverflows(layout);
+  const effectiveStartOffset = clamp(startOffset, 0, Math.max(0, perSheet - 1));
+
   const shipmentQuery = useQuery({
     queryKey: ['shipments', 'print', id],
     queryFn: () => shipmentsApi.getById(id!),
@@ -117,8 +123,10 @@ export default function ShipmentPrintPage() {
     queryKey: ['shipments', 'print', id, 'all-sim-cards'],
     queryFn: async () => {
       setLoadProgress({ fetched: 0, total: 0 });
-      const cards = await shipmentsApi.listAllSimCards(id!, (fetched, total) =>
-        setLoadProgress({ fetched, total }),
+      const cards = await shipmentsApi.listAllSimCards(
+        id!,
+        (fetched, total) => setLoadProgress({ fetched, total }),
+        fetchLimit,
       );
       return cards;
     },
@@ -137,11 +145,8 @@ export default function ShipmentPrintPage() {
   );
 
   /* ---------------------------------- izvedene vrijednosti ---------------------------- */
-  const perSheet = labelsPerSheet(layout);
-  const overflowed = layoutOverflows(layout);
-
   useEffect(() => {
-    setStartOffset((s) => clamp(s, 0, perSheet - 1));
+    setStartOffset((s) => clamp(s, 0, Math.max(0, perSheet - 1)));
   }, [perSheet]);
 
   const effectiveFrom = clamp(rangeFrom, 1, Math.max(1, totalCards));
@@ -154,9 +159,10 @@ export default function ShipmentPrintPage() {
   );
 
   const copies = persisted.copies;
+  const oneSheetCardCapacity = cardsForSheets(1, layout, effectiveStartOffset, copies);
   const sheets = useMemo(
-    () => buildSheets(cardsInRange, layout, startOffset, copies),
-    [cardsInRange, layout, startOffset, copies],
+    () => buildSheets(cardsInRange, layout, effectiveStartOffset, copies),
+    [cardsInRange, layout, effectiveStartOffset, copies],
   );
   const printSheets = testSheetOnly ? sheets.slice(0, 1) : sheets;
 
@@ -416,6 +422,14 @@ export default function ShipmentPrintPage() {
                     disabled={totalCards === 0}
                   />
                 </div>
+                <Button
+                  onClick={() =>
+                    setRangeTo(Math.min(totalCards, effectiveFrom + oneSheetCardCapacity - 1))
+                  }
+                  disabled={totalCards === 0}
+                >
+                  {t('shipments.printPage.fillOneSheet', { count: Math.min(oneSheetCardCapacity, Math.max(0, totalCards - effectiveFrom + 1)) })}
+                </Button>
                 <Button onClick={() => { setRangeFrom(1); setRangeTo(RANGE_TO_END); }} disabled={totalCards === 0}>
                   {t('common.labels.all')}
                 </Button>
@@ -437,7 +451,7 @@ export default function ShipmentPrintPage() {
                   <InputNumber
                     min={1}
                     max={perSheet}
-                    value={startOffset + 1}
+                    value={effectiveStartOffset + 1}
                     onChange={(v) => setStartOffset(typeof v === 'number' ? clamp(v - 1, 0, perSheet - 1) : 0)}
                     className="w-full"
                   />
@@ -614,7 +628,7 @@ export default function ShipmentPrintPage() {
                 <StatBox label={t('shipments.printPage.statCardsInRange')} value={cardsInRange.length} />
                 <StatBox label={t('shipments.printPage.statLabelsToPrint')} value={totalLabels} />
                 <StatBox label={t('shipments.printPage.statSheetsA4')} value={printSheets.length} suffix={testSheetOnly ? `/ ${sheets.length}` : undefined} />
-                <StatBox label={t('shipments.printPage.statStartAtLabel')} value={`#${startOffset + 1}`} />
+                <StatBox label={t('shipments.printPage.statStartAtLabel')} value={`#${effectiveStartOffset + 1}`} />
               </div>
 
               <Button
@@ -649,7 +663,7 @@ export default function ShipmentPrintPage() {
           </div>
 
           {/* vidljivo upozorenje o aktivnoj početnoj poziciji (izbjegava zabunu 79/80) */}
-          {!loading && startOffset > 0 ? (
+          {!loading && effectiveStartOffset > 0 ? (
             <Alert
               className="mb-3"
               type="warning"
@@ -658,8 +672,9 @@ export default function ShipmentPrintPage() {
               onClose={() => setStartOffset(0)}
               message={
                 <span className="text-sm">
-                  {t('shipments.printPage.printStartsFrom')} <strong>#{startOffset + 1}</strong> {t('shipments.printPage.onFirstSheet')}
-                  ({startOffset} {startOffset === 1 ? t('shipments.printPage.markedSingular') : t('shipments.printPage.markedPlural')}).{' '}
+                  {t('shipments.printPage.printStartsFrom')} <strong>#{effectiveStartOffset + 1}</strong> {t('shipments.printPage.onFirstSheet')}{' '}
+                  ({effectiveStartOffset} {effectiveStartOffset === 1 ? t('shipments.printPage.markedSingular') : t('shipments.printPage.markedPlural')} ·{' '}
+                  {t('shipments.printPage.remainingOnFirstSheet', { count: perSheet - effectiveStartOffset })}).{' '}
                   <Button size="small" type="link" className="!p-0" onClick={() => setStartOffset(0)}>
                     {t('shipments.printPage.resetToLabel1')}
                   </Button>

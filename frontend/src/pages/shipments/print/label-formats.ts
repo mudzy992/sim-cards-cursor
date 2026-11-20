@@ -179,7 +179,7 @@ export function buildSheets<T extends PrintableSimCard>(
 ): LabelSlot<T>[][] {
   const perSheet = labelsPerSheet(layout);
   const copiesSafe = Math.max(1, Math.floor(copies));
-  const offsetSafe = Math.max(0, Math.floor(startOffset));
+  const offsetSafe = clamp(Math.floor(startOffset), 0, Math.max(0, perSheet - 1));
   const totalSlots = Math.max(perSheet, offsetSafe + items.length * copiesSafe);
   const sheetCount = Math.ceil(totalSlots / perSheet);
 
@@ -200,6 +200,23 @@ export function buildSheets<T extends PrintableSimCard>(
   }
   return sheets;
 }
+
+/**
+ * Koliko kartica staje u zadatih `sheetCount` listova odabranog formata,
+ * uzimajući u obzir preskočene etikete na 1. listu (`startOffset`) i `copies`.
+ */
+export const cardsForSheets = (
+  sheetCount: number,
+  layout: LabelSheetLayout,
+  startOffset: number,
+  copies: number,
+): number => {
+  const perSheet = labelsPerSheet(layout);
+  const copiesSafe = Math.max(1, Math.floor(copies));
+  const offsetSafe = clamp(Math.floor(startOffset), 0, Math.max(0, perSheet - 1));
+  const availableSlots = Math.max(0, Math.max(1, Math.floor(sheetCount)) * perSheet - offsetSafe);
+  return Math.max(1, Math.floor(availableSlots / copiesSafe));
+};
 
 /** Koliko je etiketa u listu stvarno popunjeno (za indikator popunjenosti). */
 export const filledInSheet = <T extends PrintableSimCard>(cells: LabelSlot<T>[]): number =>
