@@ -32,6 +32,9 @@ describe('ShipmentsService — Excel import atomicity', () => {
         createMany: jest.fn().mockResolvedValue({ count: 2 }),
         count: jest.fn().mockResolvedValue(2),
       },
+      simEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 2 }),
+      },
       shipment: {
         update: jest.fn().mockResolvedValue({ id: 'ship-1' }),
       },
@@ -39,10 +42,15 @@ describe('ShipmentsService — Excel import atomicity', () => {
 
     const prisma = {
       shipment: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'ship-1' }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'ship-1', distributionId: 'dist-1' }),
+        update: jest.fn().mockResolvedValue({ id: 'ship-1' }),
+      },
+      distribution: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'dist-2' }),
       },
       simCard: {
         findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
       },
       $transaction: jest.fn(async (cb: (client: typeof tx) => Promise<unknown>) => cb(tx)),
     };
@@ -161,9 +169,15 @@ describe('ShipmentsService — Excel import atomicity', () => {
     expect(tx.shipment.update).not.toHaveBeenCalled();
   });
 
-  it('inserts valid selected rows atomically, updates shipment status, and logs IMPORT', async () => {
+  it('inserts valid selected rows atomically, creates IMPORTED events, updates shipment status, and logs IMPORT', async () => {
     const { service, tx, activityLogService } = createMocks();
     tx.simCard.createMany.mockResolvedValueOnce({ count: 1 });
+    tx.simCard.findMany.mockImplementation(async (args?: { select?: { id?: boolean; shipment?: unknown } }) => {
+      if (args?.select?.id && !args.select.shipment) {
+        return [{ id: 'sim-new-1' }];
+      }
+      return [];
+    });
     tx.simCard.count.mockResolvedValueOnce(1);
 
     const result = await service.importExcel(
@@ -191,6 +205,16 @@ describe('ShipmentsService — Excel import atomicity', () => {
         }),
       ],
     });
+    expect(tx.simEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          simCardId: 'sim-new-1',
+          type: 'IMPORTED',
+          userId: 'admin-1',
+          distributionId: 'dist-1',
+        }),
+      ],
+    });
     expect(tx.shipment.update).toHaveBeenCalledWith({
       where: { id: 'ship-1' },
       data: {
@@ -206,6 +230,34 @@ describe('ShipmentsService — Excel import atomicity', () => {
         entityId: 'ship-1',
       }),
     );
+  });
+
+  it('rejects empty selectedRowNumbers array instead of importing all rows', async () => {
+    const { service, prisma } = createMocks();
+
+    await expect(
+      service.importExcel(
+        'ship-1',
+        { applyImport: 'true', selectedRowNumbers: '[]' },
+        makeCsvBuffer(sampleCsv),
+        'admin-1',
+        '127.0.0.1',
+        scope,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('blocks changing distributionId when shipment already has assigned or installed SIM cards', async () => {
+    const { service, prisma } = createMocks();
+    prisma.simCard.count.mockResolvedValueOnce(3);
+
+    await expect(
+      service.update('ship-1', { distributionId: 'dist-2' }, 'admin-1', '127.0.0.1', scope),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.shipment.update).not.toHaveBeenCalled();
   });
 
   it('chunks large 8,500+ row imports for both lookup and createMany to stay below PostgreSQL 32,767 bind-parameter limit', async () => {
@@ -242,9 +294,9 @@ describe('ShipmentsService — Excel import atomicity', () => {
       expect(result.insertedRows).toBe(rowCount);
     }
 
-    // 4 fields × 2 chunks (5,000 + 3,500) = 8 findMany calls on outer pre-check and 8 inside tx
+    // 4 fields × 2 chunks (5,000 + 3,500) = 8 findMany calls on outer pre-check; inside tx 8 duplicate checks + 2 inserted-id lookups
     expect(prisma.simCard.findMany).toHaveBeenCalledTimes(8);
-    expect(tx.simCard.findMany).toHaveBeenCalledTimes(8);
+    expect(tx.simCard.findMany).toHaveBeenCalledTimes(10);
     for (const call of prisma.simCard.findMany.mock.calls) {
       const where = call[0]?.where as Record<string, { in?: string[] }>;
       const values = Object.values(where)[0]?.in ?? [];

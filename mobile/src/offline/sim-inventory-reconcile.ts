@@ -19,14 +19,21 @@ export async function reconcileOfflineSimInventory(user: AuthUser): Promise<Reco
   }
 
   const slice = cached.slice(0, MAX_ITEMS)
+  const iccids = Array.from(
+    new Set(slice.map((entry) => normalizeIccid(entry.iccid ?? '')).filter(Boolean)),
+  )
+  if (iccids.length === 0) {
+    return { removedIccids: [], kept: cached.length, updated: 0 }
+  }
+
   const removedIccids = new Set<string>()
   const updatedByIccid = new Map<string, MobileSimCard>()
 
-  for (const entry of slice) {
-    const iccid = normalizeIccid(entry.iccid ?? '')
-    if (!iccid) continue
-    try {
-      const fresh = await simCardsApi.scanByIccid(iccid)
+  try {
+    const { items } = await simCardsApi.scanBatch(iccids)
+    for (const fresh of items) {
+      const iccid = normalizeIccid(fresh.iccid ?? '')
+      if (!iccid) continue
       const status = String(fresh.status ?? '')
       const assignedToId = fresh.assignedTo?.id
 
@@ -39,11 +46,12 @@ export async function reconcileOfflineSimInventory(user: AuthUser): Promise<Reco
       }
 
       updatedByIccid.set(iccid, fresh)
-    } catch (error) {
-      if (axios.isAxiosError(error) && !error.response) {
-        break
-      }
     }
+  } catch (error) {
+    if (axios.isAxiosError(error) && !error.response) {
+      return { removedIccids: [], kept: cached.length, updated: 0 }
+    }
+    throw error
   }
 
   if (removedIccids.size === 0 && updatedByIccid.size === 0) {
@@ -74,4 +82,3 @@ export async function removeSimFromOfflineInventoryById(
   const next = cached.filter((c) => c.id !== simCardId)
   await offlineCache.offlineSimInventory.set(user, next)
 }
-

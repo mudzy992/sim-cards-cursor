@@ -335,13 +335,20 @@ const bs: TranslationDictionary = {
     },
     simEventType: {
       created: 'Kreirano u sistemu',
+      imported: 'Uvezeno iz isporuke',
       claimed: 'Zadužena od strane operatera',
       assigned: 'Dodijeljena korisniku',
       unassigned: 'Uklonjena dodjela',
       installed: 'Ugrađena u brojilo',
       demounted: 'Demontirana / uklonjena sa brojila',
+      returnedToStock: 'Vraćena u dostupne zalihe',
       sent: 'Zapisnik poslan (e-pošta)',
       statusChange: 'Promjena statusa ({{status}})',
+    },
+    shipmentStatus: {
+      received: 'Primljena',
+      processing: 'U obradi',
+      completed: 'Završena',
     },
     demountResolution: {
       fullDemount: 'Potpuna demontaža',
@@ -671,6 +678,9 @@ const bs: TranslationDictionary = {
       historyTitle: 'Kretanje / historija događaja',
       noEvents: 'Nema zabilježenih događaja.',
       noExtraDetails: 'Nema dodatnih detalja.',
+      returnToStock: 'Vrati u dostupne',
+      returnToStockSuccess: 'SIM kartica je vraćena u dostupne zalihe.',
+      returnToStockConfirm: 'Vratiti ovu SIM karticu u status Dostupna (AVAILABLE)?',
     },
   },
 
@@ -679,6 +689,10 @@ const bs: TranslationDictionary = {
     list: {
       assignSuccess: 'SIM kartica je dodijeljena korisniku.',
       assignFailed: 'Dodjela nije uspjela.',
+      bulkAssignSuccess: 'Dodijeljeno {{count}} SIM kartica korisniku.',
+      bulkAssignButton: 'Dodijeli odabrane ({{count}})',
+      bulkAssignDrawerTitle: 'Masovna dodjela SIM kartica',
+      bulkAssignSummary: 'Odabrano dostupnih kartica: {{count}}',
       unassignSuccess: 'SIM kartica je vraćena na AVAILABLE.',
       unassignFailed: 'Oduzimanje nije uspjelo.',
       noCards: 'Nema kartica',

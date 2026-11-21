@@ -39,6 +39,27 @@ export const simCardsApi = {
     return response.data.data;
   },
 
+  scanBatch: async (
+    iccids: string[],
+  ): Promise<{ items: MobileSimCard[]; notFoundIccids: string[] }> => {
+    const normalized = Array.from(
+      new Set(iccids.map((v) => normalizeIccid(v)).filter(Boolean)),
+    ).slice(0, 100);
+    if (normalized.length === 0) {
+      return { items: [], notFoundIccids: [] };
+    }
+    const response = await axiosInstance.post('/sim-cards/scan-batch', {
+      iccids: normalized,
+    });
+    const data = response.data.data as
+      | { items?: MobileSimCard[]; notFoundIccids?: string[] }
+      | undefined;
+    return {
+      items: Array.isArray(data?.items) ? data.items : [],
+      notFoundIccids: Array.isArray(data?.notFoundIccids) ? data.notFoundIccids : [],
+    };
+  },
+
   scanByIccidWithOffline: async (iccid: string): Promise<MobileSimCard> => {
     const user = requireUser()
     try {
@@ -127,9 +148,18 @@ export const simCardsApi = {
   myAssigned: async (): Promise<MobileSimCard[]> => {
     const user = requireUser()
     try {
-      const response = await axiosInstance.get('/sim-cards/my-assigned')
-      const data = response.data.data
-      const list = Array.isArray(data) ? (data as MobileSimCard[]) : []
+      const response = await axiosInstance.get('/sim-cards/my-assigned', {
+        params: { limit: 100 },
+      })
+      const data = response.data.data as
+        | MobileSimCard[]
+        | { items?: MobileSimCard[] }
+        | undefined
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+          ? data.items
+          : []
       await offlineCache.myAssignedSimCards.set(user, list)
       return list
     } catch (error) {

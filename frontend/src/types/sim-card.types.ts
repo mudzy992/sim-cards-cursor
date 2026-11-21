@@ -47,6 +47,16 @@ export type SimCardItem = {
     provider: string;
     receivedDate: string;
   };
+  meter?: {
+    id: string;
+    serialNumber: string;
+    status: string;
+    branch?: {
+      id: string;
+      name: string;
+      code: string;
+    } | null;
+  } | null;
   createdAt: string;
   updatedAt: string;
 };

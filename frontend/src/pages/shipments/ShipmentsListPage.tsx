@@ -22,7 +22,7 @@ import { shipmentsApi } from '@/api/shipments.api';
 import { simCardsApi } from '@/api/sim-cards.api';
 import { usersApi } from '@/api/users.api';
 import { useAuthStore } from '@/store/auth.store';
-import { getSimCardStatusLabel } from '@/utils/labels.utils';
+import { getShipmentStatusLabel, getSimCardStatusLabel } from '@/utils/labels.utils';
 import type { ShipmentItem, ShipmentStatus } from '@/types/shipment.types';
 import type {
   SimCardItem,
@@ -95,7 +95,10 @@ export default function ShipmentsListPage() {
   });
   const [simSearchInput, setSimSearchInput] = useState('');
   const [assignTarget, setAssignTarget] = useState<SimCardItem | null>(null);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [selectedSimIds, setSelectedSimIds] = useState<string[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [userSearch, setUserSearch] = useState('');
 
   const shipmentsQuery = useQuery({
     queryKey: ['shipments', 'list', shipmentFilters],
@@ -114,10 +117,17 @@ export default function ShipmentsListPage() {
     enabled: activeTab === 'sim-cards',
   });
 
+  const isAssignDrawerOpen = Boolean(assignTarget) || bulkAssignOpen;
+
   const usersQuery = useQuery({
-    queryKey: ['users', 'list'],
-    queryFn: () => usersApi.list(),
-    enabled: Boolean(assignTarget),
+    queryKey: ['users', 'list', 'sim-assign', userSearch],
+    queryFn: () =>
+      usersApi.list({
+        role: 'USER',
+        limit: 100,
+        search: userSearch.trim() || undefined,
+      }),
+    enabled: isAssignDrawerOpen,
   });
 
   const assignMutation = useMutation({
@@ -127,6 +137,27 @@ export default function ShipmentsListPage() {
       messageApi.success(t('shipments.list.assignSuccess'));
       setAssignTarget(null);
       setSelectedUserId(null);
+      setUserSearch('');
+
+      await queryClient.invalidateQueries({ queryKey: ['sim-cards', 'list'] });
+      await queryClient.invalidateQueries({ queryKey: ['shipments', 'list'] });
+    },
+    onError: () => {
+      messageApi.error(t('shipments.list.assignFailed'));
+    },
+  });
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: (payload: { simCardIds: string[]; userId: string }) =>
+      simCardsApi.bulkAssign(payload.simCardIds, payload.userId),
+    onSuccess: async (res) => {
+      messageApi.success(
+        t('shipments.list.bulkAssignSuccess', { count: res.assignedCount }),
+      );
+      setBulkAssignOpen(false);
+      setSelectedSimIds([]);
+      setSelectedUserId(null);
+      setUserSearch('');
 
       await queryClient.invalidateQueries({ queryKey: ['sim-cards', 'list'] });
       await queryClient.invalidateQueries({ queryKey: ['shipments', 'list'] });
@@ -273,7 +304,7 @@ export default function ShipmentsListPage() {
                   }))
                 }
                 options={shipmentStatusOptions.map((s) => ({
-                  label: s,
+                  label: getShipmentStatusLabel(s, t),
                   value: s,
                 }))}
               />
@@ -331,7 +362,10 @@ export default function ShipmentsListPage() {
                 title: t('common.labels.status'),
                 dataIndex: 'status',
                 render: (status: string) => (
-                  <StatusBadge tone={getShipmentStatusTone(status)} label={status} />
+                  <StatusBadge
+                    tone={getShipmentStatusTone(status)}
+                    label={getShipmentStatusLabel(status, t)}
+                  />
                 ),
               },
               {
@@ -438,6 +472,19 @@ export default function ShipmentsListPage() {
                 }
                 options={shipmentOptions}
               />
+
+              {canManageShipments && selectedSimIds.length > 0 ? (
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    setAssignTarget(null);
+                    setSelectedUserId(null);
+                    setBulkAssignOpen(true);
+                  }}
+                >
+                  {t('shipments.list.bulkAssignButton', { count: selectedSimIds.length })}
+                </Button>
+              ) : null}
             </div>
           </FilterBar>
 
@@ -446,6 +493,17 @@ export default function ShipmentsListPage() {
             loading={simCardsQuery.isLoading}
             dataSource={simRows}
             locale={{ emptyText: <EmptyNotice /> }}
+            rowSelection={
+              canManageShipments
+                ? {
+                    selectedRowKeys: selectedSimIds,
+                    onChange: (keys) => setSelectedSimIds(keys.map(String)),
+                    getCheckboxProps: (row) => ({
+                      disabled: row.status !== 'AVAILABLE',
+                    }),
+                  }
+                : undefined
+            }
             pagination={{
               current: simCardsQuery.data?.page,
               pageSize: simCardsQuery.data?.limit,
@@ -564,12 +622,18 @@ export default function ShipmentsListPage() {
         <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
 
         <Drawer
-          title={t('shipments.list.assignDrawerTitle')}
-          open={Boolean(assignTarget)}
+          title={
+            bulkAssignOpen
+              ? t('shipments.list.bulkAssignDrawerTitle')
+              : t('shipments.list.assignDrawerTitle')
+          }
+          open={isAssignDrawerOpen}
           width={520}
           onClose={() => {
             setAssignTarget(null);
+            setBulkAssignOpen(false);
             setSelectedUserId(null);
+            setUserSearch('');
           }}
           destroyOnClose
           footer={
@@ -577,7 +641,9 @@ export default function ShipmentsListPage() {
               <Button
                 onClick={() => {
                   setAssignTarget(null);
+                  setBulkAssignOpen(false);
                   setSelectedUserId(null);
+                  setUserSearch('');
                 }}
               >
                 {t('common.actions.cancel')}
@@ -585,12 +651,22 @@ export default function ShipmentsListPage() {
 
               <Button
                 type="primary"
-                loading={assignMutation.isPending}
+                loading={assignMutation.isPending || bulkAssignMutation.isPending}
                 onClick={() => {
-                  if (!assignTarget || !selectedUserId) {
+                  if (!selectedUserId) {
                     messageApi.warning(t('shipments.list.selectUserWarning'));
                     return;
                   }
+
+                  if (bulkAssignOpen) {
+                    void bulkAssignMutation.mutate({
+                      simCardIds: selectedSimIds,
+                      userId: selectedUserId,
+                    });
+                    return;
+                  }
+
+                  if (!assignTarget) return;
 
                   void assignMutation.mutate({
                     simCardId: assignTarget.id,
@@ -604,18 +680,27 @@ export default function ShipmentsListPage() {
           }
         >
           <Space direction="vertical" className="w-full">
-            <div className="text-sm text-fg-primary">
-              {t('shipments.list.simColon')}{' '}
-              <span className="font-mono">{assignTarget?.iccid}</span>
-            </div>
+            {bulkAssignOpen ? (
+              <div className="text-sm text-fg-primary">
+                {t('shipments.list.bulkAssignSummary', { count: selectedSimIds.length })}
+              </div>
+            ) : (
+              <div className="text-sm text-fg-primary">
+                {t('shipments.list.simColon')}{' '}
+                <span className="font-mono">{assignTarget?.iccid}</span>
+              </div>
+            )}
 
             <Select
               showSearch
-              optionFilterProp="label"
+              filterOption={false}
+              onSearch={(val) => setUserSearch(val)}
+              loading={usersQuery.isFetching}
               placeholder={t('shipments.list.selectUserPlaceholder')}
               value={selectedUserId ?? undefined}
               onChange={(value) => setSelectedUserId(value)}
               options={userOptions}
+              className="w-full"
             />
           </Space>
         </Drawer>

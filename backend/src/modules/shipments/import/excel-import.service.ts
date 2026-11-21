@@ -335,7 +335,7 @@ export class ExcelImportService {
     selectedRowNumbers?: number[],
   ) {
     const selected =
-      selectedRowNumbers && selectedRowNumbers.length > 0 ? new Set(selectedRowNumbers) : null;
+      selectedRowNumbers !== undefined ? new Set(selectedRowNumbers) : null;
 
     return rows
       .filter((row) => row.errors.length === 0)

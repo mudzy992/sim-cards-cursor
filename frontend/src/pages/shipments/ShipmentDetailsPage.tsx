@@ -3,7 +3,7 @@ import { Button, Descriptions, Table } from 'antd';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { shipmentsApi } from '@/api/shipments.api';
-import { getSimCardStatusLabel } from '@/utils/labels.utils';
+import { getShipmentStatusLabel, getSimCardStatusLabel } from '@/utils/labels.utils';
 import type { ShipmentSimCardsResponse } from '@/types/shipment.types';
 import type { SimCardStatus } from '@/types/sim-card.types';
 import { PrinterOutlined } from '@ant-design/icons';
@@ -54,7 +54,7 @@ export default function ShipmentDetailsPage() {
           shipment ? (
             <StatusBadge
               tone={getShipmentStatusTone(shipment.status)}
-              label={shipment.status}
+              label={getShipmentStatusLabel(shipment.status, t)}
             />
           ) : undefined
         }
@@ -77,7 +77,7 @@ export default function ShipmentDetailsPage() {
             <Descriptions.Item label={t('common.labels.status')}>
               <StatusBadge
                 tone={getShipmentStatusTone(shipment.status)}
-                label={shipment.status}
+                label={getShipmentStatusLabel(shipment.status, t)}
               />
             </Descriptions.Item>
             <Descriptions.Item label={t('shipments.details.provider')}>

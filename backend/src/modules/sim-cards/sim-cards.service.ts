@@ -30,31 +30,19 @@ export class SimCardsService {
   ): Promise<
     PaginatedResult<
       Prisma.SimCardGetPayload<{
-        include: ReturnType<SimCardsService['moderatedInstalledInclude']>
+        include: ReturnType<SimCardsService['moderatedInstalledInclude']>;
       }> & { installedAt: Date | null }
     >
   > {
-    const page = filter.page ?? 1
-    const limit = filter.limit ?? 20
+    const page = filter.page ?? 1;
+    const limit = filter.limit ?? 20;
 
-    const branchIds = this.getModeratedBranchIds(scope)
+    const branchIds = this.getModeratedBranchIds(scope);
     if (scope?.role === 'DIST_ADMIN' && !scope.distributionId) {
-      return {
-        items: [],
-        page,
-        limit,
-        total: 0,
-        totalPages: 1,
-      }
+      return { items: [], page, limit, total: 0, totalPages: 1 };
     }
     if (scope?.role === 'USER' && !branchIds) {
-      return {
-        items: [],
-        page,
-        limit,
-        total: 0,
-        totalPages: 1,
-      }
+      return { items: [], page, limit, total: 0, totalPages: 1 };
     }
 
     const where: Prisma.SimCardWhereInput = {
@@ -70,14 +58,14 @@ export class SimCardsService {
       ...(filter.search
         ? {
             OR: [
-              { iccid: { contains: filter.search } },
-              { ipAddress: { contains: filter.search } },
-              { publicIpAddress: { contains: filter.search } },
-              { phoneNumber: { contains: filter.search } },
+              { iccid: { contains: filter.search, mode: 'insensitive' } },
+              { ipAddress: { contains: filter.search, mode: 'insensitive' } },
+              { publicIpAddress: { contains: filter.search, mode: 'insensitive' } },
+              { phoneNumber: { contains: filter.search, mode: 'insensitive' } },
             ],
           }
         : {}),
-    }
+    };
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.simCard.findMany({
@@ -88,12 +76,12 @@ export class SimCardsService {
         take: limit,
       }),
       this.prisma.simCard.count({ where }),
-    ])
+    ]);
 
     const withInstalledAt = items.map((i) => ({
       ...i,
       installedAt: i.installationRecords?.[0]?.createdAt ?? null,
-    }))
+    }));
 
     return {
       items: withInstalledAt,
@@ -101,87 +89,53 @@ export class SimCardsService {
       limit,
       total,
       totalPages: Math.ceil(total / limit) || 1,
-    }
+    };
   }
 
-  async create(dto: CreateSimCardDto, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
+  async create(
+    dto: CreateSimCardDto,
+    actorId: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
     await this.ensureShipmentExists(dto.shipmentId, scope);
 
     const simIccid = normalizeIccid(dto.iccid.trim());
     const simIpAddress = dto.ipAddress.trim();
     const simPublicIpAddress = dto.publicIpAddress?.trim() || undefined;
     const simPhoneNumber = dto.phoneNumber?.trim() || undefined;
-    const normalizedPhone = simPhoneNumber ? normalizePhoneNumber(simPhoneNumber) : undefined;
 
-    const duplicateChecks: Prisma.SimCardWhereInput[] = [
-      { iccid: simIccid },
-      { ipAddress: simIpAddress },
-      ...(simPublicIpAddress ? [{ publicIpAddress: simPublicIpAddress }] : []),
-      ...(simPhoneNumber
-        ? [
-            {
-              phoneNumber: {
-                in:
-                  normalizedPhone && normalizedPhone !== simPhoneNumber
-                    ? [simPhoneNumber, normalizedPhone]
-                    : [simPhoneNumber],
-              },
-            },
-          ]
-        : []),
-    ];
-
-    const existingDup = await this.prisma.simCard.findFirst({
-      where: { OR: duplicateChecks },
-      select: { iccid: true, ipAddress: true, publicIpAddress: true, phoneNumber: true },
+    await this.assertUniqueSimFields({
+      iccid: simIccid,
+      ipAddress: simIpAddress,
+      publicIpAddress: simPublicIpAddress,
+      phoneNumber: simPhoneNumber,
     });
-    if (existingDup) {
-      if (existingDup.iccid === simIccid) {
-        throw new ConflictException({
-          message: 'SIM kartica sa ovim ICCID-om već postoji u bazi.',
-          code: ErrorCodes.SIM_DUPLICATE_ICCID,
-        });
-      }
-      if (existingDup.ipAddress === simIpAddress) {
-        throw new ConflictException({
-          message: 'SIM kartica sa ovom internom IP adresom već postoji u bazi.',
-          code: ErrorCodes.SIM_DUPLICATE_IP,
-        });
-      }
-      if (simPublicIpAddress && existingDup.publicIpAddress === simPublicIpAddress) {
-        throw new ConflictException({
-          message: 'SIM kartica sa ovom javnom IP adresom već postoji u bazi.',
-          code: ErrorCodes.SIM_DUPLICATE_PUBLIC_IP,
-        });
-      }
-      if (
-        normalizedPhone &&
-        existingDup.phoneNumber &&
-        normalizePhoneNumber(existingDup.phoneNumber) === normalizedPhone
-      ) {
-        throw new ConflictException({
-          message: 'SIM kartica sa ovim brojem telefona već postoji u bazi.',
-          code: ErrorCodes.SIM_DUPLICATE_PHONE,
-        });
-      }
-      throw new ConflictException({
-        message: 'SIM kartica sa istim podacima već postoji u bazi.',
-        code: ErrorCodes.CONFLICT,
-      });
-    }
 
     try {
-      const simCard = await this.prisma.simCard.create({
-        data: {
-          iccid: simIccid,
-          ipAddress: simIpAddress,
-          publicIpAddress: simPublicIpAddress,
-          phoneNumber: simPhoneNumber,
-          apn: dto.apn?.trim() || undefined,
-          shipmentId: dto.shipmentId,
-          status: dto.status ?? SimCardStatus.AVAILABLE,
-        },
-        include: this.simCardInclude(),
+      const simCard = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.simCard.create({
+          data: {
+            iccid: simIccid,
+            ipAddress: simIpAddress,
+            publicIpAddress: simPublicIpAddress,
+            phoneNumber: simPhoneNumber,
+            apn: dto.apn?.trim() || undefined,
+            shipmentId: dto.shipmentId,
+            status: dto.status ?? SimCardStatus.AVAILABLE,
+          },
+          include: this.simCardInclude(),
+        });
+
+        const totalCards = await tx.simCard.count({
+          where: { shipmentId: dto.shipmentId },
+        });
+        await tx.shipment.update({
+          where: { id: dto.shipmentId },
+          data: { totalCards },
+        });
+
+        return created;
       });
 
       await this.activityLogService.log({
@@ -204,14 +158,20 @@ export class SimCardsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('SIM card with this ICCID already exists');
+        throw new ConflictException({
+          message: 'SIM card with this ICCID already exists',
+          code: ErrorCodes.SIM_DUPLICATE_ICCID,
+        });
       }
 
       throw error;
     }
   }
 
-  async findAll(filter: SimCardFilterDto, scope?: ScopeContext | null): Promise<PaginatedResult<unknown>> {
+  async findAll(
+    filter: SimCardFilterDto,
+    scope?: ScopeContext | null,
+  ): Promise<PaginatedResult<unknown>> {
     const page = filter.page ?? 1;
     const limit = filter.limit ?? 20;
 
@@ -224,10 +184,10 @@ export class SimCardsService {
       ...(filter.search
         ? {
             OR: [
-              { iccid: { contains: filter.search } },
-              { ipAddress: { contains: filter.search } },
-              { publicIpAddress: { contains: filter.search } },
-              { phoneNumber: { contains: filter.search } },
+              { iccid: { contains: filter.search, mode: 'insensitive' } },
+              { ipAddress: { contains: filter.search, mode: 'insensitive' } },
+              { publicIpAddress: { contains: filter.search, mode: 'insensitive' } },
+              { phoneNumber: { contains: filter.search, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -253,42 +213,112 @@ export class SimCardsService {
     };
   }
 
-  async findOne(id: string, scope?: ScopeContext | null) {
-    const scopeClause = scopeWhere(scope, { viaShipment: true });
+  async findOne(id: string, scope?: ScopeContext | null, actorUserId?: string) {
+    const where = this.buildSingleSimWhere(id, scope, actorUserId);
     const simCard = await this.prisma.simCard.findFirst({
-      where: {
-        id,
-        ...(scopeClause ? { AND: [scopeClause] } : {}),
-      },
+      where,
       include: this.simCardInclude(),
     });
 
     if (!simCard) {
-      throw new NotFoundException('SIM card not found');
+      throw new NotFoundException({
+        message: 'SIM card not found',
+        code: ErrorCodes.SIM_NOT_FOUND,
+      });
     }
 
     return simCard;
   }
 
-  async update(id: string, dto: UpdateSimCardDto, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
-    await this.ensureSimCardExists(id, scope);
+  async update(
+    id: string,
+    dto: UpdateSimCardDto,
+    actorId: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
+    const scopeClause = scopeWhere(scope, { viaShipment: true });
+    const existing = await this.prisma.simCard.findFirst({
+      where: {
+        id,
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+      },
+      select: {
+        id: true,
+        shipmentId: true,
+        status: true,
+        meter: { select: { id: true } },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException({
+        message: 'SIM card not found',
+        code: ErrorCodes.SIM_NOT_FOUND,
+      });
+    }
+
+    if (existing.meter && dto.status !== undefined && dto.status !== SimCardStatus.INSTALLED) {
+      throw new BadRequestException(
+        'SIM kartica je ugrađena u brojilo — promjena statusa je moguća samo kroz proces demontaže.',
+      );
+    }
 
     if (dto.shipmentId) {
       await this.ensureShipmentExists(dto.shipmentId, scope);
     }
 
-    const updated = await this.prisma.simCard.update({
-      where: { id },
-      data: {
-        iccid: dto.iccid,
-        ipAddress: dto.ipAddress,
-        publicIpAddress: dto.publicIpAddress,
-        phoneNumber: dto.phoneNumber,
-        apn: dto.apn,
-        shipmentId: dto.shipmentId,
-        status: dto.status,
+    const nextIccid = dto.iccid !== undefined ? normalizeIccid(dto.iccid.trim()) : undefined;
+    const nextIpAddress = dto.ipAddress !== undefined ? dto.ipAddress.trim() : undefined;
+    const nextPublicIpAddress =
+      dto.publicIpAddress !== undefined ? dto.publicIpAddress.trim() || null : undefined;
+    const nextPhoneNumber =
+      dto.phoneNumber !== undefined ? dto.phoneNumber.trim() || null : undefined;
+    const nextApn = dto.apn !== undefined ? dto.apn.trim() || null : undefined;
+
+    await this.assertUniqueSimFields(
+      {
+        iccid: nextIccid,
+        ipAddress: nextIpAddress,
+        publicIpAddress: nextPublicIpAddress ?? undefined,
+        phoneNumber: nextPhoneNumber ?? undefined,
       },
-      include: this.simCardInclude(),
+      id,
+    );
+
+    const shipmentChanged = dto.shipmentId !== undefined && dto.shipmentId !== existing.shipmentId;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.simCard.update({
+        where: { id },
+        data: {
+          iccid: nextIccid,
+          ipAddress: nextIpAddress,
+          publicIpAddress: nextPublicIpAddress,
+          phoneNumber: nextPhoneNumber,
+          apn: nextApn,
+          shipmentId: dto.shipmentId,
+          status: dto.status,
+        },
+        include: this.simCardInclude(),
+      });
+
+      if (shipmentChanged && dto.shipmentId) {
+        const [oldTotal, newTotal] = await Promise.all([
+          tx.simCard.count({ where: { shipmentId: existing.shipmentId } }),
+          tx.simCard.count({ where: { shipmentId: dto.shipmentId } }),
+        ]);
+        await tx.shipment.update({
+          where: { id: existing.shipmentId },
+          data: { totalCards: oldTotal },
+        });
+        await tx.shipment.update({
+          where: { id: dto.shipmentId },
+          data: { totalCards: newTotal },
+        });
+      }
+
+      return saved;
     });
 
     await this.activityLogService.log({
@@ -300,7 +330,7 @@ export class SimCardsService {
       ipAddress,
     });
 
-    if (dto.status) {
+    if (dto.status && dto.status !== existing.status) {
       await this.createSimEvent(id, `STATUS_${dto.status}`, actorId, {
         fields: Object.keys(dto),
       });
@@ -309,14 +339,19 @@ export class SimCardsService {
     return updated;
   }
 
-  async remove(id: string, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
+  async remove(
+    id: string,
+    actorId: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
     const scopeClause = scopeWhere(scope, { viaShipment: true });
     const simCard = await this.prisma.simCard.findFirst({
       where: {
         id,
         ...(scopeClause ? { AND: [scopeClause] } : {}),
       },
-      select: { id: true, meter: { select: { id: true } } },
+      select: { id: true, shipmentId: true, meter: { select: { id: true } } },
     });
 
     if (!simCard) {
@@ -333,7 +368,16 @@ export class SimCardsService {
       });
     }
 
-    await this.prisma.simCard.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.simCard.delete({ where: { id } });
+      const totalCards = await tx.simCard.count({
+        where: { shipmentId: simCard.shipmentId },
+      });
+      await tx.shipment.update({
+        where: { id: simCard.shipmentId },
+        data: { totalCards },
+      });
+    });
 
     await this.activityLogService.log({
       userId: actorId,
@@ -347,8 +391,9 @@ export class SimCardsService {
   }
 
   async scanByIccid(iccid: string, scope?: ScopeContext | null) {
+    const normalized = normalizeIccid(iccid.trim());
     const simCard = await this.prisma.simCard.findUnique({
-      where: { iccid },
+      where: { iccid: normalized },
       include: this.simCardInclude(),
     });
 
@@ -365,7 +410,7 @@ export class SimCardsService {
     if (scopeClause) {
       const allowed = await this.prisma.simCard.findFirst({
         where: {
-          iccid,
+          iccid: normalized,
           AND: [scopeClause],
         },
         select: { id: true },
@@ -378,6 +423,36 @@ export class SimCardsService {
     }
 
     return simCard;
+  }
+
+  async scanBatch(iccids: string[], scope?: ScopeContext | null) {
+    const normalizedList = Array.from(
+      new Set(iccids.map((v) => normalizeIccid(v.trim())).filter(Boolean)),
+    ).slice(0, 100);
+
+    if (normalizedList.length === 0) {
+      return { items: [], notFoundIccids: [] };
+    }
+
+    const scopeClause = scopeWhere(scope, { viaShipment: true });
+    if (scope && scope.role !== 'SYSTEM_ADMIN' && !scopeClause) {
+      throw new BadRequestException(
+        'Nemate dodijeljenu distribuciju ili podružnicu. Ne možete skenirati SIM kartice.',
+      );
+    }
+
+    const items = await this.prisma.simCard.findMany({
+      where: {
+        iccid: { in: normalizedList },
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+      },
+      include: this.simCardInclude(),
+    });
+
+    const foundSet = new Set(items.map((item) => item.iccid));
+    const notFoundIccids = normalizedList.filter((iccid) => !foundSet.has(iccid));
+
+    return { items, notFoundIccids };
   }
 
   async assign(
@@ -425,6 +500,83 @@ export class SimCardsService {
     return updated;
   }
 
+  async bulkAssign(
+    simCardIds: string[],
+    userId: string,
+    actorId: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
+    const uniqueIds = Array.from(new Set(simCardIds));
+    await this.ensureUserExists(userId, scope);
+
+    const scopeClause = scopeWhere(scope, { viaShipment: true });
+    const candidates = await this.prisma.simCard.findMany({
+      where: {
+        id: { in: uniqueIds },
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+      },
+      select: { id: true, status: true },
+    });
+
+    const assignableIds = candidates
+      .filter((c) => c.status === SimCardStatus.AVAILABLE)
+      .map((c) => c.id);
+
+    if (assignableIds.length === 0) {
+      throw new BadRequestException(
+        'Nijedna odabrana SIM kartica nije u statusu AVAILABLE ili izvan je vašeg opsega.',
+      );
+    }
+
+    const assignedAt = new Date();
+    const assignedCount = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.simCard.updateMany({
+        where: {
+          id: { in: assignableIds },
+          status: SimCardStatus.AVAILABLE,
+        },
+        data: {
+          assignedToId: userId,
+          assignedAt,
+          status: SimCardStatus.ASSIGNED,
+        },
+      });
+
+      if (updated.count > 0) {
+        await tx.simEvent.createMany({
+          data: assignableIds.map((simCardId) => ({
+            simCardId,
+            type: 'ASSIGNED',
+            userId: actorId,
+            metadata: { assignedToId: userId, bulk: true },
+          })),
+        });
+      }
+
+      return updated.count;
+    });
+
+    await this.activityLogService.log({
+      userId: actorId,
+      action: 'ASSIGN',
+      entity: 'sim_card',
+      details: {
+        assignedToId: userId,
+        requestedCount: uniqueIds.length,
+        assignedCount,
+        bulk: true,
+      },
+      ipAddress,
+    });
+
+    return {
+      assignedCount,
+      requestedCount: uniqueIds.length,
+      skippedCount: uniqueIds.length - assignedCount,
+    };
+  }
+
   async claim(id: string, actorId: string, ipAddress?: string, scope?: ScopeContext | null) {
     const scopeClause = scopeWhere(scope, { viaShipment: true });
     if (scope && scope.role !== 'SYSTEM_ADMIN' && !scopeClause) {
@@ -455,7 +607,7 @@ export class SimCardsService {
     }
 
     if (simCard.status === SimCardStatus.ASSIGNED && simCard.assignedToId === actorId) {
-      return this.findOne(id, scope);
+      return this.findOne(id, scope, actorId);
     }
 
     if (simCard.status !== SimCardStatus.AVAILABLE) {
@@ -483,7 +635,7 @@ export class SimCardsService {
         select: { status: true, assignedToId: true },
       });
       if (latest?.status === SimCardStatus.ASSIGNED && latest.assignedToId === actorId) {
-        return this.findOne(id, scope);
+        return this.findOne(id, scope, actorId);
       }
       throw new BadRequestException({
         message: 'Only AVAILABLE SIM cards can be claimed',
@@ -491,7 +643,7 @@ export class SimCardsService {
       });
     }
 
-    const claimed = await this.findOne(id, scope);
+    const claimed = await this.findOne(id, scope, actorId);
 
     await this.activityLogService.log({
       userId: actorId,
@@ -556,12 +708,89 @@ export class SimCardsService {
     return updated;
   }
 
-  async available(pagination: SimCardFilterDto, scope?: ScopeContext | null): Promise<PaginatedResult<unknown>> {
+  async returnToStock(
+    id: string,
+    actorId: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
+    const scopeClause = scopeWhere(scope, { viaShipment: true });
+    const simCard = await this.prisma.simCard.findFirst({
+      where: {
+        id,
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+      },
+      select: {
+        id: true,
+        status: true,
+        meter: { select: { id: true } },
+      },
+    });
+
+    if (!simCard) {
+      throw new NotFoundException({
+        message: 'SIM card not found',
+        code: ErrorCodes.SIM_NOT_FOUND,
+      });
+    }
+
+    if (simCard.meter) {
+      throw new BadRequestException(
+        'SIM kartica je i dalje povezana sa brojilom i ne može se vratiti u zalihe.',
+      );
+    }
+
+    if (
+      simCard.status !== SimCardStatus.DEMOUNTED &&
+      simCard.status !== SimCardStatus.RETURNED
+    ) {
+      throw new BadRequestException(
+        'Samo DEMOUNTED ili RETURNED SIM kartice mogu biti vraćene u dostupne zalihe.',
+      );
+    }
+
+    const updated = await this.prisma.simCard.update({
+      where: { id },
+      data: {
+        status: SimCardStatus.AVAILABLE,
+        assignedToId: null,
+        assignedAt: null,
+      },
+      include: this.simCardInclude(),
+    });
+
+    await this.activityLogService.log({
+      userId: actorId,
+      action: 'STATUS_CHANGE',
+      entity: 'sim_card',
+      entityId: id,
+      details: { previousStatus: simCard.status, nextStatus: SimCardStatus.AVAILABLE },
+      ipAddress,
+    });
+
+    await this.createSimEvent(id, 'RETURNED_TO_STOCK', actorId, {
+      previousStatus: simCard.status,
+    });
+
+    return updated;
+  }
+
+  async available(
+    pagination: SimCardFilterDto,
+    scope?: ScopeContext | null,
+  ): Promise<PaginatedResult<unknown>> {
     return this.findAll({ ...pagination, status: SimCardStatus.AVAILABLE }, scope);
   }
 
-  async myAssigned(userId: string, pagination: SimCardFilterDto, scope?: ScopeContext | null): Promise<PaginatedResult<unknown>> {
-    return this.findAll({ ...pagination, assignedToId: userId, status: SimCardStatus.ASSIGNED }, scope);
+  async myAssigned(
+    userId: string,
+    pagination: SimCardFilterDto,
+    scope?: ScopeContext | null,
+  ): Promise<PaginatedResult<unknown>> {
+    return this.findAll(
+      { ...pagination, assignedToId: userId, status: SimCardStatus.ASSIGNED },
+      scope,
+    );
   }
 
   async stats(scope?: ScopeContext | null) {
@@ -589,13 +818,26 @@ export class SimCardsService {
     return result;
   }
 
-  async listEvents(id: string, scope?: ScopeContext | null) {
-    await this.ensureSimCardExists(id, scope);
+  async listEvents(id: string, scope?: ScopeContext | null, actorUserId?: string) {
+    const where = this.buildSingleSimWhere(id, scope, actorUserId);
+    const exists = await this.prisma.simCard.findFirst({
+      where,
+      select: { id: true },
+    });
+    if (!exists) {
+      throw new NotFoundException({
+        message: 'SIM card not found',
+        code: ErrorCodes.SIM_NOT_FOUND,
+      });
+    }
+
     const events = await this.prisma.simEvent.findMany({
       where: { simCardId: id },
       orderBy: { createdAt: 'desc' },
     });
-    const userIds = [...new Set(events.map((e) => e.userId).filter((uid): uid is string => Boolean(uid)))];
+    const userIds = [
+      ...new Set(events.map((e) => e.userId).filter((uid): uid is string => Boolean(uid))),
+    ];
     const users =
       userIds.length > 0
         ? await this.prisma.user.findMany({
@@ -611,6 +853,114 @@ export class SimCardsService {
       metadata: e.metadata,
       user: e.userId ? userById.get(e.userId) ?? null : null,
     }));
+  }
+
+  private buildSingleSimWhere(
+    id: string,
+    scope?: ScopeContext | null,
+    actorUserId?: string,
+  ): Prisma.SimCardWhereInput {
+    if (!scope) {
+      return { id, id_fail: undefined } as unknown as Prisma.SimCardWhereInput;
+    }
+    if (scope.role === 'USER') {
+      const moderatedBranches = this.getModeratedBranchIds(scope);
+      if (moderatedBranches && moderatedBranches.length > 0) {
+        return {
+          id,
+          OR: [
+            { meter: { is: { branchId: { in: moderatedBranches } } } },
+            ...(actorUserId ? [{ assignedToId: actorUserId }] : []),
+          ],
+        };
+      }
+      if (actorUserId) {
+        return { id, assignedToId: actorUserId };
+      }
+      return { id: { in: [] } };
+    }
+    const scopeClause = scopeWhere(scope, { viaShipment: true });
+    return {
+      id,
+      ...(scopeClause ? { AND: [scopeClause] } : {}),
+    };
+  }
+
+  private async assertUniqueSimFields(
+    fields: {
+      iccid?: string;
+      ipAddress?: string;
+      publicIpAddress?: string;
+      phoneNumber?: string;
+    },
+    excludeId?: string,
+  ): Promise<void> {
+    const normalizedPhone = fields.phoneNumber
+      ? normalizePhoneNumber(fields.phoneNumber)
+      : undefined;
+
+    const duplicateChecks: Prisma.SimCardWhereInput[] = [
+      ...(fields.iccid ? [{ iccid: fields.iccid }] : []),
+      ...(fields.ipAddress ? [{ ipAddress: fields.ipAddress }] : []),
+      ...(fields.publicIpAddress ? [{ publicIpAddress: fields.publicIpAddress }] : []),
+      ...(fields.phoneNumber
+        ? [
+            {
+              phoneNumber: {
+                in:
+                  normalizedPhone && normalizedPhone !== fields.phoneNumber
+                    ? [fields.phoneNumber, normalizedPhone]
+                    : [fields.phoneNumber],
+              },
+            },
+          ]
+        : []),
+    ];
+
+    if (duplicateChecks.length === 0) return;
+
+    const existingDup = await this.prisma.simCard.findFirst({
+      where: {
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+        OR: duplicateChecks,
+      },
+      select: { iccid: true, ipAddress: true, publicIpAddress: true, phoneNumber: true },
+    });
+
+    if (!existingDup) return;
+
+    if (fields.iccid && existingDup.iccid === fields.iccid) {
+      throw new ConflictException({
+        message: 'SIM kartica sa ovim ICCID-om već postoji u bazi.',
+        code: ErrorCodes.SIM_DUPLICATE_ICCID,
+      });
+    }
+    if (fields.ipAddress && existingDup.ipAddress === fields.ipAddress) {
+      throw new ConflictException({
+        message: 'SIM kartica sa ovom internom IP adresom već postoji u bazi.',
+        code: ErrorCodes.SIM_DUPLICATE_IP,
+      });
+    }
+    if (fields.publicIpAddress && existingDup.publicIpAddress === fields.publicIpAddress) {
+      throw new ConflictException({
+        message: 'SIM kartica sa ovom javnom IP adresom već postoji u bazi.',
+        code: ErrorCodes.SIM_DUPLICATE_PUBLIC_IP,
+      });
+    }
+    if (
+      normalizedPhone &&
+      existingDup.phoneNumber &&
+      normalizePhoneNumber(existingDup.phoneNumber) === normalizedPhone
+    ) {
+      throw new ConflictException({
+        message: 'SIM kartica sa ovim brojem telefona već postoji u bazi.',
+        code: ErrorCodes.SIM_DUPLICATE_PHONE,
+      });
+    }
+    throw new ConflictException({
+      message: 'SIM kartica sa istim podacima već postoji u bazi.',
+      code: ErrorCodes.CONFLICT,
+    });
   }
 
   private async ensureSimCardExists(id: string, scope?: ScopeContext | null): Promise<void> {
@@ -678,16 +1028,11 @@ export class SimCardsService {
           receivedDate: true,
         },
       },
-    } as const;
-  }
-
-  private moderatedInstalledInclude() {
-    return {
-      ...this.simCardInclude(),
       meter: {
         select: {
           id: true,
           serialNumber: true,
+          status: true,
           branch: {
             select: {
               id: true,
@@ -697,6 +1042,12 @@ export class SimCardsService {
           },
         },
       },
+    } as const;
+  }
+
+  private moderatedInstalledInclude() {
+    return {
+      ...this.simCardInclude(),
       installationRecords: {
         select: {
           createdAt: true,
@@ -704,16 +1055,16 @@ export class SimCardsService {
         orderBy: { createdAt: 'desc' },
         take: 1,
       },
-    } as const
+    } as const;
   }
 
   private getModeratedBranchIds(scope?: ScopeContext | null): string[] | null {
-    if (!scope) return null
-    if (scope.role !== 'USER') return null
-    const moderated = scope.branchModeratorBranchIds ?? []
-    const combined = scope.branchId ? [scope.branchId, ...moderated] : moderated
-    const unique = [...new Set(combined)].filter((id) => Boolean(id))
-    return unique.length > 0 ? unique : null
+    if (!scope) return null;
+    if (scope.role !== 'USER') return null;
+    const moderated = scope.branchModeratorBranchIds ?? [];
+    const combined = scope.branchId ? [scope.branchId, ...moderated] : moderated;
+    const unique = [...new Set(combined)].filter((id) => Boolean(id));
+    return unique.length > 0 ? unique : null;
   }
 
   private async createSimEvent(

@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { Descriptions, Space, Timeline, Typography } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Button, Descriptions, Popconfirm, Space, Timeline, Typography, message } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { simCardsApi } from '@/api/sim-cards.api';
 import { useAuthStore } from '@/store/auth.store';
@@ -29,7 +29,10 @@ export default function SimCardDetailsPage() {
   const user = useAuthStore((s) => s.user);
   const role = user?.role;
   const isModerator = role === 'USER' && (user?.branchModeratorBranchIds?.length ?? 0) > 0;
+  const canManage = role === 'SYSTEM_ADMIN' || role === 'DIST_ADMIN';
   const { t, language } = useTranslation();
+  const queryClient = useQueryClient();
+  const [messageApi, messageContextHolder] = message.useMessage();
 
   const simCardQuery = useQuery({
     queryKey: ['sim-cards', 'details', id],
@@ -43,7 +46,27 @@ export default function SimCardDetailsPage() {
     enabled: Boolean(id),
   });
 
+  const returnToStockMutation = useMutation({
+    mutationFn: () => simCardsApi.returnToStock(id!),
+    onSuccess: async () => {
+      messageApi.success(t('simCards.details.returnToStockSuccess'));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['sim-cards', 'details', id] }),
+        queryClient.invalidateQueries({ queryKey: ['sim-cards', 'list'] }),
+        queryClient.invalidateQueries({ queryKey: ['shipments', 'list'] }),
+      ]);
+    },
+    onError: () => {
+      messageApi.error(t('common.states.error'));
+    },
+  });
+
   const simCard = simCardQuery.data;
+  const canReturnToStock =
+    canManage &&
+    Boolean(simCard) &&
+    !simCard?.meter &&
+    (simCard?.status === 'DEMOUNTED' || simCard?.status === 'RETURNED');
 
   const renderMetadata = (metadata: unknown) => {
     if (!metadata || typeof metadata !== 'object') return null;
@@ -128,6 +151,7 @@ export default function SimCardDetailsPage() {
 
   return (
     <PageShell>
+      {messageContextHolder}
       <PageHeader
         title={t('simCards.details.title')}
         backTo={isModerator ? ROUTES.simCards : ROUTES.shipments}
@@ -137,6 +161,20 @@ export default function SimCardDetailsPage() {
               tone={getSimCardStatusTone(simCard.status)}
               label={getSimCardStatusLabel(simCard.status, t)}
             />
+          ) : undefined
+        }
+        actions={
+          canReturnToStock ? (
+            <Popconfirm
+              title={t('simCards.details.returnToStockConfirm')}
+              onConfirm={() => returnToStockMutation.mutate()}
+              okText={t('common.actions.confirm')}
+              cancelText={t('common.actions.cancel')}
+            >
+              <Button type="primary" loading={returnToStockMutation.isPending}>
+                {t('simCards.details.returnToStock')}
+              </Button>
+            </Popconfirm>
           ) : undefined
         }
       />
@@ -165,6 +203,25 @@ export default function SimCardDetailsPage() {
             <Descriptions.Item label="APN">{simCard.apn ?? FALLBACK_DASH}</Descriptions.Item>
             <Descriptions.Item label={t('simCards.details.shipment')}>
               {simCard.shipment.name} ({simCard.shipment.provider})
+            </Descriptions.Item>
+            <Descriptions.Item label={t('simCards.details.meter')}>
+              {simCard.meter ? (
+                <Space size={8} wrap>
+                  <Link
+                    to={ROUTES.meterDetail(simCard.meter.id)}
+                    className="font-mono text-accent-fg hover:underline"
+                  >
+                    {simCard.meter.serialNumber}
+                  </Link>
+                  {simCard.meter.branch ? (
+                    <span className="text-xs text-fg-secondary">
+                      ({simCard.meter.branch.name})
+                    </span>
+                  ) : null}
+                </Space>
+              ) : (
+                FALLBACK_DASH
+              )}
             </Descriptions.Item>
             <Descriptions.Item label={t('simCards.details.assignedTo')}>
               {simCard.assignedTo

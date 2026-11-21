@@ -2,6 +2,7 @@ import type { TranslateOptions } from '@/i18n/core'
 import type { UserRole } from '@/types/auth.types'
 import type { UserStatus } from '@/types/user.types'
 import type { SimCardStatus } from '@/types/sim-card.types'
+import type { ShipmentStatus } from '@/types/shipment.types'
 import type { MeterStatus } from '@/types/meter.types'
 
 /**
@@ -38,11 +39,13 @@ export const getSimCardStatusLabel = (status: SimCardStatus, t: TFn): string => 
 export const getSimEventTypeLabel = (type: string, t: TFn): string => {
   const map: Record<string, string> = {
     CREATED: 'labels.simEventType.created',
+    IMPORTED: 'labels.simEventType.imported',
     CLAIMED: 'labels.simEventType.claimed',
     ASSIGNED: 'labels.simEventType.assigned',
     UNASSIGNED: 'labels.simEventType.unassigned',
     INSTALLED: 'labels.simEventType.installed',
     DEMOUNTED: 'labels.simEventType.demounted',
+    RETURNED_TO_STOCK: 'labels.simEventType.returnedToStock',
     SENT: 'labels.simEventType.sent',
   }
   if (map[type]) return t(map[type])
@@ -50,6 +53,13 @@ export const getSimEventTypeLabel = (type: string, t: TFn): string => {
     return t('labels.simEventType.statusChange', { status: type.replace('STATUS_', '') })
   }
   return type
+}
+
+export const getShipmentStatusLabel = (status: ShipmentStatus | string, t: TFn): string => {
+  if (status === 'RECEIVED') return t('labels.shipmentStatus.received')
+  if (status === 'PROCESSING') return t('labels.shipmentStatus.processing')
+  if (status === 'COMPLETED') return t('labels.shipmentStatus.completed')
+  return status
 }
 
 export const getDemountResolutionLabel = (resolution: string, t: TFn): string => {

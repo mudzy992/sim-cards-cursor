@@ -212,6 +212,10 @@ model SimCard {
 
   @@index([iccid])
   @@index([ipAddress])
+  @@index([publicIpAddress])
+  @@index([phoneNumber])
+  @@index([shipmentId])
+  @@index([assignedToId])
   @@index([status])
   @@map("sim_cards")
 }

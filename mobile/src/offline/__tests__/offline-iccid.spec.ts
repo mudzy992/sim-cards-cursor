@@ -39,6 +39,7 @@ import { reconcileOfflineSimInventory } from '@/offline/sim-inventory-reconcile'
 import { queueInstallationRecord } from '@/api/installation-records.api';
 import { listOutbox } from '@/offline/outbox';
 import { simCardsApi } from '@/api/sim-cards.api';
+import { axiosInstance } from '@/api/axios.instance';
 import { useAuthStore } from '@/store/auth.store';
 
 const testUser: AuthUser = {
@@ -108,36 +109,72 @@ describe('Mobile offline ICCID normalization, cache & outbox', () => {
       status: 'AVAILABLE',
     });
 
-    const scanSpy = jest
-      .spyOn(simCardsApi, 'scanByIccid')
-      .mockImplementation(async (iccid: string) => {
-        if (iccid === '89387000000000000002') {
-          return {
+    const scanBatchSpy = jest
+      .spyOn(simCardsApi, 'scanBatch')
+      .mockResolvedValue({
+        items: [
+          {
             id: 'sim-drop',
-            iccid,
+            iccid: '89387000000000000002',
             ipAddress: '10.10.0.2',
             status: 'INSTALLED',
-          };
-        }
-        return {
-          id: 'sim-keep',
-          iccid,
-          ipAddress: '10.10.0.1',
-          status: 'ASSIGNED',
-          assignedTo: {
-            id: testUser.id,
-            firstName: 'Test',
-            lastName: 'Operator',
-            email: testUser.email,
           },
-        };
+          {
+            id: 'sim-keep',
+            iccid: '89387000000000000001',
+            ipAddress: '10.10.0.1',
+            status: 'ASSIGNED',
+            assignedTo: {
+              id: testUser.id,
+              firstName: 'Test',
+              lastName: 'Operator',
+              email: testUser.email,
+            },
+          },
+        ],
+        notFoundIccids: [],
       });
 
     const result = await reconcileOfflineSimInventory(testUser);
-    expect(scanSpy).toHaveBeenCalledTimes(2);
+    expect(scanBatchSpy).toHaveBeenCalledTimes(1);
+    expect(scanBatchSpy).toHaveBeenCalledWith([
+      '89387000000000000002',
+      '89387000000000000001',
+    ]);
     expect(result.removedIccids).toEqual(['89387000000000000002']);
     expect(result.kept).toBe(1);
     expect(result.updated).toBe(1);
+  });
+
+  it('extracts items from paginated /sim-cards/my-assigned response and caches them', async () => {
+    const paginatedItems = [
+      {
+        id: 'sim-a1',
+        iccid: '89387000000000000099',
+        ipAddress: '10.10.0.99',
+        status: 'ASSIGNED',
+      },
+    ];
+    (axiosInstance.get as jest.Mock).mockResolvedValueOnce({
+      data: {
+        data: {
+          items: paginatedItems,
+          page: 1,
+          limit: 100,
+          total: 1,
+          totalPages: 1,
+        },
+      },
+    });
+
+    const list = await simCardsApi.myAssigned();
+    expect(axiosInstance.get).toHaveBeenCalledWith('/sim-cards/my-assigned', {
+      params: { limit: 100 },
+    });
+    expect(list).toEqual(paginatedItems);
+
+    const cached = await offlineCache.myAssignedSimCards.get(testUser);
+    expect(cached?.data).toEqual(paginatedItems);
   });
 
   it('strips localPhotoUris from request body into outbox meta when queueing installation record', async () => {

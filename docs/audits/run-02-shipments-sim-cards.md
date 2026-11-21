@@ -2,7 +2,17 @@
 
 **Obuhvaćeni moduli:** `shipments` (`shipments.service.ts`, `shipments.controller.ts`, `excel-import.service.ts`, `column-mapper.service.ts`), `sim-cards` (`sim-cards.service.ts`, `sim-cards.controller.ts`), web stranice (`shipments/*`, `sim-cards/*`), mobilni ekrani i API (`scan`, `scan-result`, `offline-inventory`, `sim-cards.api.ts`, `sim-inventory-reconcile.ts`).  
 **Datum audita:** 2026-11-21 (branch `arena/015aa78f-sim-cards-cursor`)  
-**Status:** Kompletiran audit i prijedlog izmjena — **čeka odobrenje prije izmjena koda**.
+**Status:** Audit završen i **Paketi A + B + C implementirani i verificirani**.
+
+---
+
+## Implementacija (Paketi A + B + C)
+- **Prisma & DB (`backend/prisma/schema.prisma`, `backend/prisma/migrations/20261121000000_add_sim_card_indexes/migration.sql`):** Dodati idempotentni indeksi na `sim_cards` (`public_ip_address`, `phone_number`, `shipment_id`, `assigned_to_id`).
+- **Backend `shipments` & `excel-import`:** Prazan `selectedRowNumbers = []` se sada odbija umjesto importa svih redova; masovni Excel import upisuje početne `SimEvent('IMPORTED')` zapise u chunkovima; `ShipmentsService.findAll` koristi `mode: 'insensitive'`; `ShipmentsService.update` validira `distributionId` i blokira promjenu distribucije ako isporuka već ima dodijeljene/ugrađene SIM kartice.
+- **Backend `sim-cards`:** `findOne` i `listEvents` za `BranchModerator` koriste strogi opseg moderiranih poslovnica (`meter.branchId` + vlastite kartice) preko `toScopeContext`; `update` normalizuje polja, provjerava duplikate (`iccid`, `ipAddress`, `publicIpAddress`, `phoneNumber`), štiti `INSTALLED` kartice vezane za brojilo i sinhronizuje `Shipment.totalCards` (kao i `create`/`remove`); `scanByIccid` normalizuje ICCID; dodani su `POST /sim-cards/scan-batch`, `POST /sim-cards/bulk-assign`, `POST /sim-cards/:id/return-to-stock`, `mode: 'insensitive'` pretrage, i `meter` u `simCardInclude()`.
+- **Mobile (`mobile/src/api/sim-cards.api.ts`, `mobile/src/offline/sim-inventory-reconcile.ts`):** `myAssigned()` ispravno čita `PaginatedResult.items` (`limit: 100`), a `reconcileOfflineSimInventory` koristi jedan `POST /sim-cards/scan-batch` poziv umjesto do 80 sekvencijalnih zahtjeva.
+- **Frontend (`ShipmentsListPage`, `ShipmentDetailsPage`, `SimCardDetailsPage`, `labels.utils`, `bs.ts`/`en.ts`):** Dodana masovna dodjela dostupnih SIM kartica, filter korisnika (`role: 'USER', limit: 100` + pretraga) u draweru za dodjelu, prikaz povezanog brojila i dugme "Vrati u dostupne" na detaljima SIM kartice, te potpuna lokalizacija statusa isporuka i novih SIM događaja.
+- **Testovi i gate-ovi:** Backend Jest `14/14` (`66/66`), Mobile Jest `1/1` (`5/5`), Frontend Vitest `9/9` (`30/30`), `check:i18n` (`1061` ključeva), `check:wcag` (`72` para), `check:ui` (`141` fajl), svi `typecheck`/`lint`/`build` zadaci prošli.
 
 ---
 

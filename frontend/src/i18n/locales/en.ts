@@ -335,13 +335,20 @@ const en: TranslationDictionary = {
     },
     simEventType: {
       created: 'Created in system',
+      imported: 'Imported from shipment',
       claimed: 'Claimed by operator',
       assigned: 'Assigned to user',
       unassigned: 'Assignment removed',
       installed: 'Installed in meter',
       demounted: 'Demounted / removed from meter',
+      returnedToStock: 'Returned to available stock',
       sent: 'Record sent (email)',
       statusChange: 'Status change ({{status}})',
+    },
+    shipmentStatus: {
+      received: 'Received',
+      processing: 'Processing',
+      completed: 'Completed',
     },
     demountResolution: {
       fullDemount: 'Full demount',
@@ -671,6 +678,9 @@ const en: TranslationDictionary = {
       historyTitle: 'Movement / event history',
       noEvents: 'No recorded events.',
       noExtraDetails: 'No additional details.',
+      returnToStock: 'Return to stock',
+      returnToStockSuccess: 'SIM card returned to available stock.',
+      returnToStockConfirm: 'Return this SIM card to Available (AVAILABLE) status?',
     },
   },
 
@@ -679,6 +689,10 @@ const en: TranslationDictionary = {
     list: {
       assignSuccess: 'SIM card assigned to user.',
       assignFailed: 'Assignment failed.',
+      bulkAssignSuccess: 'Assigned {{count}} SIM cards to user.',
+      bulkAssignButton: 'Assign selected ({{count}})',
+      bulkAssignDrawerTitle: 'Bulk assign SIM cards',
+      bulkAssignSummary: 'Selected available cards: {{count}}',
       unassignSuccess: 'SIM card returned to AVAILABLE.',
       unassignFailed: 'Unassignment failed.',
       noCards: 'No cards',

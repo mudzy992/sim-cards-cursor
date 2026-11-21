@@ -48,8 +48,26 @@ export const simCardsApi = {
     const response = await axiosInstance.post(`/sim-cards/${id}/assign`, { userId });
     return response.data.data;
   },
+  bulkAssign: async (
+    simCardIds: string[],
+    userId: string,
+  ): Promise<{ assignedCount: number; requestedCount: number; skippedCount: number }> => {
+    const response = await axiosInstance.post<
+      ApiEnvelope<{ assignedCount: number; requestedCount: number; skippedCount: number }>
+    >('/sim-cards/bulk-assign', {
+      simCardIds,
+      userId,
+    });
+    return response.data.data;
+  },
   unassign: async (id: string) => {
     const response = await axiosInstance.post(`/sim-cards/${id}/unassign`);
+    return response.data.data;
+  },
+  returnToStock: async (id: string): Promise<SimCardItem> => {
+    const response = await axiosInstance.post<ApiEnvelope<SimCardItem>>(
+      `/sim-cards/${id}/return-to-stock`,
+    );
     return response.data.data;
   },
 };

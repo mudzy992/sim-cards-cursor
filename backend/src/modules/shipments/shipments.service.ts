@@ -143,6 +143,7 @@ export class ShipmentsService {
         ? {
             provider: {
               contains: filter.provider,
+              mode: 'insensitive',
             },
           }
         : {}),
@@ -152,11 +153,13 @@ export class ShipmentsService {
               {
                 name: {
                   contains: filter.search,
+                  mode: 'insensitive',
                 },
               },
               {
                 provider: {
                   contains: filter.search,
+                  mode: 'insensitive',
                 },
               },
             ],
@@ -289,7 +292,7 @@ export class ShipmentsService {
     ipAddress?: string,
     scope?: ScopeContext | null,
   ) {
-    await this.ensureShipmentExists(id, scope);
+    const existing = await this.ensureShipmentExists(id, scope);
 
     if (
       scope?.role === 'DIST_ADMIN' &&
@@ -300,6 +303,40 @@ export class ShipmentsService {
         message: 'Cannot reassign shipment to another distribution',
         code: ErrorCodes.SHIPMENT_REASSIGN_FORBIDDEN,
       });
+    }
+
+    if (
+      dto.distributionId !== undefined &&
+      dto.distributionId !== existing.distributionId
+    ) {
+      if (!dto.distributionId) {
+        throw new BadRequestException(
+          'Distribucija je obavezna za isporuku.',
+        );
+      }
+
+      const dist = await this.prisma.distribution.findUnique({
+        where: { id: dto.distributionId },
+        select: { id: true },
+      });
+      if (!dist) {
+        throw new NotFoundException('Odabrana distribucija nije pronađena.');
+      }
+
+      const nonAvailableCount = await this.prisma.simCard.count({
+        where: {
+          shipmentId: id,
+          OR: [
+            { status: { not: SimCardStatus.AVAILABLE } },
+            { assignedToId: { not: null } },
+          ],
+        },
+      });
+      if (nonAvailableCount > 0) {
+        throw new ConflictException(
+          'Ne možete promijeniti distribuciju isporuke koja već ima dodijeljene, ugrađene ili obrađene SIM kartice.',
+        );
+      }
     }
 
     const updated = await this.prisma.shipment.update({
@@ -567,7 +604,7 @@ export class ShipmentsService {
     ipAddress?: string,
     scope?: ScopeContext | null,
   ) {
-    await this.ensureShipmentExists(shipmentId, scope);
+    const shipment = await this.ensureShipmentExists(shipmentId, scope);
 
     if (!file?.buffer || file.size <= 0) {
       throw new BadRequestException({
@@ -762,6 +799,33 @@ export class ShipmentsService {
           }
           const created = { count: insertedCount };
 
+          const insertedSimRows: Array<{ id: string }> = [];
+          for (const iccidChunk of chunkArray(txIccids, SIM_LOOKUP_CHUNK_SIZE)) {
+            const rows = await tx.simCard.findMany({
+              where: {
+                shipmentId,
+                iccid: { in: iccidChunk },
+              },
+              select: { id: true },
+            });
+            insertedSimRows.push(...rows);
+          }
+
+          for (const eventChunk of chunkArray(insertedSimRows, SIM_INSERT_CHUNK_SIZE)) {
+            await tx.simEvent.createMany({
+              data: eventChunk.map((sim) => ({
+                simCardId: sim.id,
+                type: 'IMPORTED',
+                userId: actorId,
+                distributionId: shipment.distributionId,
+                metadata: {
+                  shipmentId,
+                  fileName: file.originalname,
+                },
+              })),
+            });
+          }
+
           const shipmentSimTotal = await tx.simCard.count({
             where: {
               shipmentId,
@@ -832,7 +896,7 @@ export class ShipmentsService {
   private async ensureShipmentExists(
     id: string,
     scope?: ScopeContext | null,
-  ): Promise<void> {
+  ): Promise<{ id: string; distributionId: string | null }> {
     const scopeClause = scopeWhere(scope, {
       distributionIdField: 'distributionId',
     });
@@ -844,6 +908,7 @@ export class ShipmentsService {
       },
       select: {
         id: true,
+        distributionId: true,
       },
     });
 
@@ -853,6 +918,8 @@ export class ShipmentsService {
         code: ErrorCodes.SHIPMENT_NOT_FOUND,
       });
     }
+
+    return shipment;
   }
 
   private parseMappingInput(
