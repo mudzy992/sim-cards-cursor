@@ -33,6 +33,12 @@ export const axiosInstance = axios.create({
 
 let refreshInFlight: Promise<string> | null = null;
 
+function isRefreshRejection(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === 401 || status === 403;
+}
+
 async function performSingleFlightRefresh(
   refreshToken: string,
   baseURL: string,
@@ -55,7 +61,9 @@ async function performSingleFlightRefresh(
         return payload.accessToken;
       })
       .catch((err) => {
-        useAuthStore.getState().clearSession();
+        if (isRefreshRejection(err)) {
+          useAuthStore.getState().clearSession();
+        }
         throw err;
       })
       .finally(() => {
@@ -106,8 +114,14 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    if (originalRequest.url?.includes('/auth/login')) {
+      return Promise.reject(error);
+    }
+
     if (originalRequest.url?.includes('/auth/refresh')) {
-      useAuthStore.getState().clearSession();
+      if (isRefreshRejection(error)) {
+        useAuthStore.getState().clearSession();
+      }
       return Promise.reject(error);
     }
 

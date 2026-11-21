@@ -37,7 +37,9 @@ test-results/
 # VM deploy branch specific – ne track-ati ove direktorije/fajlove
 # Ne stavljati ceo mobile/ ovdje: EAS Build pakuje prema .gitignore i onda nema package.json u arhivi
 .cursor/
-docs/
+docs/*
+!docs/audits/
+!docs/audits/**
 execution-playbook/
 .cursorrules
 

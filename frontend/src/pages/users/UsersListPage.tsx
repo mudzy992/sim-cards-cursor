@@ -187,24 +187,29 @@ export default function UsersListPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateUserInput }) =>
       usersApi.update(id, data),
-    onSuccess: async () => {
+    onSuccess: async (updatedUser) => {
       messageApi.success(t('users.userUpdated'));
       queryClient.invalidateQueries({ queryKey: ['users'] });
       if (pendingModeratorSync?.userId) {
-        const currentAssignments = branchModeratorAssignmentsQuery.data ?? []
-        const desiredBranchIds = pendingModeratorSync.desiredBranchIds
-        const currentBranchIds = currentAssignments.map((a) => a.branchId)
-        const toAdd = desiredBranchIds.filter((b) => !currentBranchIds.includes(b))
-        const toRemove = currentAssignments.filter((a) => !desiredBranchIds.includes(a.branchId))
-        try {
-          await Promise.all([
-            ...toAdd.map((branchId) => branchModeratorsApi.assign({ userId: pendingModeratorSync.userId, branchId })),
-            ...toRemove.map((a) => branchModeratorsApi.remove(a.id)),
-          ])
+        if (updatedUser.role === 'USER') {
+          const currentAssignments = branchModeratorAssignmentsQuery.data ?? []
+          const desiredBranchIds = pendingModeratorSync.desiredBranchIds
+          const currentBranchIds = currentAssignments.map((a) => a.branchId)
+          const toAdd = desiredBranchIds.filter((b) => !currentBranchIds.includes(b))
+          const toRemove = currentAssignments.filter((a) => !desiredBranchIds.includes(a.branchId))
+          try {
+            await Promise.all([
+              ...toAdd.map((branchId) => branchModeratorsApi.assign({ userId: pendingModeratorSync.userId, branchId })),
+              ...toRemove.map((a) => branchModeratorsApi.remove(a.id)),
+            ])
+            await queryClient.invalidateQueries({ queryKey: ['branch-moderators'] })
+          } catch (e) {
+            messageApi.error(getApiErrorMessage(e, t('users.moderatorSyncFailed')))
+          } finally {
+            setPendingModeratorSync(null)
+          }
+        } else {
           await queryClient.invalidateQueries({ queryKey: ['branch-moderators'] })
-        } catch (e) {
-          messageApi.error(getApiErrorMessage(e, t('users.moderatorSyncFailed')))
-        } finally {
           setPendingModeratorSync(null)
         }
       }
@@ -308,20 +313,24 @@ export default function UsersListPage() {
         messageApi.error(t('validation.passwordsMustMatch'));
         return;
       }
-      const payload: CreateUserInput & UpdateUserInput = {
-        ...rest,
-        distributionId: rest.role === 'DIST_ADMIN' ? rest.distributionId : undefined,
-        branchId: rest.role === 'USER' ? rest.branchId : undefined,
-      };
       if (editing) {
         if (currentUserRole === 'SYSTEM_ADMIN') {
           setPendingModeratorSync({ userId: editing.id, desiredBranchIds: moderatorBranchIds })
         }
-        const updateData: UpdateUserInput = { ...payload };
+        const updateData: UpdateUserInput = {
+          ...rest,
+          distributionId: rest.role === 'DIST_ADMIN' ? (rest.distributionId ?? null) : null,
+          branchId: rest.role === 'USER' ? (rest.branchId ?? null) : null,
+        };
         if (!updateData.password) delete updateData.password;
         updateMutation.mutate({ id: editing.id, data: updateData });
       } else {
-        createMutation.mutate(payload as CreateUserInput);
+        const createPayload: CreateUserInput = {
+          ...rest,
+          distributionId: rest.role === 'DIST_ADMIN' ? rest.distributionId : undefined,
+          branchId: rest.role === 'USER' ? rest.branchId : undefined,
+        };
+        createMutation.mutate(createPayload);
       }
     });
   };
@@ -668,7 +677,7 @@ export default function UsersListPage() {
             <Select
               placeholder={t('users.form.selectRolePlaceholder')}
               options={ROLE_OPTIONS}
-              disabled={editing?.id === currentUser?.id}
+              disabled={!canManage || editing?.id === currentUser?.id}
             />
           </Form.Item>
           <Form.Item name="status" label={t('common.labels.status')}>

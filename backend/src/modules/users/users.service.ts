@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -57,6 +58,13 @@ export class UsersService {
     const saltRounds = Number(this.configService.get('BCRYPT_SALT_ROUNDS', 12));
     const passwordHash = await bcrypt.hash(dto.password, saltRounds);
 
+    const targetRole = dto.role ?? UserRole.USER;
+    const resolvedOrg = await this.validateAndNormalizeOrgAssignment({
+      role: targetRole,
+      distributionId: dto.distributionId,
+      branchId: dto.branchId,
+    });
+
     const base = baseUsername(dto.firstName, dto.lastName);
     const username = await generateUniqueUsername(base, async (candidate) => {
       const exists = await this.prisma.user.findUnique({
@@ -74,10 +82,10 @@ export class UsersService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         phone: dto.phone,
-        role: dto.role,
+        role: targetRole,
         status: dto.status,
-        distributionId: dto.distributionId,
-        branchId: dto.branchId,
+        distributionId: resolvedOrg.distributionId,
+        branchId: resolvedOrg.branchId,
       },
       include: { distribution: { select: { id: true, name: true, code: true } }, branch: { select: { id: true, name: true, code: true } } },
     });
@@ -184,7 +192,21 @@ export class UsersService {
           code: ErrorCodes.USER_CANNOT_ASSIGN_SYSTEM_ADMIN,
         });
       }
-      if (dto.distributionId !== undefined && dto.distributionId !== scope.distributionId) {
+      if (dto.role !== undefined && dto.role !== existing.role) {
+        throw new ForbiddenException({
+          message: 'DIST_ADMIN cannot change user role',
+          code: ErrorCodes.FORBIDDEN,
+        });
+      }
+      const effectiveRole = dto.role ?? existing.role;
+      if (effectiveRole === UserRole.DIST_ADMIN) {
+        if (dto.distributionId !== undefined && dto.distributionId !== scope.distributionId) {
+          throw new ForbiddenException({
+            message: 'Cannot reassign user outside your distribution',
+            code: ErrorCodes.USER_CANNOT_REASSIGN_DISTRIBUTION,
+          });
+        }
+      } else if (dto.distributionId !== undefined && dto.distributionId !== null) {
         throw new ForbiddenException({
           message: 'Cannot reassign user outside your distribution',
           code: ErrorCodes.USER_CANNOT_REASSIGN_DISTRIBUTION,
@@ -203,6 +225,13 @@ export class UsersService {
         }
       }
     }
+
+    const nextRole = dto.role ?? existing.role;
+    const resolvedOrg = await this.validateAndNormalizeOrgAssignment({
+      role: nextRole,
+      distributionId: dto.distributionId !== undefined ? dto.distributionId : existing.distributionId,
+      branchId: dto.branchId !== undefined ? dto.branchId : existing.branchId,
+    });
 
     let nextEmail: string | undefined;
     if (dto.email !== undefined) {
@@ -227,19 +256,32 @@ export class UsersService {
       password = await bcrypt.hash(dto.password, saltRounds);
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: {
-        email: nextEmail,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        phone: dto.phone,
-        role: dto.role,
-        status: dto.status,
-        distributionId: dto.distributionId,
-        branchId: dto.branchId,
-        ...(password ? { password } : {}),
-      },
+    const shouldClearRefreshToken =
+      Boolean(password) ||
+      (dto.role !== undefined && dto.role !== existing.role) ||
+      (dto.status !== undefined && dto.status !== UserStatus.ACTIVE);
+
+    const roleLeftUser = existing.role === UserRole.USER && nextRole !== UserRole.USER;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (roleLeftUser) {
+        await tx.branchModerator.deleteMany({ where: { userId: id } });
+      }
+      return tx.user.update({
+        where: { id },
+        data: {
+          email: nextEmail,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          phone: dto.phone,
+          role: dto.role,
+          status: dto.status,
+          distributionId: resolvedOrg.distributionId,
+          branchId: resolvedOrg.branchId,
+          ...(password ? { password } : {}),
+          ...(shouldClearRefreshToken ? { refreshToken: null } : {}),
+        },
+      });
     });
 
     await this.prisma.activityLog.create({
@@ -278,11 +320,35 @@ export class UsersService {
     actorId?: string,
     scope?: ScopeContext | null,
   ): Promise<UserListItem> {
-    await this.ensureExists(id, scope);
+    const scopeClause = scopeWhere(scope, { userScope: true });
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        id,
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+      },
+      select: { id: true, role: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException({
+        message: 'User not found',
+        code: ErrorCodes.USER_NOT_FOUND,
+      });
+    }
+
+    if (scope?.role === UserRole.DIST_ADMIN && existing.role === UserRole.SYSTEM_ADMIN) {
+      throw new ForbiddenException({
+        message: 'Cannot modify a system administrator',
+        code: ErrorCodes.USER_CANNOT_MODIFY_SYSTEM_ADMIN,
+      });
+    }
 
     const updated = await this.prisma.user.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        ...(status !== UserStatus.ACTIVE ? { refreshToken: null } : {}),
+      },
       include: { distribution: { select: { id: true, name: true, code: true } }, branch: { select: { id: true, name: true, code: true } } },
     });
 
@@ -297,6 +363,45 @@ export class UsersService {
     });
 
     return this.toUserListItem(updated);
+  }
+
+  private async validateAndNormalizeOrgAssignment(input: {
+    role: UserRole;
+    distributionId?: string | null;
+    branchId?: string | null;
+  }): Promise<{ distributionId: string | null; branchId: string | null }> {
+    const normalizedDistId =
+      input.role === UserRole.DIST_ADMIN ? (input.distributionId ?? null) : null;
+    const normalizedBranchId =
+      input.role === UserRole.USER ? (input.branchId ?? null) : null;
+
+    if (normalizedDistId) {
+      const dist = await this.prisma.distribution.findUnique({
+        where: { id: normalizedDistId },
+        select: { id: true },
+      });
+      if (!dist) {
+        throw new NotFoundException('Distribution not found');
+      }
+    }
+
+    if (normalizedBranchId) {
+      const branch = await this.prisma.branch.findUnique({
+        where: { id: normalizedBranchId },
+        select: { id: true, distributionId: true },
+      });
+      if (!branch) {
+        throw new NotFoundException('Branch not found');
+      }
+      if (normalizedDistId && branch.distributionId !== normalizedDistId) {
+        throw new BadRequestException('Branch does not belong to selected distribution');
+      }
+    }
+
+    return {
+      distributionId: normalizedDistId,
+      branchId: normalizedBranchId,
+    };
   }
 
   private async ensureExists(id: string, scope?: ScopeContext | null): Promise<void> {

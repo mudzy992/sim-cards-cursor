@@ -14,13 +14,17 @@ export type CreateUserInput = {
   branchId?: string;
 };
 
-export type UpdateUserInput = Partial<CreateUserInput> & { password?: string };
+export type UpdateUserInput = Partial<Omit<CreateUserInput, 'distributionId' | 'branchId'>> & {
+  password?: string;
+  distributionId?: string | null;
+  branchId?: string | null;
+};
 
 const unwrap = <T>(r: { data: { data?: T } | T }): T =>
   (r.data as { data?: T }).data ?? (r.data as T);
 
 export const usersApi = {
-  list: async (params?: { role?: string; limit?: number; page?: number }): Promise<UsersResponse> => {
+  list: async (params?: { role?: string; limit?: number; page?: number; search?: string }): Promise<UsersResponse> => {
     const response = await axiosInstance.get<ApiEnvelope<UsersResponse>>('/users', {
       params: params ?? {},
     });

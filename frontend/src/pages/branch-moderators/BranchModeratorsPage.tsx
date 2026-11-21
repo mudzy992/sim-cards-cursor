@@ -18,6 +18,7 @@ export default function BranchModeratorsPage() {
 
   const [branchIdFilter, setBranchIdFilter] = useState<string | undefined>(undefined)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [userSearch, setUserSearch] = useState('')
   const [form] = Form.useForm<{ branchId: string; userId: string }>()
 
   const listQuery = useQuery({
@@ -31,8 +32,13 @@ export default function BranchModeratorsPage() {
   })
 
   const usersQuery = useQuery({
-    queryKey: ['users', 'list', 'for-branch-moderators'],
-    queryFn: () => usersApi.list({ role: 'USER', limit: 200 }),
+    queryKey: ['users', 'list', 'for-branch-moderators', userSearch],
+    queryFn: () =>
+      usersApi.list({
+        role: 'USER',
+        limit: 100,
+        ...(userSearch.trim() ? { search: userSearch.trim() } : {}),
+      }),
     enabled: drawerOpen,
   })
 
@@ -146,6 +152,7 @@ export default function BranchModeratorsPage() {
         width={520}
         onClose={() => {
           setDrawerOpen(false)
+          setUserSearch('')
           form.resetFields()
         }}
         destroyOnClose
@@ -154,6 +161,7 @@ export default function BranchModeratorsPage() {
             <Button
               onClick={() => {
                 setDrawerOpen(false)
+                setUserSearch('')
                 form.resetFields()
               }}
             >
@@ -181,7 +189,9 @@ export default function BranchModeratorsPage() {
               options={userOptions}
               loading={usersQuery.isLoading}
               showSearch
-              optionFilterProp="label"
+              filterOption={false}
+              onSearch={setUserSearch}
+              onSelect={() => setUserSearch('')}
             />
           </Form.Item>
         </Form>

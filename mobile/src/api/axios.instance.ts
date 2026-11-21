@@ -8,6 +8,12 @@ type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 let refreshPromise: Promise<string> | null = null;
 
+function isRefreshRejection(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === 401 || status === 403;
+}
+
 export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
 });
@@ -26,6 +32,17 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config as RetriableConfig | undefined;
 
     if (!originalRequest || originalRequest._retry || error.response?.status !== 401) {
+      return Promise.reject(error);
+    }
+
+    if (originalRequest.url?.includes('/auth/login')) {
+      return Promise.reject(error);
+    }
+
+    if (originalRequest.url?.includes('/auth/refresh')) {
+      if (isRefreshRejection(error)) {
+        await useAuthStore.getState().clearSession();
+      }
       return Promise.reject(error);
     }
 
@@ -61,7 +78,9 @@ axiosInstance.interceptors.response.use(
       originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
       return axiosInstance(originalRequest);
     } catch (refreshError) {
-      await useAuthStore.getState().clearSession();
+      if (isRefreshRejection(refreshError)) {
+        await useAuthStore.getState().clearSession();
+      }
       return Promise.reject(refreshError);
     }
   },
