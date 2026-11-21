@@ -1,4 +1,7 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { Test, TestingModule } from '@nestjs/testing';
 import { InstallationRecordKind, RecordStatus, UserRole } from '@prisma/client';
 import { RecordNumberGenerator } from 'src/common/utils/record-number.generator';
@@ -297,6 +300,88 @@ describe('InstallationRecordsService', () => {
 
       expect(perms.canRetrySend).toBe(false);
       expect(perms.canMarkSepActivated).toBe(true);
+    });
+  });
+
+  describe('generatePdf', () => {
+    it('writes PDF to uploads dir and updates pdfPath when writable', async () => {
+      const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-pdf-ok-'));
+      try {
+        const year = String(mockRecord.createdAt.getFullYear());
+        const localModule = await Test.createTestingModule({
+          providers: [
+            InstallationRecordsService,
+            { provide: PrismaService, useValue: prismaMock },
+            { provide: RecordNumberGenerator, useValue: { generate: jest.fn() } },
+            { provide: PdfGeneratorService, useValue: { generatePdf: jest.fn().mockResolvedValue(Buffer.from('pdf-bytes')) } },
+            { provide: ActivityLogService, useValue: { log: jest.fn() } },
+            { provide: MailService, useValue: { sendRecordWithPdf: jest.fn() } },
+            { provide: MeterTypeFieldsService, useValue: { validateDynamicValues: jest.fn(), findAllByDefinition: jest.fn().mockResolvedValue([]) } },
+            { provide: ConfigService, useValue: { get: jest.fn((_k: string) => tempRoot) } },
+          ],
+        }).compile();
+        const localService = localModule.get<InstallationRecordsService>(InstallationRecordsService);
+        prismaMock.installationRecord.findFirst.mockResolvedValue({
+          ...mockRecord,
+          kind: InstallationRecordKind.NEW_CONNECTION,
+        });
+        prismaMock.installationRecord.update.mockResolvedValue({ ...mockRecord, pdfPath: `installation-records/${year}/SN-001/zapisnik/REC-001.pdf` });
+
+        const buf = await localService.generatePdf('rec-1');
+
+        expect(buf.toString()).toBe('pdf-bytes');
+        const expectedFile = path.join(tempRoot, 'installation-records', year, 'SN-001', 'zapisnik', 'REC-001.pdf');
+        expect(fs.existsSync(expectedFile)).toBe(true);
+        expect(prismaMock.installationRecord.update).toHaveBeenCalledWith({
+          where: { id: 'rec-1' },
+          data: { pdfPath: `installation-records/${year}/SN-001/zapisnik/REC-001.pdf` },
+        });
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('logs error and still returns PDF buffer when disk write fails with EACCES', async () => {
+      const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-pdf-eacces-'));
+      const year = String(mockRecord.createdAt.getFullYear());
+      const zapisnikDir = path.join(tempRoot, 'installation-records', year, 'SN-001', 'zapisnik');
+      const existingPdf = path.join(zapisnikDir, 'REC-001.pdf');
+      fs.mkdirSync(zapisnikDir, { recursive: true });
+      fs.writeFileSync(existingPdf, 'stale');
+      fs.chmodSync(existingPdf, 0o444);
+      fs.chmodSync(zapisnikDir, 0o555);
+
+      const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      try {
+        const localModule = await Test.createTestingModule({
+          providers: [
+            InstallationRecordsService,
+            { provide: PrismaService, useValue: prismaMock },
+            { provide: RecordNumberGenerator, useValue: { generate: jest.fn() } },
+            { provide: PdfGeneratorService, useValue: { generatePdf: jest.fn().mockResolvedValue(Buffer.from('fresh-pdf')) } },
+            { provide: ActivityLogService, useValue: { log: jest.fn() } },
+            { provide: MailService, useValue: { sendRecordWithPdf: jest.fn() } },
+            { provide: MeterTypeFieldsService, useValue: { validateDynamicValues: jest.fn(), findAllByDefinition: jest.fn().mockResolvedValue([]) } },
+            { provide: ConfigService, useValue: { get: jest.fn((_k: string) => tempRoot) } },
+          ],
+        }).compile();
+        const localService = localModule.get<InstallationRecordsService>(InstallationRecordsService);
+        prismaMock.installationRecord.findFirst.mockResolvedValue({
+          ...mockRecord,
+          kind: InstallationRecordKind.NEW_CONNECTION,
+        });
+
+        const buf = await localService.generatePdf('rec-1');
+
+        expect(buf.toString()).toBe('fresh-pdf');
+        expect(prismaMock.installationRecord.update).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('chown -R 1000:1000'));
+      } finally {
+        errorSpy.mockRestore();
+        fs.chmodSync(zapisnikDir, 0o755);
+        fs.chmodSync(existingPdf, 0o644);
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
     });
   });
 });

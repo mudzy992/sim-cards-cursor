@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MobileAppPlatform } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -8,6 +14,7 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class AppReleasesService {
+  private readonly logger = new Logger(AppReleasesService.name);
   private readonly uploadsDir: string;
   private readonly graceDays: number;
 
@@ -53,25 +60,41 @@ export class AppReleasesService {
 
     const relDir = path.posix.join('app-releases', 'android');
     const absDir = path.join(this.uploadsDir, relDir);
-    fs.mkdirSync(absDir, { recursive: true });
-
     const fileBase = `${input.versionCode}_${Date.now()}_${originalName}`;
     const absPath = path.join(absDir, fileBase);
 
     let sha256: string;
-    if (file.path) {
-      sha256 = await this.computeFileSha256(file.path);
-      try {
-        fs.renameSync(file.path, absPath);
-      } catch {
-        fs.copyFileSync(file.path, absPath);
-        fs.unlinkSync(file.path);
+    try {
+      fs.mkdirSync(absDir, { recursive: true });
+
+      if (file.path) {
+        sha256 = await this.computeFileSha256(file.path);
+        try {
+          fs.renameSync(file.path, absPath);
+        } catch {
+          fs.copyFileSync(file.path, absPath);
+          fs.unlinkSync(file.path);
+        }
+      } else if (file.buffer) {
+        sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
+        fs.writeFileSync(absPath, file.buffer);
+      } else {
+        throw new BadRequestException('Uploaded file content is unavailable');
       }
-    } else if (file.buffer) {
-      sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
-      fs.writeFileSync(absPath, file.buffer);
-    } else {
-      throw new BadRequestException('Uploaded file content is unavailable');
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code;
+      if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
+        const uid = process.getuid?.();
+        const gid = process.getgid?.();
+        this.logger.error(
+          `Cannot save APK release to "${absPath}" (${code}, uid=${uid}, gid=${gid}). ` +
+            'Ensure the host uploads mount is writable by UID/GID 1000:1000 (chown -R 1000:1000 <host_uploads_dir>).',
+        );
+        throw new InternalServerErrorException(
+          'Nije moguće sačuvati APK fajl na disk (nedovoljne dozvole na uploads direktoriju).',
+        );
+      }
+      throw error;
     }
 
     const publishedAt = new Date();

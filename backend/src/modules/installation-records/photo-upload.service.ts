@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
@@ -8,6 +13,7 @@ import { SETTINGS_KEYS } from '../settings/settings-keys';
 
 @Injectable()
 export class PhotoUploadService {
+  private readonly logger = new Logger(PhotoUploadService.name);
   private readonly uploadsRoot: string;
 
   constructor(
@@ -97,10 +103,26 @@ export class PhotoUploadService {
     const dir = path.join(this.uploadsRoot, 'installation-records', year, serial, 'photos');
     const fullPath = path.join(dir, sanitizedName);
 
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(fullPath, buffer);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code;
+      if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
+        const uid = process.getuid?.();
+        const gid = process.getgid?.();
+        this.logger.error(
+          `Cannot save photo to "${fullPath}" (${code}, uid=${uid}, gid=${gid}). ` +
+            'Ensure the host uploads mount is writable by UID/GID 1000:1000 (chown -R 1000:1000 <host_uploads_dir>).',
+        );
+        throw new InternalServerErrorException(
+          'Nije moguće sačuvati fotografiju na disk (nedovoljne dozvole na uploads direktoriju).',
+        );
+      }
+      throw error;
     }
-    fs.writeFileSync(fullPath, buffer);
 
     return relativePath;
   }

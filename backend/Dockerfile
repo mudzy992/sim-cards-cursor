@@ -54,6 +54,9 @@ COPY --from=build --chown=node:node /usr/app/node_modules/@prisma/client ./node_
 COPY --from=build --chown=node:node /usr/app/backend/prisma ./prisma
 COPY --from=build --chown=node:node /usr/app/backend/src/templates ./templates
 
+# Kontejner radi pod non-root korisnikom `node` (UID/GID 1000). Na hostu za
+# bind-mount (/mnt/shared-app-files/sim-cards-codex) osigurati:
+#   chown -R 1000:1000 /mnt/shared-app-files/sim-cards-codex
 RUN mkdir -p /app/uploads /usr/app/uploads && chown -R node:node /usr/app /app/uploads
 
 USER node

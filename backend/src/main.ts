@@ -2,6 +2,8 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as fs from 'fs';
+import * as path from 'path';
 import helmet from 'helmet';
 import { Prisma } from '@prisma/client';
 import { IoAdapter } from '@nestjs/platform-socket.io';
@@ -138,6 +140,27 @@ async function bootstrap() {
   }
 
   app.enableShutdownHooks();
+
+  const uploadRoot = config.get<string>(
+    'UPLOAD_ROOT_PATH',
+    path.join(process.cwd(), 'uploads'),
+  );
+  try {
+    fs.mkdirSync(uploadRoot, { recursive: true });
+    fs.accessSync(uploadRoot, fs.constants.W_OK | fs.constants.X_OK);
+    const recordsDir = path.join(uploadRoot, 'installation-records');
+    if (fs.existsSync(recordsDir)) {
+      fs.accessSync(recordsDir, fs.constants.W_OK | fs.constants.X_OK);
+    }
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code ?? 'ERR';
+    const uid = process.getuid?.();
+    const gid = process.getgid?.();
+    logger.error(
+      `Uploads directory "${uploadRoot}" is not writable (${code}, uid=${uid}, gid=${gid}). ` +
+        'If using a host bind mount, run: chown -R 1000:1000 <host_uploads_dir>',
+    );
+  }
 
   const port = Number(config.get('PORT', 3003));
   await app.listen(port, '0.0.0.0');

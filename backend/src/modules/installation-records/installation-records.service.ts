@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -42,6 +43,7 @@ export type InstallationRecordContext = {
 
 @Injectable()
 export class InstallationRecordsService {
+  private readonly logger = new Logger(InstallationRecordsService.name);
   private readonly uploadsRoot: string;
 
   constructor(
@@ -906,12 +908,30 @@ export class InstallationRecordsService {
     const relativePath = path.posix.join(baseRelativeDir, 'zapisnik', sanitizedFileName);
     const absoluteDir = path.join(baseAbsoluteDir, 'zapisnik');
     const absolutePath = path.join(absoluteDir, sanitizedFileName);
-    fs.mkdirSync(absoluteDir, { recursive: true });
-    fs.writeFileSync(absolutePath, buffer);
-    await this.prisma.installationRecord.update({
-      where: { id },
-      data: { pdfPath: relativePath },
-    });
+    let savedToDisk = false;
+    try {
+      fs.mkdirSync(absoluteDir, { recursive: true });
+      fs.writeFileSync(absolutePath, buffer);
+      savedToDisk = true;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code;
+      if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
+        const uid = process.getuid?.();
+        const gid = process.getgid?.();
+        this.logger.error(
+          `Cannot persist generated PDF to "${absolutePath}" (${code}, uid=${uid}, gid=${gid}). ` +
+            'Returning PDF buffer without caching to disk. Ensure the host uploads mount is writable by UID/GID 1000:1000 (chown -R 1000:1000 <host_uploads_dir>).',
+        );
+      } else {
+        throw error;
+      }
+    }
+    if (savedToDisk) {
+      await this.prisma.installationRecord.update({
+        where: { id },
+        data: { pdfPath: relativePath },
+      });
+    }
     return buffer;
   }
 
@@ -936,15 +956,20 @@ export class InstallationRecordsService {
     }
     const uniqueEmails = [...new Set(emails)].filter((e) => e?.trim());
 
-    let pdfBuffer: Buffer;
+    let pdfBuffer: Buffer | null = null;
     if (record.pdfPath) {
       const absolutePath = this.resolveUploadsPath(record.pdfPath);
       if (fs.existsSync(absolutePath)) {
-        pdfBuffer = fs.readFileSync(absolutePath);
-      } else {
-        pdfBuffer = await this.generatePdf(id, scope);
+        try {
+          pdfBuffer = fs.readFileSync(absolutePath);
+        } catch (error) {
+          this.logger.warn(
+            `Cannot read cached PDF "${absolutePath}" (${(error as NodeJS.ErrnoException)?.code ?? 'unknown'}); regenerating.`,
+          );
+        }
       }
-    } else {
+    }
+    if (!pdfBuffer) {
       pdfBuffer = await this.generatePdf(id, scope);
     }
 
