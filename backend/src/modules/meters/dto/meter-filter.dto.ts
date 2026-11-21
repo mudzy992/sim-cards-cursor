@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { MeterSimCardState } from '@prisma/client';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { MeterSimCardState, MeterStatus } from '@prisma/client';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 export class MeterFilterDto extends PaginationDto {
@@ -18,4 +18,14 @@ export class MeterFilterDto extends PaginationDto {
   @IsOptional()
   @IsEnum(MeterSimCardState)
   simCardState?: MeterSimCardState;
+
+  @ApiPropertyOptional({ enum: MeterStatus, description: 'Filter po statusu brojila' })
+  @IsOptional()
+  @IsEnum(MeterStatus)
+  status?: MeterStatus;
+
+  @ApiPropertyOptional({ description: 'Filter po podružnici (UUID)' })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
 }

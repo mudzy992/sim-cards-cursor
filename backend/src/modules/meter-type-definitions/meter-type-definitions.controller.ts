@@ -3,19 +3,21 @@ import {
   Controller,
   Delete,
   Get,
+  Ip,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ParseUUIDPipe } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { BranchModeratorGuard } from 'src/common/guards/branch-moderator.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-import { BranchModeratorGuard } from 'src/common/guards/branch-moderator.guard';
 import { MeterTypeDefinitionsService } from './meter-type-definitions.service';
 import { MeterTypeFieldsService } from './meter-type-fields.service';
 import { CreateMeterTypeDefinitionDto } from './dto/create-meter-type-definition.dto';
@@ -60,8 +62,12 @@ export class MeterTypeDefinitionsController {
   @Post()
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Kreiraj tip brojila' })
-  create(@Body() dto: CreateMeterTypeDefinitionDto) {
-    return this.meterTypeDefinitionsService.create(dto);
+  create(
+    @Body() dto: CreateMeterTypeDefinitionDto,
+    @CurrentUser('id') actorId?: string,
+    @Ip() ipAddress?: string,
+  ) {
+    return this.meterTypeDefinitionsService.create(dto, actorId, ipAddress);
   }
 
   @Patch(':id')
@@ -70,15 +76,21 @@ export class MeterTypeDefinitionsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateMeterTypeDefinitionDto,
+    @CurrentUser('id') actorId?: string,
+    @Ip() ipAddress?: string,
   ) {
-    return this.meterTypeDefinitionsService.update(id, dto);
+    return this.meterTypeDefinitionsService.update(id, dto, actorId, ipAddress);
   }
 
   @Delete(':id')
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Obriši tip brojila' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.meterTypeDefinitionsService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') actorId?: string,
+    @Ip() ipAddress?: string,
+  ) {
+    return this.meterTypeDefinitionsService.remove(id, actorId, ipAddress);
   }
 
   @Get(':id/fields')
@@ -94,8 +106,10 @@ export class MeterTypeDefinitionsController {
   createField(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateMeterTypeFieldDto,
+    @CurrentUser('id') actorId?: string,
+    @Ip() ipAddress?: string,
   ) {
-    return this.meterTypeFieldsService.create(id, dto);
+    return this.meterTypeFieldsService.create(id, dto, actorId, ipAddress);
   }
 
   @Patch(':defId/fields/:fieldId')
@@ -105,8 +119,10 @@ export class MeterTypeDefinitionsController {
     @Param('defId', ParseUUIDPipe) _defId: string,
     @Param('fieldId', ParseUUIDPipe) fieldId: string,
     @Body() dto: UpdateMeterTypeFieldDto,
+    @CurrentUser('id') actorId?: string,
+    @Ip() ipAddress?: string,
   ) {
-    return this.meterTypeFieldsService.update(fieldId, dto);
+    return this.meterTypeFieldsService.update(fieldId, dto, actorId, ipAddress);
   }
 
   @Delete(':defId/fields/:fieldId')
@@ -115,8 +131,10 @@ export class MeterTypeDefinitionsController {
   removeField(
     @Param('defId', ParseUUIDPipe) _defId: string,
     @Param('fieldId', ParseUUIDPipe) fieldId: string,
+    @CurrentUser('id') actorId?: string,
+    @Ip() ipAddress?: string,
   ) {
-    return this.meterTypeFieldsService.remove(fieldId);
+    return this.meterTypeFieldsService.remove(fieldId, actorId, ipAddress);
   }
 
   @Put(':id/fields/reorder')
@@ -125,7 +143,9 @@ export class MeterTypeDefinitionsController {
   reorderFields(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReorderMeterTypeFieldsDto,
+    @CurrentUser('id') actorId?: string,
+    @Ip() ipAddress?: string,
   ) {
-    return this.meterTypeFieldsService.reorder(id, dto.fieldIds);
+    return this.meterTypeFieldsService.reorder(id, dto.fieldIds, actorId, ipAddress);
   }
 }

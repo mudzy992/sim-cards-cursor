@@ -999,6 +999,8 @@ const bs: TranslationDictionary = {
   meters: {
     pageIntro: 'Pregled svih brojila (po serijskim brojevima), upravljanje tipovima brojila te dodavanje i izmjena. Jedan tip – više brojila; jedno brojilo – jedna SIM (trenutna), više zapisnika.',
     filterByType: 'Filter po tipu brojila',
+    filterByStatus: 'Status brojila',
+    filterByBranch: 'Podružnica',
     simOnMeterFilter: 'SIM na brojilu',
     noSimOption: 'Bez SIM',
     simInstalledOption: 'SIM ugrađena',
@@ -1009,6 +1011,8 @@ const bs: TranslationDictionary = {
       yearShort: 'God. proizv.',
       calibrationYearShort: 'God. baždarenja',
       meterStatus: 'Status brojila',
+      branch: 'Podružnica',
+      metersCount: 'Broj brojila',
       demount: 'Demontaža',
       orderLabel: 'Nalog:',
       maxCurrent: 'Max struja',

@@ -2,7 +2,17 @@
 
 **Obuhvaćeni moduli:** `meters` (`meters.controller.ts`, `meters.service.ts`, `dto/*`), `meter-type-definitions` (`meter-type-definitions.controller.ts`, `meter-type-definitions.service.ts`, `meter-type-fields.service.ts`, `dto/*`), web stranice (`MetersListPage.tsx`, `MeterDetailPage.tsx`, `MeterTypeUpsertPage.tsx`, `MeterTypeFieldsPage.tsx`), i mobile (`meter-type-definitions.api.ts`, `meter-types-sync.ts`).  
 **Datum audita:** 2026-11-21 (branch `arena/015aa78f-sim-cards-cursor`)  
-**Status:** Kompletiran audit i prijedlog izmjena — **čeka odobrenje prije izmjena koda**.
+**Status:** Audit završen i **Paketi A + B + C implementirani i verificirani**.
+
+---
+
+## Implementacija (Paketi A + B + C)
+- **Prisma & Storage (`backend/prisma/schema.prisma`, `backend/prisma/migrations/20261121010000_add_meter_indexes_and_field_unique/migration.sql`, `UploadsStorageService`):** Dodati indeksi `meters(branch_id)` i `meters(sim_card_state)`, jedinstveni ključ `meter_type_fields(meter_type_definition_id, name)`, te sigurna `removeDirRecursive` metoda na `UploadsStorageService`.
+- **Backend `meters`:** `create` i `update` trimuju `serialNumber`, validiraju postojanje `meterTypeDefinitionId`, vraćaju `409 Conflict` na `P2002`, i loguju `CREATE`/`UPDATE` preko `ActivityLogService`; `update` i `UpdateMeterDto` zabranjuju direktno prepisivanje `simCardId`/`simCardState` i provjeravaju `branchId` opseg za `DIST_ADMIN`; `MetersController.create` radi rollback novokreiranog brojila ako inicijalni zapisnik za `simCardId` padne; `getMetersReadScopeClause` ograničava `BranchModerator`-a striktno na njegove moderirane podružnice (`branchId IN [...]`); `findAvailable` je zaštićen sa `search` + `limit` (`<= 500`); `deleteWithConfirm` koristi `UploadsStorageService.removeDirRecursive`.
+- **Backend `meter-type-definitions` & `meter-type-fields`:** `findAll` uključuje `_count.meters`; `remove` provjerava korištenje tipa i vraća `409 Conflict`; `MeterTypeFieldsService` provjerava jedinstvenost ključa `name` po tipu brojila, odbija duplikate pri `reorder()`, i loguje promjene u `ActivityLog`.
+- **Mobile (`meter-types-sync.ts`, `meter-type-definitions.api.ts`):** `syncMeterTypesOfflineCache` koristi ugrađene `fields` iz `GET /meter-type-definitions/list` — **1 zahtjev umjesto `1 + N`**.
+- **Frontend (`MetersListPage.tsx`, `meter.types.ts`, `meter-type-definition.types.ts`, `bs.ts`/`en.ts`):** Dodani filteri po `status` i `branchId`, kolona `Podružnica` u tabeli brojila, i kolona `Broj brojila` u tabeli tipova brojila.
+- **Verifikacija:** Backend Jest `15/15` (`72/72`), Mobile Jest `2/2` (`6/6`), Frontend Vitest `9/9` (`30/30`), `check:i18n` (`1065` ključeva), `check:wcag` (`72` para), `check:ui` (`141` fajl), svi `typecheck`/`lint`/`build` zadaci prošli.
 
 ---
 

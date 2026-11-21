@@ -30,6 +30,7 @@ export interface UploadsStorageDriver {
   createReadStream(relativePath: string): fs.ReadStream;
   writeBuffer(relativePath: string, data: Buffer): void;
   moveLocalFile(sourcePath: string, targetRelativePath: string): Promise<{ sha256: string }>;
+  removeDirRecursive(relativeDir: string): void;
 }
 
 const PERMISSION_ERRNO_CODES = new Set(['EACCES', 'EPERM', 'EROFS']);
@@ -163,6 +164,14 @@ export class DiskUploadsStorageDriver implements UploadsStorageDriver {
 
     return { sha256 };
   }
+
+  removeDirRecursive(relativeDir: string): void {
+    const resolved = this.resolvePath(relativeDir);
+    if (resolved === this.rootDir || !fs.existsSync(resolved)) {
+      return;
+    }
+    fs.rmSync(resolved, { recursive: true, force: true });
+  }
 }
 
 @Injectable()
@@ -199,5 +208,9 @@ export class UploadsStorageService implements UploadsStorageDriver {
 
   moveLocalFile(sourcePath: string, targetRelativePath: string): Promise<{ sha256: string }> {
     return this.driver.moveLocalFile(sourcePath, targetRelativePath);
+  }
+
+  removeDirRecursive(relativeDir: string): void {
+    this.driver.removeDirRecursive(relativeDir);
   }
 }

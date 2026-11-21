@@ -999,6 +999,8 @@ const en: TranslationDictionary = {
   meters: {
     pageIntro: 'Overview of all meters (by serial number), meter type management, and adding/editing. One type – many meters; one meter – one current SIM, many records.',
     filterByType: 'Filter by meter type',
+    filterByStatus: 'Meter status',
+    filterByBranch: 'Branch',
     simOnMeterFilter: 'SIM on meter',
     noSimOption: 'No SIM',
     simInstalledOption: 'SIM installed',
@@ -1009,6 +1011,8 @@ const en: TranslationDictionary = {
       yearShort: 'Mfg. year',
       calibrationYearShort: 'Calibration year',
       meterStatus: 'Meter status',
+      branch: 'Branch',
+      metersCount: 'Meters count',
       demount: 'Demount',
       orderLabel: 'Order:',
       maxCurrent: 'Max current',

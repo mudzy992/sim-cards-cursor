@@ -10,7 +10,9 @@ export async function syncMeterTypesOfflineCache(user: AuthUser): Promise<{
   let fieldsCount = 0
 
   for (const t of types) {
-    const fields = await meterTypeDefinitionsApi.listFields(t.id)
+    const fields = Array.isArray(t.fields)
+      ? t.fields
+      : await meterTypeDefinitionsApi.listFields(t.id)
     fieldsCount += fields.length
     await offlineCache.meterTypeFields.set(user, t.id, fields)
   }
@@ -18,4 +20,3 @@ export async function syncMeterTypesOfflineCache(user: AuthUser): Promise<{
   await offlineCache.meterTypeDefinitions.set(user, types)
   return { typesCount: types.length, fieldsCount }
 }
-

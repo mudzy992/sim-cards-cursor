@@ -23,6 +23,7 @@ export type MeterItem = {
   serialNumber: string;
   meterTypeDefinitionId: string;
   branchId?: string | null;
+  branch?: { id: string; name: string; code: string } | null;
   meterTypeDefinition?: MeterTypeDefinitionRef | null;
   status?: MeterStatus;
   simCard?: { id: string; iccid: string; status: string; ipAddress?: string } | null;
@@ -63,6 +64,8 @@ export type MetersListParams = {
   meterTypeDefinitionId?: string;
   serialNumber?: string;
   simCardState?: MeterSimCardState;
+  status?: MeterStatus;
+  branchId?: string;
 };
 
 export type MetersResponse = PaginatedResult<MeterItem>;

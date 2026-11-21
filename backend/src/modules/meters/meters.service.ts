@@ -1,29 +1,36 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
-import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
-import { CreateMeterDto } from './dto/create-meter.dto';
-import { UpdateMeterDto } from './dto/update-meter.dto';
-import { Meter, MeterSimCardState, MeterStatus, Prisma } from '@prisma/client';
-import { MeterFilterDto } from './dto/meter-filter.dto';
+import { ConfigService } from '@nestjs/config';
+import { Meter, MeterSimCardState, Prisma, UserRole } from '@prisma/client';
+import * as fs from 'fs';
+import * as path from 'path';
+import { ErrorCodes } from 'src/common/constants/error-codes';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
-import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
+import { UploadsStorageService } from 'src/common/storage/uploads-storage.service';
 import {
   assertMeterYearsPairIfPartial,
   assertMeterYearsRequired,
 } from 'src/common/utils/meter-years.util';
-import { UserRole } from '@prisma/client';
-import { DeleteMeterDto, MeterDeleteRecordsAction, MeterDeleteSimAction } from './dto/delete-meter.dto';
+import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
+import { ScopeContext, scopeWhere } from 'src/common/utils/scope-filter.util';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 import { AuthService } from '../auth/auth.service';
-import { ConfigService } from '@nestjs/config';
-import { ErrorCodes } from 'src/common/constants/error-codes';
-import * as fs from 'fs';
-import * as path from 'path';
+import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
+import { CreateMeterDto } from './dto/create-meter.dto';
+import {
+  DeleteMeterDto,
+  MeterDeleteRecordsAction,
+  MeterDeleteSimAction,
+} from './dto/delete-meter.dto';
+import { MeterFilterDto } from './dto/meter-filter.dto';
+import { UpdateMeterDto } from './dto/update-meter.dto';
 
 type MeterDeleteSummary = {
   meter: {
@@ -67,67 +74,70 @@ export class MetersService {
     private readonly meterTypeFieldsService: MeterTypeFieldsService,
     private readonly authService: AuthService,
     private readonly config: ConfigService,
+    @Optional() private readonly activityLogService?: ActivityLogService,
+    @Optional() private readonly uploadsStorage?: UploadsStorageService,
   ) {}
 
   private uploadsRoot(): string {
     return this.config.get<string>('UPLOAD_ROOT_PATH', path.join(process.cwd(), 'uploads'));
   }
 
-  private safeRmDirRecursive(absolutePath: string): void {
+  private removeRelativeDir(relativeDir: string): void {
+    if (this.uploadsStorage) {
+      this.uploadsStorage.removeDirRecursive(relativeDir);
+      return;
+    }
     const uploadsRoot = path.resolve(this.uploadsRoot());
-    const resolved = path.resolve(absolutePath);
-    if (!resolved.startsWith(uploadsRoot)) {
+    const resolved = path.resolve(uploadsRoot, relativeDir);
+    if (!resolved.startsWith(`${uploadsRoot}${path.sep}`)) {
       return;
     }
     if (!fs.existsSync(resolved)) return;
     fs.rmSync(resolved, { recursive: true, force: true });
   }
 
-  async create(createMeterDto: CreateMeterDto, scope?: ScopeContext | null): Promise<Meter> {
-    assertMeterYearsRequired(
-      createMeterDto.year,
-      createMeterDto.calibrationYear,
-      'brojilo',
-    );
-    if (createMeterDto.branchId) {
-      const branch = await this.prisma.branch.findUnique({
-        where: { id: createMeterDto.branchId },
-        select: { id: true, distributionId: true },
-      });
-      if (!branch) {
-        throw new BadRequestException({
-          message: 'Odabrana podružnica ne postoji.',
-          code: ErrorCodes.METER_BRANCH_NOT_FOUND,
-        });
-      }
-      if (scope && scope.role === UserRole.DIST_ADMIN) {
-        const distId = scope.distributionId;
-        if (!distId || branch.distributionId !== distId) {
-          throw new ForbiddenException({
-            message: 'Podružnica ne pripada vašoj distribuciji.',
-            code: ErrorCodes.METER_BRANCH_OUTSIDE_DISTRIBUTION,
-          });
-        }
-      }
+  async create(
+    createMeterDto: CreateMeterDto,
+    scope?: ScopeContext | null,
+    actorId?: string,
+    ipAddress?: string,
+  ): Promise<Meter> {
+    assertMeterYearsRequired(createMeterDto.year, createMeterDto.calibrationYear, 'brojilo');
+
+    const serialNumber = createMeterDto.serialNumber.trim();
+    if (!serialNumber) {
+      throw new BadRequestException('Serijski broj brojila je obavezan.');
     }
+
+    await this.assertBranchScope(createMeterDto.branchId, scope);
+    await this.assertMeterTypeExists(createMeterDto.meterTypeDefinitionId);
+
+    const existingSerial = await this.prisma.meter.findUnique({
+      where: { serialNumber },
+      select: { id: true },
+    });
+    if (existingSerial) {
+      throw new ConflictException(`Brojilo sa serijskim brojem "${serialNumber}" već postoji.`);
+    }
+
     const data: Record<string, unknown> = {
-      serialNumber: createMeterDto.serialNumber,
+      serialNumber,
       meterTypeDefinitionId: createMeterDto.meterTypeDefinitionId,
     };
     if (createMeterDto.branchId) data.branchId = createMeterDto.branchId;
-    if (createMeterDto.status) data.status = createMeterDto.status
+    if (createMeterDto.status) data.status = createMeterDto.status;
     if (createMeterDto.year != null) data.year = createMeterDto.year;
     if (createMeterDto.calibrationYear != null) data.calibrationYear = createMeterDto.calibrationYear;
     if (createMeterDto.notes != null) data.notes = createMeterDto.notes;
-    if (createMeterDto.installationAddress != null)
+    if (createMeterDto.installationAddress != null) {
       data.installationAddress = createMeterDto.installationAddress;
+    }
     if (createMeterDto.installationDate) {
       data.installationDate = new Date(createMeterDto.installationDate);
     }
     if (createMeterDto.city != null) data.city = createMeterDto.city;
     if (createMeterDto.municipality != null) data.municipality = createMeterDto.municipality;
-    if (createMeterDto.measuringPoint != null)
-      data.measuringPoint = createMeterDto.measuringPoint;
+    if (createMeterDto.measuringPoint != null) data.measuringPoint = createMeterDto.measuringPoint;
     if (createMeterDto.latitude != null) data.latitude = createMeterDto.latitude;
     if (createMeterDto.longitude != null) data.longitude = createMeterDto.longitude;
 
@@ -156,8 +166,41 @@ export class MetersService {
       data.noSimReason = createMeterDto.noSimReason;
     }
 
-    return this.prisma.meter.create({
-      data: data as Prisma.MeterUncheckedCreateInput,
+    try {
+      const created = await this.prisma.meter.create({
+        data: data as Prisma.MeterUncheckedCreateInput,
+      });
+
+      if (this.activityLogService) {
+        await this.activityLogService.log({
+          userId: actorId,
+          action: 'CREATE',
+          entity: 'meter',
+          entityId: created.id,
+          details: {
+            serialNumber: created.serialNumber,
+            meterTypeDefinitionId: created.meterTypeDefinitionId,
+            branchId: created.branchId,
+          },
+          ipAddress,
+        });
+      }
+
+      return created;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException(`Brojilo sa serijskim brojem "${serialNumber}" već postoji.`);
+      }
+      throw error;
+    }
+  }
+
+  async rollbackUnlinkedMeter(id: string): Promise<void> {
+    await this.prisma.meter.deleteMany({
+      where: {
+        id,
+        simCardId: null,
+      },
     });
   }
 
@@ -165,19 +208,23 @@ export class MetersService {
     filter: MeterFilterDto,
     scope?: ScopeContext | null,
   ): Promise<PaginatedResult<Meter & { meterTypeDefinition?: unknown }>> {
-    const { page, limit, meterTypeDefinitionId, serialNumber, simCardState } = filter;
+    const { page, limit, meterTypeDefinitionId, serialNumber, simCardState, status, branchId } =
+      filter;
     const skip = (page - 1) * limit;
     const where: Record<string, unknown> = {};
     if (meterTypeDefinitionId) where.meterTypeDefinitionId = meterTypeDefinitionId;
     if (serialNumber?.trim()) {
       where.serialNumber = { contains: serialNumber.trim(), mode: 'insensitive' };
     }
-    if (simCardState) {
-      where.simCardState = simCardState;
-    }
+    if (simCardState) where.simCardState = simCardState;
+    if (status) where.status = status;
+    if (branchId) where.branchId = branchId;
+
     const scopeClause = this.getMetersReadScopeClause(scope);
     if (scopeClause) {
-      where.AND = where.AND ? [...(Array.isArray(where.AND) ? where.AND : [where.AND]), scopeClause] : [scopeClause];
+      where.AND = where.AND
+        ? [...(Array.isArray(where.AND) ? where.AND : [where.AND]), scopeClause]
+        : [scopeClause];
     }
     const whereClause = Object.keys(where).length ? where : undefined;
 
@@ -189,6 +236,7 @@ export class MetersService {
         orderBy: { createdAt: 'desc' },
         include: {
           meterTypeDefinition: true,
+          branch: { select: { id: true, name: true, code: true } },
           simCard: true,
           demountTasks: {
             where: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
@@ -221,6 +269,7 @@ export class MetersService {
       },
       include: {
         meterTypeDefinition: true,
+        branch: { select: { id: true, name: true, code: true } },
         simCard: { include: { assignedTo: { select: SAFE_USER_SELECT } } },
         installTasks: {
           where: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
@@ -248,82 +297,117 @@ export class MetersService {
     return meter;
   }
 
-  async update(id: string, updateMeterDto: UpdateMeterDto, scope?: ScopeContext | null): Promise<Meter> {
-    const scopeClause = scopeWhere(scope, { branchIdField: 'branchId' });
-    if (scopeClause) {
-      const exists = await this.prisma.meter.findFirst({
-        where: { id, AND: [scopeClause] },
-        select: { id: true },
-      });
-      if (!exists) throw new NotFoundException(`Meter with ID ${id} not found`);
+  async update(
+    id: string,
+    updateMeterDto: UpdateMeterDto & {
+      simCardId?: string | null;
+      simCardState?: MeterSimCardState;
+    },
+    scope?: ScopeContext | null,
+    actorId?: string,
+    ipAddress?: string,
+  ): Promise<Meter> {
+    if (updateMeterDto.simCardId !== undefined || updateMeterDto.simCardState !== undefined) {
+      throw new BadRequestException(
+        'SIM kartica na brojilu se mijenja isključivo kroz zapisnik ugradnje ili nalog demontaže.',
+      );
     }
-    const currentYears = await this.prisma.meter.findUnique({
-      where: { id },
-      select: { year: true, calibrationYear: true },
+
+    const scopeClause = scopeWhere(scope, { branchIdField: 'branchId' });
+    const existing = await this.prisma.meter.findFirst({
+      where: {
+        id,
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+      },
+      select: {
+        id: true,
+        serialNumber: true,
+        year: true,
+        calibrationYear: true,
+        meterTypeDefinitionId: true,
+      },
     });
+    if (!existing) {
+      throw new NotFoundException(`Meter with ID ${id} not found`);
+    }
+
+    if (updateMeterDto.branchId) {
+      await this.assertBranchScope(updateMeterDto.branchId, scope);
+    }
+    if (
+      updateMeterDto.meterTypeDefinitionId &&
+      updateMeterDto.meterTypeDefinitionId !== existing.meterTypeDefinitionId
+    ) {
+      await this.assertMeterTypeExists(updateMeterDto.meterTypeDefinitionId);
+    }
+
     const mergedYear =
-      updateMeterDto.year !== undefined ? updateMeterDto.year : currentYears?.year ?? undefined;
+      updateMeterDto.year !== undefined ? updateMeterDto.year : (existing.year ?? undefined);
     const mergedCalibration =
       updateMeterDto.calibrationYear !== undefined
         ? updateMeterDto.calibrationYear
-        : currentYears?.calibrationYear ?? undefined;
+        : (existing.calibrationYear ?? undefined);
     assertMeterYearsPairIfPartial(mergedYear, mergedCalibration);
+
     const data: Record<string, unknown> = { ...updateMeterDto };
+    delete data.simCardId;
+    delete data.simCardState;
+
+    if (updateMeterDto.serialNumber !== undefined) {
+      const trimmedSerial = updateMeterDto.serialNumber.trim();
+      if (!trimmedSerial) {
+        throw new BadRequestException('Serijski broj brojila ne smije biti prazan.');
+      }
+      if (trimmedSerial !== existing.serialNumber) {
+        const dup = await this.prisma.meter.findUnique({
+          where: { serialNumber: trimmedSerial },
+          select: { id: true },
+        });
+        if (dup && dup.id !== id) {
+          throw new ConflictException(`Brojilo sa serijskim brojem "${trimmedSerial}" već postoji.`);
+        }
+      }
+      data.serialNumber = trimmedSerial;
+    }
+
     if (data.installationDate && typeof data.installationDate === 'string') {
       data.installationDate = new Date(data.installationDate as string);
     }
-    if (data.branchId !== undefined) (data as Record<string, unknown>).branchId = data.branchId;
-
-    const simCardId = updateMeterDto.simCardId;
-    const simCardState = updateMeterDto.simCardState;
-    if (simCardId) {
-      const existing = await this.prisma.meter.findUnique({ where: { id }, select: { status: true } })
-      if (existing?.status && existing.status !== MeterStatus.ACTIVE) {
-        throw new BadRequestException({
-          message: 'Nije dozvoljeno ugraditi SIM na brojilo koje nije aktivno.',
-          code: ErrorCodes.METER_INACTIVE_FOR_SIM,
-        });
-      }
-      data.simCardState = MeterSimCardState.INSTALLED;
-      data.noSimReason = null;
-    }
-    if (simCardId === null) {
-      data.simCardState = MeterSimCardState.NO_SIM;
-      data.noSimReason = updateMeterDto.noSimReason ?? null;
-    }
-    if (simCardState) {
-      if (simCardState === MeterSimCardState.INSTALLED && !simCardId) {
-        throw new BadRequestException('simCardState=INSTALLED zahtijeva simCardId.');
-      }
-      if (simCardState === MeterSimCardState.NO_SIM) {
-        data.simCardId = null;
-        data.noSimReason = updateMeterDto.noSimReason ?? null;
-      }
-      data.simCardState = simCardState;
-    }
 
     if (updateMeterDto.dynamicFieldValues !== undefined) {
-      const meter = await this.prisma.meter.findUnique({
-        where: { id },
-        select: { meterTypeDefinitionId: true },
-      });
-      if (meter) {
-        const validated = await this.meterTypeFieldsService.validateDynamicValues(
-          meter.meterTypeDefinitionId,
-          updateMeterDto.dynamicFieldValues ?? null,
-        );
-        data.dynamicFieldValues = Object.keys(validated).length > 0 ? validated : Prisma.DbNull;
-      }
+      const targetTypeId =
+        updateMeterDto.meterTypeDefinitionId ?? existing.meterTypeDefinitionId;
+      const validated = await this.meterTypeFieldsService.validateDynamicValues(
+        targetTypeId,
+        updateMeterDto.dynamicFieldValues ?? null,
+      );
+      data.dynamicFieldValues = Object.keys(validated).length > 0 ? validated : Prisma.DbNull;
     }
 
     try {
-      return await this.prisma.meter.update({
+      const updated = await this.prisma.meter.update({
         where: { id },
         data: data as Prisma.MeterUncheckedUpdateInput,
       });
+
+      if (this.activityLogService) {
+        await this.activityLogService.log({
+          userId: actorId,
+          action: 'UPDATE',
+          entity: 'meter',
+          entityId: id,
+          details: { fields: Object.keys(updateMeterDto) },
+          ipAddress,
+        });
+      }
+
+      return updated;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         throw new NotFoundException(`Meter with ID ${id} not found`);
+      }
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Brojilo sa ovim serijskim brojem već postoji.');
       }
       throw error;
     }
@@ -437,10 +521,8 @@ export class MetersService {
     const baseDirsToCleanup = new Set<string>();
     const collectBaseDir = (p: string) => {
       const parts = p.split(/[\\/]+/).filter(Boolean);
-      // expected: installation-records/<year>/<serial>/...
-      if (parts.length < 3) return;
-      if (parts[0] !== 'installation-records') return;
-      baseDirsToCleanup.add(path.join(this.uploadsRoot(), parts[0], parts[1], parts[2]));
+      if (parts.length < 3 || parts[0] !== 'installation-records') return;
+      baseDirsToCleanup.add(`${parts[0]}/${parts[1]}/${parts[2]}`);
     };
     for (const r of records) {
       if (r.pdfPath && typeof r.pdfPath === 'string') collectBaseDir(r.pdfPath);
@@ -452,7 +534,6 @@ export class MetersService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // SIM handling (optional)
       if (meter.simCardId) {
         if (dto.simAction === MeterDeleteSimAction.RETURN_SIM_TO_AVAILABLE) {
           await tx.meter.update({
@@ -490,7 +571,6 @@ export class MetersService {
         deletedRecordsCount = del.count;
       }
 
-      // Meter delete (install/demount tasks cascade)
       await tx.meter.delete({ where: { id } });
 
       await tx.activityLog.create({
@@ -513,8 +593,8 @@ export class MetersService {
     });
 
     if (dto.recordsAction === MeterDeleteRecordsAction.DELETE_ALL) {
-      for (const dir of baseDirsToCleanup) {
-        this.safeRmDirRecursive(dir);
+      for (const relDir of baseDirsToCleanup) {
+        this.removeRelativeDir(relDir);
       }
     }
 
@@ -522,13 +602,63 @@ export class MetersService {
   }
 
   /** Sva brojila – pri kreiranju zapisnika bira se brojilo i SIM (zapisnik = pridruživanje SIM brojilu). */
-  async findAvailable(scope?: ScopeContext | null) {
+  async findAvailable(
+    scope?: ScopeContext | null,
+    opts?: { search?: string; limit?: number },
+  ) {
     const scopeClause = this.getMetersReadScopeClause(scope);
+    const search = opts?.search?.trim();
+    const safeLimit = Math.min(Math.max(opts?.limit ?? 200, 1), 500);
+
     return this.prisma.meter.findMany({
-      where: scopeClause ? { AND: [scopeClause] } : undefined,
+      where: {
+        ...(scopeClause ? { AND: [scopeClause] } : {}),
+        ...(search
+          ? {
+              serialNumber: { contains: search, mode: 'insensitive' },
+            }
+          : {}),
+      },
       orderBy: [{ meterTypeDefinition: { name: 'asc' } }, { serialNumber: 'asc' }],
+      take: safeLimit,
       include: { meterTypeDefinition: true },
     });
+  }
+
+  private async assertBranchScope(
+    branchId: string | undefined,
+    scope?: ScopeContext | null,
+  ): Promise<void> {
+    if (!branchId) return;
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { id: true, distributionId: true },
+    });
+    if (!branch) {
+      throw new BadRequestException({
+        message: 'Odabrana podružnica ne postoji.',
+        code: ErrorCodes.METER_BRANCH_NOT_FOUND,
+      });
+    }
+    if (scope && scope.role === UserRole.DIST_ADMIN) {
+      const distId = scope.distributionId;
+      if (!distId || branch.distributionId !== distId) {
+        throw new ForbiddenException({
+          message: 'Podružnica ne pripada vašoj distribuciji.',
+          code: ErrorCodes.METER_BRANCH_OUTSIDE_DISTRIBUTION,
+        });
+      }
+    }
+  }
+
+  private async assertMeterTypeExists(meterTypeDefinitionId: string): Promise<void> {
+    const def = await this.prisma.meterTypeDefinition.findUnique({
+      where: { id: meterTypeDefinitionId },
+      select: { id: true },
+    });
+    if (!def) {
+      throw new NotFoundException('Odabrani tip brojila nije pronađen.');
+    }
   }
 
   private getMetersReadScopeClause(scope?: ScopeContext | null) {
@@ -537,13 +667,17 @@ export class MetersService {
       scope.role === UserRole.USER &&
       (scope.branchModeratorBranchIds?.length ?? 0) > 0
     ) {
-      if (scope.distributionId) {
-        return { branch: { distributionId: scope.distributionId } };
+      const branchIds = Array.from(
+        new Set(
+          [scope.branchId, ...(scope.branchModeratorBranchIds ?? [])].filter(
+            (id): id is string => Boolean(id),
+          ),
+        ),
+      );
+      if (branchIds.length > 0) {
+        return { branchId: { in: branchIds } };
       }
-      // Fallback (shouldn't happen in normal data): behave like normal USER scope.
-      return scopeWhere(scope, { branchIdField: 'branchId' });
     }
     return scopeWhere(scope, { branchIdField: 'branchId' });
   }
 }
-

@@ -11,6 +11,7 @@ export type MeterTypeDefinitionItem = {
   type: string;
   maxCurrent?: string | null;
   notes?: string | null;
+  fields?: MeterTypeFieldItem[];
 };
 
 export type MeterFieldType = 'STRING' | 'NUMBER' | 'BOOLEAN' | 'DATE';

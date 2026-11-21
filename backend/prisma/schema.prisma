@@ -254,8 +254,10 @@ model Meter {
   installTasks            InstallTask[]
 
   @@index([serialNumber])
+  @@index([branchId])
   @@index([meterTypeDefinitionId])
   @@index([simCardId])
+  @@index([simCardState])
   @@index([status])
   @@map("meters")
 }
@@ -594,6 +596,7 @@ model MeterTypeField {
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
 
+  @@unique([meterTypeDefinitionId, name])
   @@index([meterTypeDefinitionId])
   @@map("meter_type_fields")
 }

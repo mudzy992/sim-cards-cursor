@@ -21,6 +21,7 @@ import { PlusOutlined, ThunderboltOutlined, AppstoreOutlined } from '@ant-design
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { metersApi } from '@/api/meters.api';
+import { branchesApi } from '@/api/branches.api';
 import { usersApi } from '@/api/users.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import {
@@ -35,6 +36,7 @@ import type {
   CreateMeterInput,
   MeterItem,
   MeterSimCardState,
+  MeterStatus,
   MeterType,
   UpdateMeterInput,
 } from '@/types/meter.types';
@@ -83,6 +85,8 @@ export default function MetersListPage() {
   const [filterSimCardState, setFilterSimCardState] = useState<MeterSimCardState | undefined>(
     undefined,
   );
+  const [filterStatus, setFilterStatus] = useState<MeterStatus | undefined>(undefined);
+  const [filterBranchId, setFilterBranchId] = useState<string | undefined>(undefined);
   const [meterDrawerOpen, setMeterDrawerOpen] = useState(false);
   const [editingMeter, setEditingMeter] = useState<MeterItem | null>(null);
   const [detailMeter, setDetailMeter] = useState<MeterItem | null>(null);
@@ -123,15 +127,38 @@ export default function MetersListPage() {
   })
 
   const listQuery = useQuery({
-    queryKey: ['meters', 'list', pagination, filterTypeId, serialNumberFilter, filterSimCardState],
+    queryKey: [
+      'meters',
+      'list',
+      pagination,
+      filterTypeId,
+      serialNumberFilter,
+      filterSimCardState,
+      filterStatus,
+      filterBranchId,
+    ],
     queryFn: () =>
       metersApi.list({
         ...pagination,
         meterTypeDefinitionId: filterTypeId,
         serialNumber: serialNumberFilter,
         simCardState: filterSimCardState,
+        status: filterStatus,
+        branchId: filterBranchId,
       }),
   });
+
+  const branchesQuery = useQuery({
+    queryKey: ['branches', 'list', 'for-meters-filter'],
+    queryFn: () => branchesApi.list(),
+    enabled: userRole === 'SYSTEM_ADMIN' || userRole === 'DIST_ADMIN',
+  });
+
+  const branchOptions =
+    branchesQuery.data?.map((b) => ({
+      label: b.code ? `${b.name} (${b.code})` : b.name,
+      value: b.id,
+    })) ?? [];
 
   const meterTypesQuery = useQuery({
     queryKey: ['meter-type-definitions', 'list-all'],
@@ -349,7 +376,7 @@ export default function MetersListPage() {
                     <Select
                       allowClear
                       placeholder={t('meters.simOnMeterFilter')}
-                      style={{ minWidth: 180 }}
+                      style={{ minWidth: 160 }}
                       value={filterSimCardState}
                       onChange={(v) => {
                         setFilterSimCardState(v);
@@ -360,6 +387,38 @@ export default function MetersListPage() {
                         { label: t('meters.simInstalledOption'), value: 'INSTALLED' },
                       ]}
                     />
+                    <Select
+                      allowClear
+                      placeholder={t('meters.filterByStatus')}
+                      style={{ minWidth: 170 }}
+                      value={filterStatus}
+                      onChange={(v) => {
+                        setFilterStatus(v);
+                        setPagination((p) => ({ ...p, page: 1 }));
+                      }}
+                      options={(['ACTIVE', 'DEFECTIVE', 'INACTIVE', 'IN_CALIBRATION'] as MeterStatus[]).map(
+                        (s) => ({
+                          label: getMeterStatusLabel(s, t),
+                          value: s,
+                        }),
+                      )}
+                    />
+                    {(userRole === 'SYSTEM_ADMIN' || userRole === 'DIST_ADMIN') && (
+                      <Select
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder={t('meters.filterByBranch')}
+                        style={{ minWidth: 190 }}
+                        value={filterBranchId}
+                        onChange={(v) => {
+                          setFilterBranchId(v);
+                          setPagination((p) => ({ ...p, page: 1 }));
+                        }}
+                        options={branchOptions}
+                        loading={branchesQuery.isLoading}
+                      />
+                    )}
                     <Input
                       placeholder={t('installationRecords.form.meterSerialLabel')}
                       value={serialSearchInput}
@@ -378,13 +437,19 @@ export default function MetersListPage() {
                     >
                       {t('common.actions.search')}
                     </Button>
-                    {(serialNumberFilter || filterTypeId || filterSimCardState) && (
+                    {(serialNumberFilter ||
+                      filterTypeId ||
+                      filterSimCardState ||
+                      filterStatus ||
+                      filterBranchId) && (
                       <Button
                         onClick={() => {
                           setSerialSearchInput('');
                           setSerialNumberFilter(undefined);
                           setFilterTypeId(undefined);
                           setFilterSimCardState(undefined);
+                          setFilterStatus(undefined);
+                          setFilterBranchId(undefined);
                           setPagination(defaultPagination);
                         }}
                       >
@@ -437,6 +502,11 @@ export default function MetersListPage() {
                         key: 'meterTypeDefinition',
                         render: (_: unknown, row: MeterItem) =>
                           row.meterTypeDefinition?.name ?? '–',
+                      },
+                      {
+                        title: t('meters.columns.branch'),
+                        key: 'branch',
+                        render: (_: unknown, row: MeterItem) => row.branch?.name ?? '–',
                       },
                       {
                         title: t('meterTypes.manufacturer'),
@@ -588,6 +658,12 @@ export default function MetersListPage() {
                         dataIndex: 'maxCurrent',
                         key: 'maxCurrent',
                         render: (v: string | null) => v ?? '–',
+                      },
+                      {
+                        title: t('meters.columns.metersCount'),
+                        key: 'metersCount',
+                        width: 120,
+                        render: (_: unknown, record) => record._count?.meters ?? 0,
                       },
                       {
                         title: t('common.actions.actions'),

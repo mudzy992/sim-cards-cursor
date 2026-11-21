@@ -8,6 +8,7 @@ export type MeterTypeDefinitionItem = {
   type: MeterType;
   maxCurrent?: string | null;
   notes?: string | null;
+  _count?: { meters: number };
   createdAt: string;
   updatedAt: string;
 };
