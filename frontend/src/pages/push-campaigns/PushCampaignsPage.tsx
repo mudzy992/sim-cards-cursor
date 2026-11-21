@@ -172,7 +172,7 @@ export default function PushCampaignsPage() {
 
   const { data: recipientsData, isLoading: recipientsLoading } = useQuery({
     queryKey: ['push-campaigns', 'recipients', selectedCampaign?.id],
-    queryFn: () => pushCampaignsApi.recipients(selectedCampaign!.id, { page: 1, limit: 200 }),
+    queryFn: () => pushCampaignsApi.recipients(selectedCampaign!.id, { page: 1, limit: 100 }),
     enabled: pushEnabled && !!selectedCampaign && detailsOpen,
   });
 

@@ -325,6 +325,7 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId, isRead])
+  @@index([userId, isRead, createdAt])
   @@map("notifications")
 }
 
@@ -360,6 +361,7 @@ model PushToken {
 
   @@unique([token])
   @@index([userId])
+  @@index([userId, isValid])
   @@map("push_tokens")
 }
 
@@ -414,6 +416,7 @@ model PushDelivery {
 
   @@unique([campaignId, pushTokenId])
   @@index([campaignId])
+  @@index([campaignId, status])
   @@index([userId])
   @@index([pushTokenId])
   @@index([status, createdAt])
@@ -579,6 +582,7 @@ model BranchEmailRecipient {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([branchId])
+  @@index([branchId, isActive])
   @@map("branch_email_recipients")
 }
 

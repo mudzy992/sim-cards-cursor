@@ -2,7 +2,7 @@
 
 **Obuhvaćeni moduli:** `mail` (`mail.controller.ts`, `mail.service.ts`, `dto/mail.dto.ts`), `branch-email-recipients` (`branch-email-recipients.controller.ts`, `branch-email-recipients.service.ts`), `notifications` (`notifications.controller.ts`, `notifications.service.ts`, `notifications.gateway.ts`, `dto/notifications-query.dto.ts`), `push-tokens` (`push-tokens.controller.ts`, `push-tokens.service.ts`), i `push-campaigns` (`push-campaigns.controller.ts`, `push-campaigns.service.ts`, `push-receipts.poller.ts`, `dto/*`).  
 **Datum audita:** 2026-11-21 (branch `arena/015aa78f-sim-cards-cursor`)  
-**Status:** Kompletiran audit i prijedlog izmjena — **čeka odobrenje prije izmjena koda**.
+**Status:** **Paketi A + B + C implementirani i verifikovani**.
 
 ---
 
@@ -67,3 +67,20 @@
    - Prisma schema + migracija: `@@unique([branchId, email])` na `BranchEmailRecipient` (uz bezbjednu deduplikaciju / provjeru u migraciji ili provjeru na servisnom nivou ako bi migracija mogla pasti na postojećim duplikatima — sigurnije `@@index([branchId, isActive])` + provjera u servisu!) i `@@index([userId, isRead, createdAt])` na `Notification`, `@@index([userId, isValid])` na `PushToken`, `@@index([campaignId, status])` na `PushDelivery`.
 7. **P2-2 (Unit testovi):**
    - Dodati unit testove (`push-campaigns.service.spec.ts`, `mail.service.spec.ts`, `notifications.service.spec.ts`, `branch-email-recipients.service.spec.ts`) koji pokrivaju cross-distribution `DIST_ADMIN` blokadu nad globalnom kampanjom, atomični `sendCampaign` lock, Handlebars template sintaksnu provjeru, bulk notifikacije i duplicate email provjeru.
+
+---
+
+## 4. Sažetak implementacije (Paketi A + B + C)
+
+- **Backend (`push-campaigns`, `mail`, `notifications`, `push-tokens`, `branch-email-recipients`, `prisma`):**
+  - **Push campaigns (P0-1, P0-2):** `assertCampaignScope` strogo zahtijeva `campaign.scopeDistributionId === actor.distributionId` za `DIST_ADMIN` (blokira pristup globalnim kampanjama `SYSTEM_ADMIN`-a); `list()` je fail-closed kad `DIST_ADMIN` nema `distributionId`; `resolveRecipientUsers` filtrira isključivo `status: UserStatus.ACTIVE`; `sendCampaign` koristi atomični `DRAFT -> SENDING` lock (`updateMany`); `recipients` endpoint koristi `PaginationDto` (`@Max(100)`) i ne vraća sirovi Expo `token`; `deepLink` validiran na `/` ili `simtracker://`.
+  - **Mail (P0-3):** `updateTemplate` provjerava sintaksu putem `Handlebars.precompile` prije snimanja u `AppSetting`; `getSmtpTransport` dodaje `connectionTimeout` / `greetingTimeout` / `socketTimeout`; `sendRecordWithPdf` i `sendMail` dedupliciraju i trimuju primaoce.
+  - **Notifications & WebSocket (P1-1, P1-2):** `NotificationsGateway.handleConnection` provjerava tip tokena i da je korisnik `UserStatus.ACTIVE` u bazi (uz null-provjeru `this.server` u `sendToUser`); `NotificationsService.createBulk` jednim upitom provjerava `inAppEnabled` i koristi `createMany` + socket emit (korišteno u `PushCampaignsService.sendCampaign`); `findByUser` clampuje `limit` na `[1, 100]`.
+  - **Push tokens (P1-2):** `RegisterPushTokenDto` / `InvalidatePushTokenDto` dopunjeni s `@IsNotEmpty()`, `@MaxLength()` i trimovanjem tokena u servisu.
+  - **Branch email recipients (P2-1):** Prevencija duplikata (`branchId + email`) s `ConflictException` umjesto `500`.
+  - **Prisma migracija `20261121040000_add_messaging_indexes` (P2-1):** Indeksi na `Notification(userId, isRead, createdAt)`, `PushToken(userId, isValid)`, `PushDelivery(campaignId, status)`, `BranchEmailRecipient(branchId, isActive)`.
+- **Frontend (`PushCampaignsPage.tsx`):** `recipients` upit ograničen na `limit: 100` u skladu s `PaginationDto`.
+- **Verifikacija:**
+  - `backend`: `nest build`, `eslint`, `jest` (**20/20 suites, 102/102 tests** uključujući 4 nova spec fajla za Run 6).
+  - `frontend`: `tsc --noEmit`, `eslint`, `check:i18n` (**1067 ključeva**), `check:ui` (**141 fajl**), `vitest` (**9/9 suites, 30/30 tests**), `vite build`.
+  - `mobile`: `tsc --noEmit`, `eslint`, `jest` (**2/2 suites, 8/8 tests**).

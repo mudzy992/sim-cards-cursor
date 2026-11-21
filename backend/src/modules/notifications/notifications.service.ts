@@ -38,11 +38,43 @@ export class NotificationsService {
     return notification;
   }
 
+  async createBulk(dtos: CreateNotificationDto[]): Promise<number> {
+    if (dtos.length === 0) return 0;
+    const { inAppEnabled } = await this.settings.getNotificationChannelSettings();
+    if (!inAppEnabled) {
+      return 0;
+    }
+    const result = await this.prisma.notification.createMany({
+      data: dtos.map((dto) => ({
+        userId: dto.userId,
+        title: dto.title,
+        message: dto.message,
+        type: dto.type,
+        link: dto.link,
+      })),
+    });
+    const now = new Date();
+    dtos.forEach((dto, idx) => {
+      this.gateway.sendToUser(dto.userId, 'notification', {
+        id: `bulk-${now.getTime()}-${idx}`,
+        userId: dto.userId,
+        title: dto.title,
+        message: dto.message,
+        type: dto.type,
+        isRead: false,
+        link: dto.link ?? null,
+        createdAt: now,
+      });
+    });
+    return result.count;
+  }
+
   async findByUser(
     userId: string,
     options?: { unreadOnly?: boolean; limit?: number },
   ): Promise<Notification[]> {
-    const { unreadOnly = false, limit = 50 } = options ?? {};
+    const unreadOnly = options?.unreadOnly ?? false;
+    const limit = Math.min(100, Math.max(1, options?.limit ?? 50));
     return this.prisma.notification.findMany({
       where: {
         userId,

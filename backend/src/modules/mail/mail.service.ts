@@ -109,6 +109,9 @@ export class MailService {
       port,
       secure,
       auth: user && pass ? { user, pass } : undefined,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
       ...(requireTLS ? { requireTLS: true } : {}),
     });
 
@@ -168,7 +171,13 @@ export class MailService {
   async sendRecordWithPdf(options: SendRecordEmailOptions): Promise<void> {
     const { to, subject, recordNumber, recordId, pdfBuffer, pdfFileName } =
       options;
-    const recipients = Array.isArray(to) ? to : [to];
+    const rawList = Array.isArray(to) ? to : [to];
+    const recipients = [
+      ...new Set(rawList.map((e) => e.trim()).filter(Boolean)),
+    ];
+    if (recipients.length === 0) {
+      throw new BadRequestException('Lista email primalaca ne smije biti prazna.');
+    }
 
     await this.sendMail({
       to: recipients,
@@ -199,7 +208,13 @@ export class MailService {
     attachments?: { filename: string; content: Buffer }[];
   }): Promise<void> {
     const { to, subject, template, context = {}, attachments } = options;
-    const recipients = Array.isArray(to) ? to : [to];
+    const recipients = [
+      ...new Set((Array.isArray(to) ? to : [to]).map((e) => e.trim()).filter(Boolean)),
+    ];
+    if (recipients.length === 0) {
+      this.logger.warn(`Email skipped (empty recipients). Subject="${subject}"`);
+      return;
+    }
 
     const transport = await this.getSmtpTransport();
     if (!transport) {
@@ -249,6 +264,13 @@ export class MailService {
     }
     const key = this.getTemplateSettingKey(safe);
     const value = String(content ?? '');
+    try {
+      Handlebars.precompile(value);
+    } catch (error) {
+      throw new BadRequestException(
+        `Neispravna Handlebars sintaksa šablona: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
     await this.prisma.appSetting.upsert({
       where: { key },
       create: { key, value, description: `Email template override: ${safe}` },

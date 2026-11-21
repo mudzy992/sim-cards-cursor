@@ -6,6 +6,7 @@ import {
   PushCampaignStatus,
   PushDeliveryStatus,
   UserRole,
+  UserStatus,
 } from '@prisma/client';
 import { Expo, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -50,9 +51,9 @@ export class PushCampaignsService {
         createdById: input.actor.id,
         scopeDistributionId: scopeDistributionId ?? undefined,
         scopeBranchId: scopeBranchId ?? undefined,
-        title: input.title,
-        message: input.message,
-        deepLink: input.deepLink,
+        title: input.title.trim(),
+        message: input.message.trim(),
+        deepLink: input.deepLink?.trim() || undefined,
         audienceType: input.audienceType,
         filters: (input.filters as Prisma.InputJsonValue | undefined) ?? undefined,
         targetUserId: input.targetUserId,
@@ -92,10 +93,13 @@ export class PushCampaignsService {
       throw new BadRequestException('Push notifications are disabled by settings');
     }
 
-    await this.prisma.pushCampaign.update({
-      where: { id },
+    const lockResult = await this.prisma.pushCampaign.updateMany({
+      where: { id, status: PushCampaignStatus.DRAFT },
       data: { status: PushCampaignStatus.SENDING },
     });
+    if (lockResult.count === 0) {
+      throw new BadRequestException('Campaign already sent or sending');
+    }
 
     const recipients = await this.resolveRecipientUsers(campaign, actor);
     if (recipients.length === 0) {
@@ -114,17 +118,15 @@ export class PushCampaignsService {
       select: { id: true, token: true, userId: true },
     });
 
-    // Create in-app notifications regardless of push delivery result.
-    await Promise.all(
-      recipients.map((u) =>
-        this.notifications.create({
-          userId: u.id,
-          title: campaign.title,
-          message: campaign.message,
-          type: 'PUSH_CAMPAIGN',
-          link: campaign.deepLink ?? '/notifications',
-        }),
-      ),
+    // Create in-app notifications in bulk regardless of push delivery result.
+    await this.notifications.createBulk(
+      recipients.map((u) => ({
+        userId: u.id,
+        title: campaign.title,
+        message: campaign.message,
+        type: 'PUSH_CAMPAIGN',
+        link: campaign.deepLink ?? '/notifications',
+      })),
     );
 
     // Create delivery rows per token
@@ -230,7 +232,11 @@ export class PushCampaignsService {
 
   async list(dto: { status?: PushCampaignStatus; page?: number; limit?: number }, actor: ScopeContext & { id: string }) {
     const page = dto.page ?? 1;
-    const limit = dto.limit ?? 20;
+    const limit = Math.min(100, Math.max(1, dto.limit ?? 20));
+
+    if (actor.role === UserRole.DIST_ADMIN && !actor.distributionId) {
+      return { items: [], page, limit, total: 0, totalPages: 1 };
+    }
 
     const where: Prisma.PushCampaignWhereInput = {
       ...(dto.status ? { status: dto.status } : {}),
@@ -289,14 +295,14 @@ export class PushCampaignsService {
     await this.assertCampaignScope(campaign, actor);
 
     const page = params?.page ?? 1;
-    const limit = params?.limit ?? 50;
+    const limit = Math.min(100, Math.max(1, params?.limit ?? 50));
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.pushDelivery.findMany({
         where: { campaignId: id },
         include: {
           user: { select: { id: true, email: true, firstName: true, lastName: true, role: true, distributionId: true, branchId: true } },
-          pushToken: { select: { id: true, platform: true, deviceId: true, token: true, isValid: true } },
+          pushToken: { select: { id: true, platform: true, deviceId: true, isValid: true } },
         },
         orderBy: { createdAt: 'asc' },
         skip: (page - 1) * limit,
@@ -376,6 +382,12 @@ export class PushCampaignsService {
     if (input.audienceType === PushCampaignAudienceType.FILTER && !input.filters) {
       throw new BadRequestException('filters is required for FILTER audience');
     }
+    if (input.deepLink !== undefined && input.deepLink.trim()) {
+      const trimmed = input.deepLink.trim();
+      if (!/^(\/(?!\/)|simtracker:\/\/)/.test(trimmed)) {
+        throw new BadRequestException('deepLink mora počinjati sa "/" ili "simtracker://".');
+      }
+    }
   }
 
   private async resolveRecipientUsers(
@@ -390,7 +402,11 @@ export class PushCampaignsService {
       if (!campaign.targetUserId) return [];
       const scopeClause = scopeWhere<Prisma.UserWhereInput>(actor, { userScope: true });
       const user = await this.prisma.user.findFirst({
-        where: { id: campaign.targetUserId, ...(scopeClause ? { AND: [scopeClause] } : {}) },
+        where: {
+          id: campaign.targetUserId,
+          status: UserStatus.ACTIVE,
+          ...(scopeClause ? { AND: [scopeClause] } : {}),
+        },
         select: { id: true },
       });
       return user ? [user] : [];
@@ -399,7 +415,10 @@ export class PushCampaignsService {
     if (campaign.audienceType === PushCampaignAudienceType.ALL) {
       const scopeClause = scopeWhere<Prisma.UserWhereInput>(actor, { userScope: true });
       return this.prisma.user.findMany({
-        where: { ...(scopeClause ? { AND: [scopeClause] } : {}) },
+        where: {
+          status: UserStatus.ACTIVE,
+          ...(scopeClause ? { AND: [scopeClause] } : {}),
+        },
         select: { id: true },
       });
     }
@@ -414,6 +433,7 @@ export class PushCampaignsService {
     const scopeClause = scopeWhere<Prisma.UserWhereInput>(actor, { userScope: true });
     return this.prisma.user.findMany({
       where: {
+        status: UserStatus.ACTIVE,
         ...(userIds && userIds.length ? { id: { in: userIds } } : {}),
         ...(role ? { role } : {}),
         ...(scopeClause ? { AND: [scopeClause] } : {}),
@@ -429,7 +449,7 @@ export class PushCampaignsService {
     if (actor.role === UserRole.SYSTEM_ADMIN) return;
     if (actor.role === UserRole.DIST_ADMIN) {
       if (!actor.distributionId) throw new ForbiddenException('Missing distribution admin scope');
-      if (campaign.scopeDistributionId && campaign.scopeDistributionId !== actor.distributionId) {
+      if (!campaign.scopeDistributionId || campaign.scopeDistributionId !== actor.distributionId) {
         throw new ForbiddenException('Out of scope');
       }
       return;

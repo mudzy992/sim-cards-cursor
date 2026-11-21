@@ -1,9 +1,10 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { UserRole } from '@prisma/client'
+import { Prisma, UserRole } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { CreateBranchEmailRecipientDto } from './dto/create-branch-email-recipient.dto'
 import { UpdateBranchEmailRecipientDto } from './dto/update-branch-email-recipient.dto'
@@ -17,17 +18,36 @@ export class BranchEmailRecipientsService {
   async create(dto: CreateBranchEmailRecipientDto, actor: Actor) {
     const branch = await this.ensureBranchExists(dto.branchId)
     this.assertBranchInScope(branch.distributionId, actor)
+    const normalizedEmail = dto.email.trim().toLowerCase()
 
-    return this.prisma.branchEmailRecipient.create({
-      data: {
-        branchId: dto.branchId,
-        email: dto.email.trim().toLowerCase(),
-        label: dto.label ?? null,
-      },
-      include: {
-        branch: { select: { id: true, name: true, code: true } },
-      },
+    const duplicate = await this.prisma.branchEmailRecipient.findFirst({
+      where: { branchId: dto.branchId, email: normalizedEmail },
+      select: { id: true },
     })
+    if (duplicate) {
+      throw new ConflictException('Email adresa je već dodana za ovu podružnicu.')
+    }
+
+    try {
+      return await this.prisma.branchEmailRecipient.create({
+        data: {
+          branchId: dto.branchId,
+          email: normalizedEmail,
+          label: dto.label ?? null,
+        },
+        include: {
+          branch: { select: { id: true, name: true, code: true } },
+        },
+      })
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Email adresa je već dodana za ovu podružnicu.')
+      }
+      throw error
+    }
   }
 
   async update(id: string, dto: UpdateBranchEmailRecipientDto, actor: Actor) {
@@ -35,10 +55,26 @@ export class BranchEmailRecipientsService {
     const branch = await this.ensureBranchExists(recipient.branchId)
     this.assertBranchInScope(branch.distributionId, actor)
 
+    const normalizedEmail =
+      dto.email !== undefined ? dto.email.trim().toLowerCase() : undefined
+    if (normalizedEmail !== undefined && normalizedEmail !== recipient.email) {
+      const duplicate = await this.prisma.branchEmailRecipient.findFirst({
+        where: {
+          branchId: recipient.branchId,
+          email: normalizedEmail,
+          NOT: { id },
+        },
+        select: { id: true },
+      })
+      if (duplicate) {
+        throw new ConflictException('Email adresa je već dodana za ovu podružnicu.')
+      }
+    }
+
     return this.prisma.branchEmailRecipient.update({
       where: { id },
       data: {
-        ...(dto.email !== undefined ? { email: dto.email.trim().toLowerCase() } : {}),
+        ...(normalizedEmail !== undefined ? { email: normalizedEmail } : {}),
         ...(dto.label !== undefined ? { label: dto.label } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       },

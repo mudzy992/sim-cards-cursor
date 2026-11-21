@@ -7,6 +7,8 @@ import {
 import { Server } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { UserStatus } from '@prisma/client';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 const USER_SOCKET_MAP = new Map<string, Set<string>>();
 
@@ -46,19 +48,32 @@ export class NotificationsGateway
   constructor(
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
-  handleConnection(client: AuthenticatedSocket): void {
+  async handleConnection(client: AuthenticatedSocket): Promise<void> {
     const token = client.handshake?.auth?.token;
     if (!token) {
       if (typeof client.disconnect === 'function') client.disconnect();
       return;
     }
     try {
-      const payload = this.jwtService.verify(token, {
+      const payload = this.jwtService.verify<{ sub?: string; type?: string }>(token, {
         secret: this.config.getOrThrow<string>('JWT_SECRET'),
       });
-      const userId = payload.sub as string;
+      if (!payload?.sub || (payload.type && payload.type !== 'access')) {
+        if (typeof client.disconnect === 'function') client.disconnect();
+        return;
+      }
+      const userId = payload.sub;
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { status: true },
+      });
+      if (!user || user.status !== UserStatus.ACTIVE) {
+        if (typeof client.disconnect === 'function') client.disconnect();
+        return;
+      }
       if (!USER_SOCKET_MAP.has(userId)) {
         USER_SOCKET_MAP.set(userId, new Set());
       }
@@ -81,6 +96,7 @@ export class NotificationsGateway
   }
 
   sendToUser(userId: string, event: string, payload: unknown): void {
+    if (!this.server) return;
     const socketIds = USER_SOCKET_MAP.get(userId);
     if (socketIds?.size) {
       socketIds.forEach((socketId) => {

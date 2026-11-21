@@ -4,6 +4,7 @@ import { UserRole } from '@prisma/client';
 import { ParseUUIDPipe } from '@nestjs/common';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { toScopeContext } from 'src/common/utils/scope-filter.util';
@@ -93,13 +94,12 @@ export class PushCampaignsController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser()
     user: { id: string; role: UserRole; distributionId?: string | null; branchId?: string | null },
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query() query: PaginationDto,
   ) {
     const actor = { id: user.id, ...toScopeContext(user)! };
     return this.service.listRecipients(id, actor, {
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
+      page: query.page,
+      limit: query.limit,
     });
   }
 }

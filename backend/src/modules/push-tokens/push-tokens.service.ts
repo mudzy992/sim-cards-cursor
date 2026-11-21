@@ -13,8 +13,9 @@ export class PushTokensService {
   constructor(private readonly prisma: PrismaService) {}
 
   async register(input: RegisterPushTokenInput) {
+    const token = input.token.trim();
     const existing = await this.prisma.pushToken.findUnique({
-      where: { token: input.token },
+      where: { token },
     });
 
     if (existing) {
@@ -22,8 +23,8 @@ export class PushTokensService {
         where: { id: existing.id },
         data: {
           userId: input.userId,
-          platform: input.platform ?? existing.platform,
-          deviceId: input.deviceId ?? existing.deviceId,
+          platform: input.platform?.trim() ?? existing.platform,
+          deviceId: input.deviceId?.trim() ?? existing.deviceId,
           isValid: true,
           lastUsedAt: new Date(),
         },
@@ -33,9 +34,9 @@ export class PushTokensService {
     return this.prisma.pushToken.create({
       data: {
         userId: input.userId,
-        token: input.token,
-        platform: input.platform,
-        deviceId: input.deviceId,
+        token,
+        platform: input.platform?.trim(),
+        deviceId: input.deviceId?.trim(),
         isValid: true,
         lastUsedAt: new Date(),
       },
@@ -43,8 +44,9 @@ export class PushTokensService {
   }
 
   async invalidateToken(token: string, userId: string) {
+    const normalized = token.trim();
     const existing = await this.prisma.pushToken.findUnique({
-      where: { token },
+      where: { token: normalized },
     });
     if (!existing || existing.userId !== userId) {
       return;
