@@ -13,10 +13,9 @@ import {
   Select,
   Space,
   Steps,
-  Typography,
   message,
 } from 'antd';
-import { ArrowLeftOutlined, CheckOutlined } from '@ant-design/icons';
+import { CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { shipmentsApi } from '@/api/shipments.api';
@@ -25,6 +24,7 @@ import { useAuthStore } from '@/store/auth.store';
 import type { CreateShipmentInput, ShipmentItem } from '@/types/shipment.types';
 import { ShipmentImportPanel } from './import/ShipmentImportPanel';
 import { useTranslation } from '@/i18n';
+import { PageHeader } from '@/components/ui';
 
 /**
  * Kreiranje isporuke kroz stepper:
@@ -116,14 +116,10 @@ export default function ShipmentWizardPage() {
     <div className="mx-auto max-w-[1200px]">
       {contextHolder}
 
-      <div className="mb-5 flex items-center gap-3">
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/shipments')}>
-          {t('common.actions.back')}
-        </Button>
-        <Typography.Title level={3} className="!mb-0">
-          {t('shipments.list.newShipment')}
-        </Typography.Title>
-      </div>
+      <PageHeader
+        title={t('shipments.list.newShipment')}
+        backTo="/shipments"
+      />
 
       <Card className="mb-5 shadow-sm">
         <Steps

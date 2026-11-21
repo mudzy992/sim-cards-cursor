@@ -98,12 +98,14 @@ test.describe('Frontend browser smoke', () => {
 
     for (const route of [
       '/shipments',
-      '/shipments/import',
+      '/shipments/new',
       '/installation-records',
       '/meters',
-      '/sim-cards',
       '/analytics',
       '/settings',
+      '/users',
+      '/activity-log',
+      '/app-releases',
     ]) {
       await page.goto(route);
       await expect(page).toHaveURL(new RegExp(route.replace('/', '\\/')));

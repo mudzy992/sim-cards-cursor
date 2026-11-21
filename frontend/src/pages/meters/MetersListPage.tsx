@@ -15,7 +15,7 @@ import {
   Typography,
   message,
 } from 'antd';
-import { StatusBadge, getMeterStatusTone } from '@/components/ui';
+import { PageHeader, StatusBadge, getMeterStatusTone } from '@/components/ui';
 import { useState } from 'react';
 import { PlusOutlined, ThunderboltOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
@@ -312,12 +312,10 @@ export default function MetersListPage() {
       data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
     >
       {messageContextHolder}
-      <Typography.Title level={3} className="!mb-0">
-        {t('layout.sidebar.meters')}
-      </Typography.Title>
-      <Typography.Paragraph type="secondary" className="!mb-4">
-        {t('meters.pageIntro')}
-      </Typography.Paragraph>
+      <PageHeader
+        title={t('layout.sidebar.meters')}
+        subtitle={t('meters.pageIntro')}
+      />
 
       <Tabs
         activeKey={activeTab}

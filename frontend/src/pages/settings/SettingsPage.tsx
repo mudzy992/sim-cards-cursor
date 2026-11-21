@@ -19,6 +19,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { useTranslation } from '@/i18n';
+import { PageHeader } from '@/components/ui';
 import {
   getAppSettingsManifest,
   MANIFEST_GROUP_ORDER,
@@ -525,9 +526,7 @@ export default function SettingsPage() {
       data-tour-role="SYSTEM_ADMIN"
     >
       {contextHolder}
-      <Typography.Title level={3} className="!mb-0">
-        {t('settings.title')}
-      </Typography.Title>
+      <PageHeader title={t('settings.title')} />
       <Card title={t('settings.notificationsCardTitle')} className="mb-4">
         <SettingsNotificationsSection />
       </Card>
