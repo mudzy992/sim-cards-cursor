@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { scopeWhere, toScopeContext, ScopeContext } from 'src/common/utils/scope-filter.util';
 import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
@@ -28,8 +29,11 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { MailService } from '../mail/mail.service';
 import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fields.service';
 import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs';
 import * as path from 'path';
+import {
+  isStoragePermissionError,
+  UploadsStorageService,
+} from 'src/common/storage/uploads-storage.service';
 
 export type InstallationRecordContext = {
   userId?: string;
@@ -44,7 +48,7 @@ export type InstallationRecordContext = {
 @Injectable()
 export class InstallationRecordsService {
   private readonly logger = new Logger(InstallationRecordsService.name);
-  private readonly uploadsRoot: string;
+  private readonly storage: UploadsStorageService;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -54,16 +58,9 @@ export class InstallationRecordsService {
     private readonly mailService: MailService,
     private readonly meterTypeFieldsService: MeterTypeFieldsService,
     private readonly config: ConfigService,
+    @Optional() storage?: UploadsStorageService,
   ) {
-    this.uploadsRoot = this.config.get<string>(
-      'UPLOAD_ROOT_PATH',
-      path.join(process.cwd(), 'uploads'),
-    );
-  }
-
-  private resolveUploadsPath(relativePath: string): string {
-    const parts = relativePath.split(/[\\/]+/).filter(Boolean);
-    return path.join(this.uploadsRoot, ...parts);
+    this.storage = storage ?? new UploadsStorageService(this.config);
   }
 
   private sanitizePathSegment(value: string): string {
@@ -78,13 +75,12 @@ export class InstallationRecordsService {
   private getRecordBaseDir(record: {
     createdAt?: Date | string | null;
     meter?: { serialNumber?: string | null } | null;
-  }): { year: string; serial: string; baseRelativeDir: string; baseAbsoluteDir: string } {
+  }): { year: string; serial: string; baseRelativeDir: string } {
     const year = this.getRecordYear(record);
     const serialRaw = record.meter?.serialNumber?.trim() || 'unknown-meter';
     const serial = this.sanitizePathSegment(serialRaw);
     const baseRelativeDir = path.posix.join('installation-records', year, serial);
-    const baseAbsoluteDir = this.resolveUploadsPath(baseRelativeDir);
-    return { year, serial, baseRelativeDir, baseAbsoluteDir };
+    return { year, serial, baseRelativeDir };
   }
 
   async create(
@@ -792,14 +788,12 @@ export class InstallationRecordsService {
         }
       : null;
     const photos = (record.photos as string[] | undefined) ?? [];
-    const uploadsRoot = this.uploadsRoot;
     const photoDataUrls: string[] = [];
     for (const p of photos) {
       if (typeof p !== 'string' || !p.startsWith('installation-records/')) continue;
-      const fullPath = path.join(uploadsRoot, p);
       try {
-        if (fs.existsSync(fullPath)) {
-          const buf = fs.readFileSync(fullPath);
+        if (this.storage.exists(p)) {
+          const buf = this.storage.readBuffer(p);
           const ext = path.extname(p).toLowerCase();
           const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
           photoDataUrls.push(`data:${mime};base64,${buf.toString('base64')}`);
@@ -903,24 +897,17 @@ export class InstallationRecordsService {
         ? 'installation-record-meter-replacement'
         : 'installation-record';
     const buffer = await this.pdfGenerator.generatePdf(templateName, pdfData);
-    const { baseRelativeDir, baseAbsoluteDir } = this.getRecordBaseDir(installationRecord);
+    const { baseRelativeDir } = this.getRecordBaseDir(installationRecord);
     const sanitizedFileName = `${this.sanitizePathSegment(installationRecord.recordNumber)}.pdf`;
     const relativePath = path.posix.join(baseRelativeDir, 'zapisnik', sanitizedFileName);
-    const absoluteDir = path.join(baseAbsoluteDir, 'zapisnik');
-    const absolutePath = path.join(absoluteDir, sanitizedFileName);
     let savedToDisk = false;
     try {
-      fs.mkdirSync(absoluteDir, { recursive: true });
-      fs.writeFileSync(absolutePath, buffer);
+      this.storage.writeBuffer(relativePath, buffer);
       savedToDisk = true;
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException)?.code;
-      if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
-        const uid = process.getuid?.();
-        const gid = process.getgid?.();
-        this.logger.error(
-          `Cannot persist generated PDF to "${absolutePath}" (${code}, uid=${uid}, gid=${gid}). ` +
-            'Returning PDF buffer without caching to disk. Ensure the host uploads mount is writable by UID/GID 1000:1000 (chown -R 1000:1000 <host_uploads_dir>).',
+      if (isStoragePermissionError(error)) {
+        this.logger.warn(
+          `Returning PDF buffer for "${relativePath}" without caching to disk due to storage permissions.`,
         );
       } else {
         throw error;
@@ -958,15 +945,14 @@ export class InstallationRecordsService {
 
     let pdfBuffer: Buffer | null = null;
     if (record.pdfPath) {
-      const absolutePath = this.resolveUploadsPath(record.pdfPath);
-      if (fs.existsSync(absolutePath)) {
-        try {
-          pdfBuffer = fs.readFileSync(absolutePath);
-        } catch (error) {
-          this.logger.warn(
-            `Cannot read cached PDF "${absolutePath}" (${(error as NodeJS.ErrnoException)?.code ?? 'unknown'}); regenerating.`,
-          );
+      try {
+        if (this.storage.exists(record.pdfPath)) {
+          pdfBuffer = this.storage.readBuffer(record.pdfPath);
         }
+      } catch (error) {
+        this.logger.warn(
+          `Cannot read cached PDF "${record.pdfPath}" (${error instanceof Error ? error.message : 'unknown'}); regenerating.`,
+        );
       }
     }
     if (!pdfBuffer) {

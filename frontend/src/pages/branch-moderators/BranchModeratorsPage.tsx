@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Drawer, Form, Select, Space, Table, Typography, message } from 'antd'
+import { Button, Drawer, Form, Select, Table, message } from 'antd'
 import { useMemo, useState } from 'react'
 import { branchModeratorsApi } from '@/api/branch-moderators.api'
 import { branchesApi } from '@/api/branches.api'
@@ -7,6 +7,8 @@ import { usersApi } from '@/api/users.api'
 import { useAuthStore } from '@/store/auth.store'
 import type { BranchModeratorItem } from '@/types/branch-moderator.types'
 import { useTranslation } from '@/i18n'
+import { EmptyNotice, FilterBar, PageHeader, PageShell } from '@/components/ui'
+import { getApiErrorMessage } from '@/utils/error.utils'
 
 export default function BranchModeratorsPage() {
   const queryClient = useQueryClient()
@@ -43,9 +45,7 @@ export default function BranchModeratorsPage() {
       await queryClient.invalidateQueries({ queryKey: ['branch-moderators'] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -56,9 +56,7 @@ export default function BranchModeratorsPage() {
       await queryClient.invalidateQueries({ queryKey: ['branch-moderators'] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -83,23 +81,22 @@ export default function BranchModeratorsPage() {
   const rows = listQuery.data ?? []
 
   return (
-    <div className="space-y-4">
+    <PageShell>
       {messageContextHolder}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Typography.Title level={3} className="!mb-0">
-            {t('branchModerators.title')}
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {t('branchModerators.subtitle')}
-          </Typography.Text>
-        </div>
-        <Button type="primary" onClick={() => setDrawerOpen(true)}>
-          {t('branchModerators.assignButton')}
-        </Button>
-      </div>
+      <PageHeader
+        title={t('branchModerators.title')}
+        subtitle={t('branchModerators.subtitle')}
+        actions={
+          <Button type="primary" onClick={() => setDrawerOpen(true)}>
+            {t('branchModerators.assignButton')}
+          </Button>
+        }
+      />
 
-      <Space wrap>
+      <FilterBar
+        hasActiveFilters={Boolean(branchIdFilter)}
+        onReset={() => setBranchIdFilter(undefined)}
+      >
         <Select
           allowClear
           style={{ width: 260 }}
@@ -108,13 +105,13 @@ export default function BranchModeratorsPage() {
           value={branchIdFilter}
           onChange={(v) => setBranchIdFilter(v || undefined)}
         />
-        <Button onClick={() => setBranchIdFilter(undefined)}>{t('common.actions.reset')}</Button>
-      </Space>
+      </FilterBar>
 
       <Table<BranchModeratorItem>
         rowKey="id"
         loading={listQuery.isLoading}
         dataSource={rows}
+        locale={{ emptyText: <EmptyNotice /> }}
         pagination={false}
         columns={[
           {
@@ -189,6 +186,6 @@ export default function BranchModeratorsPage() {
           </Form.Item>
         </Form>
       </Drawer>
-    </div>
+    </PageShell>
   )
 }

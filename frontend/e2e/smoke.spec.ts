@@ -37,13 +37,18 @@ test.describe('Frontend browser smoke', () => {
     await expect(themeBtn).toBeVisible();
 
     await themeBtn.click();
-    await page.getByRole('menuitem', { name: /tamn|dark/i }).click();
+    const darkItem = page.getByRole('menuitem', { name: /tamn|dark/i });
+    await expect(darkItem).toBeVisible();
+    await darkItem.click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-    await expect(page.getByRole('menuitem', { name: /tamn|dark/i })).toBeHidden();
+    await expect(darkItem).toBeHidden();
 
     await themeBtn.click();
-    await page.getByRole('menuitem', { name: /svijetl|light/i }).click();
+    const lightItem = page.getByRole('menuitem', { name: /svijetl|light/i });
+    await expect(lightItem).toBeVisible();
+    await lightItem.click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(lightItem).toBeHidden();
 
     expect(errors).toEqual([]);
   });
@@ -56,13 +61,18 @@ test.describe('Frontend browser smoke', () => {
     await expect(langBtn).toBeVisible();
 
     await langBtn.click();
-    await page.getByRole('menuitem', { name: /englesk|english/i }).click();
+    const englishItem = page.getByRole('menuitem', { name: /englesk|english/i });
+    await expect(englishItem).toBeVisible();
+    await englishItem.click();
     await expect(page.getByRole('button', { name: /sign in|login/i })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /englesk|english/i })).toBeHidden();
+    await expect(englishItem).toBeHidden();
 
     await langBtn.click();
-    await page.getByRole('menuitem', { name: /bosansk|bosnian/i }).click();
+    const bosnianItem = page.getByRole('menuitem', { name: /bosansk|bosnian/i });
+    await expect(bosnianItem).toBeVisible();
+    await bosnianItem.click();
     await expect(page.getByRole('button', { name: /prijav/i })).toBeVisible();
+    await expect(bosnianItem).toBeHidden();
 
     expect(errors).toEqual([]);
   });
@@ -84,11 +94,21 @@ test.describe('Frontend browser smoke', () => {
 
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
     await expect(page.locator('#main-content')).toBeVisible();
+    await expect(page.locator('h1')).toBeVisible({ timeout: 15_000 });
 
-    for (const route of ['/shipments', '/meters', '/sim-cards', '/analytics', '/settings']) {
+    for (const route of [
+      '/shipments',
+      '/shipments/import',
+      '/installation-records',
+      '/meters',
+      '/sim-cards',
+      '/analytics',
+      '/settings',
+    ]) {
       await page.goto(route);
       await expect(page).toHaveURL(new RegExp(route.replace('/', '\\/')));
-      await expect(page.locator('#main-content')).toBeVisible();
+      await expect(page.locator('#main-content')).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator('h1')).toBeVisible({ timeout: 15_000 });
     }
 
     expect(errors).toEqual([]);

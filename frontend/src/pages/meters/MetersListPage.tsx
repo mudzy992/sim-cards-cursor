@@ -43,6 +43,7 @@ import type {
   MeterTypeDefinitionItem,
 } from '@/types/meter-type-definition.types';
 import { useTranslation } from '@/i18n';
+import { getApiErrorMessage } from '@/utils/error.utils';
 import {
   getDemountResolutionLabel,
   getMeterDemountCategoryLabel,
@@ -171,10 +172,7 @@ export default function MetersListPage() {
       setDemountMeterDemountCategory('')
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.taskCreateFailed'),
-      );
+      messageApi.error(getApiErrorMessage(err, t('meters.taskCreateFailed')));
     },
   });
 
@@ -189,10 +187,7 @@ export default function MetersListPage() {
       setInstallNotes('');
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.taskCreateFailed'),
-      );
+      messageApi.error(getApiErrorMessage(err, t('meters.taskCreateFailed')));
     },
   });
 
@@ -206,12 +201,7 @@ export default function MetersListPage() {
       void queryClient.invalidateQueries({ queryKey: ['meters', 'list'] });
     },
     onError: (err: unknown) => {
-      const msg =
-        typeof (err as { response?: { data?: { message?: string } } })?.response?.data?.message ===
-        'string'
-          ? (err as { response: { data: { message: string } } }).response.data.message
-          : t('meters.createFailed');
-      messageApi.error(msg);
+      messageApi.error(getApiErrorMessage(err, t('meters.createFailed')));
     },
   });
 
@@ -227,12 +217,7 @@ export default function MetersListPage() {
       if (detailMeter) void queryClient.invalidateQueries({ queryKey: ['meters', detailMeter.id] });
     },
     onError: (err: unknown) => {
-      const msg =
-        typeof (err as { response?: { data?: { message?: string } } })?.response?.data?.message ===
-        'string'
-          ? (err as { response: { data: { message: string } } }).response.data.message
-          : t('meters.updateFailed');
-      messageApi.error(msg);
+      messageApi.error(getApiErrorMessage(err, t('meters.updateFailed')));
     },
   });
 
@@ -243,10 +228,7 @@ export default function MetersListPage() {
       void queryClient.invalidateQueries({ queryKey: ['meter-type-definitions'] });
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.typeDeleteFailed'),
-      );
+      messageApi.error(getApiErrorMessage(err, t('meters.typeDeleteFailed')));
     },
   });
 

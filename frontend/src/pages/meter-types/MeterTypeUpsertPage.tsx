@@ -22,6 +22,7 @@ import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import type { CreateMeterTypeDefinitionInput, MeterType, MeterTypeDefinitionItem } from '@/types/meter-type-definition.types'
 import type { CreateMeterTypeFieldInput, MeterFieldType, MeterTypeFieldItem, UpdateMeterTypeFieldInput } from '@/types/meter-type-field.types'
 import { useTranslation } from '@/i18n'
+import { getApiErrorMessage } from '@/utils/error.utils'
 
 function getMeterTypeOptions(t: (key: string) => string): { label: string; value: MeterType }[] {
   return [
@@ -116,9 +117,7 @@ export default function MeterTypeUpsertPage() {
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'get', definitionId] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -133,9 +132,7 @@ export default function MeterTypeUpsertPage() {
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields', definitionId] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -150,9 +147,7 @@ export default function MeterTypeUpsertPage() {
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields', definitionId] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -163,9 +158,7 @@ export default function MeterTypeUpsertPage() {
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields', definitionId] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -176,9 +169,7 @@ export default function MeterTypeUpsertPage() {
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields', definitionId] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 

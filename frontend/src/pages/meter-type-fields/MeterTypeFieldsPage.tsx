@@ -5,6 +5,7 @@ import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import type { MeterTypeDefinitionItem } from '@/types/meter-type-definition.types'
 import type { CreateMeterTypeFieldInput, MeterFieldType, MeterTypeFieldItem, UpdateMeterTypeFieldInput } from '@/types/meter-type-field.types'
 import { useTranslation } from '@/i18n'
+import { getApiErrorMessage } from '@/utils/error.utils'
 
 export default function MeterTypeFieldsPage() {
   const queryClient = useQueryClient()
@@ -53,9 +54,7 @@ export default function MeterTypeFieldsPage() {
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields'] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -70,9 +69,7 @@ export default function MeterTypeFieldsPage() {
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields'] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -83,9 +80,7 @@ export default function MeterTypeFieldsPage() {
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields'] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -96,9 +91,7 @@ export default function MeterTypeFieldsPage() {
       await queryClient.invalidateQueries({ queryKey: ['meter-type-definitions', 'fields'] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 

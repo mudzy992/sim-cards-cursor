@@ -661,7 +661,7 @@ export class ShipmentsService {
 
     let selectedRowNumbers: number[] | undefined;
 
-    if (dto.selectedRowNumbers) {
+    if (dto.importAllValid !== 'true' && dto.selectedRowNumbers) {
       try {
         const raw = JSON.parse(dto.selectedRowNumbers) as unknown;
 

@@ -43,4 +43,14 @@ export class ImportExcelDto {
   @IsOptional()
   @IsBooleanString()
   applyImport?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Ako je true, uvoze se svi validni redovi bez potrebe za slanjem velikog selectedRowNumbers niza.',
+    default: 'false',
+    type: String,
+  })
+  @IsOptional()
+  @IsBooleanString()
+  importAllValid?: string;
 }

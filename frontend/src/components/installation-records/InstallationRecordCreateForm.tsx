@@ -13,6 +13,7 @@ import type {
 } from '@/types/installation-record.types';
 import type { MeterTypeFieldItem } from '@/types/meter-type-field.types'
 import { useTranslation } from '@/i18n'
+import { getApiErrorMessage } from '@/utils/error.utils'
 
 type CreateMode = 'existing' | 'new';
 
@@ -105,10 +106,7 @@ export default function InstallationRecordCreateForm({
       onSuccess?.(data);
     },
     onError: (err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        t('installationRecords.form.createFailed');
-      messageApi.error(msg);
+      messageApi.error(getApiErrorMessage(err, t('installationRecords.form.createFailed')));
     },
   });
 

@@ -12,7 +12,7 @@ import {
   Typography,
   message,
 } from 'antd';
-import { StatusBadge, getUserRoleTone, getUserStatusTone } from '@/components/ui';
+import { EmptyNotice, PageHeader, PageShell, StatusBadge, getUserRoleTone, getUserStatusTone } from '@/components/ui';
 import { PlusOutlined, EditOutlined, UserOutlined, ApartmentOutlined, BankOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { usersApi, type CreateUserInput, type UpdateUserInput } from '@/api/users.api';
@@ -23,7 +23,8 @@ import { useAuthStore } from '@/store/auth.store';
 import type { UserListItem } from '@/types/user.types';
 import type { UserRole } from '@/types/auth.types';
 import { useTranslation } from '@/i18n';
-import { getUserRoleLabel, getUserStatusLabel } from '@/utils/labels.utils'
+import { getUserRoleLabel, getUserStatusLabel } from '@/utils/labels.utils';
+import { getApiErrorMessage } from '@/utils/error.utils';
 
 function getRoleOptions(t: (key: string) => string): { label: string; value: UserRole }[] {
   return [
@@ -98,8 +99,8 @@ export default function UsersListPage() {
       setDistDrawerOpen(false);
       distForm.resetFields();
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('common.states.error')));
     },
   });
 
@@ -113,8 +114,8 @@ export default function UsersListPage() {
       setEditingDist(null);
       distForm.resetFields();
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('common.states.error')));
     },
   });
 
@@ -124,8 +125,8 @@ export default function UsersListPage() {
       messageApi.success(t('users.distributions.deleted'));
       queryClient.invalidateQueries({ queryKey: ['distributions'] });
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('common.states.error')));
     },
   });
 
@@ -138,8 +139,8 @@ export default function UsersListPage() {
       setBranchDrawerOpen(false);
       branchForm.resetFields();
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('common.states.error')));
     },
   });
 
@@ -153,8 +154,8 @@ export default function UsersListPage() {
       setEditingBranch(null);
       branchForm.resetFields();
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('common.states.error')));
     },
   });
 
@@ -164,8 +165,8 @@ export default function UsersListPage() {
       messageApi.success(t('users.branches.deleted'));
       queryClient.invalidateQueries({ queryKey: ['branches'] });
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('common.states.error')));
     },
   });
 
@@ -178,8 +179,8 @@ export default function UsersListPage() {
       setEditing(null);
       form.resetFields();
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('common.states.error')));
     },
   });
 
@@ -202,10 +203,7 @@ export default function UsersListPage() {
           ])
           await queryClient.invalidateQueries({ queryKey: ['branch-moderators'] })
         } catch (e) {
-          messageApi.error(
-            (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-              t('users.moderatorSyncFailed'),
-          )
+          messageApi.error(getApiErrorMessage(e, t('users.moderatorSyncFailed')))
         } finally {
           setPendingModeratorSync(null)
         }
@@ -214,8 +212,8 @@ export default function UsersListPage() {
       setEditing(null);
       form.resetFields();
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('common.states.error')));
     },
   });
 
@@ -225,8 +223,8 @@ export default function UsersListPage() {
       messageApi.success(t('users.userDeleted'));
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      messageApi.error(err.response?.data?.message ?? t('common.states.error'));
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('common.states.error')));
     },
   });
 
@@ -366,6 +364,7 @@ export default function UsersListPage() {
         rowKey="id"
         loading={usersQuery.isLoading}
         dataSource={rows}
+        locale={{ emptyText: <EmptyNotice /> }}
         pagination={{
           current: userPage,
           pageSize: userLimit,
@@ -474,6 +473,7 @@ export default function UsersListPage() {
                   rowKey="id"
                   loading={distributionsQuery.isLoading}
                   dataSource={distributions}
+                  locale={{ emptyText: <EmptyNotice /> }}
                   pagination={false}
                   columns={[
                     { title: t('common.labels.name'), dataIndex: 'name' },
@@ -526,6 +526,7 @@ export default function UsersListPage() {
                   rowKey="id"
                   loading={branchesQuery.isLoading}
                   dataSource={branches}
+                  locale={{ emptyText: <EmptyNotice /> }}
                   pagination={false}
                   columns={[
                     {
@@ -563,18 +564,15 @@ export default function UsersListPage() {
   ];
 
   return (
-    <div
-      className="space-y-4"
-      data-tour-id="admin-users"
-      data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
-    >
-      {messageContextHolder}
-      <div className="flex justify-between items-center">
-        <Typography.Title level={3} className="!mb-0">
-          {t('layout.sidebar.users')}
-        </Typography.Title>
-      </div>
-      <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
+    <PageShell>
+      <div
+        className="space-y-4"
+        data-tour-id="admin-users"
+        data-tour-role="SYSTEM_ADMIN DIST_ADMIN"
+      >
+        {messageContextHolder}
+        <PageHeader title={t('layout.sidebar.users')} />
+        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
       <Drawer
         title={editing ? t('users.editUser') : t('users.newUser')}
         open={userDrawerOpen}
@@ -831,6 +829,7 @@ export default function UsersListPage() {
           </Form.Item>
         </Form>
       </Drawer>
-    </div>
+      </div>
+    </PageShell>
   );
 }

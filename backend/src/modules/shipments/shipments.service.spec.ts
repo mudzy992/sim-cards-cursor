@@ -258,4 +258,42 @@ describe('ShipmentsService — Excel import atomicity', () => {
     );
     expect(batchSizes).toEqual([2000, 2000, 2000, 2000, 500]);
   });
+
+  it('imports all valid rows when importAllValid is true even without selectedRowNumbers', async () => {
+    const { service, tx } = createMocks();
+    const multiValidCsv = [
+      'ICCID,IP,Public_IP,Phone,APN',
+      '89387000000000000001,10.10.0.1,31.47.0.1,061111222,iot.apn',
+      '89387000000000000002,10.10.0.2,31.47.0.2,061111223,iot.apn',
+      'bad-iccid,10.10.0.3,31.47.0.3,061111224,iot.apn',
+    ].join('\n');
+
+    tx.simCard.createMany.mockResolvedValueOnce({ count: 2 });
+    tx.simCard.count.mockResolvedValueOnce(2);
+
+    const result = await service.importExcel(
+      'ship-1',
+      {
+        applyImport: 'true',
+        importAllValid: 'true',
+        selectedRowNumbers: 'not-used-when-importAllValid',
+      },
+      makeCsvBuffer(multiValidCsv),
+      'admin-1',
+      '127.0.0.1',
+      scope,
+    );
+
+    expect(result.mode).toBe('import');
+    if (result.mode === 'import') {
+      expect(result.insertedRows).toBe(2);
+      expect(result.skippedRows).toBe(1);
+    }
+    expect(tx.simCard.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ iccid: '89387000000000000001' }),
+        expect.objectContaining({ iccid: '89387000000000000002' }),
+      ]),
+    });
+  });
 });

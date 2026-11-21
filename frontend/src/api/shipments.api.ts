@@ -95,12 +95,16 @@ export const shipmentsApi = {
     columnMapping?: ImportColumnMapping;
     applyImport?: boolean;
     selectedRowNumbers?: number[];      // NOVO
+    importAllValid?: boolean;
+    onUploadProgress?: (percent: number) => void;
   }): Promise<ShipmentImportPreview | ShipmentImportApply> => {
     const formData = new FormData();
     formData.append('file', params.file);
     formData.append('applyImport', params.applyImport ? 'true' : 'false');
     if (params.columnMapping) formData.append('columnMapping', JSON.stringify(params.columnMapping));
-    if (params.selectedRowNumbers?.length) {
+    if (params.importAllValid) {
+      formData.append('importAllValid', 'true');
+    } else if (params.selectedRowNumbers?.length) {
       formData.append('selectedRowNumbers', JSON.stringify(params.selectedRowNumbers));
     }
     // NAPOMENA: ne postavljati 'Content-Type' ručno za FormData — axios/browser mora sam
@@ -109,6 +113,13 @@ export const shipmentsApi = {
     const response = await axiosInstance.post<ApiEnvelope<BackendShipmentImportPreview | ShipmentImportApply>>(
       `/shipments/${params.shipmentId}/import`,
       formData,
+      {
+        onUploadProgress: (event) => {
+          if (!params.onUploadProgress || !event.total || event.total <= 0) return;
+          const pct = Math.min(99, Math.round((event.loaded * 100) / event.total));
+          params.onUploadProgress(pct);
+        },
+      },
     );
     const data = response.data.data;
 

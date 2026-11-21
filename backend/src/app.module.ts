@@ -28,6 +28,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { PushCampaignsModule } from './modules/push-campaigns/push-campaigns.module';
 import { AppReleasesModule } from './modules/app-releases/app-releases.module';
 import { HealthController } from './health.controller';
+import { StorageModule } from './common/storage/storage.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { HealthController } from './health.controller';
       },
     ]),
     PrismaModule,
+    StorageModule,
     AuthModule,
     UsersModule,
     ActivityLogModule,

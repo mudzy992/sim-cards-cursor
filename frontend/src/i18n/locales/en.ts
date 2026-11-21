@@ -876,6 +876,8 @@ const en: TranslationDictionary = {
       columnPlaceholder: '— column —',
       refreshPreview: 'Refresh preview',
       importSelected: 'Import selected ({{count}})',
+      uploadingPercent: 'Uploading file ({{percent}}%)…',
+      processingOnServer: 'Processing on server…',
     },
 
     wizard: {

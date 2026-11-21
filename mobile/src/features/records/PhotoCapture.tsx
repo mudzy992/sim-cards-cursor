@@ -7,6 +7,14 @@ import { ActionButton } from '@/components/ui/ActionButton';
 import { Panel } from '@/components/ui/Panel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const CAPTURE_OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ['images'],
+  allowsEditing: false,
+  quality: 0.7,
+  exif: false,
+};
+
 export function PhotoCapture({
   isOnline,
   serialNumber,
@@ -28,18 +36,22 @@ export function PhotoCapture({
   loading: boolean;
   onLoading: (v: boolean) => void;
 }) {
-  const capture = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Dozvola za kameru', 'Za snimanje fotografija potrebna je dozvola za kameru.');
+  const handleAsset = async (asset: ImagePicker.ImagePickerAsset | undefined) => {
+    const uri = asset?.uri;
+    if (!uri) return;
+    if (typeof asset.fileSize === 'number' && asset.fileSize > MAX_PHOTO_BYTES) {
+      Alert.alert(
+        'Slika je prevelika',
+        'Fotografija prelazi ograničenje od 5 MB. Pokušajte ponovo sa manjom rezolucijom.',
+      );
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
-    const uri = result.canceled ? undefined : result.assets[0]?.uri;
-    if (!uri) return;
     onLoading(true);
     try {
-      if (!isOnline) { onLocal([...localUris, uri]); return; }
+      if (!isOnline) {
+        onLocal([...localUris, uri]);
+        return;
+      }
       const parsedYear = year ? Number.parseInt(year, 10) : undefined;
       const path = await installationRecordsApi.uploadPhoto(uri, {
         serialNumber: serialNumber.trim(),
@@ -47,11 +59,38 @@ export function PhotoCapture({
       });
       onUploaded([...uploadedPaths, path]);
     } catch (error) {
-      if (axios.isAxiosError(error) && !error.response) { onLocal([...localUris, uri]); return; }
-      const message = axios.isAxiosError(error) && typeof error.response?.data?.message === 'string'
-        ? error.response.data.message : 'Upload fotografije nije uspio.';
+      if (axios.isAxiosError(error) && !error.response) {
+        onLocal([...localUris, uri]);
+        return;
+      }
+      const message =
+        axios.isAxiosError(error) && typeof error.response?.data?.message === 'string'
+          ? error.response.data.message
+          : 'Upload fotografije nije uspio.';
       Alert.alert('Greška', message);
-    } finally { onLoading(false); }
+    } finally {
+      onLoading(false);
+    }
+  };
+
+  const captureFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Dozvola za kameru', 'Za snimanje fotografija potrebna je dozvola za kameru.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync(CAPTURE_OPTIONS);
+    await handleAsset(result.canceled ? undefined : result.assets[0]);
+  };
+
+  const pickFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Dozvola za galeriju', 'Za odabir fotografije potrebna je dozvola za galeriju.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync(CAPTURE_OPTIONS);
+    await handleAsset(result.canceled ? undefined : result.assets[0]);
   };
 
   return (
@@ -62,9 +101,25 @@ export function PhotoCapture({
           <StatusBadge tone="success" label={`Poslano ${uploadedPaths.length}`} />
           <StatusBadge tone={localUris.length ? 'warning' : 'neutral'} label={`Čeka ${localUris.length}`} />
         </View>
-        <Text style={[type.caption, styles.help]}>Fotografije su opcionalne. Offline snimci šalju se iz outbox reda kada se veza vrati.</Text>
-        <ActionButton title="Dodaj fotografiju" icon="camera-outline" onPress={() => void capture()}
-          loading={loading} variant="secondary" />
+        <Text style={[type.caption, styles.help]}>
+          Fotografije su opcionalne (kompresija 70%). Offline snimci šalju se iz outbox reda kada se veza vrati.
+        </Text>
+        <View style={styles.actions}>
+          <ActionButton
+            title="Snimi kamerom"
+            icon="camera-outline"
+            onPress={() => void captureFromCamera()}
+            loading={loading}
+            variant="secondary"
+          />
+          <ActionButton
+            title="Odaberi iz galerije"
+            icon="images-outline"
+            onPress={() => void pickFromGallery()}
+            loading={loading}
+            variant="secondary"
+          />
+        </View>
       </Panel>
     </View>
   );
@@ -74,4 +129,5 @@ const styles = StyleSheet.create({
   heading: { marginBottom: spacing.md },
   statuses: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   help: { marginVertical: spacing.lg, lineHeight: 18, color: palette.textSecondary },
+  actions: { gap: spacing.sm },
 });

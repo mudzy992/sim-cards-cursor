@@ -18,12 +18,16 @@ const PrivateLayout = () => {
   const router = useRouter();
   const { isOnline } = useConnectivity();
   const [, setOfflineBannerHeight] = useState(0);
-  const blocking = useGlobalBlockingStore((state) => ({
-    isBlocked: state.isBlocked,
-    title: state.title,
-    subtitle: state.subtitle,
-    consumeQueuedDeepLink: state.consumeQueuedDeepLink,
-  }));
+  const isBlocked = useGlobalBlockingStore((state) => state.isBlocked);
+  const blockingTitle = useGlobalBlockingStore((state) => state.title);
+  const blockingSubtitle = useGlobalBlockingStore((state) => state.subtitle);
+  const consumeQueuedDeepLink = useGlobalBlockingStore((state) => state.consumeQueuedDeepLink);
+  const blocking = {
+    isBlocked,
+    title: blockingTitle,
+    subtitle: blockingSubtitle,
+    consumeQueuedDeepLink,
+  };
 
   usePushNotifications();
   useOfflineSync();
@@ -41,23 +45,23 @@ const PrivateLayout = () => {
       statusBarStyle: 'light' as const,
       statusBarColor: palette.background,
       contentStyle: { backgroundColor: palette.background },
-      gestureEnabled: !blocking.isBlocked,
+      gestureEnabled: !isBlocked,
     }),
-    [blocking.isBlocked],
+    [isBlocked],
   );
 
   useEffect(() => {
-    if (!blocking.isBlocked) return;
+    if (!isBlocked) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
     return () => subscription.remove();
-  }, [blocking.isBlocked]);
+  }, [isBlocked]);
 
   useEffect(() => {
-    if (blocking.isBlocked) return;
-    const queued = blocking.consumeQueuedDeepLink();
+    if (isBlocked) return;
+    const queued = consumeQueuedDeepLink();
     if (!queued) return;
     router.push((normalizeDeepLink(queued) ?? '/notifications') as never);
-  }, [blocking.isBlocked, blocking.consumeQueuedDeepLink, router]);
+  }, [isBlocked, consumeQueuedDeepLink, router]);
 
   useEffect(() => {
     if (updateState.kind !== 'update_available') return;

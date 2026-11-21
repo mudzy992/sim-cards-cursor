@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import axe from 'axe-core';
@@ -89,6 +89,13 @@ function renderWithProviders(ui: ReactNode, mode: 'light' | 'dark' = 'light') {
 describe('Accessibility checks (axe-core, dual light/dark)', () => {
   it('NotificationBell has accessible button label and zero axe violations', async () => {
     const { container } = renderWithProviders(<NotificationBell />, 'light');
+    await waitFor(() => {
+      expect(container.querySelector('button')).not.toBeNull();
+      expect(container.textContent).toContain('2');
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
     const results = await axe.run(container);
     expect(results.violations).toEqual([]);
   });
@@ -167,8 +174,13 @@ describe('Accessibility checks (axe-core, dual light/dark)', () => {
     'LoginPage has <main>, single <h1>, and zero axe violations in %s mode',
     async (mode) => {
       const { container } = renderWithProviders(<LoginPage />, mode);
-      expect(container.querySelectorAll('h1').length).toBe(1);
-      expect(container.querySelector('main')).not.toBeNull();
+      await waitFor(() => {
+        expect(container.querySelectorAll('h1').length).toBe(1);
+        expect(container.querySelector('main')).not.toBeNull();
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
 
       const results = await axe.run(container);
       expect(results.violations).toEqual([]);
@@ -180,7 +192,12 @@ describe('Accessibility checks (axe-core, dual light/dark)', () => {
     'DashboardPage has single <h1> and zero axe violations in %s mode',
     async (mode) => {
       const { container } = renderWithProviders(<DashboardPage />, mode);
-      expect(container.querySelectorAll('h1').length).toBe(1);
+      await waitFor(() => {
+        expect(container.querySelectorAll('h1').length).toBe(1);
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
 
       const results = await axe.run(container);
       expect(results.violations).toEqual([]);
@@ -210,9 +227,15 @@ describe('Accessibility checks (axe-core, dual light/dark)', () => {
       </I18nProvider>,
     );
 
+    await waitFor(() => {
+      expect(container.querySelector('main#main-content')).not.toBeNull();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
     const skipLink = container.querySelector('a[href="#main-content"]');
     expect(skipLink).not.toBeNull();
-    expect(container.querySelector('main#main-content')).not.toBeNull();
     expect(container.querySelectorAll('nav').length).toBeGreaterThanOrEqual(2);
 
     const results = await axe.run(container);

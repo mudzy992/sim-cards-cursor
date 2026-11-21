@@ -4,6 +4,7 @@ import { Alert, Button, Input, Modal, Typography, message } from 'antd';
 import { DeleteOutlined, ExclamationCircleFilled } from '@ant-design/icons';
 import { shipmentsApi } from '@/api/shipments.api';
 import { useTranslation } from '@/i18n';
+import { getApiErrorMessage } from '@/utils/error.utils';
 
 /**
  * Brisanje isporuke — reusable dugme + potvrdni dijalog.
@@ -67,10 +68,7 @@ export function ShipmentDeleteButton(props: ShipmentDeleteButtonProps) {
       onDeleted?.(result, shipment.id);
     },
     onError: (e: unknown) => {
-      const serverMessage = (e as { response?: { data?: { message?: string | string[] } } })
-        ?.response?.data?.message;
-      const text = Array.isArray(serverMessage) ? serverMessage.join(' ') : serverMessage;
-      messageApi.error(typeof text === 'string' && text ? text : t('shipments.deleteButton.failed'));
+      messageApi.error(getApiErrorMessage(e, t('shipments.deleteButton.failed')));
     },
   });
 

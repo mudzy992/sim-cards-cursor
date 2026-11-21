@@ -24,6 +24,7 @@ import type { MeterTypeFieldItem } from '@/types/meter-type-field.types';
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
 import { useTranslation } from '@/i18n'
 import { getActivityLogActionLabel, getSimCardStatusLabel } from '@/utils/labels.utils'
+import { getApiErrorMessage } from '@/utils/error.utils'
 
 const statusLabelKey: Record<string, string> = {
   DRAFT: 'installationRecords.status.draft',
@@ -114,10 +115,7 @@ export default function InstallationRecordDetailPage() {
       void permissionsQuery.refetch();
     },
     onError: (err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        t('installationRecords.detail.actionFailed');
-      messageApi.error(msg);
+      messageApi.error(getApiErrorMessage(err, t('installationRecords.detail.actionFailed')));
     },
   });
 
@@ -129,10 +127,7 @@ export default function InstallationRecordDetailPage() {
       void permissionsQuery.refetch();
     },
     onError: (err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        t('installationRecords.detail.actionFailed');
-      messageApi.error(msg);
+      messageApi.error(getApiErrorMessage(err, t('installationRecords.detail.actionFailed')));
     },
   });
 

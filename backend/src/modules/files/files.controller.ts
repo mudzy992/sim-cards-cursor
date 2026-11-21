@@ -1,12 +1,15 @@
-import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Optional, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { Request, Response } from 'express';
-import * as fs from 'fs';
 import * as path from 'path';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { scopeWhere, toScopeContext } from 'src/common/utils/scope-filter.util';
+import {
+  StorageInvalidPathError,
+  UploadsStorageService,
+} from 'src/common/storage/uploads-storage.service';
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -21,14 +24,14 @@ type AuthenticatedRequest = Request & {
 @Controller('files')
 @UseGuards(JwtAuthGuard)
 export class FilesController {
-  private readonly uploadsDir: string;
+  private readonly storage: UploadsStorageService;
 
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    @Optional() storage?: UploadsStorageService,
   ) {
-    const root = this.config.get<string>('UPLOAD_ROOT_PATH', path.join(process.cwd(), 'uploads'));
-    this.uploadsDir = root;
+    this.storage = storage ?? new UploadsStorageService(this.config);
   }
 
   @Get('photo')
@@ -40,9 +43,19 @@ export class FilesController {
     if (!filePath || typeof filePath !== 'string') {
       return res.status(400).send('Missing path');
     }
-    const sanitized = filePath.replace(/\.\./g, '').replace(/^\/+/, '').trim();
+    const sanitized = filePath.replace(/^\/+/, '').trim();
     if (!sanitized.startsWith('installation-records/')) {
       return res.status(400).send('Invalid path');
+    }
+
+    let resolvedPath: string;
+    try {
+      resolvedPath = this.storage.resolvePath(sanitized);
+    } catch (error) {
+      if (error instanceof StorageInvalidPathError) {
+        return res.status(400).send('Invalid path');
+      }
+      throw error;
     }
 
     const user = req.user;
@@ -61,15 +74,13 @@ export class FilesController {
       }
     }
 
-    const fullPath = path.join(this.uploadsDir, sanitized);
-    const resolved = path.resolve(fullPath);
-    if (!fs.existsSync(resolved) || !resolved.startsWith(path.resolve(this.uploadsDir))) {
+    if (!this.storage.exists(sanitized)) {
       return res.status(404).send('File not found');
     }
-    const ext = path.extname(resolved).toLowerCase();
+    const ext = path.extname(resolvedPath).toLowerCase();
     const contentType = ext === '.png' ? 'image/png' : 'image/jpeg';
     res.setHeader('Content-Type', contentType);
-    const stream = fs.createReadStream(resolved);
+    const stream = this.storage.createReadStream(sanitized);
     stream.on('error', () => {
       if (!res.headersSent) {
         res.status(404).send('File not found');

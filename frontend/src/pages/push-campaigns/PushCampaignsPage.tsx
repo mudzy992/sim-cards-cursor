@@ -1,15 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Drawer, Form, Input, Select, Space, Table, Typography, message } from 'antd';
+import { Alert, Button, Drawer, Form, Input, Select, Space, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { pushCampaignsApi, type PushCampaign, type PushCampaignAudienceType, type PushCampaignStatus, type PushDeliveryListItem } from '@/api/push-campaigns.api';
 import { usersApi } from '@/api/users.api';
 import type { UserListItem } from '@/types/user.types';
 import { useAppFeatures } from '@/hooks/useAppFeatures';
-import { Alert } from 'antd';
 import { useTranslation } from '@/i18n';
-import { StatusBadge, type StatusTone } from '@/components/ui';
+import { EmptyNotice, PageHeader, PageShell, StatusBadge, type StatusTone } from '@/components/ui';
+import { getApiErrorMessage } from '@/utils/error.utils';
 
 const statusToneMap: Record<PushCampaignStatus, StatusTone> = {
   DRAFT: 'neutral',
@@ -21,6 +21,7 @@ const statusToneMap: Record<PushCampaignStatus, StatusTone> = {
 
 export default function PushCampaignsPage() {
   const { t } = useTranslation();
+  const [messageApi, messageContextHolder] = message.useMessage();
   const featuresQuery = useAppFeatures();
   const pushEnabled = featuresQuery.data?.pushCampaignsEnabled ?? true;
 
@@ -69,9 +70,12 @@ export default function PushCampaignsPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['push-campaigns', 'list'] });
-      message.success(t('pushCampaigns.createdDraft'));
+      messageApi.success(t('pushCampaigns.createdDraft'));
       setCreateOpen(false);
       createForm.resetFields();
+    },
+    onError: (e: unknown) => {
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')));
     },
   });
 
@@ -79,7 +83,10 @@ export default function PushCampaignsPage() {
     mutationFn: (id: string) => pushCampaignsApi.send(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['push-campaigns', 'list'] });
-      message.success(t('pushCampaigns.sent'));
+      messageApi.success(t('pushCampaigns.sent'));
+    },
+    onError: (e: unknown) => {
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')));
     },
   });
 
@@ -214,36 +221,38 @@ export default function PushCampaignsPage() {
 
   if (!pushEnabled) {
     return (
-      <Alert
-        type="warning"
-        message={t('pushCampaigns.disabledTitle')}
-        description={t('pushCampaigns.disabledDescription')}
-        showIcon
-      />
+      <PageShell>
+        {messageContextHolder}
+        <PageHeader title={t('layout.sidebar.pushCampaigns')} />
+        <Alert
+          type="warning"
+          message={t('pushCampaigns.disabledTitle')}
+          description={t('pushCampaigns.disabledDescription')}
+          showIcon
+        />
+      </PageShell>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            {t('layout.sidebar.pushCampaigns')}
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {t('pushCampaigns.pageIntro')}
-          </Typography.Text>
-        </div>
-        <Button type="primary" onClick={openCreate}>
-          {t('pushCampaigns.newCampaign')}
-        </Button>
-      </div>
+    <PageShell>
+      {messageContextHolder}
+      <PageHeader
+        title={t('layout.sidebar.pushCampaigns')}
+        subtitle={t('pushCampaigns.pageIntro')}
+        actions={
+          <Button type="primary" onClick={openCreate}>
+            {t('pushCampaigns.newCampaign')}
+          </Button>
+        }
+      />
 
       <Table
         rowKey="id"
         loading={isLoading}
         columns={columns}
         dataSource={listData?.items ?? []}
+        locale={{ emptyText: <EmptyNotice /> }}
         pagination={false}
       />
 
@@ -399,6 +408,7 @@ export default function PushCampaignsPage() {
                 loading={recipientsLoading}
                 columns={recipientColumns}
                 dataSource={recipientsData?.items ?? []}
+                locale={{ emptyText: <EmptyNotice /> }}
                 pagination={false}
                 size="small"
               />
@@ -406,7 +416,7 @@ export default function PushCampaignsPage() {
           </div>
         )}
       </Drawer>
-    </div>
+    </PageShell>
   );
 }
 

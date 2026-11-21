@@ -31,6 +31,7 @@ import {
 import { installTasksApi } from '@/api/install-tasks.api'
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api'
 import { buildOsmEmbedUrl } from '@/utils/osm.utils'
+import { getApiErrorMessage } from '@/utils/error.utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useTranslation } from '@/i18n'
 import {
@@ -188,10 +189,7 @@ export default function MeterDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.detail.deleteFailed'),
-      )
+      messageApi.error(getApiErrorMessage(err, t('meters.detail.deleteFailed')))
     },
   })
 
@@ -272,10 +270,7 @@ export default function MeterDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.updateFailed'),
-      )
+      messageApi.error(getApiErrorMessage(err, t('meters.updateFailed')))
     },
   })
 
@@ -291,10 +286,7 @@ export default function MeterDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['meters'] })
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.taskCreateFailed'),
-      )
+      messageApi.error(getApiErrorMessage(err, t('meters.taskCreateFailed')))
     },
   })
 
@@ -320,10 +312,7 @@ export default function MeterDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ['meters', 'detail', id] })
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.taskCreateFailed'),
-      )
+      messageApi.error(getApiErrorMessage(err, t('meters.taskCreateFailed')))
     },
   })
 
@@ -335,10 +324,7 @@ export default function MeterDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['meters'] })
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.detail.cancelOrderFailed'),
-      )
+      messageApi.error(getApiErrorMessage(err, t('meters.detail.cancelOrderFailed')))
     },
   })
 
@@ -350,10 +336,7 @@ export default function MeterDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['meters'] })
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.detail.cancelOrderFailed'),
-      )
+      messageApi.error(getApiErrorMessage(err, t('meters.detail.cancelOrderFailed')))
     },
   })
 
@@ -369,10 +352,7 @@ export default function MeterDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['meters'] })
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.detail.reassignFailed'),
-      )
+      messageApi.error(getApiErrorMessage(err, t('meters.detail.reassignFailed')))
     },
   })
 
@@ -388,10 +368,7 @@ export default function MeterDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['meters'] })
     },
     onError: (err: unknown) => {
-      messageApi.error(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('meters.detail.reassignFailed'),
-      )
+      messageApi.error(getApiErrorMessage(err, t('meters.detail.reassignFailed')))
     },
   })
 

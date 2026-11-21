@@ -876,6 +876,8 @@ const bs: TranslationDictionary = {
       columnPlaceholder: '— kolona —',
       refreshPreview: 'Osvježi preview',
       importSelected: 'Uvezi odabrano ({{count}})',
+      uploadingPercent: 'Slanje fajla ({{percent}}%)…',
+      processingOnServer: 'Obrada na serveru…',
     },
 
     wizard: {

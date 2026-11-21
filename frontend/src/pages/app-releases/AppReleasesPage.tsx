@@ -1,4 +1,3 @@
-import type { AxiosError } from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Form, Input, InputNumber, Space, Table, Typography, Upload, message } from 'antd';
 import type { UploadFile } from 'antd/es/upload/interface';
@@ -8,10 +7,13 @@ import dayjs from 'dayjs';
 import { appReleasesApi, type MobileAppRelease } from '@/api/app-releases.api';
 import { API_BASE_URL } from '@/api/axios.instance';
 import { useTranslation } from '@/i18n';
+import { EmptyNotice, PageHeader, PageShell, SectionCard } from '@/components/ui';
+import { getApiErrorMessage } from '@/utils/error.utils';
 
 export default function AppReleasesPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const [messageApi, messageContextHolder] = message.useMessage();
   const [form] = Form.useForm<{
     versionName: string;
     versionCode: number;
@@ -32,17 +34,12 @@ export default function AppReleasesPage() {
       file: File;
     }) => appReleasesApi.uploadAndroid(values),
     onSuccess: async () => {
-      message.success(t('appReleases.messages.uploaded'));
+      messageApi.success(t('appReleases.messages.uploaded'));
       await queryClient.invalidateQueries({ queryKey: ['app-releases', 'android'] });
       form.resetFields();
     },
     onError: (e: unknown) => {
-      const err = e as AxiosError<{ message?: string }>;
-      const msg =
-        err?.response?.data?.message ??
-        (e instanceof Error ? e.message : undefined) ??
-        t('appReleases.messages.uploadFailed');
-      message.error(msg);
+      messageApi.error(getApiErrorMessage(e, t('appReleases.messages.uploadFailed')));
     },
   });
 
@@ -102,17 +99,9 @@ export default function AppReleasesPage() {
   const latest = releases[0];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Typography.Title level={3} className="!mb-1">
-            {t('appReleases.title')}
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {t('appReleases.subtitle')}
-          </Typography.Text>
-        </div>
-      </div>
+    <PageShell>
+      {messageContextHolder}
+      <PageHeader title={t('appReleases.title')} subtitle={t('appReleases.subtitle')} />
 
       {latest && (
         <div className="rounded border border-status-success-border bg-status-success-bg px-4 py-3 text-status-success-fg">
@@ -124,38 +113,39 @@ export default function AppReleasesPage() {
         </div>
       )}
 
-      <Table
-        rowKey="id"
-        loading={isLoading}
-        columns={columns}
-        dataSource={releases}
-        pagination={false}
-        size="middle"
-        scroll={{ x: 'max-content' }}
-      />
+      <SectionCard>
+        <Table
+          rowKey="id"
+          loading={isLoading}
+          columns={columns}
+          dataSource={releases}
+          locale={{ emptyText: <EmptyNotice /> }}
+          pagination={false}
+          size="middle"
+          scroll={{ x: 'max-content' }}
+        />
+      </SectionCard>
 
-      <div className="mt-8 max-w-xl">
-        <Typography.Title level={4} className="!mb-3">
-          {t('appReleases.uploadTitle')}
-        </Typography.Title>
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={(values) => {
-            const fileList = values.file as unknown as UploadFile[] | undefined;
-            const first = fileList && fileList[0]?.originFileObj;
-            if (!first) {
-              message.error(t('appReleases.messages.selectFile'));
-              return;
-            }
-            uploadMutation.mutate({
-              versionName: values.versionName,
-              versionCode: values.versionCode,
-              releaseNotes: values.releaseNotes,
-              file: first,
-            });
-          }}
-        >
+      <SectionCard title={t('appReleases.uploadTitle')}>
+        <div className="max-w-xl">
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={(values) => {
+              const fileList = values.file as unknown as UploadFile[] | undefined;
+              const first = fileList && fileList[0]?.originFileObj;
+              if (!first) {
+                messageApi.error(t('appReleases.messages.selectFile'));
+                return;
+              }
+              uploadMutation.mutate({
+                versionName: values.versionName,
+                versionCode: values.versionCode,
+                releaseNotes: values.releaseNotes,
+                file: first,
+              });
+            }}
+          >
           <Form.Item
             name="versionName"
             label={t('appReleases.form.versionLabel')}
@@ -187,7 +177,7 @@ export default function AppReleasesPage() {
             <Upload
               beforeUpload={(file) => {
                 if (!file.name.toLowerCase().endsWith('.apk')) {
-                  message.error(t('appReleases.messages.onlyApk'));
+                  messageApi.error(t('appReleases.messages.onlyApk'));
                   return Upload.LIST_IGNORE;
                 }
                 // Vrati false da spriječimo automatski upload; fajl ide kroz FormData u onFinish.
@@ -218,7 +208,8 @@ export default function AppReleasesPage() {
             </Space>
           </Form.Item>
         </Form>
-      </div>
-    </div>
+        </div>
+      </SectionCard>
+    </PageShell>
   );
 }

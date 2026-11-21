@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { settingsApi } from '@/api/settings.api';
 import { mailApi, type MailTemplate } from '@/api/mail.api';
 import { useTranslation } from '@/i18n';
+import { getApiErrorMessage } from '@/utils/error.utils';
 
 type SettingRow = { key: string; value: string; description?: string };
 
@@ -64,10 +65,7 @@ function SmtpWizardCard(props: { settings: SettingRow[] }) {
       messageApi.success(t('emailSettings.smtp.saved'));
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('emailSettings.smtp.saveFailed'),
-      );
+      messageApi.error(getApiErrorMessage(e, t('emailSettings.smtp.saveFailed')));
     },
   });
 
@@ -226,10 +224,7 @@ function TemplatesCard() {
       mailApi.previewTemplate(selected, sampleContext),
     onSuccess: (data) => setPreviewHtml(data.html),
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('emailSettings.templates.previewFailed'),
-      );
+      messageApi.error(getApiErrorMessage(e, t('emailSettings.templates.previewFailed')));
     },
   });
 
@@ -240,10 +235,7 @@ function TemplatesCard() {
       messageApi.success(t('emailSettings.templates.saved'));
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('emailSettings.templates.saveFailed'),
-      );
+      messageApi.error(getApiErrorMessage(e, t('emailSettings.templates.saveFailed')));
     },
   });
 
@@ -257,10 +249,7 @@ function TemplatesCard() {
       }),
     onSuccess: () => messageApi.success(t('emailSettings.templates.testSent')),
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          t('emailSettings.templates.testFailed'),
-      );
+      messageApi.error(getApiErrorMessage(e, t('emailSettings.templates.testFailed')));
     },
   });
 

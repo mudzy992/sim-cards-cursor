@@ -2,7 +2,7 @@ import {
   Injectable,
   BadRequestException,
   InternalServerErrorException,
-  Logger,
+  Optional,
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -10,20 +10,21 @@ import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { SettingsService } from '../settings/settings.service';
 import { SETTINGS_KEYS } from '../settings/settings-keys';
+import {
+  isStoragePermissionError,
+  UploadsStorageService,
+} from 'src/common/storage/uploads-storage.service';
 
 @Injectable()
 export class PhotoUploadService {
-  private readonly logger = new Logger(PhotoUploadService.name);
-  private readonly uploadsRoot: string;
+  private readonly storage: UploadsStorageService;
 
   constructor(
     private readonly config: ConfigService,
     private readonly settings: SettingsService,
+    @Optional() storage?: UploadsStorageService,
   ) {
-    this.uploadsRoot = this.config.get<string>(
-      'UPLOAD_ROOT_PATH',
-      path.join(process.cwd(), 'uploads'),
-    );
+    this.storage = storage ?? new UploadsStorageService(this.config);
   }
 
   private sanitizePathSegment(value: string): string {
@@ -100,23 +101,11 @@ export class PhotoUploadService {
       'photos',
       sanitizedName,
     );
-    const dir = path.join(this.uploadsRoot, 'installation-records', year, serial, 'photos');
-    const fullPath = path.join(dir, sanitizedName);
 
     try {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(fullPath, buffer);
+      this.storage.writeBuffer(relativePath, buffer);
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException)?.code;
-      if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
-        const uid = process.getuid?.();
-        const gid = process.getgid?.();
-        this.logger.error(
-          `Cannot save photo to "${fullPath}" (${code}, uid=${uid}, gid=${gid}). ` +
-            'Ensure the host uploads mount is writable by UID/GID 1000:1000 (chown -R 1000:1000 <host_uploads_dir>).',
-        );
+      if (isStoragePermissionError(error)) {
         throw new InternalServerErrorException(
           'Nije moguće sačuvati fotografiju na disk (nedovoljne dozvole na uploads direktoriju).',
         );

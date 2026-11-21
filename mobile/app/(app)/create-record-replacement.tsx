@@ -76,8 +76,14 @@ export default function CreateRecordReplacementScreen() {
     queryFn: () => meterTypeDefinitionsApi.listFields(meterTypeId), enabled: Boolean(meterTypeId) && step === 2,
   });
   const types = Array.isArray(typesQuery.data) ? typesQuery.data : [];
-  const dmFields = Array.isArray(dmFieldsQuery.data) ? dmFieldsQuery.data : [];
-  const fields = Array.isArray(fieldsQuery.data) ? fieldsQuery.data : [];
+  const dmFields = useMemo(
+    () => (Array.isArray(dmFieldsQuery.data) ? dmFieldsQuery.data : []),
+    [dmFieldsQuery.data],
+  );
+  const fields = useMemo(
+    () => (Array.isArray(fieldsQuery.data) ? fieldsQuery.data : []),
+    [fieldsQuery.data],
+  );
   const typesError = typesQuery.isError || (typesQuery.isFetched && !typesQuery.isLoading && typesQuery.data === undefined);
 
   const dmValidation = useMemo(() => {

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, Collapse, Result, Select, Space, Spin, Upload, message } from 'antd';
+import { Alert, Button, Card, Collapse, Progress, Result, Select, Space, Spin, Upload, message } from 'antd';
 import { InboxOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
 import { shipmentsApi } from '@/api/shipments.api';
@@ -35,18 +35,35 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
   const [selected, setSelected] = useState<number[]>([]);
   const [mappingDraft, setMappingDraft] = useState<ImportColumnMapping>({});
   const [result, setResult] = useState<ShipmentImportApply | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
   const queryClient = useQueryClient();
 
+  const allImportableRowNumbers = useMemo(
+    () => (preview ? preview.previewRows.filter((r) => r.importable).map((r) => r.rowNumber) : []),
+    [preview],
+  );
+
+  const isAllValidSelected = useMemo(() => {
+    if (allImportableRowNumbers.length === 0) return false;
+    if (selected.length !== allImportableRowNumbers.length) return false;
+    const selectedSet = new Set(selected);
+    return allImportableRowNumbers.every((n) => selectedSet.has(n));
+  }, [allImportableRowNumbers, selected]);
+
   const previewMutation = useMutation({
-    mutationFn: (params: { file: File; columnMapping?: ImportColumnMapping }) =>
-      shipmentsApi.importExcel({
+    mutationFn: (params: { file: File; columnMapping?: ImportColumnMapping }) => {
+      setUploadProgress(0);
+      return shipmentsApi.importExcel({
         shipmentId,
         file: params.file,
         applyImport: false,
         columnMapping: params.columnMapping,
-      }),
+        onUploadProgress: setUploadProgress,
+      });
+    },
     onSuccess: (response, variables) => {
+      setUploadProgress(null);
       if (response.mode !== 'preview') return;
       const { file } = variables;
       const previewWithFileName: ShipmentImportPreview = {
@@ -63,16 +80,22 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
         apn: previewWithFileName.resolvedMapping.apn ?? undefined,
       });
     },
-    onError: (error) => messageApi.error(getApiErrorMessage(error, t('shipments.import.readFailed'))),
+    onError: (error) => {
+      setUploadProgress(null);
+      messageApi.error(getApiErrorMessage(error, t('shipments.import.readFailed')));
+    },
   });
 
   const applyMutation = useMutation({
-    mutationFn: () =>
-      shipmentsApi.importExcel({
+    mutationFn: () => {
+      setUploadProgress(0);
+      return shipmentsApi.importExcel({
         shipmentId,
         file: file!,
         applyImport: true,
-        selectedRowNumbers: selected,
+        importAllValid: isAllValidSelected,
+        selectedRowNumbers: isAllValidSelected ? undefined : selected,
+        onUploadProgress: setUploadProgress,
         // Bez ovoga bi backend pri "apply" pozivu ponovo automatski predložio mapiranje kolona
         // (jer polje columnMapping ne bi bilo poslano), čime bi se ignorisalo mapiranje koje je
         // korisnik ručno odabrao/izmijenio u preview koraku.
@@ -85,15 +108,20 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
               apn: mappingDraft.apn ?? preview.resolvedMapping.apn ?? undefined,
             }
           : mappingDraft,
-      }),
+      });
+    },
     onSuccess: (data) => {
+      setUploadProgress(null);
       if (data.mode !== 'import') return;
       setResult(data);
       messageApi.success(t('shipments.import.importedCards', { count: data.insertedRows }));
       void queryClient.invalidateQueries({ queryKey: ['shipments'] });
       onImported?.(data);
     },
-    onError: (error) => messageApi.error(getApiErrorMessage(error, t('shipments.import.importFailed'))),
+    onError: (error) => {
+      setUploadProgress(null);
+      messageApi.error(getApiErrorMessage(error, t('shipments.import.importFailed')));
+    },
   });
 
   const reset = () => {
@@ -102,6 +130,7 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
     setSelected([]);
     setMappingDraft({});
     setResult(null);
+    setUploadProgress(null);
   };
 
   if (result) {
@@ -131,6 +160,16 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
               <p className="ant-upload-text">{t('shipments.import.dragDropText')}</p>
             </Upload.Dragger>
           </Spin>
+          {previewMutation.isPending && uploadProgress !== null ? (
+            <div className="mt-3 space-y-1">
+              <div className="text-xs text-fg-secondary">
+                {uploadProgress >= 99
+                  ? t('shipments.import.processingOnServer')
+                  : t('shipments.import.uploadingPercent', { percent: uploadProgress })}
+              </div>
+              <Progress percent={uploadProgress} size="small" status="active" showInfo={false} />
+            </div>
+          ) : null}
           <Alert className="mt-4" type="info" showIcon message={t('shipments.import.previewFirstHint')} />
           {footer ? <div className="mt-4">{footer}</div> : null}
         </Card>
@@ -164,6 +203,16 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
           </div>)}]} />
         <ImportReviewTable preview={preview} shipmentName={shipmentName}
           selectedRowNumbers={selected} onChangeSelection={setSelected} />
+        {applyMutation.isPending && uploadProgress !== null ? (
+          <div className="mt-4 space-y-1">
+            <div className="text-xs text-fg-secondary">
+              {uploadProgress >= 99
+                ? t('shipments.import.processingOnServer')
+                : t('shipments.import.uploadingPercent', { percent: uploadProgress })}
+            </div>
+            <Progress percent={uploadProgress} size="small" status="active" showInfo={false} />
+          </div>
+        ) : null}
         <div className="flex justify-end gap-2 pt-4 mt-4 border-t">
           {footer}
           <Button type="primary" icon={<UploadOutlined />} disabled={selected.length === 0}

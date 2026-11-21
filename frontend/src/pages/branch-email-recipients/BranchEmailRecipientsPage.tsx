@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Drawer, Form, Input, Select, Space, Switch, Table, Typography, message } from 'antd'
-import { StatusBadge } from '@/components/ui'
+import { Button, Drawer, Form, Input, Select, Space, Switch, Table, message } from 'antd'
+import { EmptyNotice, FilterBar, PageHeader, PageShell, SectionCard, StatusBadge } from '@/components/ui'
 import { useMemo, useState } from 'react'
 import { branchEmailRecipientsApi } from '@/api/branch-email-recipients.api'
 import { branchModeratorsApi } from '@/api/branch-moderators.api'
@@ -8,6 +8,7 @@ import { branchesApi } from '@/api/branches.api'
 import { useAuthStore } from '@/store/auth.store'
 import type { BranchEmailRecipientItem } from '@/types/branch-email-recipient.types'
 import { useTranslation } from '@/i18n'
+import { getApiErrorMessage } from '@/utils/error.utils'
 
 export default function BranchEmailRecipientsPage() {
   const queryClient = useQueryClient()
@@ -46,9 +47,7 @@ export default function BranchEmailRecipientsPage() {
       await queryClient.invalidateQueries({ queryKey: ['branch-email-recipients'] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -63,9 +62,7 @@ export default function BranchEmailRecipientsPage() {
       await queryClient.invalidateQueries({ queryKey: ['branch-email-recipients'] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -76,9 +73,7 @@ export default function BranchEmailRecipientsPage() {
       await queryClient.invalidateQueries({ queryKey: ['branch-email-recipients'] })
     },
     onError: (e: unknown) => {
-      messageApi.error(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('common.states.error'),
-      )
+      messageApi.error(getApiErrorMessage(e, t('common.states.error')))
     },
   })
 
@@ -149,35 +144,34 @@ export default function BranchEmailRecipientsPage() {
   }
 
   return (
-    <div className="space-y-4" data-tour-id="branch-email-recipients-page">
-      {messageContextHolder}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Typography.Title level={3} className="!mb-0">
-            {t('branchEmailRecipients.title')}
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {t('branchEmailRecipients.subtitle')}
-          </Typography.Text>
-        </div>
-        <Button type="primary" onClick={handleOpenCreate}>
-          {t('branchEmailRecipients.addButton')}
-        </Button>
-      </div>
-
-      <Space wrap>
-        <Select
-          allowClear
-          style={{ width: 260 }}
-          placeholder={t('branchModerators.filterPlaceholder')}
-          options={branchOptions}
-          value={branchIdFilter}
-          onChange={(v) => setBranchIdFilter(v || undefined)}
+    <PageShell>
+      <div className="space-y-4" data-tour-id="branch-email-recipients-page">
+        {messageContextHolder}
+        <PageHeader
+          title={t('branchEmailRecipients.title')}
+          subtitle={t('branchEmailRecipients.subtitle')}
+          actions={
+            <Button type="primary" onClick={handleOpenCreate}>
+              {t('branchEmailRecipients.addButton')}
+            </Button>
+          }
         />
-        <Button onClick={() => setBranchIdFilter(undefined)}>{t('common.actions.reset')}</Button>
-      </Space>
 
-      <div className="rounded-md border border-subtle bg-surface-sunken p-3">
+        <FilterBar
+          hasActiveFilters={Boolean(branchIdFilter)}
+          onReset={() => setBranchIdFilter(undefined)}
+        >
+          <Select
+            allowClear
+            style={{ width: 260 }}
+            placeholder={t('branchModerators.filterPlaceholder')}
+            options={branchOptions}
+            value={branchIdFilter}
+            onChange={(v) => setBranchIdFilter(v || undefined)}
+          />
+        </FilterBar>
+
+        <SectionCard>
         <div className="mb-2 font-medium text-fg-primary">{t('branchEmailRecipients.moderatorsHeading')}</div>
         {moderatorsQuery.isLoading ? (
           <div className="text-sm text-fg-secondary">{t('common.states.loading')}</div>
@@ -201,12 +195,13 @@ export default function BranchEmailRecipientsPage() {
             ))}
           </div>
         )}
-      </div>
+      </SectionCard>
 
       <Table<BranchEmailRecipientItem>
         rowKey="id"
         loading={listQuery.isLoading}
         dataSource={rows}
+        locale={{ emptyText: <EmptyNotice /> }}
         pagination={false}
         columns={[
           {
@@ -315,7 +310,8 @@ export default function BranchEmailRecipientsPage() {
           )}
         </Form>
       </Drawer>
-    </div>
+      </div>
+    </PageShell>
   )
 }
 

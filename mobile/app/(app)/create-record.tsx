@@ -64,7 +64,10 @@ export default function CreateRecordScreen() {
     enabled: Boolean(meterTypeId),
   });
   const meterTypes = Array.isArray(meterTypesQuery.data) ? meterTypesQuery.data : [];
-  const dynamicFields = Array.isArray(fieldsQuery.data) ? fieldsQuery.data : [];
+  const dynamicFields = useMemo(
+    () => (Array.isArray(fieldsQuery.data) ? fieldsQuery.data : []),
+    [fieldsQuery.data],
+  );
   const typesError = meterTypesQuery.isError || (meterTypesQuery.isFetched && !meterTypesQuery.isLoading && meterTypesQuery.data === undefined);
 
   const validation = useMemo(() => {
