@@ -57,8 +57,8 @@ Ovaj direktorij sadrži sistematsku dokumentaciju sistema **modul po modul**, an
 
 | Run | Obuhvaćeni moduli | Status | Izvještaj |
 |---|---|---|---|
-| **Run 1** | `auth`, `users`, `distributions`, `branches`, `branch-moderators` | **Paket A (P0) implementiran; Paket B/C na čekanju** | [`run-01-identity-org-access.md`](./run-01-identity-org-access.md) |
-| **Run 2** | `shipments`, `sim-cards` | Planiran | — |
+| **Run 1** | `auth`, `users`, `distributions`, `branches`, `branch-moderators` | **Paket A (P0) implementiran (`8a5ab99`); Paket B/C na čekanju** | [`run-01-identity-org-access.md`](./run-01-identity-org-access.md) |
+| **Run 2** | `shipments`, `sim-cards` | **Završen audit (čeka odobrenje za izmjene)** | [`run-02-shipments-sim-cards.md`](./run-02-shipments-sim-cards.md) |
 | **Run 3** | `meters`, `meter-type-definitions`, `meter-type-fields` | Planiran | — |
 | **Run 4** | `installation-records`, `photo-upload`, `files`, mobile `outbox` | Planiran | — |
 | **Run 5** | `install-tasks`, `demount-tasks` | Planiran | — |
