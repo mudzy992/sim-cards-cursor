@@ -524,6 +524,9 @@ model DemountTask {
 
   @@index([assignedToId])
   @@index([status])
+  @@index([meterId])
+  @@index([createdById])
+  @@index([assignedToId, status])
   @@map("demount_tasks")
 }
 
@@ -546,6 +549,8 @@ model InstallTask {
   @@index([assignedToId])
   @@index([status])
   @@index([meterId])
+  @@index([createdById])
+  @@index([assignedToId, status])
   @@map("install_tasks")
 }
 

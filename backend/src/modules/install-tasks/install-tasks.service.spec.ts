@@ -1,9 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   InstallTaskStatus,
   MeterSimCardState,
   MeterStatus,
   UserRole,
+  UserStatus,
   type User,
 } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -51,12 +52,27 @@ describe('InstallTasksService — lifecycle & atomic locks', () => {
       },
       branchModerator: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       installTask: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
+      },
+      installationRecord: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      simCard: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'sim-1',
+          status: 'AVAILABLE',
+          assignedToId: null,
+          shipment: { distributionId: 'dist-1' },
+          meter: null,
+        }),
       },
       $transaction: jest.fn(async (cb: (client: typeof tx) => Promise<unknown>) => cb(tx)),
     };
@@ -285,7 +301,12 @@ describe('InstallTasksService — lifecycle & atomic locks', () => {
 
     expect(completed.status).toBe(InstallTaskStatus.COMPLETED);
     expect(simCardsService.claim).toHaveBeenCalledWith('sim-1', 'op-1', '127.0.0.1', adminScope);
-    expect(installationRecordsService.create).toHaveBeenCalled();
+    expect(installationRecordsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientRequestId: 'install-task:task-1',
+      }),
+      expect.any(Object),
+    );
     expect(tx.installTask.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'task-1', status: InstallTaskStatus.IN_PROGRESS },
@@ -298,6 +319,159 @@ describe('InstallTasksService — lifecycle & atomic locks', () => {
     expect(tx.meter.update).toHaveBeenCalledWith({
       where: { id: 'meter-1' },
       data: { hasOpenInstallTask: false },
+    });
+  });
+
+  describe('Run 5 hardening', () => {
+    it('rejects assigning install task to INACTIVE operator on create and reassign', async () => {
+      const { service, prisma } = createMocks();
+      prisma.meter.findFirst.mockResolvedValueOnce({
+        id: 'meter-1',
+        branchId: 'branch-1',
+        simCardId: null,
+        simCardState: MeterSimCardState.NO_SIM,
+        status: MeterStatus.ACTIVE,
+        hasOpenInstallTask: false,
+      });
+      prisma.user.findUnique.mockResolvedValueOnce({
+        id: 'op-inactive',
+        role: UserRole.USER,
+        status: UserStatus.INACTIVE,
+        branchId: 'branch-1',
+        distributionId: 'dist-1',
+        branch: { distributionId: 'dist-1' },
+      });
+
+      await expect(
+        service.create({ meterId: 'meter-1', assignedToId: 'op-inactive' }, 'admin-1', adminScope),
+      ).rejects.toThrow(BadRequestException);
+
+      prisma.installTask.findUnique.mockResolvedValueOnce({
+        id: 'task-1',
+        meterId: 'meter-1',
+        createdById: 'admin-1',
+        status: InstallTaskStatus.PENDING,
+        meter: { id: 'meter-1', serialNumber: 'SN-100', branchId: 'branch-1' },
+      });
+      prisma.user.findUnique.mockResolvedValueOnce({
+        id: 'op-inactive',
+        role: UserRole.USER,
+        status: UserStatus.INACTIVE,
+        branchId: 'branch-1',
+        distributionId: 'dist-1',
+        branch: { distributionId: 'dist-1' },
+      });
+
+      await expect(
+        service.reassign(
+          'task-1',
+          'op-inactive',
+          { id: 'admin-1', role: UserRole.SYSTEM_ADMIN } as User,
+          adminScope,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('blocks non-moderator USER from findAll and blocks moderator reassign to other branch', async () => {
+      const { service, prisma } = createMocks();
+      await expect(
+        service.findAll(
+          { page: 1, limit: 20 },
+          'user-1',
+          { role: UserRole.USER, distributionId: 'dist-1', branchId: 'branch-1', branchModeratorBranchIds: [] },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      prisma.installTask.findFirst.mockResolvedValueOnce({
+        id: 'task-1',
+        meterId: 'meter-1',
+        createdById: 'mod-1',
+        status: InstallTaskStatus.PENDING,
+        meter: { id: 'meter-1', serialNumber: 'SN-100', branchId: 'branch-1' },
+      });
+      prisma.user.findUnique.mockResolvedValueOnce({
+        id: 'op-other-branch',
+        role: UserRole.USER,
+        status: UserStatus.ACTIVE,
+        branchId: 'branch-2',
+        distributionId: 'dist-1',
+        branch: { distributionId: 'dist-1' },
+      });
+
+      await expect(
+        service.reassign(
+          'task-1',
+          'op-other-branch',
+          { id: 'mod-1', role: UserRole.USER } as User,
+          { role: UserRole.USER, distributionId: 'dist-1', branchId: 'branch-1', branchModeratorBranchIds: ['branch-1'] },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('blocks DIST_ADMIN cancel when task is outside distribution scope', async () => {
+      const { service, prisma } = createMocks();
+      prisma.installTask.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.cancel(
+          'task-other-dist',
+          { id: 'dadmin-1', role: UserRole.DIST_ADMIN } as User,
+          '127.0.0.1',
+          { role: UserRole.DIST_ADMIN, distributionId: 'dist-1', branchId: null },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('checks otherOpen before mutating task in updateStatus', async () => {
+      const { service, prisma } = createMocks();
+      prisma.installTask.findUnique.mockResolvedValueOnce({
+        id: 'task-1',
+        meterId: 'meter-1',
+        assignedToId: 'op-1',
+        createdById: 'admin-1',
+        status: InstallTaskStatus.PENDING,
+        meter: { id: 'meter-1', serialNumber: 'SN-100' },
+      });
+      prisma.installTask.findFirst.mockResolvedValueOnce({ id: 'task-other' });
+
+      await expect(
+        service.updateStatus('task-1', InstallTaskStatus.IN_PROGRESS, 'op-1'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.installTask.update).not.toHaveBeenCalled();
+    });
+
+    it('recovers idempotently when installation record was already created for this installTask', async () => {
+      const { service, prisma, tx, simCardsService, installationRecordsService } = createMocks();
+      prisma.installTask.findFirst.mockResolvedValueOnce({
+        id: 'task-1',
+        assignedToId: 'op-1',
+        createdById: 'admin-1',
+        status: InstallTaskStatus.IN_PROGRESS,
+        meter: {
+          id: 'meter-1',
+          status: MeterStatus.ACTIVE,
+          simCardId: 'sim-1',
+          simCardState: MeterSimCardState.INSTALLED,
+          meterTypeDefinitionId: 'mtd-1',
+          year: 2024,
+          calibrationYear: 2025,
+          isDemountedFromLocation: false,
+          branch: { distributionId: 'dist-1' },
+        },
+      });
+      prisma.installationRecord.findUnique.mockResolvedValueOnce({ id: 'rec-existing' });
+
+      const result = await service.complete('task-1', { simCardId: 'sim-1' }, 'op-1', adminScope);
+
+      expect(result.status).toBe(InstallTaskStatus.COMPLETED);
+      expect(simCardsService.claim).not.toHaveBeenCalled();
+      expect(installationRecordsService.create).not.toHaveBeenCalled();
+      expect(tx.installTask.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ installationRecordId: 'rec-existing' }),
+        }),
+      );
     });
   });
 });

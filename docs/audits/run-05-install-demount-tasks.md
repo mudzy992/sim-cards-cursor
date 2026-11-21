@@ -2,7 +2,7 @@
 
 **Obuhvaćeni moduli:** `install-tasks` (`install-tasks.controller.ts`, `install-tasks.service.ts`, `dto/*`), `demount-tasks` (`demount-tasks.controller.ts`, `demount-tasks.service.ts`, `dto/*`), web integracija (`MeterDetailPage.tsx`, `MetersListPage.tsx`, `install-tasks.api.ts`, `demount-tasks.api.ts`), i mobile (`install.tsx`, `demount.tsx`, `install-tasks.api.ts`, `demount-tasks.api.ts`).  
 **Datum audita:** 2026-11-21 (branch `arena/015aa78f-sim-cards-cursor`)  
-**Status:** Kompletiran audit i prijedlog izmjena — **čeka odobrenje prije izmjena koda**.
+**Status:** **Paketi A + B + C implementirani i verifikovani**.
 
 ---
 
@@ -83,3 +83,22 @@
    - Dodati `@@index([meterId])`, `@@index([createdById])` i `@@index([assignedToId, status])` na `DemountTask`, te `@@index([createdById])` i `@@index([assignedToId, status])` na `InstallTask`.
 8. **P2-2 (Unit testovi):**
    - Proširiti `install-tasks.service.spec.ts` i `demount-tasks.service.spec.ts` za `DIST_ADMIN` cross-distribution `cancel`/`reassign` blokadu, `USER` cross-branch `reassign` blokadu, neaktivnog operatora, `InstallTask.complete` idempotentnost / atomičnost, i `DemountTask` trimmed `requestedReason` + `meter.status !== ACTIVE` provjeru.
+
+---
+
+## 4. Sažetak implementacije (Paketi A + B + C)
+
+- **Backend (`install-tasks`, `demount-tasks`, `installation-records`, `prisma`):**
+  - **DTO validacija (P0-2, P1-2, P1-3):** Zamijenjeni inline `@Body()` parametri pravim DTO klasama (`UpdateInstallTaskStatusDto`, `ReassignInstallTaskDto`, `InstallTaskFilterDto`, `UpdateDemountTaskStatusDto`, `ReassignDemountTaskDto`, `DemountTaskFilterDto`); `CompleteInstallTaskDto` proširen za `photos?: string[]`.
+  - **Scope & status kontrole (P0-2):** `cancel()` i `reassign()` na oba servisa provjeravaju `scopeWhere(..., { viaMeter: true })` (blokada cross-distribution IDOR-a za `DIST_ADMIN`); `reassign()` za `USER` (moderatora) provjerava `assignedTo.branchId === task.meter.branchId`; `create()` i `reassign()` zahtijevaju `assignedTo.status === UserStatus.ACTIVE`.
+  - **Atomičnost & idempotentnost `InstallTasksService.complete` (P0-1):** Pre-validacija SIM kartice i njene distribucije prije mutacija, deterministički `clientRequestId: install-task:<id>` prosleđen u `InstallationRecordsService.create`, i `finalizeInstallTaskCompletion` sa oporavkom ako je zapisnik već kreiran u prekinutom pokušaju.
+  - **`DemountTasksService.complete` (P0-3):** Provjera `meter.status === MeterStatus.ACTIVE`, trimovano poređenje zaključanog `requestedReason`, i poravnanje `assignedToId: userId` pri `REPLACE_SIM` claim-u.
+  - **`updateStatus` redoslijed & `GET /` pregled (P1-1, P1-2):** `otherOpen` provjera pomjerena prije mutacije u `updateStatus()`; dodati paginirani `GET /install-tasks` i `GET /demount-tasks` za admine i moderatore (sa `status`, `unassignedOnly`, `branchId`, `search`); ručno kreiranje `InstallationRecord` na postojećem brojilu zatvara otvoreni `InstallTask` i resetuje `hasOpenInstallTask`.
+  - **Prisma migracija `20261121030000_add_task_indexes` (P2-1):** Indeksi na `DemountTask(meterId, createdById, [assignedToId, status])` i `InstallTask(createdById, [assignedToId, status])`.
+- **Frontend & Mobile API:**
+  - `frontend/src/api/{install-tasks,demount-tasks}.api.ts`: dodati `list()` metodi i tipovi za `GET /install-tasks` i `GET /demount-tasks`.
+  - `mobile/src/api/install-tasks.api.ts`: dodata `photos?: string[]` podrška na `CompleteInstallTaskPayload`.
+- **Verifikacija:**
+  - `backend`: `nest build`, `eslint`, `jest` (**16/16 suites, 90/90 tests** uključujući nove Run 5 testove u `install-tasks.service.spec.ts` i `demount-tasks.service.spec.ts`).
+  - `mobile`: `tsc --noEmit`, `eslint`, `jest` (**2/2 suites, 8/8 tests**).
+  - `frontend`: `tsc --noEmit`, `eslint`, `check:i18n` (**1067 ključeva**), `check:ui` (**141 fajl**), `vitest` (**9/9 suites, 30/30 tests**), `vite build`.

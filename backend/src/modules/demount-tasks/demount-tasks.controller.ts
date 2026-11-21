@@ -13,6 +13,9 @@ import { Request } from 'express';
 import { DemountTasksService } from './demount-tasks.service';
 import { CreateDemountTaskDto } from './dto/create-demount-task.dto';
 import { CompleteDemountTaskDto } from './dto/complete-demount-task.dto';
+import { DemountTaskFilterDto } from './dto/demount-task-filter.dto';
+import { ReassignDemountTaskDto } from './dto/reassign-demount-task.dto';
+import { UpdateDemountTaskStatusDto } from './dto/update-demount-task-status.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -20,6 +23,12 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { User, UserRole, DemountTaskStatus } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { toScopeContext } from 'src/common/utils/scope-filter.util';
+
+type ScopedUser = User & {
+  distributionId?: string | null;
+  branchId?: string | null;
+  branchModeratorBranchIds?: string[];
+};
 
 @ApiTags('Demount Tasks (Zadaci demontaže)')
 @Controller('demount-tasks')
@@ -33,7 +42,7 @@ export class DemountTasksController {
   @ApiOperation({ summary: 'Kreiraj zadatak demontaže – bira operatora' })
   create(
     @Body() dto: CreateDemountTaskDto,
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null; branchModeratorBranchIds?: string[] },
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =
@@ -41,6 +50,17 @@ export class DemountTasksController {
       req.socket?.remoteAddress;
     const scope = toScopeContext({ ...user, role: user.role });
     return this.demountTasksService.create(dto, user.id, ipAddress, scope);
+  }
+
+  @Get()
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Pregled zadataka demontaže u opsegu (za admine i moderatore)' })
+  findAll(
+    @Query() filter: DemountTaskFilterDto,
+    @CurrentUser() user: ScopedUser,
+  ) {
+    const scope = toScopeContext({ ...user, role: user.role });
+    return this.demountTasksService.findAll(filter, user.id, scope);
   }
 
   @Get('my')
@@ -59,18 +79,20 @@ export class DemountTasksController {
   @ApiOperation({ summary: 'Operator: započni / vrati na čekanje (PENDING, IN_PROGRESS)' })
   updateStatus(
     @Param('id') id: string,
-    @Body() body: { status: DemountTaskStatus },
-    @CurrentUser() user: User,
+    @Body() body: UpdateDemountTaskStatusDto,
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress;
+    const scope = toScopeContext({ ...user, role: user.role });
     return this.demountTasksService.updateStatus(
       id,
       body.status,
       user.id,
       ipAddress,
+      scope,
     );
   }
 
@@ -79,13 +101,14 @@ export class DemountTasksController {
   @ApiOperation({ summary: 'Inicijator: otkaži nalog (CANCELLED)' })
   cancel(
     @Param('id') id: string,
-    @CurrentUser() user: User,
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress;
-    return this.demountTasksService.cancel(id, user, ipAddress);
+    const scope = toScopeContext({ ...user, role: user.role });
+    return this.demountTasksService.cancel(id, user, ipAddress, scope);
   }
 
   @Post(':id/reassign')
@@ -93,8 +116,8 @@ export class DemountTasksController {
   @ApiOperation({ summary: 'Inicijator: dodijeli nalog drugom operatoru' })
   reassign(
     @Param('id') id: string,
-    @Body() body: { assignedToId: string },
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null; branchModeratorBranchIds?: string[] },
+    @Body() body: ReassignDemountTaskDto,
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =
@@ -110,7 +133,7 @@ export class DemountTasksController {
   complete(
     @Param('id') id: string,
     @Body() dto: CompleteDemountTaskDto,
-    @CurrentUser() user: User,
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =

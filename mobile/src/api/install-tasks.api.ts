@@ -42,6 +42,7 @@ export type InstallTaskItem = {
 export type CompleteInstallTaskPayload = {
   simCardId: string
   recordNotes?: string
+  photos?: string[]
   calibrationYear?: number
   installationAddress?: string
   installationDate?: string

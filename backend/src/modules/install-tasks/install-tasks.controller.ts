@@ -19,7 +19,16 @@ import { RolesGuard } from 'src/common/guards/roles.guard'
 import { toScopeContext } from 'src/common/utils/scope-filter.util'
 import { CreateInstallTaskDto } from './dto/create-install-task.dto'
 import { CompleteInstallTaskDto } from './dto/complete-install-task.dto'
+import { InstallTaskFilterDto } from './dto/install-task-filter.dto'
+import { ReassignInstallTaskDto } from './dto/reassign-install-task.dto'
+import { UpdateInstallTaskStatusDto } from './dto/update-install-task-status.dto'
 import { InstallTasksService } from './install-tasks.service'
+
+type ScopedUser = User & {
+  distributionId?: string | null
+  branchId?: string | null
+  branchModeratorBranchIds?: string[]
+}
 
 @ApiTags('Install Tasks (Zadaci ugradnje SIM)')
 @Controller('install-tasks')
@@ -33,7 +42,7 @@ export class InstallTasksController {
   @ApiOperation({ summary: 'Kreiraj zadatak ugradnje SIM-a (samo za NO_SIM brojilo)' })
   create(
     @Body() dto: CreateInstallTaskDto,
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null; branchModeratorBranchIds?: string[] },
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =
@@ -41,6 +50,17 @@ export class InstallTasksController {
       req.socket?.remoteAddress
     const scope = toScopeContext({ ...user, role: user.role })
     return this.installTasksService.create(dto, user.id, scope, ipAddress)
+  }
+
+  @Get()
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Pregled zadataka ugradnje u opsegu (za admine i moderatore)' })
+  findAll(
+    @Query() filter: InstallTaskFilterDto,
+    @CurrentUser() user: ScopedUser,
+  ) {
+    const scope = toScopeContext({ ...user, role: user.role })
+    return this.installTasksService.findAll(filter, user.id, scope)
   }
 
   @Get('my')
@@ -59,14 +79,15 @@ export class InstallTasksController {
   @ApiOperation({ summary: 'Operator: započni / vrati na čekanje (PENDING, IN_PROGRESS)' })
   updateStatus(
     @Param('id') id: string,
-    @Body() body: { status: InstallTaskStatus },
-    @CurrentUser() user: User,
+    @Body() body: UpdateInstallTaskStatusDto,
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress
-    return this.installTasksService.updateStatus(id, body.status, user.id, ipAddress)
+    const scope = toScopeContext({ ...user, role: user.role })
+    return this.installTasksService.updateStatus(id, body.status, user.id, ipAddress, scope)
   }
 
   @Post(':id/cancel')
@@ -74,13 +95,14 @@ export class InstallTasksController {
   @ApiOperation({ summary: 'Inicijator: otkaži nalog (CANCELLED)' })
   cancel(
     @Param('id') id: string,
-    @CurrentUser() user: User,
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress
-    return this.installTasksService.cancel(id, user, ipAddress)
+    const scope = toScopeContext({ ...user, role: user.role })
+    return this.installTasksService.cancel(id, user, ipAddress, scope)
   }
 
   @Post(':id/reassign')
@@ -88,8 +110,8 @@ export class InstallTasksController {
   @ApiOperation({ summary: 'Inicijator: dodijeli nalog drugom operatoru' })
   reassign(
     @Param('id') id: string,
-    @Body() body: { assignedToId: string },
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null; branchModeratorBranchIds?: string[] },
+    @Body() body: ReassignInstallTaskDto,
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =
@@ -105,7 +127,7 @@ export class InstallTasksController {
   complete(
     @Param('id') id: string,
     @Body() dto: CompleteInstallTaskDto,
-    @CurrentUser() user: User & { distributionId?: string | null; branchId?: string | null; branchModeratorBranchIds?: string[] },
+    @CurrentUser() user: ScopedUser,
     @Req() req: Request,
   ) {
     const ipAddress =

@@ -26,7 +26,29 @@ export type InstallTaskItem = {
   installationRecord?: { id: string; recordNumber: string; status: string } | null
 }
 
+export type InstallTaskListParams = {
+  page?: number
+  limit?: number
+  status?: InstallTaskStatus
+  unassignedOnly?: boolean
+  branchId?: string
+  search?: string
+}
+
 export const installTasksApi = {
+  list: async (
+    params?: InstallTaskListParams,
+  ): Promise<{
+    items: InstallTaskItem[]
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }> => {
+    const response = await axiosInstance.get('/install-tasks', { params })
+    return response.data.data
+  },
+
   create: async (payload: {
     meterId: string
     assignedToId: string

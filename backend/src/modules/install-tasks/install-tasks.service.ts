@@ -1,9 +1,17 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { InstallTaskStatus, MeterSimCardState, MeterStatus, UserRole } from '@prisma/client'
+import {
+  InstallTaskStatus,
+  MeterSimCardState,
+  MeterStatus,
+  SimCardStatus,
+  UserRole,
+  UserStatus,
+} from '@prisma/client'
 import { scopeWhere, type ScopeContext } from 'src/common/utils/scope-filter.util'
 import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select'
 import { PrismaService } from 'src/prisma/prisma.service'
@@ -14,6 +22,7 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { SimCardsService } from '../sim-cards/sim-cards.service'
 import { CreateInstallTaskDto } from './dto/create-install-task.dto'
 import { CompleteInstallTaskDto } from './dto/complete-install-task.dto'
+import { InstallTaskFilterDto } from './dto/install-task-filter.dto'
 import { assertMeterYearsPairIfPartial } from 'src/common/utils/meter-years.util'
 import { Prisma, type User } from '@prisma/client'
 import { ErrorCodes } from 'src/common/constants/error-codes'
@@ -107,6 +116,9 @@ export class InstallTasksService {
         code: ErrorCodes.TASK_ASSIGNEE_NOT_OPERATOR,
       })
     }
+    if (assignedTo.status && assignedTo.status !== UserStatus.ACTIVE) {
+      throw new BadRequestException('Zadatak se može dodijeliti samo aktivnom operatoru.')
+    }
     if (scope && scope.role === UserRole.USER) {
       if (!meter.branchId || assignedTo.branchId !== meter.branchId) {
         throw new BadRequestException(
@@ -173,6 +185,78 @@ export class InstallTasksService {
     return task
   }
 
+  async findAll(
+    filter: InstallTaskFilterDto,
+    userId: string,
+    scope?: ScopeContext | null,
+  ) {
+    let moderatorWhere: Record<string, unknown> | undefined
+    if (scope?.role === UserRole.USER) {
+      let branchIds = scope.branchModeratorBranchIds ?? []
+      if (branchIds.length === 0 && this.prisma.branchModerator?.findMany) {
+        const moderated = await this.prisma.branchModerator.findMany({
+          where: { userId },
+          select: { branchId: true },
+        })
+        branchIds = moderated.map((m) => m.branchId)
+      }
+      if (branchIds.length === 0) {
+        throw new ForbiddenException(
+          'Samo administratori i moderatori podružnica mogu pregledati listu zadataka.',
+        )
+      }
+      moderatorWhere = { meter: { branchId: { in: branchIds } } }
+    }
+
+    const { page = 1, limit = 20, status, unassignedOnly, branchId, search } = filter
+    const skip = (page - 1) * limit
+    const scopeClause = moderatorWhere ? undefined : scopeWhere(scope, { viaMeter: true })
+    const andClauses: Record<string, unknown>[] = []
+    if (scopeClause) andClauses.push(scopeClause)
+    if (moderatorWhere) andClauses.push(moderatorWhere)
+    if (branchId) andClauses.push({ meter: { branchId } })
+    if (search?.trim()) {
+      const q = search.trim()
+      andClauses.push({
+        OR: [
+          { meter: { serialNumber: { contains: q, mode: 'insensitive' } } },
+          { assignedTo: { firstName: { contains: q, mode: 'insensitive' } } },
+          { assignedTo: { lastName: { contains: q, mode: 'insensitive' } } },
+        ],
+      })
+    }
+
+    const where: Prisma.InstallTaskWhereInput = {
+      ...(status ? { status } : {}),
+      ...(unassignedOnly ? { assignedToId: null } : {}),
+      ...(andClauses.length ? { AND: andClauses as Prisma.InstallTaskWhereInput[] } : {}),
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.installTask.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          meter: { include: { meterTypeDefinition: true, simCard: true } },
+          assignedTo: { select: SAFE_USER_SELECT },
+          createdBy: { select: SAFE_USER_SELECT },
+          installationRecord: true,
+        },
+      }),
+      this.prisma.installTask.count({ where }),
+    ])
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
+  }
+
   async findMy(assignedToId: string, status?: InstallTaskStatus, scope?: ScopeContext | null) {
     const scopeClause = scopeWhere(scope, { viaMeter: true })
     return this.prisma.installTask.findMany({
@@ -191,17 +275,29 @@ export class InstallTasksService {
     })
   }
 
-  async updateStatus(id: string, status: InstallTaskStatus, userId: string, ipAddress?: string) {
+  async updateStatus(
+    id: string,
+    status: InstallTaskStatus,
+    userId: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
     if (status === InstallTaskStatus.COMPLETED) {
       throw new BadRequestException('Završetak zadatka ide preko POST /install-tasks/:id/complete.')
     }
     if (status === InstallTaskStatus.CANCELLED) {
       throw new BadRequestException('Operator ne može otkazati nalog. Otkazivanje radi inicijator naloga.')
     }
-    const task = await this.prisma.installTask.findUnique({
-      where: { id },
-      include: { meter: { select: { id: true, serialNumber: true } } },
-    })
+    const scopeClause = scope ? scopeWhere(scope, { viaMeter: true }) : undefined
+    const task = scopeClause
+      ? await this.prisma.installTask.findFirst({
+          where: { id, AND: [scopeClause] },
+          include: { meter: { select: { id: true, serialNumber: true } } },
+        })
+      : await this.prisma.installTask.findUnique({
+          where: { id },
+          include: { meter: { select: { id: true, serialNumber: true } } },
+        })
     if (!task) {
       throw new NotFoundException({
         message: 'Zadatak ugradnje nije pronađen.',
@@ -233,6 +329,20 @@ export class InstallTasksService {
       throw new BadRequestException('Dozvoljeno je samo: započni nalog ili vrati nalog inicijatoru.')
     }
 
+    if (status === InstallTaskStatus.PENDING || status === InstallTaskStatus.IN_PROGRESS) {
+      const otherOpen = await this.prisma.installTask.findFirst({
+        where: {
+          meterId: task.meterId,
+          status: { in: [InstallTaskStatus.PENDING, InstallTaskStatus.IN_PROGRESS] },
+          NOT: { id: task.id },
+        },
+        select: { id: true },
+      })
+      if (otherOpen) {
+        throw new BadRequestException('Za ovo brojilo već postoji aktivan nalog za ugradnju SIM-a.')
+      }
+    }
+
     const isReturnToInitiator =
       task.status === InstallTaskStatus.IN_PROGRESS && status === InstallTaskStatus.PENDING
 
@@ -247,6 +357,11 @@ export class InstallTasksService {
       },
     })
 
+    await this.prisma.meter.update({
+      where: { id: task.meterId },
+      data: { hasOpenInstallTask: true },
+    })
+
     await this.activityLogService.log({
       userId,
       action: 'UPDATE',
@@ -255,24 +370,6 @@ export class InstallTasksService {
       details: { status, ...(isReturnToInitiator ? { returnedToInitiator: true } : {}) },
       ipAddress,
     })
-
-    if (status === InstallTaskStatus.PENDING || status === InstallTaskStatus.IN_PROGRESS) {
-      const otherOpen = await this.prisma.installTask.findFirst({
-        where: {
-          meterId: task.meterId,
-          status: { in: [InstallTaskStatus.PENDING, InstallTaskStatus.IN_PROGRESS] },
-          NOT: { id: task.id },
-        },
-        select: { id: true },
-      })
-      if (otherOpen) {
-        throw new BadRequestException('Za ovo brojilo već postoji aktivan nalog za ugradnju SIM-a.')
-      }
-      await this.prisma.meter.update({
-        where: { id: task.meterId },
-        data: { hasOpenInstallTask: true },
-      })
-    }
 
     await this.notificationsService.create({
       userId: task.createdById,
@@ -285,11 +382,17 @@ export class InstallTasksService {
     return updated
   }
 
-  async cancel(id: string, actor: User, ipAddress?: string) {
-    const task = await this.prisma.installTask.findUnique({
-      where: { id },
-      include: { meter: { select: { id: true, serialNumber: true } } },
-    })
+  async cancel(id: string, actor: User, ipAddress?: string, scope?: ScopeContext | null) {
+    const scopeClause = scope ? scopeWhere(scope, { viaMeter: true }) : undefined
+    const task = scopeClause
+      ? await this.prisma.installTask.findFirst({
+          where: { id, AND: [scopeClause] },
+          include: { meter: { select: { id: true, serialNumber: true } } },
+        })
+      : await this.prisma.installTask.findUnique({
+          where: { id },
+          include: { meter: { select: { id: true, serialNumber: true } } },
+        })
     if (!task) throw new NotFoundException('Zadatak ugradnje nije pronađen.')
     const canCancel =
       actor.role === UserRole.SYSTEM_ADMIN ||
@@ -342,10 +445,16 @@ export class InstallTasksService {
     scope: ScopeContext | null,
     ipAddress?: string,
   ) {
-    const task = await this.prisma.installTask.findUnique({
-      where: { id },
-      include: { meter: { select: { id: true, serialNumber: true, branchId: true } } },
-    })
+    const scopeClause = scope ? scopeWhere(scope, { viaMeter: true }) : undefined
+    const task = scopeClause
+      ? await this.prisma.installTask.findFirst({
+          where: { id, AND: [scopeClause] },
+          include: { meter: { select: { id: true, serialNumber: true, branchId: true } } },
+        })
+      : await this.prisma.installTask.findUnique({
+          where: { id },
+          include: { meter: { select: { id: true, serialNumber: true, branchId: true } } },
+        })
     if (!task) throw new NotFoundException('Zadatak ugradnje nije pronađen.')
     const canReassign =
       actor.role === UserRole.SYSTEM_ADMIN ||
@@ -367,6 +476,16 @@ export class InstallTasksService {
     if (!assignedTo) throw new BadRequestException('Operator nije pronađen.')
     if (assignedTo.role !== UserRole.USER) {
       throw new BadRequestException('Nalog se može dodijeliti samo operatoru.')
+    }
+    if (assignedTo.status && assignedTo.status !== UserStatus.ACTIVE) {
+      throw new BadRequestException('Nalog se može dodijeliti samo aktivnom operatoru.')
+    }
+    if (scope && scope.role === UserRole.USER) {
+      if (!task.meter?.branchId || assignedTo.branchId !== task.meter.branchId) {
+        throw new BadRequestException(
+          'Možete dodijeliti nalog samo operatoru iz iste podružnice kao brojilo.',
+        )
+      }
     }
     if (scope && scope.role === UserRole.DIST_ADMIN && scope.distributionId) {
       const opDistributionId = assignedTo.distributionId ?? assignedTo.branch?.distributionId
@@ -430,6 +549,7 @@ export class InstallTasksService {
             year: true,
             calibrationYear: true,
             isDemountedFromLocation: true,
+            branch: { select: { distributionId: true } },
           },
         },
       },
@@ -457,6 +577,30 @@ export class InstallTasksService {
         code: ErrorCodes.INSTALL_TASK_MUST_BE_IN_PROGRESS,
       })
     }
+
+    const clientRequestId = `install-task:${task.id}`
+
+    // Recovery path: if an earlier attempt already created the installation record for this task
+    // before crashing prior to updating the task row, finalize task closure idempotently.
+    if (
+      task.meter.simCardId === dto.simCardId &&
+      this.prisma.installationRecord?.findUnique
+    ) {
+      const existingRecord = await this.prisma.installationRecord.findUnique({
+        where: { clientRequestId },
+        select: { id: true },
+      })
+      if (existingRecord) {
+        return this.finalizeInstallTaskCompletion(
+          task.id,
+          task.meter.id,
+          existingRecord.id,
+          userId,
+          ipAddress,
+        )
+      }
+    }
+
     if (task.meter.simCardState !== MeterSimCardState.NO_SIM || task.meter.simCardId) {
       throw new BadRequestException({
         message: 'Brojilo više nije u stanju NO_SIM; zadatak se ne može završiti ovim tokom.',
@@ -468,6 +612,46 @@ export class InstallTasksService {
         message: 'Brojilo nije aktivno; ugradnja SIM-a nije dozvoljena.',
         code: ErrorCodes.INSTALL_TASK_METER_INACTIVE,
       })
+    }
+
+    // Pre-validate SIM card distribution and availability before any state mutation
+    if (this.prisma.simCard?.findFirst) {
+      const simScopeClause = scope ? scopeWhere(scope, { viaShipment: true }) : undefined
+      const sim = await this.prisma.simCard.findFirst({
+        where: {
+          id: dto.simCardId,
+          ...(simScopeClause ? { AND: [simScopeClause] } : {}),
+        },
+        select: {
+          id: true,
+          status: true,
+          assignedToId: true,
+          shipment: { select: { distributionId: true } },
+          meter: { select: { id: true } },
+        },
+      })
+      if (!sim) {
+        throw new BadRequestException('SIM kartica nije pronađena ili nije u vašem opsegu.')
+      }
+      if (sim.meter) {
+        throw new BadRequestException('SIM kartica je već vezana za brojilo.')
+      }
+      const simUsable =
+        sim.status === SimCardStatus.AVAILABLE ||
+        (sim.status === SimCardStatus.ASSIGNED && sim.assignedToId === userId)
+      if (!simUsable) {
+        throw new BadRequestException('SIM kartica nije dostupna za ugradnju.')
+      }
+      const meterDistId = task.meter.branch?.distributionId ?? null
+      if (
+        meterDistId &&
+        sim.shipment?.distributionId &&
+        sim.shipment.distributionId !== meterDistId
+      ) {
+        throw new BadRequestException(
+          'SIM kartica mora pripadati istoj distribuciji kao podružnica brojila.',
+        )
+      }
     }
 
     const validatedDynamic = await this.meterTypeFieldsService.validateDynamicValues(
@@ -526,6 +710,8 @@ export class InstallTasksService {
         simCardId: dto.simCardId,
         installedById: userId,
         notes: dto.recordNotes,
+        photos: dto.photos,
+        clientRequestId,
       },
       {
         userId,
@@ -537,24 +723,52 @@ export class InstallTasksService {
       },
     )
 
+    return this.finalizeInstallTaskCompletion(
+      task.id,
+      task.meter.id,
+      record.id,
+      userId,
+      ipAddress,
+    )
+  }
+
+  private async finalizeInstallTaskCompletion(
+    taskId: string,
+    meterId: string,
+    recordId: string,
+    userId: string,
+    ipAddress?: string,
+  ) {
     const updated = await this.prisma.$transaction(async (tx) => {
       const transitioned = await tx.installTask.updateMany({
-        where: { id: task.id, status: InstallTaskStatus.IN_PROGRESS },
+        where: { id: taskId, status: InstallTaskStatus.IN_PROGRESS },
         data: {
           status: InstallTaskStatus.COMPLETED,
           completedAt: new Date(),
-          installationRecordId: record.id,
+          installationRecordId: recordId,
         },
       })
       if (transitioned.count === 0) {
-        throw new BadRequestException('Zadatak je u međuvremenu već završen ili promijenjen.')
+        const alreadyClosed = tx.installTask.findUnique
+          ? await tx.installTask.findUnique({
+              where: { id: taskId },
+              select: { status: true, installationRecordId: true },
+            })
+          : null
+        if (
+          !alreadyClosed ||
+          alreadyClosed.status !== InstallTaskStatus.COMPLETED ||
+          alreadyClosed.installationRecordId !== recordId
+        ) {
+          throw new BadRequestException('Zadatak je u međuvremenu već završen ili promijenjen.')
+        }
       }
       await tx.meter.update({
-        where: { id: task.meter.id },
+        where: { id: meterId },
         data: { hasOpenInstallTask: false },
       })
       return tx.installTask.findUniqueOrThrow({
-        where: { id: task.id },
+        where: { id: taskId },
         include: {
           meter: { include: { meterTypeDefinition: true, simCard: true } },
           assignedTo: { select: SAFE_USER_SELECT },
@@ -568,8 +782,8 @@ export class InstallTasksService {
       userId,
       action: 'UPDATE',
       entity: 'install_task',
-      entityId: id,
-      details: { status: InstallTaskStatus.COMPLETED, installationRecordId: record.id },
+      entityId: taskId,
+      details: { status: InstallTaskStatus.COMPLETED, installationRecordId: recordId },
       ipAddress,
     })
 

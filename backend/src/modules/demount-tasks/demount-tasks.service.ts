@@ -2,12 +2,14 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
 import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateDemountTaskDto } from './dto/create-demount-task.dto';
 import { CompleteDemountTaskDto } from './dto/complete-demount-task.dto';
+import { DemountTaskFilterDto } from './dto/demount-task-filter.dto';
 import {
   DemountTaskStatus,
   DemountCompletionResolution,
@@ -18,6 +20,7 @@ import {
   SimCardStatus,
   Prisma,
   UserRole,
+  UserStatus,
 } from '@prisma/client';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -99,6 +102,9 @@ export class DemountTasksService {
         code: ErrorCodes.TASK_ASSIGNEE_NOT_OPERATOR,
       });
     }
+    if (assignedTo.status && assignedTo.status !== UserStatus.ACTIVE) {
+      throw new BadRequestException('Zadatak se može dodijeliti samo aktivnom operatoru.');
+    }
     if (scope?.role === UserRole.USER) {
       const isModerator = await this.prisma.branchModerator.findUnique({
         where: {
@@ -178,6 +184,77 @@ export class DemountTasksService {
     return task;
   }
 
+  async findAll(
+    filter: DemountTaskFilterDto,
+    userId: string,
+    scope?: ScopeContext | null,
+  ) {
+    let moderatorWhere: Record<string, unknown> | undefined;
+    if (scope?.role === UserRole.USER) {
+      let branchIds = scope.branchModeratorBranchIds ?? [];
+      if (branchIds.length === 0 && this.prisma.branchModerator?.findMany) {
+        const moderated = await this.prisma.branchModerator.findMany({
+          where: { userId },
+          select: { branchId: true },
+        });
+        branchIds = moderated.map((m) => m.branchId);
+      }
+      if (branchIds.length === 0) {
+        throw new ForbiddenException(
+          'Samo administratori i moderatori podružnica mogu pregledati listu zadataka.',
+        );
+      }
+      moderatorWhere = { meter: { branchId: { in: branchIds } } };
+    }
+
+    const { page = 1, limit = 20, status, unassignedOnly, branchId, search } = filter;
+    const skip = (page - 1) * limit;
+    const scopeClause = moderatorWhere ? undefined : scopeWhere(scope, { viaMeter: true });
+    const andClauses: Record<string, unknown>[] = [];
+    if (scopeClause) andClauses.push(scopeClause);
+    if (moderatorWhere) andClauses.push(moderatorWhere);
+    if (branchId) andClauses.push({ meter: { branchId } });
+    if (search?.trim()) {
+      const q = search.trim();
+      andClauses.push({
+        OR: [
+          { meter: { serialNumber: { contains: q, mode: 'insensitive' } } },
+          { assignedTo: { firstName: { contains: q, mode: 'insensitive' } } },
+          { assignedTo: { lastName: { contains: q, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    const where: Prisma.DemountTaskWhereInput = {
+      ...(status ? { status } : {}),
+      ...(unassignedOnly ? { assignedToId: null } : {}),
+      ...(andClauses.length ? { AND: andClauses as Prisma.DemountTaskWhereInput[] } : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.demountTask.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          meter: { include: { simCard: true, meterTypeDefinition: true } },
+          assignedTo: { select: SAFE_USER_SELECT },
+          createdBy: { select: SAFE_USER_SELECT },
+        },
+      }),
+      this.prisma.demountTask.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async findMy(assignedToId: string, status?: DemountTaskStatus, scope?: ScopeContext | null) {
     const scopeClause = scopeWhere(scope, { viaMeter: true });
     return this.prisma.demountTask.findMany({
@@ -200,6 +277,7 @@ export class DemountTasksService {
     status: DemountTaskStatus,
     userId: string,
     ipAddress?: string,
+    scope?: ScopeContext | null,
   ) {
     if (status === DemountTaskStatus.COMPLETED) {
       throw new BadRequestException(
@@ -209,10 +287,16 @@ export class DemountTasksService {
     if (status === DemountTaskStatus.CANCELLED) {
       throw new BadRequestException('Operator ne može otkazati nalog. Otkazivanje radi inicijator naloga.');
     }
-    const task = await this.prisma.demountTask.findUnique({
-      where: { id },
-      include: { meter: { select: { id: true, serialNumber: true } } },
-    });
+    const scopeClause = scope ? scopeWhere(scope, { viaMeter: true }) : undefined;
+    const task = scopeClause
+      ? await this.prisma.demountTask.findFirst({
+          where: { id, AND: [scopeClause] },
+          include: { meter: { select: { id: true, serialNumber: true } } },
+        })
+      : await this.prisma.demountTask.findUnique({
+          where: { id },
+          include: { meter: { select: { id: true, serialNumber: true } } },
+        });
     if (!task) {
       throw new NotFoundException({
         message: 'Zadatak demontaže nije pronađen.',
@@ -238,6 +322,20 @@ export class DemountTasksService {
       throw new BadRequestException('Dozvoljeno je samo: započni nalog ili vrati nalog inicijatoru.');
     }
 
+    if (status === DemountTaskStatus.PENDING || status === DemountTaskStatus.IN_PROGRESS) {
+      const otherOpen = await this.prisma.demountTask.findFirst({
+        where: {
+          meterId: task.meterId,
+          status: { in: [DemountTaskStatus.PENDING, DemountTaskStatus.IN_PROGRESS] },
+          NOT: { id: task.id },
+        },
+        select: { id: true },
+      });
+      if (otherOpen) {
+        throw new BadRequestException('Za ovo brojilo već postoji aktivan nalog za demontažu.');
+      }
+    }
+
     const isReturnToInitiator =
       task.status === DemountTaskStatus.IN_PROGRESS && status === DemountTaskStatus.PENDING
 
@@ -253,6 +351,13 @@ export class DemountTasksService {
         createdBy: { select: SAFE_USER_SELECT },
       },
     });
+
+    if (this.prisma.meter?.update) {
+      await this.prisma.meter.update({
+        where: { id: task.meterId },
+        data: { hasOpenDemountTask: true },
+      });
+    }
 
     await this.activityLogService.log({
       userId,
@@ -274,11 +379,22 @@ export class DemountTasksService {
     return updated;
   }
 
-  async cancel(id: string, actor: User, ipAddress?: string) {
-    const task = await this.prisma.demountTask.findUnique({
-      where: { id },
-      include: { meter: { select: { id: true, serialNumber: true } } },
-    });
+  async cancel(
+    id: string,
+    actor: User,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
+    const scopeClause = scope ? scopeWhere(scope, { viaMeter: true }) : undefined;
+    const task = scopeClause
+      ? await this.prisma.demountTask.findFirst({
+          where: { id, AND: [scopeClause] },
+          include: { meter: { select: { id: true, serialNumber: true } } },
+        })
+      : await this.prisma.demountTask.findUnique({
+          where: { id },
+          include: { meter: { select: { id: true, serialNumber: true } } },
+        });
     if (!task) throw new NotFoundException('Zadatak demontaže nije pronađen.');
     const canCancel =
       actor.role === UserRole.SYSTEM_ADMIN ||
@@ -333,10 +449,16 @@ export class DemountTasksService {
     scope: ScopeContext | null,
     ipAddress?: string,
   ) {
-    const task = await this.prisma.demountTask.findUnique({
-      where: { id },
-      include: { meter: { select: { id: true, serialNumber: true, branchId: true } } },
-    });
+    const scopeClause = scope ? scopeWhere(scope, { viaMeter: true }) : undefined;
+    const task = scopeClause
+      ? await this.prisma.demountTask.findFirst({
+          where: { id, AND: [scopeClause] },
+          include: { meter: { select: { id: true, serialNumber: true, branchId: true } } },
+        })
+      : await this.prisma.demountTask.findUnique({
+          where: { id },
+          include: { meter: { select: { id: true, serialNumber: true, branchId: true } } },
+        });
     if (!task) throw new NotFoundException('Zadatak demontaže nije pronađen.');
     const canReassign =
       actor.role === UserRole.SYSTEM_ADMIN ||
@@ -358,6 +480,16 @@ export class DemountTasksService {
     if (!assignedTo) throw new BadRequestException('Operator nije pronađen.');
     if (assignedTo.role !== UserRole.USER) {
       throw new BadRequestException('Nalog se može dodijeliti samo operatoru.');
+    }
+    if (assignedTo.status && assignedTo.status !== UserStatus.ACTIVE) {
+      throw new BadRequestException('Nalog se može dodijeliti samo aktivnom operatoru.');
+    }
+    if (scope && scope.role === UserRole.USER) {
+      if (!task.meter?.branchId || assignedTo.branchId !== task.meter.branchId) {
+        throw new BadRequestException(
+          'Možete dodijeliti nalog samo operatoru iz iste podružnice kao brojilo.',
+        );
+      }
     }
     if (scope && scope.role === UserRole.DIST_ADMIN && scope.distributionId) {
       const opDistributionId = assignedTo.distributionId ?? assignedTo.branch?.distributionId;
@@ -441,6 +573,12 @@ export class DemountTasksService {
       });
     }
     const meter = task.meter;
+    if (meter.status && meter.status !== MeterStatus.ACTIVE) {
+      throw new BadRequestException({
+        message: 'Brojilo nije aktivno; zadatak demontaže se ne može završiti.',
+        code: ErrorCodes.DEMOUNT_TASK_METER_INACTIVE,
+      });
+    }
     const oldSimId = meter.simCardId;
     if (!oldSimId) {
       throw new BadRequestException({
@@ -450,7 +588,7 @@ export class DemountTasksService {
     }
 
     const effectiveResolution = task.requestedResolution ?? dto.resolution
-    const effectiveReason = task.requestedReason ?? dto.reason
+    const effectiveReason = (task.requestedReason ?? dto.reason).trim()
     const effectiveRemovedSimDisposition =
       (task.requestedRemovedSimDisposition ?? dto.removedSimDisposition) as RemovedSimDisposition
     const effectiveMeterDemountCategory = (task.requestedMeterDemountCategory ??
@@ -462,7 +600,7 @@ export class DemountTasksService {
         code: ErrorCodes.DEMOUNT_TASK_FIELD_LOCKED,
       });
     }
-    if (task.requestedReason && dto.reason !== task.requestedReason) {
+    if (task.requestedReason && dto.reason.trim() !== task.requestedReason.trim()) {
       throw new BadRequestException({
         message: 'Obrazloženje je zaključano od strane inicijatora naloga.',
         code: ErrorCodes.DEMOUNT_TASK_FIELD_LOCKED,
@@ -513,7 +651,7 @@ export class DemountTasksService {
               { status: SimCardStatus.ASSIGNED, assignedToId: userId },
             ],
           },
-          data: { status: SimCardStatus.INSTALLED },
+          data: { status: SimCardStatus.INSTALLED, assignedToId: userId },
         });
         if (claimedNewSim.count === 0) {
           throw new BadRequestException({

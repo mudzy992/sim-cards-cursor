@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
+  IsArray,
   IsDateString,
   IsInt,
   IsNumber,
@@ -72,5 +73,11 @@ export class CompleteInstallTaskDto {
   @IsString()
   @MinLength(1)
   recordNotes?: string
+
+  @ApiPropertyOptional({ type: [String], description: 'Putanje uploadanih fotografija' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  photos?: string[]
 }
 

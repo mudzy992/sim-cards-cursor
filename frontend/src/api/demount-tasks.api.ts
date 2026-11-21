@@ -45,7 +45,37 @@ export type DemountTaskItem = {
   createdBy?: { firstName: string; lastName: string };
 };
 
+export type DemountTaskListParams = {
+  page?: number;
+  limit?: number;
+  status?: DemountTaskStatus;
+  unassignedOnly?: boolean;
+  branchId?: string;
+  search?: string;
+};
+
 export const demountTasksApi = {
+  list: async (
+    params?: DemountTaskListParams,
+  ): Promise<{
+    items: DemountTaskItem[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> => {
+    const response = await axiosInstance.get<
+      ApiEnvelope<{
+        items: DemountTaskItem[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>
+    >('/demount-tasks', { params });
+    return response.data.data;
+  },
+
   getMy: async (params?: {
     status?: DemountTaskStatus;
   }): Promise<DemountTaskItem[]> => {

@@ -373,6 +373,7 @@ export class InstallationRecordsService {
                 simCardId,
                 simCardState: MeterSimCardState.INSTALLED,
                 noSimReason: null,
+                hasOpenInstallTask: false,
               },
             });
           }
@@ -404,6 +405,25 @@ export class InstallationRecordsService {
               photos: validatedPhotos,
             },
           });
+
+          if (meterIdForLookup) {
+            const txWithTasks = tx as unknown as {
+              installTask?: { updateMany: (args: unknown) => Promise<unknown> };
+            };
+            if (txWithTasks.installTask?.updateMany) {
+              await txWithTasks.installTask.updateMany({
+                where: {
+                  meterId: resolvedMeterId,
+                  status: { in: ['PENDING', 'IN_PROGRESS'] },
+                },
+                data: {
+                  status: 'COMPLETED',
+                  completedAt: new Date(),
+                  installationRecordId: createdRecord.id,
+                },
+              });
+            }
+          }
 
           await tx.simEvent.create({
             data: {

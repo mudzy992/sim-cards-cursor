@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   DemountCompletionResolution,
   DemountTaskStatus,
@@ -8,6 +8,8 @@ import {
   RemovedSimDisposition,
   SimCardStatus,
   UserRole,
+  UserStatus,
+  type User,
 } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
@@ -55,10 +57,17 @@ describe('DemountTasksService — lifecycle & completion resolutions', () => {
       user: {
         findUnique: jest.fn(),
       },
+      branchModerator: {
+        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       simCard: {
         findFirst: jest.fn(),
       },
       demountTask: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        findUnique: jest.fn(),
         findFirst: jest.fn(),
         findUniqueOrThrow: jest.fn().mockResolvedValue({
           id: 'dtask-1',
@@ -234,7 +243,7 @@ describe('DemountTasksService — lifecycle & completion resolutions', () => {
     expect(tx.simCard.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ id: 'sim-new' }),
-        data: { status: SimCardStatus.INSTALLED },
+        data: { status: SimCardStatus.INSTALLED, assignedToId: 'op-1' },
       }),
     );
     expect(tx.meter.update).toHaveBeenCalledWith({
@@ -350,6 +359,130 @@ describe('DemountTasksService — lifecycle & completion resolutions', () => {
         hasOpenDemountTask: false,
         status: MeterStatus.INACTIVE,
       }),
+    });
+  });
+
+  describe('Run 5 hardening', () => {
+    it('rejects assigning demount task to INACTIVE operator', async () => {
+      const { service, prisma } = createMocks();
+      prisma.meter.findFirst.mockResolvedValueOnce({
+        id: 'meter-1',
+        branchId: 'branch-1',
+        simCardId: 'sim-old',
+        simCardState: MeterSimCardState.INSTALLED,
+        status: MeterStatus.ACTIVE,
+        hasOpenDemountTask: false,
+      });
+      prisma.user.findUnique.mockResolvedValueOnce({
+        id: 'op-inactive',
+        role: UserRole.USER,
+        status: UserStatus.INACTIVE,
+        branchId: 'branch-1',
+        distributionId: 'dist-1',
+        branch: { distributionId: 'dist-1' },
+      });
+
+      await expect(
+        service.create(
+          {
+            meterId: 'meter-1',
+            assignedToId: 'op-inactive',
+            requestedResolution: DemountCompletionResolution.REMOVE_SIM_ONLY,
+            requestedReason: 'Privremeno uklanjanje',
+            requestedRemovedSimDisposition: 'RETURN_TO_STOCK',
+            requestedMeterDemountCategory: 'TEMPORARY_REMOVAL',
+          },
+          'admin-1',
+          '127.0.0.1',
+          adminScope,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('blocks non-moderator USER from findAll and cross-distribution DIST_ADMIN cancel', async () => {
+      const { service, prisma } = createMocks();
+      await expect(
+        service.findAll(
+          { page: 1, limit: 20 },
+          'user-1',
+          { role: UserRole.USER, distributionId: 'dist-1', branchId: 'branch-1', branchModeratorBranchIds: [] },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      prisma.demountTask.findFirst.mockResolvedValueOnce(null);
+      await expect(
+        service.cancel(
+          'dtask-other',
+          { id: 'dadmin-1', role: UserRole.DIST_ADMIN } as User,
+          '127.0.0.1',
+          { role: UserRole.DIST_ADMIN, distributionId: 'dist-1', branchId: null },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects complete when meter is INACTIVE and accepts trimmed locked requestedReason', async () => {
+      const { service, prisma } = createMocks();
+      prisma.demountTask.findFirst.mockResolvedValueOnce({
+        id: 'dtask-1',
+        assignedToId: 'op-1',
+        createdById: 'admin-1',
+        status: DemountTaskStatus.IN_PROGRESS,
+        meter: {
+          id: 'meter-1',
+          status: MeterStatus.INACTIVE,
+          simCardId: 'sim-old',
+          branchId: 'branch-1',
+          branch: { id: 'branch-1', distributionId: 'dist-1' },
+        },
+      });
+
+      await expect(
+        service.complete(
+          'dtask-1',
+          {
+            resolution: DemountCompletionResolution.REMOVE_SIM_ONLY,
+            reason: 'Razlog uklanjanja',
+            removedSimDisposition: RemovedSimDisposition.RETURN_TO_STOCK,
+            meterDemountCategory: MeterDemountCategory.TEMPORARY_REMOVAL,
+          },
+          'op-1',
+          '127.0.0.1',
+          adminScope,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      prisma.demountTask.findFirst.mockResolvedValueOnce({
+        id: 'dtask-1',
+        assignedToId: 'op-1',
+        createdById: 'admin-1',
+        status: DemountTaskStatus.IN_PROGRESS,
+        requestedResolution: DemountCompletionResolution.REMOVE_SIM_ONLY,
+        requestedReason: '  Servisiranje brojila  ',
+        requestedRemovedSimDisposition: RemovedSimDisposition.RETURN_TO_STOCK,
+        requestedMeterDemountCategory: MeterDemountCategory.TEMPORARY_REMOVAL,
+        meter: {
+          id: 'meter-1',
+          status: MeterStatus.ACTIVE,
+          simCardId: 'sim-old',
+          branchId: 'branch-1',
+          branch: { id: 'branch-1', distributionId: 'dist-1' },
+        },
+      });
+
+      const completed = await service.complete(
+        'dtask-1',
+        {
+          resolution: DemountCompletionResolution.REMOVE_SIM_ONLY,
+          reason: 'Servisiranje brojila',
+          removedSimDisposition: RemovedSimDisposition.RETURN_TO_STOCK,
+          meterDemountCategory: MeterDemountCategory.TEMPORARY_REMOVAL,
+        },
+        'op-1',
+        '127.0.0.1',
+        adminScope,
+      );
+
+      expect(completed.status).toBe(DemountTaskStatus.COMPLETED);
     });
   });
 });
