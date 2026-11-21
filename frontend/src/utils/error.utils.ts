@@ -16,6 +16,22 @@ export function getApiErrorMessage(
       return translateCurrent(ERROR_CODE_I18N_MAP[data.errorCode]);
     }
 
+    if (!response) {
+      return translateCurrent('common.messages.networkError');
+    }
+
+    if (response.status === 413) {
+      return translateCurrent('common.messages.fileTooLarge');
+    }
+
+    if (response.status === 408) {
+      return translateCurrent('common.messages.requestTimeout');
+    }
+
+    if (response.status >= 500) {
+      return translateCurrent('common.messages.genericError');
+    }
+
     if (data) {
       if (typeof data.message === 'string' && data.message.trim().length > 0) {
         return data.message;
@@ -26,16 +42,8 @@ export function getApiErrorMessage(
       }
     }
 
-    if (!response) {
-      return translateCurrent('common.messages.networkError');
-    }
-
     if (response.status === 401) {
       return translateCurrent('common.messages.sessionExpired');
-    }
-
-    if (response.status >= 500) {
-      return translateCurrent('common.messages.genericError');
     }
   }
 

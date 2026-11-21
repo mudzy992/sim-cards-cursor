@@ -28,6 +28,19 @@ import {
 import { ShipmentFilterDto } from './dto/shipment-filter.dto';
 import { UpdateShipmentDto } from './dto/update-shipment.dto';
 
+const SIM_LOOKUP_CHUNK_SIZE = 5_000;
+const SIM_INSERT_CHUNK_SIZE = 2_000;
+const IMPORT_TX_TIMEOUT_MS = 120_000;
+
+function chunkArray<T>(items: T[], chunkSize: number): T[][] {
+  if (items.length === 0) return [];
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    chunks.push(items.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 @Injectable()
 export class ShipmentsService {
   constructor(
@@ -400,8 +413,6 @@ export class ShipmentsService {
       );
     }
 
-    const simCardIds = shipment.simCards.map((c) => c.id);
-
     const operationalCount = shipment.simCards.filter(
       (c) =>
         c.status === SimCardStatus.ASSIGNED ||
@@ -412,15 +423,15 @@ export class ShipmentsService {
       await this.prisma.$transaction([
         this.prisma.meter.count({
           where: {
-            simCardId: {
-              in: simCardIds,
+            simCard: {
+              shipmentId: id,
             },
           },
         }),
         this.prisma.installationRecord.count({
           where: {
-            simCardId: {
-              in: simCardIds,
+            simCard: {
+              shipmentId: id,
             },
           },
         }),
@@ -442,8 +453,8 @@ export class ShipmentsService {
       await this.prisma.$transaction(async (tx) => {
         const events = await tx.simEvent.deleteMany({
           where: {
-            simCardId: {
-              in: simCardIds,
+            simCard: {
+              shipmentId: id,
             },
           },
         });
@@ -684,72 +695,97 @@ export class ShipmentsService {
     let inserted: { count: number };
 
     try {
-      inserted = await this.prisma.$transaction(async (tx) => {
-        const txIccids = data.map((d) => d.iccid);
-        const txIps = data.map((d) => d.ipAddress);
-        const txPublicIps = data
-          .map((d) => d.publicIpAddress)
-          .filter((v): v is string => Boolean(v));
-        const txPhones = data
-          .flatMap((d) => {
-            if (!d.phoneNumber) return [];
-            const norm = normalizePhoneNumber(d.phoneNumber);
-            return norm && norm !== d.phoneNumber ? [d.phoneNumber, norm] : [d.phoneNumber];
-          })
-          .filter(Boolean);
-
-        const txExisting = await this.fetchExistingSimFields(
-          {
-            iccids: txIccids,
-            ipAddresses: txIps,
-            publicIpAddresses: txPublicIps,
-            phoneNumbers: txPhones,
-          },
-          tx,
-        );
-
-        const conflictingItem = data.find(
-          (item) =>
-            txExisting.byIccid.has(item.iccid) ||
-            txExisting.byIpAddress.has(item.ipAddress) ||
-            (item.publicIpAddress ? txExisting.byPublicIpAddress.has(item.publicIpAddress) : false) ||
-            (item.phoneNumber
-              ? txExisting.byPhoneNumber.has(normalizePhoneNumber(item.phoneNumber))
-              : false),
-        );
-
-        if (conflictingItem) {
-          throw new ConflictException(
-            'Import sadrži ICCID, IP adresu, javnu IP adresu ili broj telefona koji već postoji u bazi.',
+      inserted = await this.prisma.$transaction(
+        async (tx) => {
+          const txIccids = Array.from(new Set(data.map((d) => d.iccid)));
+          const txIps = Array.from(new Set(data.map((d) => d.ipAddress)));
+          const txPublicIps = Array.from(
+            new Set(
+              data
+                .map((d) => d.publicIpAddress)
+                .filter((v): v is string => Boolean(v)),
+            ),
           );
-        }
+          const txPhones = Array.from(
+            new Set(
+              data
+                .flatMap((d) => {
+                  if (!d.phoneNumber) return [];
+                  const norm = normalizePhoneNumber(d.phoneNumber);
+                  return norm && norm !== d.phoneNumber
+                    ? [d.phoneNumber, norm]
+                    : [d.phoneNumber];
+                })
+                .filter(Boolean),
+            ),
+          );
 
-        const created = await tx.simCard.createMany({
-          data: data.map((item) => ({
-            ...item,
-            status: SimCardStatus.AVAILABLE,
-          })),
-        });
+          const txExisting = await this.fetchExistingSimFields(
+            {
+              iccids: txIccids,
+              ipAddresses: txIps,
+              publicIpAddresses: txPublicIps,
+              phoneNumbers: txPhones,
+            },
+            tx,
+          );
 
-        const shipmentSimTotal = await tx.simCard.count({
-          where: {
-            shipmentId,
-          },
-        });
+          const conflictingItem = data.find(
+            (item) =>
+              txExisting.byIccid.has(item.iccid) ||
+              txExisting.byIpAddress.has(item.ipAddress) ||
+              (item.publicIpAddress
+                ? txExisting.byPublicIpAddress.has(item.publicIpAddress)
+                : false) ||
+              (item.phoneNumber
+                ? txExisting.byPhoneNumber.has(
+                    normalizePhoneNumber(item.phoneNumber),
+                  )
+                : false),
+          );
 
-        await tx.shipment.update({
-          where: {
-            id: shipmentId,
-          },
-          data: {
-            totalCards: shipmentSimTotal,
-            status: ShipmentStatus.COMPLETED,
-            originalFileName: file.originalname,
-          },
-        });
+          if (conflictingItem) {
+            throw new ConflictException(
+              'Import sadrži ICCID, IP adresu, javnu IP adresu ili broj telefona koji već postoji u bazi.',
+            );
+          }
 
-        return created;
-      });
+          let insertedCount = 0;
+          for (const chunk of chunkArray(data, SIM_INSERT_CHUNK_SIZE)) {
+            const batch = await tx.simCard.createMany({
+              data: chunk.map((item) => ({
+                ...item,
+                status: SimCardStatus.AVAILABLE,
+              })),
+            });
+            insertedCount += batch.count;
+          }
+          const created = { count: insertedCount };
+
+          const shipmentSimTotal = await tx.simCard.count({
+            where: {
+              shipmentId,
+            },
+          });
+
+          await tx.shipment.update({
+            where: {
+              id: shipmentId,
+            },
+            data: {
+              totalCards: shipmentSimTotal,
+              status: ShipmentStatus.COMPLETED,
+              originalFileName: file.originalname,
+            },
+          });
+
+          return created;
+        },
+        {
+          maxWait: 15_000,
+          timeout: IMPORT_TX_TIMEOUT_MS,
+        },
+      );
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -848,66 +884,63 @@ export class ShipmentsService {
     },
     db: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<ExistingSimFieldsMaps> {
-    const orClauses: Prisma.SimCardWhereInput[] = [];
-    if (candidates.iccids.length > 0) {
-      orClauses.push({ iccid: { in: candidates.iccids } });
-    }
-    if (candidates.ipAddresses.length > 0) {
-      orClauses.push({ ipAddress: { in: candidates.ipAddresses } });
-    }
-    if (candidates.publicIpAddresses.length > 0) {
-      orClauses.push({ publicIpAddress: { in: candidates.publicIpAddresses } });
-    }
-    if (candidates.phoneNumbers.length > 0) {
-      orClauses.push({ phoneNumber: { in: candidates.phoneNumbers } });
-    }
-
     const byIccid = new Map<string, ExistingIccidInfo>();
     const byIpAddress = new Map<string, ExistingIccidInfo>();
     const byPublicIpAddress = new Map<string, ExistingIccidInfo>();
     const byPhoneNumber = new Map<string, ExistingIccidInfo>();
 
-    if (orClauses.length === 0) {
-      return { byIccid, byIpAddress, byPublicIpAddress, byPhoneNumber };
-    }
-
-    const existing = await db.simCard.findMany({
-      where: { OR: orClauses },
-      select: {
-        iccid: true,
-        ipAddress: true,
-        publicIpAddress: true,
-        phoneNumber: true,
-        shipment: {
-          select: {
-            id: true,
-            name: true,
-            receivedDate: true,
-          },
+    const selectShape = {
+      iccid: true,
+      ipAddress: true,
+      publicIpAddress: true,
+      phoneNumber: true,
+      shipment: {
+        select: {
+          id: true,
+          name: true,
+          receivedDate: true,
         },
       },
-    });
+    } as const;
 
-    for (const item of existing) {
-      const info: ExistingIccidInfo = {
-        shipmentId: item.shipment.id,
-        shipmentName: item.shipment.name,
-        receivedDate: item.shipment.receivedDate,
-      };
-      if (!byIccid.has(item.iccid)) byIccid.set(item.iccid, info);
-      if (item.ipAddress && !byIpAddress.has(item.ipAddress)) {
-        byIpAddress.set(item.ipAddress, info);
-      }
-      if (item.publicIpAddress && !byPublicIpAddress.has(item.publicIpAddress)) {
-        byPublicIpAddress.set(item.publicIpAddress, info);
-      }
-      if (item.phoneNumber) {
-        const normPhone = normalizePhoneNumber(item.phoneNumber);
-        if (normPhone && !byPhoneNumber.has(normPhone)) {
-          byPhoneNumber.set(normPhone, info);
+    const queryInChunks = async (
+      values: string[],
+      buildWhere: (chunk: string[]) => Prisma.SimCardWhereInput,
+    ) => {
+      for (const chunk of chunkArray(values, SIM_LOOKUP_CHUNK_SIZE)) {
+        const rows = await db.simCard.findMany({
+          where: buildWhere(chunk),
+          select: selectShape,
+        });
+        for (const item of rows) {
+          const info: ExistingIccidInfo = {
+            shipmentId: item.shipment.id,
+            shipmentName: item.shipment.name,
+            receivedDate: item.shipment.receivedDate,
+          };
+          if (!byIccid.has(item.iccid)) byIccid.set(item.iccid, info);
+          if (item.ipAddress && !byIpAddress.has(item.ipAddress)) {
+            byIpAddress.set(item.ipAddress, info);
+          }
+          if (item.publicIpAddress && !byPublicIpAddress.has(item.publicIpAddress)) {
+            byPublicIpAddress.set(item.publicIpAddress, info);
+          }
+          if (item.phoneNumber) {
+            const normPhone = normalizePhoneNumber(item.phoneNumber);
+            if (normPhone && !byPhoneNumber.has(normPhone)) {
+              byPhoneNumber.set(normPhone, info);
+            }
+          }
         }
       }
-    }
+    };
+
+    await queryInChunks(candidates.iccids, (chunk) => ({ iccid: { in: chunk } }));
+    await queryInChunks(candidates.ipAddresses, (chunk) => ({ ipAddress: { in: chunk } }));
+    await queryInChunks(candidates.publicIpAddresses, (chunk) => ({
+      publicIpAddress: { in: chunk },
+    }));
+    await queryInChunks(candidates.phoneNumbers, (chunk) => ({ phoneNumber: { in: chunk } }));
 
     return { byIccid, byIpAddress, byPublicIpAddress, byPhoneNumber };
   }

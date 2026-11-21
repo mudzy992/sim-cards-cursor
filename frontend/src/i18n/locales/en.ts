@@ -111,6 +111,8 @@ const en: TranslationDictionary = {
       savedSuccessfully: 'Saved successfully.',
       deletedSuccessfully: 'Deleted successfully.',
       copiedToClipboard: 'Copied to clipboard.',
+      fileTooLarge: 'The file is too large to upload. Maximum allowed size is 25 MB.',
+      requestTimeout: 'The request took too long and timed out. Please try again.',
     },
     pagination: {
       itemsOf: '{{from}}-{{to}} of {{total}} items',

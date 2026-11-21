@@ -7,6 +7,7 @@ import { shipmentsApi } from '@/api/shipments.api';
 import { ImportReviewTable } from './ImportReviewTable';
 import type { ImportColumnMapping, ShipmentImportApply, ShipmentImportPreview } from '@/types/import.types';
 import { useTranslation } from '@/i18n';
+import { getApiErrorMessage } from '@/utils/error.utils';
 
 export interface ShipmentImportPanelProps {
   shipmentId: string;
@@ -62,7 +63,7 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
         apn: previewWithFileName.resolvedMapping.apn ?? undefined,
       });
     },
-    onError: () => messageApi.error(t('shipments.import.readFailed')),
+    onError: (error) => messageApi.error(getApiErrorMessage(error, t('shipments.import.readFailed'))),
   });
 
   const applyMutation = useMutation({
@@ -92,7 +93,7 @@ export function ShipmentImportPanel(props: ShipmentImportPanelProps) {
       void queryClient.invalidateQueries({ queryKey: ['shipments'] });
       onImported?.(data);
     },
-    onError: () => messageApi.error(t('shipments.import.importFailed')),
+    onError: (error) => messageApi.error(getApiErrorMessage(error, t('shipments.import.importFailed'))),
   });
 
   const reset = () => {

@@ -59,6 +59,12 @@ describe('getApiErrorMessage', () => {
     expect(getApiErrorMessage(err, 'Fallback')).toContain('expired');
   });
 
+  it('returns localized fileTooLarge / requestTimeout / genericError on 413 / 408 / 500', () => {
+    expect(getApiErrorMessage(makeAxiosError(413, {}), 'Fallback')).toContain('25 MB');
+    expect(getApiErrorMessage(makeAxiosError(408, {}), 'Fallback')).toContain('timed out');
+    expect(getApiErrorMessage(makeAxiosError(500, { message: 'Internal server error' }), 'Fallback')).toContain('Something went wrong');
+  });
+
   it('returns fallback for non-axios errors', () => {
     expect(getApiErrorMessage(new Error('boom'), 'Fallback')).toBe('Fallback');
   });

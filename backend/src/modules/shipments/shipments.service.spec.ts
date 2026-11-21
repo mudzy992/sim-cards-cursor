@@ -207,4 +207,55 @@ describe('ShipmentsService — Excel import atomicity', () => {
       }),
     );
   });
+
+  it('chunks large 8,500+ row imports for both lookup and createMany to stay below PostgreSQL 32,767 bind-parameter limit', async () => {
+    const { service, prisma, tx } = createMocks();
+    const rowCount = 8_500;
+    const lines = ['ICCID,IP,PublicIP,Phone,APN'];
+    for (let i = 0; i < rowCount; i += 1) {
+      const iccid = `893870000000000${String(10000 + i)}`;
+      const third = Math.floor(i / 250);
+      const fourth = (i % 250) + 1;
+      const ip = `10.${10 + Math.floor(third / 250)}.${third % 250}.${fourth}`;
+      const pubIp = `31.${47 + Math.floor(third / 250)}.${third % 250}.${fourth}`;
+      const phone = `061${String(100000 + i)}`;
+      lines.push(`${iccid},${ip},${pubIp},${phone},iot.apn`);
+    }
+    const largeCsv = lines.join('\n');
+
+    tx.simCard.createMany.mockImplementation(async ({ data }: { data: unknown[] }) => ({
+      count: data.length,
+    }));
+    tx.simCard.count.mockResolvedValueOnce(rowCount);
+
+    const result = await service.importExcel(
+      'ship-1',
+      { applyImport: 'true' },
+      makeCsvBuffer(largeCsv),
+      'admin-1',
+      '127.0.0.1',
+      scope,
+    );
+
+    expect(result.mode).toBe('import');
+    if (result.mode === 'import') {
+      expect(result.insertedRows).toBe(rowCount);
+    }
+
+    // 4 fields × 2 chunks (5,000 + 3,500) = 8 findMany calls on outer pre-check and 8 inside tx
+    expect(prisma.simCard.findMany).toHaveBeenCalledTimes(8);
+    expect(tx.simCard.findMany).toHaveBeenCalledTimes(8);
+    for (const call of prisma.simCard.findMany.mock.calls) {
+      const where = call[0]?.where as Record<string, { in?: string[] }>;
+      const values = Object.values(where)[0]?.in ?? [];
+      expect(values.length).toBeLessThanOrEqual(5_000);
+    }
+
+    // 8,500 rows / 2,000 chunk size = 5 createMany calls (2000, 2000, 2000, 2000, 500)
+    expect(tx.simCard.createMany).toHaveBeenCalledTimes(5);
+    const batchSizes = tx.simCard.createMany.mock.calls.map(
+      (call) => (call[0]?.data as unknown[]).length,
+    );
+    expect(batchSizes).toEqual([2000, 2000, 2000, 2000, 500]);
+  });
 });

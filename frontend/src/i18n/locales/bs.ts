@@ -111,6 +111,8 @@ const bs: TranslationDictionary = {
       savedSuccessfully: 'Uspješno sačuvano.',
       deletedSuccessfully: 'Uspješno obrisano.',
       copiedToClipboard: 'Kopirano u međuspremnik.',
+      fileTooLarge: 'Fajl je prevelik za upload. Maksimalna dozvoljena veličina je 25 MB.',
+      requestTimeout: 'Obrada zahtjeva je trajala predugo i istekla je. Pokušajte ponovo.',
     },
     pagination: {
       itemsOf: '{{from}}-{{to}} od {{total}} stavki',

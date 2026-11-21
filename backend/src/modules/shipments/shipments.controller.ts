@@ -110,7 +110,7 @@ export class ShipmentsController {
   @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: 10 * 1024 * 1024 },
+      limits: { fileSize: 25 * 1024 * 1024 },
     }),
   )
   @ApiOperation({ summary: 'Import Excel/CSV fajla (preview ili apply)' })
