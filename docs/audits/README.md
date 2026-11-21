@@ -62,6 +62,6 @@ Ovaj direktorij sadrži sistematsku dokumentaciju sistema **modul po modul**, an
 | **Run 3** | `meters`, `meter-type-definitions`, `meter-type-fields` | **Paketi A + B + C implementirani (`meters`, `meter-type-definitions`, `prisma`, web, mobile)** | [`run-03-meters-types.md`](./run-03-meters-types.md) |
 | **Run 4** | `installation-records`, `photo-upload`, `files`, mobile `outbox` | **Paketi A + B + C implementirani (`installation-records`, `files`, `prisma`, web, mobile)** | [`run-04-records-files-outbox.md`](./run-04-records-files-outbox.md) |
 | **Run 5** | `install-tasks`, `demount-tasks` | **Paketi A + B + C implementirani (`install-tasks`, `demount-tasks`, `installation-records`, `prisma`, web/mobile API)** | [`run-05-install-demount-tasks.md`](./run-05-install-demount-tasks.md) |
-| **Run 6** | `mail`, `branch-email-recipients`, `notifications`, `push-tokens`, `push-campaigns` | Planiran | — |
+| **Run 6** | `mail`, `branch-email-recipients`, `notifications`, `push-tokens`, `push-campaigns` | **Završen audit (čeka odobrenje za izmjene)** | [`run-06-mail-notifications-push.md`](./run-06-mail-notifications-push.md) |
 | **Run 7** | `dashboard`, `analytics` | Planiran | — |
 | **Run 8** | `settings`, `app-releases`, `activity-log`, `packages/shared`, globalna sigurnost | Planiran | — |
