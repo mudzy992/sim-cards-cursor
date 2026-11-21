@@ -37,9 +37,10 @@ jest.mock('@/utils/storage', () => ({
 import { offlineCache } from '@/offline/offline-cache';
 import { reconcileOfflineSimInventory } from '@/offline/sim-inventory-reconcile';
 import { queueInstallationRecord } from '@/api/installation-records.api';
-import { listOutbox } from '@/offline/outbox';
+import { listOutbox, syncOutbox } from '@/offline/outbox';
 import { simCardsApi } from '@/api/sim-cards.api';
 import { axiosInstance } from '@/api/axios.instance';
+import { installationRecordsUploadApi } from '@/api/installation-records-upload.api';
 import { useAuthStore } from '@/store/auth.store';
 
 const testUser: AuthUser = {
@@ -194,6 +195,83 @@ describe('Mobile offline ICCID normalization, cache & outbox', () => {
       simCardId: 'sim-1',
       meterId: 'meter-1',
       installedById: testUser.id,
+    });
+  });
+
+  it('uses meta.serialNumber for existing meterId photo uploads and avoids re-uploading on retry', async () => {
+    await queueInstallationRecord({
+      simCardId: 'sim-1',
+      meterId: 'meter-1',
+      serialNumber: 'SN-EXISTING-1',
+      installedById: testUser.id,
+      localPhotoUris: ['file:///tmp/p1.jpg', 'file:///tmp/p2.jpg'],
+    });
+
+    const uploadMock = installationRecordsUploadApi.uploadPhoto as jest.Mock;
+    uploadMock
+      .mockResolvedValueOnce('installation-records/2026/SN-EXISTING-1/photos/p1.jpg')
+      .mockRejectedValueOnce(new Error('Upload glitch'))
+      .mockResolvedValueOnce('installation-records/2026/SN-EXISTING-1/photos/p2.jpg');
+
+    (axiosInstance.post as jest.Mock).mockResolvedValueOnce({ data: { data: { id: 'rec-1' } } });
+
+    const firstPass = await syncOutbox(testUser);
+    expect(firstPass.failed).toBe(1);
+    expect(uploadMock).toHaveBeenCalledTimes(2);
+    expect(uploadMock).toHaveBeenNthCalledWith(1, 'file:///tmp/p1.jpg', {
+      serialNumber: 'SN-EXISTING-1',
+      year: undefined,
+    });
+
+    const midItems = await listOutbox(testUser);
+    expect(midItems).toHaveLength(1);
+    expect(midItems[0].meta?.localPhotoUris).toEqual(['file:///tmp/p2.jpg']);
+    expect(midItems[0].request.body).toMatchObject({
+      photos: ['installation-records/2026/SN-EXISTING-1/photos/p1.jpg'],
+    });
+    expect(midItems[0].request.body).not.toHaveProperty('serialNumber');
+
+    const secondPass = await syncOutbox(testUser);
+    expect(secondPass.sent).toBe(1);
+    expect(secondPass.remaining).toBe(0);
+    expect(uploadMock).toHaveBeenCalledTimes(3);
+    expect(uploadMock).toHaveBeenNthCalledWith(3, 'file:///tmp/p2.jpg', {
+      serialNumber: 'SN-EXISTING-1',
+      year: undefined,
+    });
+    expect(axiosInstance.post).toHaveBeenCalledWith(
+      '/installation-records',
+      expect.objectContaining({
+        meterId: 'meter-1',
+        photos: [
+          'installation-records/2026/SN-EXISTING-1/photos/p1.jpg',
+          'installation-records/2026/SN-EXISTING-1/photos/p2.jpg',
+        ],
+      }),
+    );
+  });
+
+  it('resolves serialNumber via GET /meters/:id when meterId record lacks serialNumber in meta', async () => {
+    await queueInstallationRecord({
+      simCardId: 'sim-1',
+      meterId: 'meter-lookup',
+      installedById: testUser.id,
+      localPhotoUris: ['file:///tmp/p3.jpg'],
+    });
+
+    (axiosInstance.get as jest.Mock).mockResolvedValueOnce({
+      data: { data: { id: 'meter-lookup', serialNumber: 'SN-LOOKED-UP' } },
+    });
+    const uploadMock = installationRecordsUploadApi.uploadPhoto as jest.Mock;
+    uploadMock.mockResolvedValueOnce('installation-records/2026/SN-LOOKED-UP/photos/p3.jpg');
+    (axiosInstance.post as jest.Mock).mockResolvedValueOnce({ data: { data: { id: 'rec-2' } } });
+
+    const res = await syncOutbox(testUser);
+    expect(res.sent).toBe(1);
+    expect(axiosInstance.get).toHaveBeenCalledWith('/meters/meter-lookup');
+    expect(uploadMock).toHaveBeenCalledWith('file:///tmp/p3.jpg', {
+      serialNumber: 'SN-LOOKED-UP',
+      year: undefined,
     });
   });
 });

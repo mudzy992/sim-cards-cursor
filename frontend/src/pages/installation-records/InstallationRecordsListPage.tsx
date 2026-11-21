@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Select, Table } from 'antd';
+import { Button, Input, Select, Table } from 'antd';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { branchesApi } from '@/api/branches.api';
 import { installationRecordsApi } from '@/api/installation-records.api';
+import { useAuthStore } from '@/store/auth.store';
 import { getApiErrorMessage } from '@/utils/error.utils';
 import type {
   InstallationRecordItem,
@@ -36,6 +38,9 @@ const defaultFilters: InstallationRecordsListParams = {
 export default function InstallationRecordsListPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
+  const canFilterByBranch = user?.role === 'SYSTEM_ADMIN' || user?.role === 'DIST_ADMIN';
+  const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] =
     useState<InstallationRecordsListParams>(defaultFilters);
 
@@ -48,6 +53,12 @@ export default function InstallationRecordsListPage() {
     { label: t('installationRecords.status.legacyCompleted'), value: 'LEGACY_COMPLETED' },
   ];
 
+  const branchesQuery = useQuery({
+    queryKey: ['branches', 'list', user?.distributionId ?? 'all'],
+    queryFn: () => branchesApi.list(user?.role === 'DIST_ADMIN' ? user.distributionId ?? undefined : undefined),
+    enabled: canFilterByBranch,
+  });
+
   const listQuery = useQuery({
     queryKey: ['installation-records', 'list', filters],
     queryFn: () =>
@@ -55,6 +66,8 @@ export default function InstallationRecordsListPage() {
         page: filters.page,
         limit: filters.limit,
         status: filters.status,
+        branchId: filters.branchId,
+        search: filters.search,
       }),
   });
 
@@ -79,10 +92,37 @@ export default function InstallationRecordsListPage() {
         </div>
 
         <FilterBar
-          hasActiveFilters={Boolean(filters.status)}
-          onReset={() => setFilters(defaultFilters)}
+          hasActiveFilters={Boolean(filters.status || filters.branchId || filters.search)}
+          onReset={() => {
+            setSearchInput('');
+            setFilters(defaultFilters);
+          }}
         >
-          <div data-tour-id="records-filters">
+          <div className="flex flex-wrap items-center gap-3" data-tour-id="records-filters">
+            <Input.Search
+              allowClear
+              placeholder={t('installationRecords.list.searchPlaceholder')}
+              style={{ width: 280 }}
+              value={searchInput}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchInput(value);
+                if (!value) {
+                  setFilters((prev) => ({
+                    ...prev,
+                    page: 1,
+                    search: undefined,
+                  }));
+                }
+              }}
+              onSearch={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  page: 1,
+                  search: value.trim() || undefined,
+                }))
+              }
+            />
             <Select
               placeholder={t('common.labels.status')}
               allowClear
@@ -97,6 +137,28 @@ export default function InstallationRecordsListPage() {
               }
               options={statusFilterOptions}
             />
+            {canFilterByBranch ? (
+              <Select
+                placeholder={t('installationRecords.list.branchPlaceholder')}
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                loading={branchesQuery.isLoading}
+                style={{ width: 220 }}
+                value={filters.branchId ?? undefined}
+                onChange={(value) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    page: 1,
+                    branchId: value || undefined,
+                  }))
+                }
+                options={(branchesQuery.data ?? []).map((b) => ({
+                  label: `${b.name} (${b.code})`,
+                  value: b.id,
+                }))}
+              />
+            ) : null}
           </div>
         </FilterBar>
 

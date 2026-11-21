@@ -60,7 +60,7 @@ Ovaj direktorij sadrži sistematsku dokumentaciju sistema **modul po modul**, an
 | **Run 1** | `auth`, `users`, `distributions`, `branches`, `branch-moderators` | **Paket A (P0) implementiran (`8a5ab99`); Paket B/C na čekanju** | [`run-01-identity-org-access.md`](./run-01-identity-org-access.md) |
 | **Run 2** | `shipments`, `sim-cards` | **Paketi A + B + C implementirani (`sim-cards`, `shipments`, `prisma`, web, mobile)** | [`run-02-shipments-sim-cards.md`](./run-02-shipments-sim-cards.md) |
 | **Run 3** | `meters`, `meter-type-definitions`, `meter-type-fields` | **Paketi A + B + C implementirani (`meters`, `meter-type-definitions`, `prisma`, web, mobile)** | [`run-03-meters-types.md`](./run-03-meters-types.md) |
-| **Run 4** | `installation-records`, `photo-upload`, `files`, mobile `outbox` | **Završen audit (čeka odobrenje za izmjene)** | [`run-04-records-files-outbox.md`](./run-04-records-files-outbox.md) |
+| **Run 4** | `installation-records`, `photo-upload`, `files`, mobile `outbox` | **Paketi A + B + C implementirani (`installation-records`, `files`, `prisma`, web, mobile)** | [`run-04-records-files-outbox.md`](./run-04-records-files-outbox.md) |
 | **Run 5** | `install-tasks`, `demount-tasks` | Planiran | — |
 | **Run 6** | `mail`, `branch-email-recipients`, `notifications`, `push-tokens`, `push-campaigns` | Planiran | — |
 | **Run 7** | `dashboard`, `analytics` | Planiran | — |

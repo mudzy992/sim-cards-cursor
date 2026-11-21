@@ -32,6 +32,7 @@ export type OutboxItem = {
     taskId?: string
     meterId?: string
     simCardId?: string
+    serialNumber?: string
     recordNumber?: string
     localPhotoUris?: string[]
   }
@@ -149,33 +150,92 @@ function toErrorMessage(error: unknown): string {
 }
 
 type OutboxInstallationBody = {
-  serialNumber?: unknown;
-  year?: number;
-  photos?: unknown;
-  [key: string]: unknown;
-};
+  meterId?: unknown
+  serialNumber?: unknown
+  year?: number
+  photos?: unknown
+  clientRequestId?: unknown
+  [key: string]: unknown
+}
 
-async function sendOne(item: OutboxItem): Promise<void> {
-  if (item.kind === 'INSTALLATION_RECORD_CREATE' && item.meta?.localPhotoUris?.length) {
-    const rawBody = item.request.body;
-    const body: OutboxInstallationBody =
-      rawBody && typeof rawBody === 'object' ? (rawBody as OutboxInstallationBody) : {};
-    const serialNumber = typeof body.serialNumber === 'string' ? body.serialNumber.trim() : '';
-    if (!serialNumber) {
-      throw new Error('Nedostaje serialNumber za upload fotografija (offline queue).');
+async function resolveSerialNumberForOutbox(
+  item: OutboxItem,
+  body: OutboxInstallationBody,
+): Promise<string> {
+  const fromBody = typeof body.serialNumber === 'string' ? body.serialNumber.trim() : ''
+  if (fromBody) return fromBody
+
+  const fromMeta =
+    typeof item.meta?.serialNumber === 'string' ? item.meta.serialNumber.trim() : ''
+  if (fromMeta) return fromMeta
+
+  const meterId =
+    typeof body.meterId === 'string'
+      ? body.meterId.trim()
+      : typeof item.meta?.meterId === 'string'
+        ? item.meta.meterId.trim()
+        : ''
+  if (meterId) {
+    try {
+      const res = await axiosInstance.get<{ data?: { serialNumber?: string } }>(
+        `/meters/${encodeURIComponent(meterId)}`,
+      )
+      const fetched = res.data?.data?.serialNumber?.trim()
+      if (fetched) return fetched
+    } catch {
+      // Fallback to deterministic meter identifier when lookup is unavailable
     }
-    const uploaded: string[] = [];
-    for (const uri of item.meta.localPhotoUris) {
-      const path = await installationRecordsUploadApi.uploadPhoto(uri, {
-        serialNumber,
-        year: typeof body.year === 'number' ? body.year : undefined,
-      });
-      uploaded.push(path);
+    return `meter-${meterId}`
+  }
+
+  throw new Error('Nedostaje serialNumber za upload fotografija (offline queue).')
+}
+
+async function sendOne(user: AuthUser, item: OutboxItem): Promise<void> {
+  if (item.kind === 'INSTALLATION_RECORD_CREATE') {
+    const rawBody = item.request.body
+    let body: OutboxInstallationBody =
+      rawBody && typeof rawBody === 'object' ? { ...(rawBody as OutboxInstallationBody) } : {}
+
+    if (typeof body.clientRequestId !== 'string' || !body.clientRequestId.trim()) {
+      body = { ...body, clientRequestId: item.clientRequestId }
+      item.request = { ...item.request, body }
     }
-    item.request.body = {
-      ...body,
-      photos: Array.isArray(body.photos) ? [...body.photos, ...uploaded] : uploaded,
-    };
+
+    const pendingUris = item.meta?.localPhotoUris ?? []
+    if (pendingUris.length > 0) {
+      const serialNumber = await resolveSerialNumberForOutbox(item, body)
+      let currentPhotos = Array.isArray(body.photos)
+        ? body.photos.filter((p): p is string => typeof p === 'string')
+        : []
+      let remainingUris = [...pendingUris]
+
+      for (const uri of pendingUris) {
+        const uploadedPath = await installationRecordsUploadApi.uploadPhoto(uri, {
+          serialNumber,
+          year: typeof body.year === 'number' ? body.year : undefined,
+        })
+        if (!currentPhotos.includes(uploadedPath)) {
+          currentPhotos = [...currentPhotos, uploadedPath]
+        }
+        const idx = remainingUris.indexOf(uri)
+        if (idx !== -1) {
+          remainingUris = [...remainingUris.slice(0, idx), ...remainingUris.slice(idx + 1)]
+        }
+
+        body = { ...body, photos: currentPhotos }
+        item.request = { ...item.request, body }
+        item.meta = {
+          ...item.meta,
+          serialNumber,
+          localPhotoUris: remainingUris.length > 0 ? remainingUris : undefined,
+        }
+        await updateItem(user, item.id, {
+          request: item.request,
+          meta: item.meta,
+        })
+      }
+    }
   }
   if (item.request.method === 'POST') {
     await axiosInstance.post(item.request.url, item.request.body)
@@ -203,7 +263,7 @@ export async function syncOutbox(user: AuthUser, opts?: { maxItems?: number }): 
   for (const item of candidates) {
     await updateItem(user, item.id, { status: 'SENDING', lastError: undefined })
     try {
-      await sendOne(item)
+      await sendOne(user, item)
       sent += 1
       await removeItem(user, item.id)
     } catch (error) {

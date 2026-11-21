@@ -80,6 +80,8 @@ export class FilesController {
     const ext = path.extname(resolvedPath).toLowerCase();
     const contentType = ext === '.png' ? 'image/png' : 'image/jpeg';
     res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     const stream = this.storage.createReadStream(sanitized);
     stream.on('error', () => {
       if (!res.headersSent) {

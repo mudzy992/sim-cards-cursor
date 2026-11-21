@@ -114,6 +114,7 @@ export type CreateInstallationRecordPayload =
 
 export type QueueInstallationRecordPayload = CreateInstallationRecordPayload & {
   localPhotoUris?: string[];
+  serialNumber?: string;
 };
 
 function requireUser() {
@@ -125,13 +126,27 @@ function requireUser() {
 export async function queueInstallationRecord(payload: QueueInstallationRecordPayload): Promise<void> {
   const user = requireUser()
   const { localPhotoUris, ...rest } = payload
-  const sanitizedPayload: CreateInstallationRecordPayload = rest
+  let sanitizedPayload: CreateInstallationRecordPayload = rest
+  if ('meterId' in rest && rest.meterId && 'serialNumber' in rest) {
+    const { serialNumber: _omitted, ...withoutSerial } = rest as CreateInstallationRecordPayload & {
+      serialNumber?: string;
+    }
+    sanitizedPayload = withoutSerial as CreateInstallationRecordPayload
+  }
+  const clientRequestId =
+    payload.clientRequestId ?? `crid_${Date.now()}_${Math.random().toString(36).slice(2)}`
   await enqueueOutboxItem(user, {
     kind: 'INSTALLATION_RECORD_CREATE',
-    request: { method: 'POST', url: '/installation-records', body: sanitizedPayload },
+    clientRequestId,
+    request: {
+      method: 'POST',
+      url: '/installation-records',
+      body: { ...sanitizedPayload, clientRequestId },
+    },
     meta: {
       simCardId: payload.simCardId,
       meterId: 'meterId' in payload ? payload.meterId : undefined,
+      serialNumber: payload.serialNumber,
       localPhotoUris: Array.isArray(localPhotoUris) ? localPhotoUris : undefined,
     },
   })

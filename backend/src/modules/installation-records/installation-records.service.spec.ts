@@ -69,6 +69,7 @@ type PrismaMockShape = {
   branchEmailRecipient: { findMany: jest.Mock };
   user: { findFirst: jest.Mock };
   branch: { findUnique: jest.Mock };
+  installTask: { updateMany: jest.Mock };
 };
 
 describe('InstallationRecordsService', () => {
@@ -108,6 +109,7 @@ describe('InstallationRecordsService', () => {
       branchEmailRecipient: { findMany: jest.fn() },
       user: { findFirst: jest.fn() },
       branch: { findUnique: jest.fn() },
+      installTask: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -380,6 +382,215 @@ describe('InstallationRecordsService', () => {
         errorSpy.mockRestore();
         fs.chmodSync(zapisnikDir, 0o755);
         fs.chmodSync(existingPdf, 0o644);
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('deduplicates concurrent generatePdf calls for the same record id', async () => {
+      let resolvePdf!: (buf: Buffer) => void;
+      const pdfPromise = new Promise<Buffer>((res) => {
+        resolvePdf = res;
+      });
+      const generatePdfMock = jest.fn().mockReturnValue(pdfPromise);
+      const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-pdf-dedup-'));
+      try {
+        const localModule = await Test.createTestingModule({
+          providers: [
+            InstallationRecordsService,
+            { provide: PrismaService, useValue: prismaMock },
+            { provide: RecordNumberGenerator, useValue: { generate: jest.fn() } },
+            { provide: PdfGeneratorService, useValue: { generatePdf: generatePdfMock } },
+            { provide: ActivityLogService, useValue: { log: jest.fn() } },
+            { provide: MailService, useValue: { sendRecordWithPdf: jest.fn() } },
+            { provide: MeterTypeFieldsService, useValue: { validateDynamicValues: jest.fn(), findAllByDefinition: jest.fn().mockResolvedValue([]) } },
+            { provide: ConfigService, useValue: { get: jest.fn((_k: string) => tempRoot) } },
+          ],
+        }).compile();
+        const localService = localModule.get<InstallationRecordsService>(InstallationRecordsService);
+        prismaMock.installationRecord.findFirst.mockResolvedValue({
+          ...mockRecord,
+          kind: InstallationRecordKind.NEW_CONNECTION,
+        });
+        prismaMock.installationRecord.update.mockResolvedValue(mockRecord);
+
+        const p1 = localService.generatePdf('rec-1');
+        const p2 = localService.generatePdf('rec-1');
+        await new Promise((r) => setTimeout(r, 20));
+        resolvePdf(Buffer.from('shared-pdf'));
+
+        const [b1, b2] = await Promise.all([p1, p2]);
+        expect(b1.toString()).toBe('shared-pdf');
+        expect(b2.toString()).toBe('shared-pdf');
+        expect(generatePdfMock).toHaveBeenCalledTimes(1);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('Run 4 hardening', () => {
+    it('rejects NEW_CONNECTION on existing meter that already has a different SIM card', async () => {
+      prismaMock.installationRecord.findUnique.mockResolvedValue(null);
+      prismaMock.simCard.findFirst.mockResolvedValue({
+        id: 'sim-new',
+        status: 'AVAILABLE',
+        assignedToId: null,
+      });
+      prismaMock.meter.findFirst.mockResolvedValue({
+        id: 'meter-existing',
+        status: 'ACTIVE',
+        simCardId: 'sim-old',
+      });
+
+      await expect(
+        service.create({
+          simCardId: 'sim-new',
+          installedById: 'user-1',
+          kind: InstallationRecordKind.NEW_CONNECTION,
+          meterId: 'meter-existing',
+        }),
+      ).rejects.toThrow('Odabrano brojilo već ima ugrađenu SIM karticu');
+    });
+
+    it('rejects USER create with branchId outside own/moderated branches', async () => {
+      prismaMock.installationRecord.findUnique.mockResolvedValue(null);
+      prismaMock.simCard.findFirst.mockResolvedValue({
+        id: 'sim-1',
+        status: 'AVAILABLE',
+        assignedToId: null,
+      });
+      prismaMock.meterTypeDefinition.findUnique.mockResolvedValue({ id: 'type-1', name: 'Type' });
+      prismaMock.meter.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.create(
+          {
+            simCardId: 'sim-1',
+            installedById: 'user-1',
+            kind: InstallationRecordKind.NEW_CONNECTION,
+            meterTypeDefinitionId: 'type-1',
+            serialNumber: 'SN-NEW',
+            year: 2025,
+            calibrationYear: 2025,
+            branchId: 'branch-other',
+          },
+          {
+            userId: 'user-1',
+            role: UserRole.USER,
+            branchId: 'branch-1',
+            branchModeratorBranchIds: [],
+          },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects path traversal or unexpected prefix in photos on create and update', async () => {
+      prismaMock.installationRecord.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.create({
+          simCardId: 'sim-1',
+          installedById: 'user-1',
+          photos: ['../secrets.txt'],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      prismaMock.installationRecord.findFirst.mockResolvedValue(mockRecord);
+      await expect(
+        service.update('rec-1', { photos: ['/etc/passwd'] }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('blocks update transition to SEP_ACTIVATED', async () => {
+      prismaMock.installationRecord.findFirst.mockResolvedValue({
+        ...mockRecord,
+        status: RecordStatus.SENT,
+      });
+
+      await expect(
+        service.update('rec-1', { status: RecordStatus.SEP_ACTIVATED }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('includes moderator own records in findAllForUser', async () => {
+      prismaMock.branchModerator.findMany.mockResolvedValue([{ branchId: 'branch-1' }]);
+
+      await service.findAllForUser('user-1', { page: 1, limit: 20 } as never);
+
+      expect(prismaMock.installationRecord.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              {
+                OR: [
+                  { meter: { branchId: { in: ['branch-1'] } } },
+                  { installedById: 'user-1' },
+                ],
+              },
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it('applies branchId and search filters in findAll', async () => {
+      await service.findAll(
+        { page: 1, limit: 20, branchId: 'branch-1', search: '8938' } as never,
+        { role: UserRole.SYSTEM_ADMIN, distributionId: null, branchId: null },
+      );
+
+      expect(prismaMock.installationRecord.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              { meter: { branchId: 'branch-1' } },
+              {
+                OR: [
+                  { recordNumber: { contains: '8938', mode: 'insensitive' } },
+                  { meter: { serialNumber: { contains: '8938', mode: 'insensitive' } } },
+                  { meter: { simCard: { iccid: { contains: '8938', mode: 'insensitive' } } } },
+                ],
+              },
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it('unlinks installTask and removes PDF file on remove', async () => {
+      const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-rec-rm-'));
+      try {
+        const relPdf = 'installation-records/2026/SN-001/zapisnik/REC-001.pdf';
+        const fullPdf = path.join(tempRoot, relPdf);
+        fs.mkdirSync(path.dirname(fullPdf), { recursive: true });
+        fs.writeFileSync(fullPdf, 'pdf');
+
+        const localModule = await Test.createTestingModule({
+          providers: [
+            InstallationRecordsService,
+            { provide: PrismaService, useValue: prismaMock },
+            { provide: RecordNumberGenerator, useValue: { generate: jest.fn() } },
+            { provide: PdfGeneratorService, useValue: { generatePdf: jest.fn() } },
+            { provide: ActivityLogService, useValue: { log: jest.fn() } },
+            { provide: MailService, useValue: { sendRecordWithPdf: jest.fn() } },
+            { provide: MeterTypeFieldsService, useValue: { validateDynamicValues: jest.fn(), findAllByDefinition: jest.fn().mockResolvedValue([]) } },
+            { provide: ConfigService, useValue: { get: jest.fn((_k: string) => tempRoot) } },
+          ],
+        }).compile();
+        const localService = localModule.get<InstallationRecordsService>(InstallationRecordsService);
+        prismaMock.installationRecord.delete.mockResolvedValue({
+          ...mockRecord,
+          pdfPath: relPdf,
+        });
+
+        await localService.remove('rec-1', { userId: 'admin-1' });
+
+        expect(prismaMock.installTask.updateMany).toHaveBeenCalledWith({
+          where: { installationRecordId: 'rec-1' },
+          data: { installationRecordId: null },
+        });
+        expect(fs.existsSync(fullPdf)).toBe(false);
+      } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
     });

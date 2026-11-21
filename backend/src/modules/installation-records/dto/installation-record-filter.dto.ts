@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { RecordStatus } from '@prisma/client';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 export class InstallationRecordFilterDto extends PaginationDto {
@@ -13,4 +13,14 @@ export class InstallationRecordFilterDto extends PaginationDto {
   @IsOptional()
   @IsUUID()
   meterId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by meter branch ID' })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
+
+  @ApiPropertyOptional({ description: 'Search by recordNumber, meter serialNumber or SIM ICCID' })
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

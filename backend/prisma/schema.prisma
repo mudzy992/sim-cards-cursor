@@ -308,6 +308,8 @@ model InstallationRecord {
   @@index([status])
   @@index([meterId])
   @@index([simCardId])
+  @@index([installedById])
+  @@index([createdAt])
   @@map("installation_records")
 }
 

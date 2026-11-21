@@ -2,7 +2,7 @@
 
 **Obuhvaćeni moduli:** `installation-records` (`installation-records.controller.ts`, `installation-records.service.ts`, `photo-upload.service.ts`, `status-transition.guard.ts`, `dto/*`), `files` (`files.controller.ts`), web (`InstallationRecordsListPage.tsx`, `InstallationRecordDetailPage.tsx`), i mobile (`outbox.ts`, `installation-records.api.ts`, `installation-records-upload.api.ts`).  
 **Datum audita:** 2026-11-21 (branch `arena/015aa78f-sim-cards-cursor`)  
-**Status:** Kompletiran audit i prijedlog izmjena — **čeka odobrenje prije izmjena koda**.
+**Status:** **Paketi A + B + C implementirani i verifikovani**.
 
 ---
 
@@ -83,3 +83,24 @@
    - Pri brisanju zapisnika (`SYSTEM_ADMIN`), provjeriti da nije vezan za `InstallTask` (ili otkačiti referencu u transakciji), i ukloniti `pdfPath` fajl preko `UploadsStorageService` (uz sigurnu provjeru ako ga niko drugi ne dijeli).
 8. **P2-2 (`InstallationRecordsService` indeksiranje / tipizacija):**
    - Dodati Prisma indeks `@@index([createdAt])` i `@@index([installedById])` na `InstallationRecord` radi bržeg sortiranja i "Moji zapisnici" upita na mobilnoj aplikaciji.
+
+---
+
+## 4. Sažetak implementacije (Paketi A + B + C)
+
+- **Backend (`installation-records`, `files`, `storage`, `prisma`):**
+  - `InstallationRecordsService.create`: validira `branchId` za `USER` (sopstvena ili moderirane podružnice), odbija `NEW_CONNECTION` na postojećem brojilu s drugom SIM karticom, i provjerava svaku stavku `photos` (`installation-records/` prefiks, zabranjen `..`, `\` i `\0`).
+  - `UpdateInstallationRecordDto` & `StatusTransitionGuard`: DTO sužen na `{ status, notes, photos }`; `PATCH` ka `SEP_ACTIVATED` blokiran na guardu i servisu (obavezan `mark-sep-activated`); `update()` validira `photos`.
+  - `PhotoUploadService` & `InstallationRecordsController`: validacija stvarnih magic-byte potpisa (`JPEG`/`PNG`/`WEBP`) + `.webp` ekstenzija kad je dozvoljeno u postavkama; Multer gornji limit podignut na `50 MB` kako bi dinamički limit iz `SettingsService` radio.
+  - `InstallationRecordFilterDto` & `InstallationRecordsService`: dodani `search` (`recordNumber`, `meter.serialNumber`, `meter.simCard.iccid`) i `branchId` filteri; `findAllForUser` za moderatora uključuje `OR` sa `installedById`; `generatePdf` deduplicira paralelne pozive putem `inFlightPdfByRecordId`; `remove()` u transakciji otkači `InstallTask.installationRecordId` i ukloni `pdfPath` putem `UploadsStorageService.removeFileIfExists`.
+  - `FilesController.servePhoto`: dodani `Cache-Control: private, max-age=300` i `X-Content-Type-Options: nosniff`.
+  - Prisma migracija `20261121020000_add_installation_record_indexes`: indeksi na `InstallationRecord(installedById)` i `InstallationRecord(createdAt)`.
+- **Mobile (`outbox.ts`, `installation-records.api.ts`):**
+  - `OutboxItem.meta` proširen za `serialNumber`; `queueInstallationRecord` skida `serialNumber` iz `body` kada je prisutan `meterId` i čuva `clientRequestId` i `meta.serialNumber`.
+  - `sendOne` podržava `body.serialNumber` -> `meta.serialNumber` -> `GET /meters/:id` fallback, te nakon svakog pojedinačnog foto uploada perzistira `request.body.photos` i uklanja završeni URI iz `meta.localPhotoUris` kako retry ne bi duplirao upload.
+- **Frontend (`InstallationRecordsListPage.tsx`, `installation-record.types.ts`, `locales/{bs,en}.ts`):**
+  - Dodani `search` (`recordNumber` / `serialNumber` / `ICCID`) i `branchId` (za `SYSTEM_ADMIN` / `DIST_ADMIN`) filteri s punim BS/EN prevodima.
+- **Verifikacija:**
+  - `backend`: `nest build`, `eslint`, `jest` (**16/16 suites, 82/82 tests** uključujući `installation-records.service.spec.ts` i `photo-upload.service.spec.ts`).
+  - `mobile`: `tsc --noEmit`, `eslint`, `jest` (**2/2 suites, 8/8 tests** uključujući retry & `meterId` outbox testove u `offline-iccid.spec.ts`).
+  - `frontend`: `tsc --noEmit`, `eslint`, `check:i18n` (**1067 ključeva u paritetu**), `check:ui` (**141 fajl bez hardcodea**), `vitest` (**9/9 suites, 30/30 tests**), `vite build`.

@@ -624,6 +624,8 @@ const en: TranslationDictionary = {
       title: 'Installation records',
       newRecord: 'New record',
       loadFailed: 'Failed to load the list.',
+      searchPlaceholder: 'Search (record number, serial, ICCID)',
+      branchPlaceholder: 'Branch',
       columns: {
         recordNumber: 'Record number',
         address: 'Address / Location',

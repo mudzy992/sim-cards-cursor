@@ -49,6 +49,7 @@ export type InstallationRecordContext = {
 export class InstallationRecordsService {
   private readonly logger = new Logger(InstallationRecordsService.name);
   private readonly storage: UploadsStorageService;
+  private readonly inFlightPdfByRecordId = new Map<string, Promise<Buffer>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -83,6 +84,30 @@ export class InstallationRecordsService {
     return { year, serial, baseRelativeDir };
   }
 
+  private assertValidPhotoPaths(photos: unknown): string[] | undefined {
+    if (photos === undefined) return undefined;
+    if (!Array.isArray(photos)) {
+      throw new BadRequestException('Polje photos mora biti niz putanja.');
+    }
+    const sanitized: string[] = [];
+    for (const raw of photos) {
+      if (typeof raw !== 'string') {
+        throw new BadRequestException('Svaka putanja fotografije mora biti string.');
+      }
+      const trimmed = raw.trim().replace(/^\/+/, '');
+      if (
+        !trimmed.startsWith('installation-records/') ||
+        trimmed.includes('..') ||
+        trimmed.includes('\\') ||
+        trimmed.includes('\0')
+      ) {
+        throw new BadRequestException('Nevažeća putanja fotografije.');
+      }
+      sanitized.push(trimmed);
+    }
+    return sanitized;
+  }
+
   async create(
     createInstallationRecordDto: CreateInstallationRecordDto,
     ctx?: InstallationRecordContext,
@@ -95,6 +120,8 @@ export class InstallationRecordsService {
         return existing;
       }
     }
+
+    const validatedPhotos = this.assertValidPhotoPaths(createInstallationRecordDto.photos);
 
     const kind =
       createInstallationRecordDto.kind ?? InstallationRecordKind.NEW_CONNECTION;
@@ -222,6 +249,15 @@ export class InstallationRecordsService {
       if (existingMeter.status && existingMeter.status !== 'ACTIVE') {
         throw new BadRequestException('Brojilo nije aktivno; ugradnja SIM-a nije dozvoljena.');
       }
+      if (
+        kind === InstallationRecordKind.NEW_CONNECTION &&
+        existingMeter.simCardId &&
+        existingMeter.simCardId !== simCardId
+      ) {
+        throw new BadRequestException(
+          'Odabrano brojilo već ima ugrađenu SIM karticu. Koristite zamjenu ili nalog demontaže.',
+        );
+      }
       meterIdForLookup = existingMeter.id;
       existingMeterSimCardId = existingMeter.simCardId;
     } else if (
@@ -249,6 +285,18 @@ export class InstallationRecordsService {
       }
       const branchId =
         createInstallationRecordDto.branchId ?? ctx?.branchId ?? undefined;
+      if (ctx && ctx.role === UserRole.USER && createInstallationRecordDto.branchId) {
+        const allowedBranches = new Set(
+          [ctx.branchId, ...(ctx.branchModeratorBranchIds ?? [])].filter(
+            (id): id is string => Boolean(id),
+          ),
+        );
+        if (!allowedBranches.has(createInstallationRecordDto.branchId)) {
+          throw new ForbiddenException(
+            'Nemate dozvolu za kreiranje brojila u odabranoj podružnici.',
+          );
+        }
+      }
       if (branchId && ctx && ctx.role === UserRole.DIST_ADMIN) {
         const branch = await this.prisma.branch.findUnique({
           where: { id: branchId },
@@ -353,9 +401,7 @@ export class InstallationRecordsService {
               simCardId,
               installedById: effectiveInstalledById,
               notes: createInstallationRecordDto.notes,
-              photos: createInstallationRecordDto.photos
-                ? (createInstallationRecordDto.photos as string[])
-                : undefined,
+              photos: validatedPhotos,
             },
           });
 
@@ -432,12 +478,9 @@ export class InstallationRecordsService {
     });
     if (moderatedBranches.length > 0) {
       const branchIds = moderatedBranches.map((b) => b.branchId);
-      return this.findManyWithFilter(
-        filter,
-        undefined,
-        scope,
-        { meter: { branchId: { in: branchIds } } },
-      );
+      return this.findManyWithFilter(filter, undefined, scope, {
+        OR: [{ meter: { branchId: { in: branchIds } } }, { installedById: userId }],
+      });
     }
     return this.findManyWithFilter(filter, { installedById: userId }, scope);
   }
@@ -466,12 +509,23 @@ export class InstallationRecordsService {
         'Korisnik mora biti vezan za podružnicu da bi pristupio listi zapisnika.',
       );
     }
-    const { page, limit, status, meterId } = filter;
+    const { page, limit, status, meterId, branchId, search } = filter;
     const skip = (page - 1) * limit;
     const scopeClause = additionalWhere ? undefined : scopeWhere(scope, { viaMeter: true });
     const andClauses: Record<string, unknown>[] = [];
     if (scopeClause) andClauses.push(scopeClause);
     if (additionalWhere) andClauses.push(additionalWhere);
+    if (branchId) andClauses.push({ meter: { branchId } });
+    if (search?.trim()) {
+      const q = search.trim();
+      andClauses.push({
+        OR: [
+          { recordNumber: { contains: q, mode: 'insensitive' } },
+          { meter: { serialNumber: { contains: q, mode: 'insensitive' } } },
+          { meter: { simCard: { iccid: { contains: q, mode: 'insensitive' } } } },
+        ],
+      });
+    }
     const where = {
       ...(status ? { status } : {}),
       ...(meterId ? { meterId } : {}),
@@ -608,17 +662,33 @@ export class InstallationRecordsService {
     scope?: ScopeContext | null,
   ): Promise<InstallationRecord> {
     await this.findOne(id, scope);
+    if (updateInstallationRecordDto.status === RecordStatus.SEP_ACTIVATED) {
+      throw new BadRequestException(
+        'Za označavanje SEP aktivacije koristite endpoint mark-sep-activated.',
+      );
+    }
+    const validatedPhotos = this.assertValidPhotoPaths(updateInstallationRecordDto.photos);
+    const data: Prisma.InstallationRecordUpdateInput = {
+      ...(updateInstallationRecordDto.status !== undefined && {
+        status: updateInstallationRecordDto.status,
+      }),
+      ...(updateInstallationRecordDto.notes !== undefined && {
+        notes: updateInstallationRecordDto.notes,
+      }),
+      ...(validatedPhotos !== undefined && { photos: validatedPhotos }),
+    };
+
     try {
       const record = await this.prisma.installationRecord.update({
         where: { id },
-        data: updateInstallationRecordDto,
+        data,
       });
       await this.activityLogService.log({
         userId: ctx?.userId,
         action: 'UPDATE',
         entity: 'installation_record',
         entityId: id,
-        details: { fields: Object.keys(updateInstallationRecordDto) },
+        details: { fields: Object.keys(data) },
         ipAddress: ctx?.ipAddress,
       });
       return record;
@@ -640,9 +710,31 @@ export class InstallationRecordsService {
     ctx?: InstallationRecordContext,
   ): Promise<InstallationRecord> {
     try {
-      const record = await this.prisma.installationRecord.delete({
-        where: { id },
+      const record = await this.prisma.$transaction(async (tx) => {
+        const txWithTasks = tx as unknown as {
+          installTask?: { updateMany: (args: unknown) => Promise<unknown> };
+        };
+        if (txWithTasks.installTask?.updateMany) {
+          await txWithTasks.installTask.updateMany({
+            where: { installationRecordId: id },
+            data: { installationRecordId: null },
+          });
+        }
+        return tx.installationRecord.delete({
+          where: { id },
+        });
       });
+
+      if (record.pdfPath) {
+        try {
+          this.storage.removeFileIfExists(record.pdfPath);
+        } catch (err) {
+          this.logger.warn(
+            `Failed to remove PDF file "${record.pdfPath}" for deleted record ${id}: ${err instanceof Error ? err.message : 'unknown'}`,
+          );
+        }
+      }
+
       await this.activityLogService.log({
         userId: ctx?.userId,
         action: 'DELETE',
@@ -890,36 +982,51 @@ export class InstallationRecordsService {
   }
 
   async generatePdf(id: string, scope?: ScopeContext | null): Promise<Buffer> {
-    const installationRecord = await this.findOne(id, scope) as Parameters<InstallationRecordsService['serializeRecordForPdf']>[0];
-    const pdfData = await this.serializeRecordForPdf(installationRecord);
-    const templateName =
-      installationRecord.kind === InstallationRecordKind.METER_REPLACEMENT
-        ? 'installation-record-meter-replacement'
-        : 'installation-record';
-    const buffer = await this.pdfGenerator.generatePdf(templateName, pdfData);
-    const { baseRelativeDir } = this.getRecordBaseDir(installationRecord);
-    const sanitizedFileName = `${this.sanitizePathSegment(installationRecord.recordNumber)}.pdf`;
-    const relativePath = path.posix.join(baseRelativeDir, 'zapisnik', sanitizedFileName);
-    let savedToDisk = false;
-    try {
-      this.storage.writeBuffer(relativePath, buffer);
-      savedToDisk = true;
-    } catch (error) {
-      if (isStoragePermissionError(error)) {
-        this.logger.warn(
-          `Returning PDF buffer for "${relativePath}" without caching to disk due to storage permissions.`,
-        );
-      } else {
-        throw error;
+    const installationRecord = (await this.findOne(id, scope)) as Parameters<
+      InstallationRecordsService['serializeRecordForPdf']
+    >[0];
+
+    const existingPromise = this.inFlightPdfByRecordId.get(id);
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const renderPromise = (async () => {
+      const pdfData = await this.serializeRecordForPdf(installationRecord);
+      const templateName =
+        installationRecord.kind === InstallationRecordKind.METER_REPLACEMENT
+          ? 'installation-record-meter-replacement'
+          : 'installation-record';
+      const buffer = await this.pdfGenerator.generatePdf(templateName, pdfData);
+      const { baseRelativeDir } = this.getRecordBaseDir(installationRecord);
+      const sanitizedFileName = `${this.sanitizePathSegment(installationRecord.recordNumber)}.pdf`;
+      const relativePath = path.posix.join(baseRelativeDir, 'zapisnik', sanitizedFileName);
+      let savedToDisk = false;
+      try {
+        this.storage.writeBuffer(relativePath, buffer);
+        savedToDisk = true;
+      } catch (error) {
+        if (isStoragePermissionError(error)) {
+          this.logger.warn(
+            `Returning PDF buffer for "${relativePath}" without caching to disk due to storage permissions.`,
+          );
+        } else {
+          throw error;
+        }
       }
-    }
-    if (savedToDisk) {
-      await this.prisma.installationRecord.update({
-        where: { id },
-        data: { pdfPath: relativePath },
-      });
-    }
-    return buffer;
+      if (savedToDisk) {
+        await this.prisma.installationRecord.update({
+          where: { id },
+          data: { pdfPath: relativePath },
+        });
+      }
+      return buffer;
+    })().finally(() => {
+      this.inFlightPdfByRecordId.delete(id);
+    });
+
+    this.inFlightPdfByRecordId.set(id, renderPromise);
+    return renderPromise;
   }
 
   async autoSendRecordEmail(

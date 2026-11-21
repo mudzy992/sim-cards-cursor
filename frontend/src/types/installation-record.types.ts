@@ -74,6 +74,8 @@ export type InstallationRecordsListParams = {
   limit?: number;
   status?: RecordStatus;
   meterId?: string;
+  branchId?: string;
+  search?: string;
 };
 
 export type InstallationRecordsResponse = PaginatedResult<InstallationRecordItem>;

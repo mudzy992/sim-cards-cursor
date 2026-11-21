@@ -22,6 +22,12 @@ export class StatusTransitionGuard implements CanActivate {
       return true;
     }
 
+    if (newStatus === RecordStatus.SEP_ACTIVATED) {
+      throw new BadRequestException(
+        'Za označavanje SEP aktivacije koristite endpoint mark-sep-activated.',
+      );
+    }
+
     const record = await this.prisma.installationRecord.findUnique({
       where: { id },
     });
@@ -34,7 +40,7 @@ export class StatusTransitionGuard implements CanActivate {
     const allowedTransitions: Record<RecordStatus, RecordStatus[]> = {
       [RecordStatus.DRAFT]: [RecordStatus.SENT, RecordStatus.SEND_FAILED],
       [RecordStatus.SEND_FAILED]: [RecordStatus.SENT, RecordStatus.SEND_FAILED],
-      [RecordStatus.SENT]: [RecordStatus.SEP_ACTIVATED],
+      [RecordStatus.SENT]: [],
       [RecordStatus.SEP_ACTIVATED]: [],
       [RecordStatus.LEGACY_COMPLETED]: [],
     };

@@ -45,6 +45,33 @@ export class PhotoUploadService {
     return unique.length > 0 ? unique : ['image/jpeg', 'image/png'];
   }
 
+  private hasValidImageMagicBytes(buffer: Buffer, mime: string): boolean {
+    if (mime === 'image/jpeg') {
+      return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    }
+    if (mime === 'image/png') {
+      return (
+        buffer.length >= 8 &&
+        buffer[0] === 0x89 &&
+        buffer[1] === 0x50 &&
+        buffer[2] === 0x4e &&
+        buffer[3] === 0x47 &&
+        buffer[4] === 0x0d &&
+        buffer[5] === 0x0a &&
+        buffer[6] === 0x1a &&
+        buffer[7] === 0x0a
+      );
+    }
+    if (mime === 'image/webp') {
+      return (
+        buffer.length >= 12 &&
+        buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+        buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+      );
+    }
+    return true;
+  }
+
   private async getPhotoUploadLimits(): Promise<{ maxBytes: number; allowedMimes: string[] }> {
     const rawMb = await this.settings.getNumber(SETTINGS_KEYS.uploadsMaxPhotoSizeMb, 5);
     const mb = Math.min(50, Math.max(1, rawMb));
@@ -82,6 +109,11 @@ export class PhotoUploadService {
         `Dozvoljeni formati: ${allowedMimes.join(', ')}. Primljen: ${file.mimetype}`,
       );
     }
+    if (!this.hasValidImageMagicBytes(buffer, normalizedMime)) {
+      throw new BadRequestException(
+        'Sadržaj fajla ne odgovara deklarisanom formatu slike (JPEG/PNG).',
+      );
+    }
     const size = file.size ?? buffer.length;
     if (size > maxBytes) {
       const mbLabel = (maxBytes / 1024 / 1024).toFixed(2);
@@ -91,7 +123,12 @@ export class PhotoUploadService {
     }
 
     const mimetype = normalizedMime || 'image/jpeg';
-    const ext = mimetype === 'image/png' ? '.png' : '.jpg';
+    const ext =
+      mimetype === 'image/png'
+        ? '.png'
+        : mimetype === 'image/webp'
+          ? '.webp'
+          : '.jpg';
     const sanitizedName = `${randomUUID()}${ext}`;
     const serial = this.sanitizePathSegment(serialNumber);
     const relativePath = path.posix.join(

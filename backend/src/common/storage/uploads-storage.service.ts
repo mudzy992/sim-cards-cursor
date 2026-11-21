@@ -31,6 +31,7 @@ export interface UploadsStorageDriver {
   writeBuffer(relativePath: string, data: Buffer): void;
   moveLocalFile(sourcePath: string, targetRelativePath: string): Promise<{ sha256: string }>;
   removeDirRecursive(relativeDir: string): void;
+  removeFileIfExists(relativePath: string): void;
 }
 
 const PERMISSION_ERRNO_CODES = new Set(['EACCES', 'EPERM', 'EROFS']);
@@ -172,6 +173,16 @@ export class DiskUploadsStorageDriver implements UploadsStorageDriver {
     }
     fs.rmSync(resolved, { recursive: true, force: true });
   }
+
+  removeFileIfExists(relativePath: string): void {
+    const resolved = this.resolvePath(relativePath);
+    if (resolved === this.rootDir || !fs.existsSync(resolved)) {
+      return;
+    }
+    if (fs.statSync(resolved).isFile()) {
+      fs.unlinkSync(resolved);
+    }
+  }
 }
 
 @Injectable()
@@ -212,5 +223,9 @@ export class UploadsStorageService implements UploadsStorageDriver {
 
   removeDirRecursive(relativeDir: string): void {
     this.driver.removeDirRecursive(relativeDir);
+  }
+
+  removeFileIfExists(relativePath: string): void {
+    this.driver.removeFileIfExists(relativePath);
   }
 }

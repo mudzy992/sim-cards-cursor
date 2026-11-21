@@ -83,7 +83,7 @@ export class InstallationRecordsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024 },
+      limits: { fileSize: 50 * 1024 * 1024 },
     }),
   )
   @ApiOperation({ summary: 'Upload photo for installation record (returns path for photos array)' })

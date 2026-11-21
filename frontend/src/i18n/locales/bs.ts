@@ -624,6 +624,8 @@ const bs: TranslationDictionary = {
       title: 'Zapisnici ugradnje',
       newRecord: 'Novi zapisnik',
       loadFailed: 'Učitavanje liste nije uspjelo.',
+      searchPlaceholder: 'Pretraga (broj zapisnika, serijski, ICCID)',
+      branchPlaceholder: 'Podružnica',
       columns: {
         recordNumber: 'Broj zapisnika',
         address: 'Adresa / Lokacija',
