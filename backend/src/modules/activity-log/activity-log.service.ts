@@ -31,6 +31,30 @@ export class ActivityLogService {
     });
   }
 
+  private resolveTenantFilter(
+    scope?: ScopeContext | null,
+  ): { allowed: false } | { allowed: true; where: Prisma.ActivityLogWhereInput } {
+    if (!scope || scope.role === UserRole.SYSTEM_ADMIN) {
+      return { allowed: true, where: {} };
+    }
+
+    if (scope.role === UserRole.DIST_ADMIN && scope.distributionId) {
+      return {
+        allowed: true,
+        where: {
+          user: {
+            OR: [
+              { distributionId: scope.distributionId },
+              { branch: { distributionId: scope.distributionId } },
+            ],
+          },
+        },
+      };
+    }
+
+    return { allowed: false };
+  }
+
   async findAll(
     filter: ActivityLogFilterDto,
     scope?: ScopeContext | null,
@@ -38,26 +62,19 @@ export class ActivityLogService {
     const page = filter.page ?? 1;
     const limit = filter.limit ?? 20;
 
-    if (scope && scope.role === UserRole.DIST_ADMIN && !scope.distributionId) {
+    const tenant = this.resolveTenantFilter(scope);
+    if (!tenant.allowed) {
       return { items: [], page, limit, total: 0, totalPages: 1 };
     }
 
-    const tenantFilter: Prisma.ActivityLogWhereInput =
-      scope && scope.role === UserRole.DIST_ADMIN && scope.distributionId
-        ? {
-            user: {
-              OR: [
-                { distributionId: scope.distributionId },
-                { branch: { distributionId: scope.distributionId } },
-              ],
-            },
-          }
-        : {};
-
     const where: Prisma.ActivityLogWhereInput = {
-      ...tenantFilter,
-      ...(filter.action ? { action: { contains: filter.action } } : {}),
-      ...(filter.entity ? { entity: { contains: filter.entity } } : {}),
+      ...tenant.where,
+      ...(filter.action
+        ? { action: { contains: filter.action, mode: 'insensitive' } }
+        : {}),
+      ...(filter.entity
+        ? { entity: { contains: filter.entity, mode: 'insensitive' } }
+        : {}),
       ...(filter.userId ? { userId: filter.userId } : {}),
       ...(filter.from || filter.to
         ? {
@@ -104,8 +121,15 @@ export class ActivityLogService {
     entityId: string,
     page = 1,
     limit = 20,
+    scope?: ScopeContext | null,
   ): Promise<PaginatedResult<unknown>> {
+    const tenant = this.resolveTenantFilter(scope);
+    if (!tenant.allowed) {
+      return { items: [], page, limit, total: 0, totalPages: 1 };
+    }
+
     const where: Prisma.ActivityLogWhereInput = {
+      ...tenant.where,
       entity,
       entityId,
     };

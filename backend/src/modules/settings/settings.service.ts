@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AppSetting } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { UpdateSettingDto } from './dto/update-setting.dto';
 import { UserTourStateDto } from './dto/update-my-settings.dto';
 import { SETTINGS_KEYS } from './settings-keys';
+
+const USER_TOUR_KEY_PREFIX = 'user:tour-state:';
+const MASKED_SECRET = '••••••••';
 
 type SettingChangeContext = {
   userId?: string;
@@ -33,21 +36,55 @@ export class SettingsService {
     private readonly activityLogService: ActivityLogService,
   ) {}
 
+  private isSensitiveSettingKey(key: string): boolean {
+    if (key === SETTINGS_KEYS.smtpPass) {
+      return true;
+    }
+    return /(^|[._:])(pass|password|secret|token|apikey)($|[._:])/i.test(key);
+  }
+
+  private maskSecret(value: string | null | undefined): string {
+    return value ? MASKED_SECRET : '';
+  }
+
   private sanitizeSetting(setting: AppSetting): AppSetting {
-    if (setting.key === SETTINGS_KEYS.smtpPass) {
+    if (this.isSensitiveSettingKey(setting.key)) {
       return {
         ...setting,
-        value: setting.value ? '••••••••' : '',
+        value: this.maskSecret(setting.value),
       };
     }
     return setting;
   }
 
+  private assertPublicSettingKey(key: string): string {
+    const trimmed = key.trim();
+    if (!trimmed || trimmed.length > 120) {
+      throw new BadRequestException('Invalid setting key');
+    }
+    if (trimmed.startsWith(USER_TOUR_KEY_PREFIX)) {
+      throw new BadRequestException(
+        'Per-user tour settings must be accessed via /settings/me',
+      );
+    }
+    return trimmed;
+  }
+
   async findAll(): Promise<AppSetting[]> {
     const items = await this.prisma.appSetting.findMany({
+      where: {
+        NOT: {
+          key: { startsWith: USER_TOUR_KEY_PREFIX },
+        },
+      },
       orderBy: { key: 'asc' },
     });
     return items.map((s) => this.sanitizeSetting(s));
+  }
+
+  async findPublicSettingByKey(key: string): Promise<AppSetting> {
+    const validKey = this.assertPublicSettingKey(key);
+    return this.findByKey(validKey);
   }
 
   async findByKey(key: string): Promise<AppSetting> {
@@ -257,7 +294,7 @@ export class SettingsService {
   }
 
   private getUserTourKey(userId: string): string {
-    return `user:tour-state:${userId}`;
+    return `${USER_TOUR_KEY_PREFIX}${userId}`;
   }
 
   private parseUserTourState(value: string | null | undefined): UserTourState {
@@ -363,6 +400,15 @@ export class SettingsService {
     return nextState;
   }
 
+  async upsertPublicSetting(
+    key: string,
+    dto: UpdateSettingDto,
+    ctx?: SettingChangeContext,
+  ): Promise<AppSetting> {
+    const validKey = this.assertPublicSettingKey(key);
+    return this.upsert(validKey, dto, ctx);
+  }
+
   async upsert(
     key: string,
     dto: UpdateSettingDto,
@@ -372,7 +418,8 @@ export class SettingsService {
       where: { key },
     });
 
-    if (key === SETTINGS_KEYS.smtpPass && dto.value === '••••••••' && existing) {
+    const isSensitive = this.isSensitiveSettingKey(key);
+    if (isSensitive && dto.value === MASKED_SECRET && existing) {
       return this.sanitizeSetting(existing);
     }
 
@@ -396,25 +443,28 @@ export class SettingsService {
       entityId: setting.id,
       details: {
         key,
-        oldValue: existing?.value ?? null,
-        newValue: setting.value,
+        oldValue: isSensitive
+          ? this.maskSecret(existing?.value)
+          : (existing?.value ?? null),
+        newValue: isSensitive ? this.maskSecret(setting.value) : setting.value,
         oldDescription: existing?.description ?? null,
         newDescription: setting.description ?? null,
       },
       ipAddress: ctx?.ipAddress,
     });
 
-    return setting;
+    return this.sanitizeSetting(setting);
   }
 
   async update(key: string, dto: UpdateSettingDto): Promise<AppSetting> {
     await this.findByKey(key);
-    return this.prisma.appSetting.update({
+    const updated = await this.prisma.appSetting.update({
       where: { key },
       data: {
         value: dto.value,
         ...(dto.description !== undefined && { description: dto.description }),
       },
     });
+    return this.sanitizeSetting(updated);
   }
 }

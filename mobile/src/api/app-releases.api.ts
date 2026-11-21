@@ -5,13 +5,11 @@ export type AndroidLatestRelease = {
   platform: 'ANDROID';
   versionName: string;
   versionCode: number;
-  apkPath: string;
   apkFileName: string;
   apkSha256: string;
   releaseNotes: string | null;
   publishedAt: string;
   mandatoryAfterAt: string;
-  createdById: string;
   createdAt: string;
   updatedAt: string;
   downloadUrl: string;

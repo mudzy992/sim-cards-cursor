@@ -17,7 +17,10 @@ export type MobileAppRelease = {
   updatedAt: string;
 };
 
-export type AndroidLatestWithMeta = MobileAppRelease & {
+export type AndroidLatestWithMeta = Omit<
+  MobileAppRelease,
+  'apkPath' | 'createdById'
+> & {
   downloadUrl: string;
   graceDays: number;
 };

@@ -18,6 +18,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -84,15 +85,21 @@ export class AppReleasesController {
   }
 
   @Get('android/download/:id')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Download Android APK (public)' })
   async downloadAndroid(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
-    const { release, stream } = await this.service.getAndroidApkStream(id);
+    const { release, stream, contentLength } = await this.service.getAndroidApkStream(id);
 
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="sim-tracker-${release.versionName}.apk"`,
     );
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    if (typeof contentLength === 'number') {
+      res.setHeader('Content-Length', String(contentLength));
+    }
     stream.on('error', () => {
       if (!res.headersSent) {
         res.status(404).send('File not found');

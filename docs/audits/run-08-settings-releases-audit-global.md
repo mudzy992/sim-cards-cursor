@@ -2,7 +2,7 @@
 
 **Obuhvaćeni moduli:** `settings` (`settings.controller.ts`, `settings.public.controller.ts`, `settings.service.ts`, `settings-keys.ts`, `dto/*`), `app-releases` (`app-releases.controller.ts`, `app-releases.service.ts`, `dto/*`), `activity-log` (`activity-log.controller.ts`, `activity-log.service.ts`, `dto/*`), `health.controller.ts`, `packages/shared`, te globalni bootstrap/filters/interceptors (`main.ts`, `timeout.interceptor.ts`, `http-exception.filter.ts`, `prisma-exception.filter.ts`).  
 **Datum audita:** 2026-11-21 (branch `arena/015aa78f-sim-cards-cursor`)  
-**Status:** Kompletiran audit i prijedlog izmjena — **čeka odobrenje prije izmjena koda**.
+**Status:** **Paketi A + B + C implementirani i verifikovani**.
 
 ---
 
@@ -56,3 +56,23 @@
    - `backend/src/modules/settings/settings.service.spec.ts` (maskiranje `smtp.pass` u `findAll`, `findByKey`, `upsert`, redakcija u `ActivityLog.details`, izuzimanje `user:tour-state:*` iz `findAll`, `getFeatures`).
    - `backend/src/modules/app-releases/app-releases.service.spec.ts` (provjera APK magic bytes, cleanup temp fajla pri grešci, izostavljanje `apkPath`/`createdById` u `getLatestAndroidRelease`, traversal guard u `getAndroidApkStream`).
    - `backend/src/modules/activity-log/activity-log.service.spec.ts` (tenant izolacija za `DIST_ADMIN`, fail-closed za `DIST_ADMIN` bez `distributionId` i `USER`, filteri datuma/akcije).
+
+---
+
+## 4. Sažetak implementacije (Paketi A + B + C)
+
+- **`settings` (`settings.public.controller.ts`, `settings.controller.ts`, `settings.service.ts`, `dto/update-my-settings.dto.ts`):**
+  - Uklonjena kolizija ruta `/settings/notifications` iz `SettingsPublicController`, tako da `GET /settings/notifications` sada ide isključivo kroz `JwtAuthGuard` + `RolesGuard` u `SettingsController` (javni ostaje samo `GET /settings/mobile-push`).
+  - `SettingsService`: uvedena generalizovana provjera osjetljivih ključeva (`isSensitiveSettingKey`); `upsert()` i `update()` obavezno vraćaju `sanitizeSetting()`; `upsert()` maskira `oldValue` i `newValue` u `ActivityLog.details`; `findAll()` izuzima interne `user:tour-state:*` redove; `:key` endpointi validiraju dužinu (`<= 120`) i blokiraju direktno čitanje/pisanje `user:tour-state:*`; `completedAt`/`lastVersionSeen` u `UpdateMySettingsDto` ograničeni na `@MaxLength(64)`.
+- **`app-releases` (`app-releases.controller.ts`, `app-releases.service.ts`, `dto/upload-android-release.dto.ts`, web/mobile tipovi):**
+  - `uploadAndroidRelease`: validira ZIP/APK magic bytes (`PK\x03\x04`) i obavezno čisti privremeni upload fajl u `finally` bloku; `releaseNotes` ograničen na `@MaxLength(2000)`.
+  - `getLatestAndroidRelease`: izostavlja interne `apkPath` i `createdById` iz javnog metadata odgovora (usklađeni TypeScript tipovi na `frontend` i `mobile`).
+  - `downloadAndroid`: dodan `@Throttle` (`20 req / 60s`), `X-Content-Type-Options: nosniff`, `Cache-Control: private, max-age=3600` i `Content-Length`.
+- **`activity-log` (`activity-log-filter.dto.ts`, `activity-log.service.ts`):**
+  - `ActivityLogFilterDto`: dodani `@IsUUID()` na `userId` i `@MaxLength(100)` na `action`/`entity`.
+  - `ActivityLogService`: eksplicitna fail-closed provjera (`resolveTenantFilter`) za sve uloge osim `SYSTEM_ADMIN` i `DIST_ADMIN` s validnim `distributionId`; `mode: 'insensitive'` na `action`/`entity`; dodan opcionalni `scope` i u `findForEntity`.
+- **Verifikacija:**
+  - `packages/shared`: `tsc` dual build OK, **5/5 tests passed**.
+  - `backend`: `nest build` OK, `eslint` OK, `jest` **24/24 suites, 119/119 tests passed** (uključujući 3 nova spec fajla za Run 8).
+  - `frontend`: `tsc --noEmit` OK, `eslint` OK, `check:i18n` (**1067 ključeva**), `check:ui` (**141 fajl**), `vitest` **9/9 suites, 30/30 tests passed**, `vite build` OK.
+  - `mobile`: `tsc --noEmit` OK, `eslint` OK, `jest` **2/2 suites, 8/8 tests passed**.

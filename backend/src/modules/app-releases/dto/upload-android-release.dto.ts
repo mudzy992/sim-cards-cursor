@@ -18,6 +18,7 @@ export class UploadAndroidReleaseDto {
   @ApiPropertyOptional({ description: 'Release notes (optional)' })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   releaseNotes?: string;
 
   // Prisutan u multipart form-data, ali stvarni fajl čitamo kroz @UploadedFile.

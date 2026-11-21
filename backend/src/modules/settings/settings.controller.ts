@@ -119,7 +119,7 @@ export class SettingsController {
   @Roles(UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Dohvati postavku po ključu' })
   findByKey(@Param('key') key: string) {
-    return this.settingsService.findByKey(key);
+    return this.settingsService.findPublicSettingByKey(key);
   }
 
   @Patch(':key')
@@ -134,7 +134,7 @@ export class SettingsController {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress;
-    return this.settingsService.upsert(key, dto, {
+    return this.settingsService.upsertPublicSetting(key, dto, {
       userId: user.id,
       ipAddress,
     });

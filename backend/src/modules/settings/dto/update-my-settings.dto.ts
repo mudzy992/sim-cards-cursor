@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsObject, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class WebRoleTourStateDto {
@@ -11,6 +11,7 @@ export class WebRoleTourStateDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   completedAt?: string | null;
 }
 
@@ -34,6 +35,7 @@ export class WebTourStateDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   lastVersionSeen?: string | null;
 }
 
@@ -46,6 +48,7 @@ export class MobileTourStateDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   completedAt?: string | null;
 }
 
