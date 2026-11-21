@@ -7,6 +7,7 @@ import {
   type TimeRangeParams,
 } from '@/api/analytics.api';
 import { useTranslation } from '@/i18n';
+import { useAuthStore } from '@/store/auth.store';
 import { getSimCardStatusLabel, getUserRoleLabel } from '@/utils/labels.utils';
 import type { SimCardStatus } from '@/types/sim-card.types';
 import type { UserRole } from '@/types/auth.types';
@@ -45,6 +46,11 @@ function useTimeRange(): [TimeRangeParams, (r: AnalyticsRange) => void] {
 
 export default function AnalyticsPage() {
   const { t, language } = useTranslation();
+  const user = useAuthStore((state) => state.user);
+  const canViewUsersAnalytics =
+    user?.role === 'SYSTEM_ADMIN' ||
+    user?.role === 'DIST_ADMIN' ||
+    (user?.role === 'USER' && (user?.branchModeratorBranchIds?.length ?? 0) > 0);
   const dateLocale = getActiveIntlLocale(language);
   const rangeOptions = getRangeOptions(t);
   const [rangeParams, setRangeRange] = useTimeRange();
@@ -67,6 +73,7 @@ export default function AnalyticsPage() {
   const usersQuery = useQuery({
     queryKey: ['analytics-users', rangeParams],
     queryFn: () => analyticsApi.getUsers(rangeParams),
+    enabled: canViewUsersAnalytics,
   });
 
   const handleDownloadCsv = async (
@@ -326,7 +333,7 @@ export default function AnalyticsPage() {
       </Row>
 
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
+        <Col xs={24} lg={canViewUsersAnalytics ? 12 : 24}>
           <SectionCard title={t('analytics.timelineTitle')} loading={recordsQuery.isLoading}>
             {records?.timeline?.length ? (
               <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto pr-1">
@@ -358,47 +365,49 @@ export default function AnalyticsPage() {
           </SectionCard>
         </Col>
 
-        <Col xs={24} lg={12}>
-          <SectionCard
-            title={t('analytics.userActivityTitle')}
-            loading={usersQuery.isLoading}
-            actions={
-              <Button size="small" onClick={() => void handleDownloadCsv('users')}>
-                CSV
-              </Button>
-            }
-          >
-            <div className="-mx-4 overflow-x-auto px-4">
-              <Table
-                dataSource={users}
-                rowKey="userId"
-                size="small"
-                pagination={false}
-                locale={{ emptyText: <EmptyNotice /> }}
-                scroll={{ x: 'max-content' }}
-                columns={[
-                  {
-                    title: t('common.labels.username'),
-                    render: (_: unknown, row) => `${row.firstName} ${row.lastName}`,
-                  },
-                  { title: t('common.labels.email'), dataIndex: 'email' },
-                  {
-                    title: t('common.labels.role'),
-                    dataIndex: 'role',
-                    render: (r: string) => (
-                      <StatusBadge
-                        tone={getUserRoleTone(r)}
-                        label={getUserRoleLabel(r as UserRole, t)}
-                      />
-                    ),
-                  },
-                  { title: t('analytics.createdRecordsColumn'), dataIndex: 'created' },
-                  { title: t('analytics.approvedRecordsColumn'), dataIndex: 'approved' },
-                ]}
-              />
-            </div>
-          </SectionCard>
-        </Col>
+        {canViewUsersAnalytics && (
+          <Col xs={24} lg={12}>
+            <SectionCard
+              title={t('analytics.userActivityTitle')}
+              loading={usersQuery.isLoading}
+              actions={
+                <Button size="small" onClick={() => void handleDownloadCsv('users')}>
+                  CSV
+                </Button>
+              }
+            >
+              <div className="-mx-4 overflow-x-auto px-4">
+                <Table
+                  dataSource={users}
+                  rowKey="userId"
+                  size="small"
+                  pagination={false}
+                  locale={{ emptyText: <EmptyNotice /> }}
+                  scroll={{ x: 'max-content' }}
+                  columns={[
+                    {
+                      title: t('common.labels.username'),
+                      render: (_: unknown, row) => `${row.firstName} ${row.lastName}`,
+                    },
+                    { title: t('common.labels.email'), dataIndex: 'email' },
+                    {
+                      title: t('common.labels.role'),
+                      dataIndex: 'role',
+                      render: (r: string) => (
+                        <StatusBadge
+                          tone={getUserRoleTone(r)}
+                          label={getUserRoleLabel(r as UserRole, t)}
+                        />
+                      ),
+                    },
+                    { title: t('analytics.createdRecordsColumn'), dataIndex: 'created' },
+                    { title: t('analytics.approvedRecordsColumn'), dataIndex: 'approved' },
+                  ]}
+                />
+              </div>
+            </SectionCard>
+          </Col>
+        )}
       </Row>
     </PageShell>
   );

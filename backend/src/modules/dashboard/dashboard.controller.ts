@@ -7,8 +7,13 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { toScopeContext } from 'src/common/utils/scope-filter.util';
 import { DashboardService } from './dashboard.service';
+import {
+  GetRecentRecordsQueryDto,
+  GetRecordsChartQueryDto,
+} from './dto/dashboard-query.dto';
 
 type ScopedUser = {
+  id?: string;
   role: string;
   distributionId?: string | null;
   branchId?: string | null;
@@ -35,13 +40,10 @@ export class DashboardController {
   @ApiOperation({ summary: 'Nedavni zapisnici' })
   getRecentRecords(
     @CurrentUser() user: ScopedUser,
-    @Query('limit') limit?: string,
+    @Query() query: GetRecentRecordsQueryDto,
   ) {
     const scope = toScopeContext({ ...user, role: user.role as UserRole });
-    return this.dashboardService.getRecentRecords(
-      limit ? parseInt(limit, 10) : 10,
-      scope,
-    );
+    return this.dashboardService.getRecentRecords(query.limit ?? 10, scope);
   }
 
   @Get('records-chart')
@@ -49,12 +51,9 @@ export class DashboardController {
   @ApiOperation({ summary: 'Graf zapisnika po danima' })
   getRecordsChart(
     @CurrentUser() user: ScopedUser,
-    @Query('days') days?: string,
+    @Query() query: GetRecordsChartQueryDto,
   ) {
     const scope = toScopeContext({ ...user, role: user.role as UserRole });
-    return this.dashboardService.getRecordsChart(
-      days ? parseInt(days, 10) : 30,
-      scope,
-    );
+    return this.dashboardService.getRecordsChart(query.days ?? 30, scope);
   }
 }

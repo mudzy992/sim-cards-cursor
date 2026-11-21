@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Query,
@@ -15,11 +16,15 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-import { toScopeContext } from 'src/common/utils/scope-filter.util';
+import {
+  isScopedAdminOrModerator,
+  toScopeContext,
+} from 'src/common/utils/scope-filter.util';
 import { AnalyticsService, TimeRangeParams } from './analytics.service';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 
 type ScopedUser = {
+  id?: string;
   role: string;
   distributionId?: string | null;
   branchId?: string | null;
@@ -95,6 +100,11 @@ export class AnalyticsController {
     @Query() query: AnalyticsQueryDto,
   ) {
     const scope = toScopeContext({ ...user, role: user.role as UserRole });
+    if (!isScopedAdminOrModerator(scope)) {
+      throw new ForbiddenException(
+        'Only administrators and branch moderators can access user analytics',
+      );
+    }
     return this.analyticsService.getUsersAnalytics(
       this.buildRangeParams(query),
       scope,
@@ -115,6 +125,11 @@ export class AnalyticsController {
       throw new BadRequestException('Unsupported report type');
     }
     const scope = toScopeContext({ ...user, role: user.role as UserRole });
+    if (report === 'users' && !isScopedAdminOrModerator(scope)) {
+      throw new ForbiddenException(
+        'Only administrators and branch moderators can export user analytics',
+      );
+    }
     const { filename, content } = await this.analyticsService.getExportCsv(
       report as ReportType,
       this.buildRangeParams(query),
@@ -123,6 +138,7 @@ export class AnalyticsController {
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(content);
   }
 }

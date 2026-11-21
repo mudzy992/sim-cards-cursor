@@ -63,5 +63,5 @@ Ovaj direktorij sadrži sistematsku dokumentaciju sistema **modul po modul**, an
 | **Run 4** | `installation-records`, `photo-upload`, `files`, mobile `outbox` | **Paketi A + B + C implementirani (`installation-records`, `files`, `prisma`, web, mobile)** | [`run-04-records-files-outbox.md`](./run-04-records-files-outbox.md) |
 | **Run 5** | `install-tasks`, `demount-tasks` | **Paketi A + B + C implementirani (`install-tasks`, `demount-tasks`, `installation-records`, `prisma`, web/mobile API)** | [`run-05-install-demount-tasks.md`](./run-05-install-demount-tasks.md) |
 | **Run 6** | `mail`, `branch-email-recipients`, `notifications`, `push-tokens`, `push-campaigns` | **Paketi A + B + C implementirani (`mail`, `branch-email-recipients`, `notifications`, `push-tokens`, `push-campaigns`, `prisma`, web)** | [`run-06-mail-notifications-push.md`](./run-06-mail-notifications-push.md) |
-| **Run 7** | `dashboard`, `analytics` | **Završen audit (čeka odobrenje za izmjene)** | [`run-07-dashboard-analytics.md`](./run-07-dashboard-analytics.md) |
+| **Run 7** | `dashboard`, `analytics` | **Paketi A + B + C implementirani (`dashboard`, `analytics`, `scope-filter`, web)** | [`run-07-dashboard-analytics.md`](./run-07-dashboard-analytics.md) |
 | **Run 8** | `settings`, `app-releases`, `activity-log`, `packages/shared`, globalna sigurnost | Planiran | — |

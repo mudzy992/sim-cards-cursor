@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
+import {
+  scopeWhere,
+  simCardScopeWhere,
+  ScopeContext,
+} from 'src/common/utils/scope-filter.util';
+
+const DAY_MS = 86_400_000;
+const CHART_BATCH_SIZE = 5000;
+const CHART_MAX_ROWS = 50_000;
 
 export interface DashboardStats {
   installationRecords: {
@@ -31,7 +40,7 @@ export class DashboardService {
 
   async getStats(scope?: ScopeContext | null): Promise<DashboardStats> {
     const irScope = scopeWhere(scope, { viaMeter: true });
-    const simScope = scopeWhere(scope, { viaShipment: true });
+    const simScope = simCardScopeWhere<Prisma.SimCardWhereInput>(scope);
     const meterScope = scopeWhere(scope, { branchIdField: 'branchId' });
 
     const irWhere = irScope ? { AND: [irScope] } : {};
@@ -88,12 +97,16 @@ export class DashboardService {
     limit = 10,
     scope?: ScopeContext | null,
   ): Promise<RecentRecord[]> {
+    const safeLimit = Math.min(
+      50,
+      Math.max(1, Number.isFinite(limit) ? Math.trunc(limit) : 10),
+    );
     const irScope = scopeWhere(scope, { viaMeter: true });
     const where = irScope ? { AND: [irScope] } : {};
 
     const records = await this.prisma.installationRecord.findMany({
       where,
-      take: limit,
+      take: safeLimit,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -119,36 +132,59 @@ export class DashboardService {
     days = 30,
     scope?: ScopeContext | null,
   ): Promise<{ date: string; count: number }[]> {
+    const safeDays = Math.min(
+      365,
+      Math.max(1, Number.isFinite(days) ? Math.trunc(days) : 30),
+    );
     const irScope = scopeWhere(scope, { viaMeter: true });
     const where = irScope ? { AND: [irScope] } : {};
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
-
-    const records = await this.prisma.installationRecord.findMany({
-      where: {
-        ...where,
-        createdAt: { gte: startDate },
-      },
-      select: { createdAt: true },
-    });
+    const now = new Date();
+    const endUtcDayMs = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+    );
+    const startUtcMs = endUtcDayMs - safeDays * DAY_MS;
+    const startDate = new Date(startUtcMs);
 
     const byDate = new Map<string, number>();
-    for (let i = 0; i <= days; i++) {
-      const d = new Date(startDate);
-      d.setDate(d.getDate() + i);
-      byDate.set(d.toISOString().slice(0, 10), 0);
+    for (let i = 0; i <= safeDays; i++) {
+      const key = new Date(startUtcMs + i * DAY_MS).toISOString().slice(0, 10);
+      byDate.set(key, 0);
     }
-    records.forEach((r) => {
-      const key = r.createdAt.toISOString().slice(0, 10);
-      if (byDate.has(key)) {
-        byDate.set(key, (byDate.get(key) ?? 0) + 1);
-      }
-    });
 
-    return Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, count]) => ({ date, count }));
+    let cursorId: string | undefined;
+    let processed = 0;
+    while (processed < CHART_MAX_ROWS) {
+      const batch = await this.prisma.installationRecord.findMany({
+        where: {
+          ...where,
+          createdAt: { gte: startDate },
+        },
+        select: { id: true, createdAt: true },
+        orderBy: { id: 'asc' },
+        take: CHART_BATCH_SIZE,
+        ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+      });
+
+      for (const r of batch) {
+        const key = r.createdAt.toISOString().slice(0, 10);
+        if (byDate.has(key)) {
+          byDate.set(key, (byDate.get(key) ?? 0) + 1);
+        }
+      }
+
+      processed += batch.length;
+      if (batch.length < CHART_BATCH_SIZE || !batch[batch.length - 1]?.id) {
+        break;
+      }
+      cursorId = batch[batch.length - 1].id;
+    }
+
+    return Array.from(byDate.entries()).map(([date, count]) => ({
+      date,
+      count,
+    }));
   }
 }

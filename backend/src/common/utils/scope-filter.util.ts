@@ -1,6 +1,7 @@
 import { UserRole } from '@prisma/client';
 
 export type ScopeContext = {
+  userId?: string;
   role: UserRole;
   distributionId: string | null;
   branchId: string | null;
@@ -129,8 +130,75 @@ export function scopeWhere<T extends Record<string, unknown>>(
   return failClosedWhere<T>(options);
 }
 
+export function simCardScopeWhere<T extends Record<string, unknown>>(
+  ctx: ScopeContext | null | undefined,
+): T | undefined {
+  if (!ctx) {
+    return { id: { in: [] } } as unknown as T;
+  }
+
+  if (ctx.role === UserRole.SYSTEM_ADMIN) {
+    return undefined;
+  }
+
+  if (ctx.role === UserRole.DIST_ADMIN) {
+    if (!ctx.distributionId) {
+      return { id: { in: [] } } as unknown as T;
+    }
+    return { shipment: { distributionId: ctx.distributionId } } as unknown as T;
+  }
+
+  if (ctx.role === UserRole.USER) {
+    const modBranches = ctx.branchModeratorBranchIds ?? [];
+    const allBranchIds = Array.from(
+      new Set([...(ctx.branchId ? [ctx.branchId] : []), ...modBranches]),
+    );
+
+    if (modBranches.length > 0 && allBranchIds.length > 0) {
+      const branchMatch =
+        allBranchIds.length === 1 ? allBranchIds[0] : { in: allBranchIds };
+      return {
+        OR: [
+          { meter: { branchId: branchMatch } },
+          { assignedTo: { branchId: branchMatch } },
+        ],
+      } as unknown as T;
+    }
+
+    if (ctx.userId) {
+      return { assignedToId: ctx.userId } as unknown as T;
+    }
+
+    if (allBranchIds.length > 0) {
+      return {
+        meter: {
+          branchId: allBranchIds.length === 1 ? allBranchIds[0] : { in: allBranchIds },
+        },
+      } as unknown as T;
+    }
+
+    return { id: { in: [] } } as unknown as T;
+  }
+
+  return { id: { in: [] } } as unknown as T;
+}
+
+export function isScopedAdminOrModerator(
+  ctx: ScopeContext | null | undefined,
+): boolean {
+  if (!ctx) return false;
+  if (ctx.role === UserRole.SYSTEM_ADMIN || ctx.role === UserRole.DIST_ADMIN) {
+    return true;
+  }
+  if (ctx.role === UserRole.USER) {
+    return (ctx.branchModeratorBranchIds?.length ?? 0) > 0;
+  }
+  return false;
+}
+
 export function toScopeContext(
   user: {
+    id?: string;
     role: UserRole;
     distributionId?: string | null;
     branchId?: string | null;
@@ -139,6 +207,7 @@ export function toScopeContext(
 ): ScopeContext | null {
   if (!user) return null;
   return {
+    userId: user.id,
     role: user.role,
     distributionId: user.distributionId ?? null,
     branchId: user.branchId ?? null,

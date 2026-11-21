@@ -2,7 +2,7 @@
 
 **Obuhvaćeni moduli:** `dashboard` (`dashboard.controller.ts`, `dashboard.service.ts`), `analytics` (`analytics.controller.ts`, `analytics.service.ts`, `analytics.service.spec.ts`, `dto/analytics-query.dto.ts`), te pripadajući web/mobile klijenti (`frontend/src/api/dashboard.api.ts`, `frontend/src/api/analytics.api.ts`, `frontend/src/pages/dashboard/DashboardPage.tsx`, `frontend/src/pages/analytics/AnalyticsPage.tsx`, `mobile/src/api/dashboard.api.ts`).  
 **Datum audita:** 2026-11-21 (branch `arena/015aa78f-sim-cards-cursor`)  
-**Status:** Kompletiran audit i prijedlog izmjena — **čeka odobrenje prije izmjena koda**.
+**Status:** **Paketi A + B + C implementirani i verifikovani**.
 
 ---
 
@@ -59,3 +59,24 @@
 8. **Unit testovi:**
    - Kreirati `backend/src/modules/dashboard/dashboard.service.spec.ts` (testovi za `getStats` po ulogama `SYSTEM_ADMIN`/`DIST_ADMIN`/`USER`/`BRANCH_MODERATOR`, `getRecentRecords` i `getRecordsChart` granice i UTC bucketing).
    - Proširiti `backend/src/modules/analytics/analytics.service.spec.ts` (testovi za `USER` vs `BRANCH_MODERATOR` vs `DIST_ADMIN` scope izolaciju, `ForbiddenException` na `users` za običnog `USER`-a, `CUSTOM` range validacija, `getUsersAnalytics` `groupBy`, CSV formula escaping + BOM).
+
+---
+
+## 4. Sažetak implementacije (Paketi A + B + C)
+
+- **Scope izolacija i validacija (`scope-filter.util.ts`, `dashboard`, `analytics`):**
+  - Dodan `userId?: string` u `ScopeContext` i `toScopeContext()`, te `simCardScopeWhere()` i `isScopedAdminOrModerator()`.
+  - Običan terenski monter (`USER`) sada u `DashboardService.getStats`, `AnalyticsService.getOverview` i `AnalyticsService.getSimCardsAnalytics` vidi isključivo svoje SIM kartice (`assignedToId`), `BRANCH_MODERATOR` vidi SIM kartice svojih podružnica, a `DIST_ADMIN` SIM kartice svoje distribucije.
+  - `GET /analytics/users` i `GET /analytics/exports/users.csv` (kao i servisne metode) odbijaju običnog `USER`-a s `ForbiddenException`, a upit nad `User` tabelom dodatno primjenjuje `scopeWhere(..., { userScope: true })`.
+  - Kreiran `DashboardQueryDto` (`GetRecentRecordsQueryDto` `limit` 1–50, `GetRecordsChartQueryDto` `days` 1–365) uz servisni clamp.
+- **Performanse i UTC aritmetika (`dashboard`, `analytics`):**
+  - `AnalyticsService.getSimCardsAnalytics` prepisan na 4 paralelna `groupBy` upita (`status`, `shipmentId`, `meter.branchId`, `assignedToId + status`) + lookup-e po ID-evima.
+  - `AnalyticsService.getUsersAnalytics` koristi dva paralelna `installationRecord.groupBy` upita (`installedById`, `approvedById`).
+  - `DashboardService.getRecordsChart` i `AnalyticsService.getInstallationRecordsAnalytics` koriste UTC datumsku aritmetiku (`Date.UTC` / `86_400_000`) i batchirano čitanje s cursor paginacijom (`5000` po batchu, max `50_000`), a `collectActivationSamples` ograničen na `5000` najnovijih zapisa.
+- **CSV & Frontend (`analytics.service.ts`, `AnalyticsPage.tsx`):**
+  - Svi CSV exporti dodaju UTF-8 BOM (`\uFEFF`), `X-Content-Type-Options: nosniff`, i koriste `escapeCsvCell`.
+  - `AnalyticsPage.tsx` gasi `analytics-users` upit i sakriva sekciju aktivnosti korisnika za običnog `USER`-a.
+- **Verifikacija:**
+  - `backend`: `nest build`, `eslint`, `jest` (**21/21 suites, 111/111 tests** uključujući `dashboard.service.spec.ts` i prošireni `analytics.service.spec.ts`).
+  - `frontend`: `tsc --noEmit`, `eslint`, `check:i18n` (**1067 ključeva**), `check:ui` (**141 fajl**), `vitest` (**9/9 suites, 30/30 tests**), `vite build`.
+  - `mobile`: `tsc --noEmit`, `eslint`, `jest` (**2/2 suites, 8/8 tests**).
