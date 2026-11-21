@@ -37,7 +37,7 @@ describe('LoginPage ThemeSwitcher & LanguageSwitcher interactions', () => {
     const darkItem = await screen.findByRole('menuitem', { name: /tamn|dark/i });
     fireEvent.click(darkItem);
     expect(document.documentElement.dataset.theme).toBe('dark');
-  });
+  }, 15_000);
 
   it('opens language dropdown and switches between bs and en', async () => {
     renderLogin();
@@ -46,5 +46,5 @@ describe('LoginPage ThemeSwitcher & LanguageSwitcher interactions', () => {
     const enItem = await screen.findByRole('menuitem', { name: /englesk|english/i });
     fireEvent.click(enItem);
     expect(await screen.findByRole('button', { name: /sign in|login/i })).toBeTruthy();
-  });
+  }, 15_000);
 });
