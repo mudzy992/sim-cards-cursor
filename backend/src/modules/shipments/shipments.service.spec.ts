@@ -211,7 +211,7 @@ describe('ShipmentsService — Excel import atomicity', () => {
   it('chunks large 8,500+ row imports for both lookup and createMany to stay below PostgreSQL 32,767 bind-parameter limit', async () => {
     const { service, prisma, tx } = createMocks();
     const rowCount = 8_500;
-    const lines = ['ICCID,IP,PublicIP,Phone,APN'];
+    const lines = ['ICCID,IP,Public_IP,Phone,APN'];
     for (let i = 0; i < rowCount; i += 1) {
       const iccid = `893870000000000${String(10000 + i)}`;
       const third = Math.floor(i / 250);
