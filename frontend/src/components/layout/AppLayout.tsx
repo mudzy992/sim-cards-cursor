@@ -38,12 +38,12 @@ export function AppLayout() {
         {t('layout.a11y.themeChanged', { mode: t(`layout.theme.${preference}`) })}
       </div>
       <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
-      <Layout className="bg-canvas">
+      <Layout className="min-w-0 bg-canvas">
         <Header onMobileMenuClick={() => setMobileNavOpen(true)} />
         <Content
           id="main-content"
           tabIndex={-1}
-          className="px-4 py-5 outline-none sm:px-6 lg:px-8 lg:py-6"
+          className="min-w-0 px-4 py-5 outline-none sm:px-6 lg:px-8 lg:py-6"
         >
           <div className="mx-auto w-full max-w-[1440px]">
             <Breadcrumb />

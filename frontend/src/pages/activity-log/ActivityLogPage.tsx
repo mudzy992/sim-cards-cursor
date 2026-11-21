@@ -33,7 +33,7 @@ export default function ActivityLogPage() {
         {t('layout.sidebar.activityLog')}
       </Typography.Title>
       <Card>
-        <div className="flex gap-4 mb-4">
+        <div className="mb-4 flex flex-wrap gap-3">
           <Input
             placeholder={t('activityLog.filters.actionPlaceholder')}
             value={actionFilter}
@@ -88,7 +88,7 @@ export default function ActivityLogPage() {
               dataIndex: 'details',
               render: (d: unknown) =>
                 d && typeof d === 'object' ? (
-                  <Typography.Text type="secondary" className="text-xs">
+                  <Typography.Text type="secondary" className="block max-w-md break-all text-xs">
                     {JSON.stringify(d)}
                   </Typography.Text>
                 ) : (

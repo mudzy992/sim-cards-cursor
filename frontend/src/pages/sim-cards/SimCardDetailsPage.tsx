@@ -143,7 +143,7 @@ export default function SimCardDetailsPage() {
 
       <SectionCard loading={simCardQuery.isLoading}>
         {simCard ? (
-          <Descriptions column={2} bordered>
+          <Descriptions column={{ xs: 1, sm: 2 }} bordered>
             <Descriptions.Item label="ICCID">
               <span className="font-mono">{simCard.iccid}</span>
             </Descriptions.Item>

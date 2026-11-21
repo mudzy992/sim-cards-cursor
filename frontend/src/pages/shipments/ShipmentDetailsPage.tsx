@@ -72,7 +72,7 @@ export default function ShipmentDetailsPage() {
 
       <SectionCard loading={shipmentQuery.isLoading}>
         {shipment ? (
-          <Descriptions column={2} bordered>
+          <Descriptions column={{ xs: 1, sm: 2 }} bordered>
             <Descriptions.Item label={t('common.labels.name')}>{shipment.name}</Descriptions.Item>
             <Descriptions.Item label={t('common.labels.status')}>
               <StatusBadge
@@ -92,7 +92,7 @@ export default function ShipmentDetailsPage() {
             <Descriptions.Item label={t('shipments.details.importedBy')}>
               {shipment.importedBy.firstName} {shipment.importedBy.lastName}
             </Descriptions.Item>
-            <Descriptions.Item label={t('common.labels.notes')} span={2}>
+            <Descriptions.Item label={t('common.labels.notes')} span={{ xs: 1, sm: 2 }}>
               {shipment.notes ?? FALLBACK_DASH}
             </Descriptions.Item>
           </Descriptions>

@@ -328,7 +328,7 @@ export default function MeterTypeUpsertPage() {
               <Descriptions.Item label={t('meterTypes.manufacturer')}>{typeQuery.data.manufacturer ?? '–'}</Descriptions.Item>
               <Descriptions.Item label={t('meterTypes.model')}>{typeQuery.data.model ?? '–'}</Descriptions.Item>
               <Descriptions.Item label={t('meterTypes.maxCurrent')}>{typeQuery.data.maxCurrent ?? '–'}</Descriptions.Item>
-              <Descriptions.Item label={t('common.labels.notes')} span={2}>
+              <Descriptions.Item label={t('common.labels.notes')} span={{ xs: 1, sm: 1, md: 2 }}>
                 {typeQuery.data.notes ?? '–'}
               </Descriptions.Item>
             </Descriptions>

@@ -105,6 +105,7 @@ export default function InstallationRecordsListPage() {
         rowKey="id"
         loading={listQuery.isLoading}
         dataSource={rows}
+        scroll={{ x: 980 }}
         pagination={{
           current: listQuery.data?.page,
           pageSize: listQuery.data?.limit,
@@ -119,10 +120,11 @@ export default function InstallationRecordsListPage() {
             title: t('installationRecords.list.columns.recordNumber'),
             dataIndex: 'recordNumber',
             key: 'recordNumber',
+            width: 160,
             render: (_, row) => (
               <Button
                 type="link"
-                className="p-0"
+                className="p-0 font-mono"
                 onClick={() => navigate(`/installation-records/${row.id}`)}
               >
                 {row.recordNumber}
@@ -132,11 +134,13 @@ export default function InstallationRecordsListPage() {
           {
             title: 'ICCID',
             key: 'iccid',
+            width: 200,
             render: (_, row) => row.meter?.simCard?.iccid ?? '–',
           },
           {
             title: t('layout.sidebar.meters'),
             key: 'meter',
+            width: 190,
             render: (_, row) =>
               row.meter
                 ? `${row.meter.serialNumber}${row.meter.meterTypeDefinition ? ` (${row.meter.meterTypeDefinition.name})` : ''}`
@@ -145,7 +149,8 @@ export default function InstallationRecordsListPage() {
           {
             title: t('installationRecords.list.columns.address'),
             key: 'address',
-            ellipsis: true,
+            width: 240,
+            ellipsis: { showTitle: true },
             render: (_, row) =>
               row.meter?.installationAddress ||
               [row.meter?.city, row.meter?.municipality].filter(Boolean).join(', ') ||
@@ -154,6 +159,7 @@ export default function InstallationRecordsListPage() {
           {
             title: t('installationRecords.list.columns.installationDate'),
             key: 'installationDate',
+            width: 140,
             render: (_, row) =>
               row.meter?.installationDate
                 ? new Date(row.meter.installationDate).toLocaleDateString()
@@ -162,6 +168,7 @@ export default function InstallationRecordsListPage() {
           {
             title: t('installationRecords.list.columns.installedBy'),
             key: 'installedBy',
+            width: 160,
             render: (_, row) =>
               row.installedBy
                 ? `${row.installedBy.firstName} ${row.installedBy.lastName}`
@@ -171,6 +178,7 @@ export default function InstallationRecordsListPage() {
             title: t('common.labels.status'),
             dataIndex: 'status',
             key: 'status',
+            width: 150,
             render: (status: RecordStatus) => (
               <StatusBadge
                 tone={getRecordStatusTone(status)}

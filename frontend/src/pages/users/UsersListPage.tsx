@@ -350,7 +350,7 @@ export default function UsersListPage() {
       children: (
         <div className="space-y-4">
           <div
-            className="flex justify-between items-center"
+            className="flex flex-wrap items-center justify-between gap-3"
             data-tour-id="users-header"
           >
             <Typography.Text type="secondary">
@@ -460,7 +460,7 @@ export default function UsersListPage() {
             children: (
               <div className="space-y-4">
                 <div
-                  className="flex justify-between items-center"
+                  className="flex flex-wrap items-center justify-between gap-3"
                   data-tour-id="users-distributions-header"
                 >
                   <Typography.Text type="secondary">
@@ -512,7 +512,7 @@ export default function UsersListPage() {
             children: (
               <div className="space-y-4">
                 <div
-                  className="flex justify-between items-center"
+                  className="flex flex-wrap items-center justify-between gap-3"
                   data-tour-id="users-branches-header"
                 >
                   <Typography.Text type="secondary">

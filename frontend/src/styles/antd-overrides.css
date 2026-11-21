@@ -79,14 +79,16 @@
 /* Industrial telemetry tables */
 .ant-table-wrapper {
   max-width: 100%;
-  overflow-x: auto;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--bg-surface);
 }
 
+.ant-table-content {
+  overflow-x: auto;
+}
+
 .ant-table {
-  min-width: max-content;
   font-variant-numeric: tabular-nums;
 }
 
@@ -115,6 +117,10 @@
 .ant-descriptions-view {
   max-width: 100%;
   overflow-x: auto;
+}
+
+.ant-descriptions-item-content {
+  word-break: break-word;
 }
 
 .ant-card {
