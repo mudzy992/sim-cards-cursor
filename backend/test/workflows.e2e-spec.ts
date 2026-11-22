@@ -6,6 +6,32 @@ import { AppValidationPipe } from '../src/common/pipes/validation.pipe';
 
 describe('Critical workflows (smoke e2e)', () => {
   let app: INestApplication;
+  let adminAccessToken: string | null = null;
+  let adminRefreshToken: string | null = null;
+
+  async function ensureAdminSession(): Promise<{
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    if (adminAccessToken && adminRefreshToken) {
+      return { accessToken: adminAccessToken, refreshToken: adminRefreshToken };
+    }
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'CiSeedPassword!123';
+    const loginRes = await request(app.getHttpServer()).post('/auth/login').send({
+      emailOrUsername: process.env.ADMIN_EMAIL ?? 'admin@simtracker.local',
+      password: adminPassword,
+    });
+    expect(loginRes.status).toBe(201);
+    const accessToken: string | undefined =
+      loginRes.body?.accessToken ?? loginRes.body?.data?.accessToken;
+    const refreshToken: string | undefined =
+      loginRes.body?.refreshToken ?? loginRes.body?.data?.refreshToken;
+    expect(typeof accessToken).toBe('string');
+    expect(typeof refreshToken).toBe('string');
+    adminAccessToken = accessToken!;
+    adminRefreshToken = refreshToken!;
+    return { accessToken: adminAccessToken, refreshToken: adminRefreshToken };
+  }
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -56,16 +82,7 @@ describe('Critical workflows (smoke e2e)', () => {
   });
 
   it('WF-05 seeded admin can authenticate and query shipments & tasks', async () => {
-    const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'CiSeedPassword!123';
-    const loginRes = await request(app.getHttpServer()).post('/auth/login').send({
-      emailOrUsername: process.env.ADMIN_EMAIL ?? 'admin@simtracker.local',
-      password: adminPassword,
-    });
-
-    expect(loginRes.status).toBe(201);
-    const token: string | undefined =
-      loginRes.body?.accessToken ?? loginRes.body?.data?.accessToken;
-    expect(typeof token).toBe('string');
+    const { accessToken: token } = await ensureAdminSession();
 
     const [shipmentsRes, installRes, demountRes] = await Promise.all([
       request(app.getHttpServer())
@@ -85,15 +102,7 @@ describe('Critical workflows (smoke e2e)', () => {
   });
 
   it('WF-06 imports 8,500+ SIM cards via CSV preview & importAllValid against PostgreSQL and cleans up', async () => {
-    const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'CiSeedPassword!123';
-    const loginRes = await request(app.getHttpServer()).post('/auth/login').send({
-      emailOrUsername: process.env.ADMIN_EMAIL ?? 'admin@simtracker.local',
-      password: adminPassword,
-    });
-    expect(loginRes.status).toBe(201);
-    const token: string | undefined =
-      loginRes.body?.accessToken ?? loginRes.body?.data?.accessToken;
-    expect(typeof token).toBe('string');
+    const { accessToken: token } = await ensureAdminSession();
 
     const distRes = await request(app.getHttpServer())
       .get('/distributions')
@@ -176,15 +185,7 @@ describe('Critical workflows (smoke e2e)', () => {
   }, 120_000);
 
   it('WF-07 refresh token rotation & public vs protected settings/releases endpoints', async () => {
-    const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'CiSeedPassword!123';
-    const loginRes = await request(app.getHttpServer()).post('/auth/login').send({
-      emailOrUsername: process.env.ADMIN_EMAIL ?? 'admin@simtracker.local',
-      password: adminPassword,
-    });
-    expect(loginRes.status).toBe(201);
-    const refreshToken: string | undefined =
-      loginRes.body?.refreshToken ?? loginRes.body?.data?.refreshToken;
-    expect(typeof refreshToken).toBe('string');
+    const { refreshToken } = await ensureAdminSession();
 
     const refreshRes = await request(app.getHttpServer())
       .post('/auth/refresh')
@@ -192,7 +193,11 @@ describe('Critical workflows (smoke e2e)', () => {
     expect(refreshRes.status).toBe(201);
     const rotatedAccess: string | undefined =
       refreshRes.body?.accessToken ?? refreshRes.body?.data?.accessToken;
+    const rotatedRefresh: string | undefined =
+      refreshRes.body?.refreshToken ?? refreshRes.body?.data?.refreshToken;
     expect(typeof rotatedAccess).toBe('string');
+    if (rotatedAccess) adminAccessToken = rotatedAccess;
+    if (rotatedRefresh) adminRefreshToken = rotatedRefresh;
 
     const [notifAnonRes, mobilePushAnonRes, androidLatestRes] = await Promise.all([
       request(app.getHttpServer()).get('/settings/notifications'),
@@ -211,14 +216,7 @@ describe('Critical workflows (smoke e2e)', () => {
   });
 
   it('WF-08 enforces RBAC on analytics & exports for field operator (USER) and cleans up', async () => {
-    const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'CiSeedPassword!123';
-    const adminLogin = await request(app.getHttpServer()).post('/auth/login').send({
-      emailOrUsername: process.env.ADMIN_EMAIL ?? 'admin@simtracker.local',
-      password: adminPassword,
-    });
-    expect(adminLogin.status).toBe(201);
-    const adminToken: string =
-      adminLogin.body?.accessToken ?? adminLogin.body?.data?.accessToken;
+    const { accessToken: adminToken } = await ensureAdminSession();
 
     const branchesRes = await request(app.getHttpServer())
       .get('/branches')
@@ -284,14 +282,7 @@ describe('Critical workflows (smoke e2e)', () => {
   });
 
   it('WF-09 masks secret settings in response & activity log and rejects forged non-ZIP APK upload', async () => {
-    const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'CiSeedPassword!123';
-    const adminLogin = await request(app.getHttpServer()).post('/auth/login').send({
-      emailOrUsername: process.env.ADMIN_EMAIL ?? 'admin@simtracker.local',
-      password: adminPassword,
-    });
-    expect(adminLogin.status).toBe(201);
-    const adminToken: string =
-      adminLogin.body?.accessToken ?? adminLogin.body?.data?.accessToken;
+    const { accessToken: adminToken } = await ensureAdminSession();
 
     const secretText = `e2e-secret-${Date.now()}`;
     try {
@@ -328,14 +319,7 @@ describe('Critical workflows (smoke e2e)', () => {
   });
 
   it('WF-10 validates pagination cap, case-insensitive user search, and distribution delete conflict', async () => {
-    const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'CiSeedPassword!123';
-    const adminLogin = await request(app.getHttpServer()).post('/auth/login').send({
-      emailOrUsername: process.env.ADMIN_EMAIL ?? 'admin@simtracker.local',
-      password: adminPassword,
-    });
-    expect(adminLogin.status).toBe(201);
-    const adminToken: string =
-      adminLogin.body?.accessToken ?? adminLogin.body?.data?.accessToken;
+    const { accessToken: adminToken } = await ensureAdminSession();
 
     const [capRes, searchRes, distRes] = await Promise.all([
       request(app.getHttpServer())
