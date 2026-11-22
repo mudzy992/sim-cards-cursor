@@ -124,11 +124,7 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
 export function usePushNotifications() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const queryClient = useQueryClient()
-  const { isBlocked, queueDeepLink } = useGlobalBlockingStore((s) => ({
-    isBlocked: s.isBlocked,
-    queueDeepLink: s.queueDeepLink,
-  }))
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!user) {
@@ -163,10 +159,11 @@ export function usePushNotifications() {
           const data = response.notification.request.content.data as {
             deepLink?: string;
           };
-          const normalized = normalizeDeepLink(data?.deepLink) ?? '/notifications'
+          const normalized = normalizeDeepLink(data?.deepLink) ?? '/notifications';
+          const { isBlocked, queueDeepLink } = useGlobalBlockingStore.getState();
           if (isBlocked) {
-            queueDeepLink(normalized)
-            return
+            queueDeepLink(normalized);
+            return;
           }
           router.push(normalized as never);
         });
@@ -195,5 +192,5 @@ export function usePushNotifications() {
       responseListener?.remove();
       receivedListener?.remove();
     };
-  }, [isBlocked, queryClient, queueDeepLink, router, user]);
+  }, [queryClient, router, user]);
 }

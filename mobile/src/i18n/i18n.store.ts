@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { translate } from './core';
@@ -58,13 +59,20 @@ export const useI18nStore = create<I18nState>((set, get) => ({
 
 /**
  * Convenience hook for components: `const { t, language, setLanguage } = useTranslation();`
- * Note: `t` re-reads `language` from the store on every render via selector below,
- * so components re-render (and re-translate) automatically when language changes.
+ * `t` and the returned object are memoized on `language` so consumers can safely
+ * include `t` in `useCallback` / `useEffect` / `useFocusEffect` dependency arrays
+ * without triggering infinite re-render / re-fetch loops.
  */
 export function useTranslation() {
   const language = useI18nStore((s) => s.language);
   const setLanguage = useI18nStore((s) => s.setLanguage);
-  const t = (key: string, options?: TranslateOptions) =>
-    translate(DICTIONARIES[language], DICTIONARIES[FALLBACK_LANGUAGE], key, options);
-  return { language, setLanguage, t };
+  const t = useCallback(
+    (key: string, options?: TranslateOptions) =>
+      translate(DICTIONARIES[language], DICTIONARIES[FALLBACK_LANGUAGE], key, options),
+    [language],
+  );
+  return useMemo(
+    () => ({ language, setLanguage, t }),
+    [language, setLanguage, t],
+  );
 }
