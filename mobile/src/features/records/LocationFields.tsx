@@ -1,5 +1,6 @@
 import { Alert, Text, View } from 'react-native';
 import * as Location from 'expo-location';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   spacing,
   useTheme,
@@ -27,6 +28,7 @@ export function LocationFields({
   onLoading: (v: boolean) => void;
 }) {
   const { type } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
 
   const fetchLocation = async () => {
@@ -36,8 +38,8 @@ export function LocationFields({
       if (status !== 'granted') {
         hapticWarning();
         Alert.alert(
-          'Dozvola za lokaciju',
-          'Za automatski unos GPS koordinata omogućite lokaciju u postavkama uređaja.',
+          t('mobile.records.form.gpsPermTitle'),
+          t('mobile.records.form.gpsPermBody'),
         );
         return;
       }
@@ -50,8 +52,8 @@ export function LocationFields({
     } catch {
       hapticWarning();
       Alert.alert(
-        'GPS nije dostupan',
-        'Provjerite da je lokacija uključena i pokušajte ponovo.',
+        t('mobile.records.form.gpsUnavailableTitle'),
+        t('mobile.records.form.gpsUnavailableBody'),
       );
     } finally {
       onLoading(false);
@@ -60,25 +62,26 @@ export function LocationFields({
 
   return (
     <View>
-      <Text style={[type.sectionLabel, styles.heading]}>GPS lokacija</Text>
+      <Text style={[type.sectionLabel, styles.heading]}>
+        {t('mobile.records.form.gpsTitle')}
+      </Text>
       <Panel
         tone={latitude && longitude ? 'success' : 'default'}
         style={styles.panel}
       >
-        <Text style={type.caption}>
-          Automatski dohvat je preporučen radi tačne evidencije terenske
-          lokacije.
-        </Text>
+        <Text style={type.caption}>{t('mobile.records.form.gpsSubtitle')}</Text>
         <View style={styles.fields}>
           <Field
-            label="Širina"
+            testID="location-latitude-input"
+            label={t('mobile.records.form.gpsLat')}
             value={latitude}
             onChangeText={onLatitude}
             keyboardType="decimal-pad"
             style={styles.field}
           />
           <Field
-            label="Dužina"
+            testID="location-longitude-input"
+            label={t('mobile.records.form.gpsLon')}
             value={longitude}
             onChangeText={onLongitude}
             keyboardType="decimal-pad"
@@ -86,7 +89,12 @@ export function LocationFields({
           />
         </View>
         <ActionButton
-          title={latitude && longitude ? 'Osvježi GPS' : 'Dohvati GPS'}
+          testID="location-fetch-gps-btn"
+          title={
+            latitude && longitude
+              ? t('mobile.records.form.gpsRefresh')
+              : t('mobile.records.form.gpsFetch')
+          }
           icon="location-outline"
           onPress={() => void fetchLocation()}
           loading={loading}

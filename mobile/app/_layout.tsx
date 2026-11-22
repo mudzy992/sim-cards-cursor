@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { useI18nStore } from '@/i18n/i18n.store';
 import { useThemeStore } from '@/store/theme.store';
 import { useTheme } from '@/theme/tokens';
+import { AppErrorBoundary } from '@/components/common/AppErrorBoundary';
 
 const queryClient = new QueryClient();
 
@@ -50,9 +51,11 @@ export default function RootLayout() {
 
   return (
     <KeyboardProvider>
-      <QueryClientProvider client={queryClient}>
-        <Slot />
-      </QueryClientProvider>
+      <AppErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <Slot />
+        </QueryClientProvider>
+      </AppErrorBoundary>
     </KeyboardProvider>
   );
 }

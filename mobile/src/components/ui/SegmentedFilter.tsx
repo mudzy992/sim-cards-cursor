@@ -17,6 +17,7 @@ export interface SegmentedFilterProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   style?: ViewStyle;
+  testID?: string;
 }
 
 export function SegmentedFilter<T extends string>({
@@ -24,11 +25,12 @@ export function SegmentedFilter<T extends string>({
   value,
   onChange,
   style,
+  testID,
 }: SegmentedFilterProps<T>) {
   const styles = useThemedStyles(createStyles);
 
   return (
-    <View style={[styles.track, style]}>
+    <View style={[styles.track, style]} testID={testID}>
       {options.map((option) => {
         const active = option.key === value;
         const count = option.count ?? 0;
@@ -36,6 +38,7 @@ export function SegmentedFilter<T extends string>({
         return (
           <Pressable
             key={option.key}
+            testID={testID ? `${testID}-${option.key}` : undefined}
             onPress={() => onChange(option.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}

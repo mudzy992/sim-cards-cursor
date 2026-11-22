@@ -1,27 +1,37 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from '@/i18n/i18n.store';
 import { radii, spacing, useTheme } from '@/theme/tokens';
 
 export interface ConnectionPillProps {
   isOnline: boolean;
   detail?: string | null;
   attention?: boolean;
+  testID?: string;
 }
 
 export function ConnectionPill({
   isOnline,
   detail,
   attention = false,
+  testID,
 }: ConnectionPillProps) {
   const { palette } = useTheme();
+  const { t } = useTranslation();
   const tone = !isOnline || attention ? 'attention' : 'ok';
   const dotColor = tone === 'ok' ? palette.success : palette.warning;
   const bg = tone === 'ok' ? palette.successSoft : palette.warningSoft;
   const border = tone === 'ok' ? palette.successBorder : palette.warningBorder;
   const textColor = tone === 'ok' ? palette.success : palette.warning;
 
-  const label = isOnline ? 'Na mreži' : 'Offline';
+  const label = isOnline
+    ? t('mobile.common.online')
+    : t('mobile.common.offline');
+
   return (
-    <View style={[styles.pill, { backgroundColor: bg, borderColor: border }]}>
+    <View
+      testID={testID}
+      style={[styles.pill, { backgroundColor: bg, borderColor: border }]}
+    >
       <View style={[styles.dot, { backgroundColor: dotColor }]} />
       <Text style={[styles.label, { color: textColor }]} numberOfLines={1}>
         {label}

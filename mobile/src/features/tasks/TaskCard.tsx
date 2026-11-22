@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   radii,
   spacing,
@@ -17,19 +18,24 @@ export type OperationalTaskStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
-const statusMeta: Record<
-  OperationalTaskStatus,
-  { label: string; tone: StatusTone }
-> = {
-  PENDING: { label: 'Čeka', tone: 'warning' },
-  IN_PROGRESS: { label: 'U toku', tone: 'info' },
-  COMPLETED: { label: 'Završeno', tone: 'success' },
-  CANCELLED: { label: 'Otkazano', tone: 'neutral' },
+const statusToneMap: Record<OperationalTaskStatus, StatusTone> = {
+  PENDING: 'warning',
+  IN_PROGRESS: 'info',
+  COMPLETED: 'success',
+  CANCELLED: 'neutral',
+};
+
+const statusKeyMap: Record<OperationalTaskStatus, string> = {
+  PENDING: 'mobile.tasks.statusPending',
+  IN_PROGRESS: 'mobile.tasks.statusInProgress',
+  COMPLETED: 'mobile.tasks.statusCompleted',
+  CANCELLED: 'mobile.tasks.statusCancelled',
 };
 
 function getSlaBadge(
   status: OperationalTaskStatus,
-  createdAt?: string,
+  createdAt: string | undefined,
+  t: (key: string, params?: Record<string, string | number>) => string,
 ): { label: string; tone: 'warning' | 'danger' } | null {
   if (!createdAt || status === 'COMPLETED' || status === 'CANCELLED') {
     return null;
@@ -38,12 +44,13 @@ function getSlaBadge(
   if (!Number.isFinite(ageHours) || ageHours < 48) return null;
   const days = Math.floor(ageHours / 24);
   if (ageHours >= 120) {
-    return { label: `Hitno · ${days}d`, tone: 'danger' };
+    return { label: t('mobile.tasks.slaUrgent', { days }), tone: 'danger' };
   }
-  return { label: `SLA · ${days}d`, tone: 'warning' };
+  return { label: t('mobile.tasks.slaWarning', { days }), tone: 'warning' };
 }
 
 export interface TaskCardProps {
+  testID?: string;
   title: string;
   status: OperationalTaskStatus;
   createdAt?: string;
@@ -62,12 +69,15 @@ export interface TaskCardProps {
 
 export function TaskCard(props: TaskCardProps) {
   const { palette, type } = useTheme();
+  const { t, language } = useTranslation();
   const styles = useThemedStyles(createStyles);
-  const meta = statusMeta[props.status];
-  const sla = getSlaBadge(props.status, props.createdAt);
+  const statusTone = statusToneMap[props.status];
+  const statusLabel = t(statusKeyMap[props.status]);
+  const sla = getSlaBadge(props.status, props.createdAt, t);
+  const locale = language === 'en' ? 'en-GB' : 'bs-BA';
 
   return (
-    <View style={styles.card}>
+    <View style={styles.card} testID={props.testID}>
       <View style={styles.header}>
         <View style={styles.titleWrap}>
           <Text style={type.dataLarge} numberOfLines={1}>
@@ -75,15 +85,15 @@ export function TaskCard(props: TaskCardProps) {
           </Text>
           {props.createdAt ? (
             <Text style={[type.caption, styles.created]} numberOfLines={1}>
-              {new Date(props.createdAt).toLocaleString('bs-BA')}
+              {new Date(props.createdAt).toLocaleString(locale)}
               {props.createdBy ? ` · ${props.createdBy}` : ''}
             </Text>
           ) : null}
         </View>
         <View style={styles.badgesCol}>
           <StatusBadge
-            tone={meta.tone}
-            label={meta.label}
+            tone={statusTone}
+            label={statusLabel}
             showDot={props.status === 'IN_PROGRESS'}
           />
           {sla ? <StatusBadge tone={sla.tone} label={sla.label} /> : null}
@@ -93,7 +103,7 @@ export function TaskCard(props: TaskCardProps) {
       {props.distanceMeters != null || props.onNavigate ? (
         <View style={styles.geoBar}>
           {props.distanceMeters != null ? (
-            <View style={styles.distanceChip}>
+            <View style={styles.distanceChip} testID="task-distance-chip">
               <Ionicons
                 name="navigate-outline"
                 size={14}
@@ -106,6 +116,7 @@ export function TaskCard(props: TaskCardProps) {
           ) : null}
           {props.onNavigate ? (
             <Pressable
+              testID="task-navigate-btn"
               onPress={props.onNavigate}
               accessibilityRole="button"
               style={({ pressed }) => [
@@ -118,20 +129,24 @@ export function TaskCard(props: TaskCardProps) {
                 size={14}
                 color={palette.brandText}
               />
-              <Text style={styles.mapButtonText}>Navigacija</Text>
+              <Text style={styles.mapButtonText}>
+                {t('mobile.tasks.navigate')}
+              </Text>
             </Pressable>
           ) : null}
         </View>
       ) : null}
 
       {props.pendingOffline ? (
-        <View style={styles.offlineRow}>
+        <View style={styles.offlineRow} testID="task-pending-offline">
           <Ionicons
             name="cloud-offline-outline"
             size={14}
             color={palette.warning}
           />
-          <Text style={styles.offlineText}>Promjena čeka slanje</Text>
+          <Text style={styles.offlineText}>
+            {t('mobile.tasks.pendingSync')}
+          </Text>
         </View>
       ) : null}
 
@@ -153,7 +168,7 @@ export function TaskCard(props: TaskCardProps) {
 
       {props.note ? (
         <View style={styles.note}>
-          <Text style={styles.noteLabel}>NAPOMENA</Text>
+          <Text style={styles.noteLabel}>{t('mobile.tasks.noteLabel')}</Text>
           <Text style={styles.noteText}>{props.note}</Text>
         </View>
       ) : null}
@@ -162,6 +177,7 @@ export function TaskCard(props: TaskCardProps) {
         <View style={styles.actions}>
           {props.secondaryLabel && props.onSecondary ? (
             <ActionButton
+              testID="task-secondary-btn"
               title={props.secondaryLabel}
               onPress={props.onSecondary}
               variant="secondary"
@@ -173,6 +189,7 @@ export function TaskCard(props: TaskCardProps) {
           ) : null}
           {props.primaryLabel && props.onPrimary ? (
             <ActionButton
+              testID="task-primary-btn"
               title={props.primaryLabel}
               onPress={props.onPrimary}
               variant="primary"
@@ -201,7 +218,11 @@ const createStyles = (palette: ThemePalette) => ({
     padding: spacing.lg,
     marginBottom: spacing.md,
   },
-  header: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, gap: spacing.md },
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: spacing.md,
+  },
   titleWrap: { flex: 1, minWidth: 0 },
   created: { marginTop: 3 },
   badgesCol: { alignItems: 'flex-end' as const, gap: spacing.xs },
@@ -262,7 +283,11 @@ const createStyles = (palette: ThemePalette) => ({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: palette.border,
   },
-  metaRow: { flexDirection: 'row' as const, gap: spacing.md, paddingVertical: spacing.sm },
+  metaRow: {
+    flexDirection: 'row' as const,
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   metaDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: palette.border,

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   spacing,
   useTheme,
@@ -9,8 +10,8 @@ import {
 import { ActionButton } from '@/components/ui/ActionButton';
 
 export function OfflineRequiredNotice({
-  title = 'Nema mreže',
-  message = 'Ovaj ekran zahtijeva internet vezu.',
+  title,
+  message,
   onRetry,
 }: {
   title?: string;
@@ -18,10 +19,11 @@ export function OfflineRequiredNotice({
   onRetry?: () => void;
 }) {
   const { palette, type } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} testID="offline-required-notice">
       <View style={styles.icon}>
         <Ionicons
           name="cloud-offline-outline"
@@ -29,11 +31,15 @@ export function OfflineRequiredNotice({
           color={palette.warning}
         />
       </View>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={[type.caption, styles.message]}>{message}</Text>
+      <Text style={styles.title}>
+        {title ?? t('mobile.common.noNetworkTitle')}
+      </Text>
+      <Text style={[type.caption, styles.message]}>
+        {message ?? t('mobile.common.noNetworkMessage')}
+      </Text>
       {onRetry ? (
         <ActionButton
-          title="Pokušaj ponovo"
+          title={t('mobile.common.retry')}
           icon="refresh"
           onPress={onRetry}
           fullWidth={false}
@@ -68,6 +74,10 @@ const createStyles = (palette: ThemePalette) => ({
     fontSize: 19,
     fontWeight: '700' as const,
   },
-  message: { marginTop: spacing.sm, textAlign: 'center' as const, lineHeight: 19 },
+  message: {
+    marginTop: spacing.sm,
+    textAlign: 'center' as const,
+    lineHeight: 19,
+  },
   action: { minWidth: 170, marginTop: spacing.xl },
 });

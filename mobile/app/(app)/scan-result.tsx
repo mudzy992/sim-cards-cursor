@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { simCardsApi, type MobileSimCard } from '@/api/sim-cards.api';
 import { useAuthStore } from '@/store/auth.store';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   spacing,
   useTheme,
@@ -25,6 +26,7 @@ import { hapticSuccess } from '@/utils/haptics';
 export default function ScanResultScreen() {
   const router = useRouter();
   const { type } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
   const currentUserId = useAuthStore((state) => state.user?.id);
   const params = useLocalSearchParams<{ iccid?: string | string[] }>();
@@ -55,13 +57,15 @@ export default function ScanResultScreen() {
     onSuccess: async () => {
       hapticSuccess();
       setActionError(null);
-      setActionMessage('Kartica je uspješno zadužena.');
+      setActionMessage(t('mobile.scan.result.claimSuccess'));
       setJustClaimed(true);
       await query.refetch();
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(getBackendMessage(error, 'Zaduživanje nije uspjelo.'));
+      setActionError(
+        getBackendMessage(error, t('mobile.scan.result.claimFailed')),
+      );
     },
   });
 
@@ -74,31 +78,33 @@ export default function ScanResultScreen() {
   const canClaim = result?.status === 'AVAILABLE';
   const canCreateRecord = Boolean(result && (assignedToMe || justClaimed));
   const status = useMemo((): { label: string; tone: StatusTone } => {
-    if (!result) return { label: 'Nepoznato', tone: 'neutral' };
+    if (!result) {
+      return { label: t('mobile.scan.result.statusUnknown'), tone: 'neutral' };
+    }
     if (result.status === 'AVAILABLE') {
-      return { label: 'Dostupna', tone: 'success' };
+      return { label: t('mobile.scan.result.statusAvailable'), tone: 'success' };
     }
     if (result.status === 'ASSIGNED') {
-      return { label: 'Zadužena', tone: 'warning' };
+      return { label: t('mobile.scan.result.statusAssigned'), tone: 'warning' };
     }
     if (result.status === 'INSTALLED') {
-      return { label: 'Ugrađena', tone: 'info' };
+      return { label: t('mobile.scan.result.statusInstalled'), tone: 'info' };
     }
     return { label: result.status, tone: 'neutral' };
-  }, [result]);
+  }, [result, t]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title="Rezultat skena"
-        subtitle={iccid || 'ICCID nije dostupan'}
+        title={t('mobile.scan.result.title')}
+        subtitle={iccid || t('mobile.scan.result.noIccid')}
         onBack={() => router.back()}
       />
       {!iccid ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Nedostaje ICCID"
-          actionLabel="Novi sken"
+          title={t('mobile.scan.result.missingIccid')}
+          actionLabel={t('mobile.scan.result.newScan')}
           onAction={() => router.replace('/(app)/(tabs)/scan')}
         />
       ) : query.isLoading ? (
@@ -112,15 +118,18 @@ export default function ScanResultScreen() {
             title={
               axios.isAxiosError(query.error) &&
               query.error.response?.status === 404
-                ? 'SIM kartica nije pronađena'
-                : 'Podaci nisu dostupni'
+                ? t('mobile.scan.result.notFoundTitle')
+                : t('mobile.scan.result.unavailableTitle')
             }
             description={
               axios.isAxiosError(query.error) && !query.error.response
-                ? 'Backend nije dostupan, a kartica nije pronađena u lokalnom inventaru.'
-                : getBackendMessage(query.error, 'Pretraga nije uspjela.')
+                ? t('mobile.scan.result.offlineNotFound')
+                : getBackendMessage(
+                    query.error,
+                    t('mobile.scan.result.searchFailed'),
+                  )
             }
-            actionLabel="Pokušaj ponovo"
+            actionLabel={t('mobile.common.retry')}
             onAction={() => void query.refetch()}
           />
         </View>
@@ -131,9 +140,11 @@ export default function ScanResultScreen() {
         >
           {result.fromOfflineCache ? (
             <Panel tone="warning" style={styles.notice}>
-              <Text style={type.bodyStrong}>Offline podaci</Text>
+              <Text style={type.bodyStrong}>
+                {t('mobile.scan.result.offlineNoticeTitle')}
+              </Text>
               <Text style={[type.caption, styles.noticeText]}>
-                Status kartice može biti zastario dok se veza ne vrati.
+                {t('mobile.scan.result.offlineNoticeBody')}
               </Text>
             </Panel>
           ) : null}
@@ -143,9 +154,13 @@ export default function ScanResultScreen() {
               <Text style={type.sectionLabel}>ICCID</Text>
               <StatusBadge tone={status.tone} label={status.label} showDot />
             </View>
-            <Text style={styles.iccid}>{result.iccid}</Text>
+            <Text style={styles.iccid} testID="scan-result-iccid">
+              {result.iccid}
+            </Text>
             <View style={styles.ipBlock}>
-              <Text style={styles.ipLabel}>EPBIH IP · unesite u brojilo</Text>
+              <Text style={styles.ipLabel}>
+                {t('mobile.scan.result.ipLabel')}
+              </Text>
               <Text style={styles.ip}>{result.ipAddress ?? '—'}</Text>
             </View>
           </Panel>
@@ -163,7 +178,8 @@ export default function ScanResultScreen() {
 
           {canClaim && !justClaimed ? (
             <ActionButton
-              title="Zaduži karticu"
+              testID="scan-result-claim-btn"
+              title={t('mobile.scan.result.claimButton')}
               icon="person-add-outline"
               size="lg"
               loading={claim.isPending}
@@ -174,7 +190,8 @@ export default function ScanResultScreen() {
           {canCreateRecord ? (
             <View style={styles.actions}>
               <ActionButton
-                title="Novi priključak"
+                testID="scan-result-create-new-btn"
+                title={t('mobile.scan.result.newConnection')}
                 icon="construct-outline"
                 size="lg"
                 onPress={() =>
@@ -185,7 +202,8 @@ export default function ScanResultScreen() {
                 }
               />
               <ActionButton
-                title="Zamjena brojila"
+                testID="scan-result-create-replacement-btn"
+                title={t('mobile.scan.result.meterReplacement')}
                 icon="swap-horizontal-outline"
                 variant="secondary"
                 size="lg"
@@ -201,7 +219,7 @@ export default function ScanResultScreen() {
           {assignedToAnother ? (
             <Panel tone="warning" style={styles.notice}>
               <Text style={type.bodyStrong}>
-                Kartica je zadužena kod drugog operatora
+                {t('mobile.scan.result.assignedOtherTitle')}
               </Text>
               <Text style={[type.caption, styles.noticeText]}>
                 {result.assignedTo
@@ -212,12 +230,12 @@ export default function ScanResultScreen() {
           ) : null}
 
           <Text style={[type.sectionLabel, styles.sectionTitle]}>
-            Podaci kartice
+            {t('mobile.scan.result.cardDataSection')}
           </Text>
           <Panel padding="none">
             <View style={styles.panelInner}>
               <ListRow
-                title="Operator"
+                title={t('mobile.scan.result.operator')}
                 value={
                   result.assignedTo
                     ? `${result.assignedTo.firstName} ${result.assignedTo.lastName}`
@@ -225,12 +243,12 @@ export default function ScanResultScreen() {
                 }
               />
               <ListRow
-                title="Telefon"
+                title={t('mobile.scan.result.phone')}
                 value={result.phoneNumber ?? '—'}
                 divider
               />
               <ListRow
-                title="Isporuka"
+                title={t('mobile.scan.result.shipment')}
                 value={result.shipment?.name ?? '—'}
                 divider
               />
@@ -238,13 +256,13 @@ export default function ScanResultScreen() {
           </Panel>
           <View style={styles.bottomActions}>
             <ActionButton
-              title="Osvježi podatke"
+              title={t('mobile.scan.result.refreshData')}
               icon="refresh"
               variant="secondary"
               onPress={() => void query.refetch()}
             />
             <ActionButton
-              title="Novi sken"
+              title={t('mobile.scan.result.newScan')}
               icon="barcode-outline"
               variant="dark"
               onPress={() => router.replace('/(app)/(tabs)/scan')}

@@ -17,6 +17,7 @@ import { simCardsApi, type MobileSimCard } from '@/api/sim-cards.api';
 import { useAuthStore } from '@/store/auth.store';
 import { reconcileOfflineSimInventory } from '@/offline/sim-inventory-reconcile';
 import { useConnectivity } from '@/hooks/useConnectivity';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   radii,
   spacing,
@@ -36,6 +37,7 @@ export default function OfflineInventoryScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const { isOnline } = useConnectivity();
+  const { t } = useTranslation();
   const { palette, type } = useTheme();
   const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{ pickedIccid?: string | string[] }>();
@@ -61,19 +63,22 @@ export default function OfflineInventoryScreen() {
           const result = await reconcileOfflineSimInventory(user);
           if (result.removedIccids.length > 0 || result.updated > 0) {
             setReconcileSummary(
-              `Usklađeno: osvježeno ${result.updated}, uklonjeno ${result.removedIccids.length}.`,
+              t('mobile.offlineInventory.reconcileSummary', {
+                updated: result.updated,
+                removed: result.removedIccids.length,
+              }),
             );
           }
         }
         setItems(await simCardsApi.listOfflineInventory());
       } catch {
-        setError('Nije moguće učitati offline inventar.');
+        setError(t('mobile.offlineInventory.loadError'));
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [user, isOnline],
+    [user, isOnline, t],
   );
 
   const runExplicitReconcile = async () => {
@@ -85,10 +90,14 @@ export default function OfflineInventoryScreen() {
       setItems(await simCardsApi.listOfflineInventory());
       hapticSuccess();
       setReconcileSummary(
-        `Usklađeno sa serverom: osvježeno ${result.updated}, uklonjeno ${result.removedIccids.length}, ostalo ${result.kept}.`,
+        t('mobile.offlineInventory.reconcileFullSummary', {
+          updated: result.updated,
+          removed: result.removedIccids.length,
+          kept: result.kept,
+        }),
       );
     } catch {
-      setError('Usklađivanje sa serverom nije uspjelo.');
+      setError(t('mobile.offlineInventory.reconcileFailed'));
     } finally {
       setReconciling(false);
     }
@@ -108,10 +117,12 @@ export default function OfflineInventoryScreen() {
       } catch (err) {
         if (!cancelled) {
           Alert.alert(
-            axios.isAxiosError(err) && !err.response ? 'Offline' : 'Greška',
             axios.isAxiosError(err) && !err.response
-              ? 'SIM nije nađena u lokalnom inventaru.'
-              : 'Nije moguće dodati SIM u inventar.',
+              ? t('mobile.common.offline')
+              : t('mobile.common.error'),
+            axios.isAxiosError(err) && !err.response
+              ? t('mobile.offlineInventory.notFoundOffline')
+              : t('mobile.offlineInventory.addFailed'),
           );
         }
       } finally {
@@ -124,7 +135,7 @@ export default function OfflineInventoryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [pickedIccid, router, load]);
+  }, [pickedIccid, router, load, t]);
 
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -140,11 +151,13 @@ export default function OfflineInventoryScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title="Offline inventar"
-        subtitle={`${items.length} kartica na uređaju`}
+        title={t('mobile.offlineInventory.title')}
+        subtitle={t('mobile.offlineInventory.subtitle', {
+          count: items.length,
+        })}
         onBack={() => router.back()}
         actionIcon="barcode-outline"
-        actionLabel="Dodaj skenom"
+        actionLabel={t('mobile.offlineInventory.addByScan')}
         onAction={() =>
           router.push({
             pathname: '/(app)/(tabs)/scan',
@@ -155,11 +168,16 @@ export default function OfflineInventoryScreen() {
       <View style={styles.connectionRow}>
         <ConnectionPill
           isOnline={isOnline}
-          detail={isOnline ? 'Spremno za usklađivanje' : 'Lokalni podaci'}
+          detail={
+            isOnline
+              ? t('mobile.offlineInventory.readyToReconcile')
+              : t('mobile.offlineInventory.localData')
+          }
         />
         {isOnline && items.length > 0 ? (
           <ActionButton
-            title="Uskladi"
+            testID="offline-inventory-reconcile-btn"
+            title={t('mobile.offlineInventory.reconcileButton')}
             icon="sync-outline"
             size="sm"
             variant="secondary"
@@ -175,9 +193,10 @@ export default function OfflineInventoryScreen() {
       <View style={styles.searchWrap}>
         <Ionicons name="search" size={18} color={palette.textMuted} />
         <TextInput
+          testID="offline-inventory-search"
           value={query}
           onChangeText={setQuery}
-          placeholder="Pretraži ICCID ili IP"
+          placeholder={t('mobile.offlineInventory.searchPlaceholder')}
           placeholderTextColor={palette.textMuted}
           style={styles.search}
           keyboardType="number-pad"
@@ -206,13 +225,15 @@ export default function OfflineInventoryScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="archive-outline"
-              title="Offline inventar je prazan"
+              title={t('mobile.offlineInventory.emptyTitle')}
               description={
                 query
-                  ? 'Nema kartice koja odgovara pretrazi.'
-                  : 'Skenirajte kartice koje nosite na teren.'
+                  ? t('mobile.offlineInventory.emptySearchDesc')
+                  : t('mobile.offlineInventory.emptyDefaultDesc')
               }
-              actionLabel={!query ? 'Dodaj skenom' : undefined}
+              actionLabel={
+                !query ? t('mobile.offlineInventory.addByScan') : undefined
+              }
               onAction={
                 !query
                   ? () =>
@@ -226,14 +247,17 @@ export default function OfflineInventoryScreen() {
           }
           renderItem={({ item }) => (
             <Pressable
+              testID={`offline-inventory-row-${item.iccid}`}
               onLongPress={() =>
                 Alert.alert(
-                  'Ukloni karticu',
-                  `Ukloniti ${item.iccid} iz offline inventara?`,
+                  t('mobile.offlineInventory.removeOneTitle'),
+                  t('mobile.offlineInventory.removeOneMessage', {
+                    iccid: item.iccid,
+                  }),
                   [
-                    { text: 'Odustani', style: 'cancel' },
+                    { text: t('mobile.common.cancel'), style: 'cancel' },
                     {
-                      text: 'Ukloni',
+                      text: t('mobile.common.remove'),
                       style: 'destructive',
                       onPress: () =>
                         void simCardsApi
@@ -274,19 +298,19 @@ export default function OfflineInventoryScreen() {
             items.length ? (
               <>
                 <Text style={styles.holdHint}>
-                  Zadržite red za uklanjanje pojedinačne kartice.
+                  {t('mobile.offlineInventory.holdHint')}
                 </Text>
                 <ActionButton
-                  title="Obriši kompletan inventar"
+                  title={t('mobile.offlineInventory.clearAllButton')}
                   variant="ghost"
                   onPress={() =>
                     Alert.alert(
-                      'Obriši sve',
-                      'Obrisati kompletan offline inventar?',
+                      t('mobile.offlineInventory.clearAllTitle'),
+                      t('mobile.offlineInventory.clearAllMessage'),
                       [
-                        { text: 'Odustani', style: 'cancel' },
+                        { text: t('mobile.common.cancel'), style: 'cancel' },
                         {
-                          text: 'Obriši',
+                          text: t('mobile.common.delete'),
                           style: 'destructive',
                           onPress: () =>
                             void simCardsApi

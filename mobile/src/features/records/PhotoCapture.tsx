@@ -1,8 +1,18 @@
 import axios from 'axios';
-import { Alert, Text, View } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { installationRecordsApi } from '@/api/installation-records.api';
 import {
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
+import { installationRecordsApi } from '@/api/installation-records.api';
+import { useTranslation } from '@/i18n/i18n.store';
+import {
+  radii,
   spacing,
   useTheme,
   useThemedStyles,
@@ -11,7 +21,7 @@ import {
 import { ActionButton } from '@/components/ui/ActionButton';
 import { Panel } from '@/components/ui/Panel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { hapticSuccess } from '@/utils/haptics';
+import { hapticSuccess, hapticTap } from '@/utils/haptics';
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const CAPTURE_OPTIONS: ImagePicker.ImagePickerOptions = {
@@ -42,7 +52,8 @@ export function PhotoCapture({
   loading: boolean;
   onLoading: (v: boolean) => void;
 }) {
-  const { type } = useTheme();
+  const { palette, type } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
 
   const handleAsset = async (
@@ -52,8 +63,8 @@ export function PhotoCapture({
     if (!uri) return;
     if (typeof asset.fileSize === 'number' && asset.fileSize > MAX_PHOTO_BYTES) {
       Alert.alert(
-        'Slika je prevelika',
-        'Fotografija prelazi ograničenje od 5 MB. Pokušajte ponovo sa manjom rezolucijom.',
+        t('mobile.records.photos.tooLargeTitle'),
+        t('mobile.records.photos.tooLargeMessage'),
       );
       return;
     }
@@ -83,8 +94,8 @@ export function PhotoCapture({
       const message =
         axios.isAxiosError(error) && typeof error.response?.data?.message === 'string'
           ? error.response.data.message
-          : 'Upload fotografije nije uspio.';
-      Alert.alert('Greška', message);
+          : t('mobile.records.photos.uploadFailed');
+      Alert.alert(t('mobile.common.error'), message);
     } finally {
       onLoading(false);
     }
@@ -94,8 +105,8 @@ export function PhotoCapture({
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(
-        'Dozvola za kameru',
-        'Za snimanje fotografija potrebna je dozvola za kameru.',
+        t('mobile.records.photos.cameraPermTitle'),
+        t('mobile.records.photos.cameraPermBody'),
       );
       return;
     }
@@ -107,8 +118,8 @@ export function PhotoCapture({
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(
-        'Dozvola za galeriju',
-        'Za odabir fotografije potrebna je dozvola za galeriju.',
+        t('mobile.records.photos.galleryPermTitle'),
+        t('mobile.records.photos.galleryPermBody'),
       );
       return;
     }
@@ -116,31 +127,127 @@ export function PhotoCapture({
     await handleAsset(result.canceled ? undefined : result.assets[0]);
   };
 
+  const removeLocalAt = (index: number) => {
+    hapticTap();
+    onLocal(localUris.filter((_, idx) => idx !== index));
+  };
+
+  const removeUploadedAt = (index: number) => {
+    hapticTap();
+    onUploaded(uploadedPaths.filter((_, idx) => idx !== index));
+  };
+
+  const hasPhotos = localUris.length > 0 || uploadedPaths.length > 0;
+
   return (
-    <View>
-      <Text style={[type.sectionLabel, styles.heading]}>Fotografije</Text>
+    <View testID="photo-capture-section">
+      <Text style={[type.sectionLabel, styles.heading]}>
+        {t('mobile.records.photos.heading')}
+      </Text>
       <Panel>
         <View style={styles.statuses}>
-          <StatusBadge tone="success" label={`Poslano ${uploadedPaths.length}`} />
+          <StatusBadge
+            tone="success"
+            label={t('mobile.records.photos.uploadedBadge', {
+              count: uploadedPaths.length,
+            })}
+          />
           <StatusBadge
             tone={localUris.length ? 'warning' : 'neutral'}
-            label={`Čeka ${localUris.length}`}
+            label={t('mobile.records.photos.queuedBadge', {
+              count: localUris.length,
+            })}
           />
         </View>
+
+        {hasPhotos ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.previewRow}
+            testID="photo-preview-strip"
+          >
+            {localUris.map((uri, index) => (
+              <View
+                key={`local-${uri}-${index}`}
+                style={styles.thumbCard}
+                testID={`photo-local-item-${index}`}
+              >
+                <Image
+                  source={{ uri }}
+                  style={styles.thumbImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.thumbTagLocal}>
+                  <Text style={styles.thumbTagText}>
+                    {t('mobile.records.photos.queuedTag')}
+                  </Text>
+                </View>
+                <Pressable
+                  testID={`photo-remove-local-${index}`}
+                  onPress={() => removeLocalAt(index)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mobile.records.photos.removePhotoLabel')}
+                  hitSlop={8}
+                  style={styles.removeButton}
+                >
+                  <Ionicons name="close" size={14} color={palette.inverse} />
+                </Pressable>
+              </View>
+            ))}
+            {uploadedPaths.map((filePath, index) => {
+              const fileName =
+                filePath.split('/').pop() || `#${index + 1}`;
+              return (
+                <View
+                  key={`uploaded-${filePath}-${index}`}
+                  style={styles.uploadedCard}
+                  testID={`photo-uploaded-item-${index}`}
+                >
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={22}
+                    color={palette.success}
+                  />
+                  <Text style={styles.uploadedName} numberOfLines={2}>
+                    {fileName}
+                  </Text>
+                  <View style={styles.thumbTagUploaded}>
+                    <Text style={styles.thumbTagText}>
+                      {t('mobile.records.photos.uploadedTag')}
+                    </Text>
+                  </View>
+                  <Pressable
+                    testID={`photo-remove-uploaded-${index}`}
+                    onPress={() => removeUploadedAt(index)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mobile.records.photos.removePhotoLabel')}
+                    hitSlop={8}
+                    style={styles.removeButton}
+                  >
+                    <Ionicons name="close" size={14} color={palette.inverse} />
+                  </Pressable>
+                </View>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+
         <Text style={[type.caption, styles.help]}>
-          Fotografije su opcionalne (kompresija 70%). Offline snimci šalju se iz
-          outbox reda kada se veza vrati.
+          {t('mobile.records.photos.helpText')}
         </Text>
         <View style={styles.actions}>
           <ActionButton
-            title="Snimi kamerom"
+            testID="photo-camera-btn"
+            title={t('mobile.records.photos.cameraButton')}
             icon="camera-outline"
             onPress={() => void captureFromCamera()}
             loading={loading}
             variant="secondary"
           />
           <ActionButton
-            title="Odaberi iz galerije"
+            testID="photo-gallery-btn"
+            title={t('mobile.records.photos.galleryButton')}
             icon="images-outline"
             onPress={() => void pickFromGallery()}
             loading={loading}
@@ -154,7 +261,82 @@ export function PhotoCapture({
 
 const createStyles = (palette: ThemePalette) => ({
   heading: { marginBottom: spacing.md },
-  statuses: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm },
+  statuses: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: spacing.sm,
+  },
+  previewRow: {
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+  },
+  thumbCard: {
+    width: 96,
+    height: 96,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: palette.warningBorder,
+    backgroundColor: palette.surfaceSunken,
+    overflow: 'hidden' as const,
+    position: 'relative' as const,
+  },
+  thumbImage: {
+    width: '100%' as const,
+    height: '100%' as const,
+  },
+  uploadedCard: {
+    width: 96,
+    height: 96,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: palette.successBorder,
+    backgroundColor: palette.successSoft,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    padding: spacing.xs,
+    position: 'relative' as const,
+  },
+  uploadedName: {
+    marginTop: 4,
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: palette.textPrimary,
+    textAlign: 'center' as const,
+  },
+  thumbTagLocal: {
+    position: 'absolute' as const,
+    left: 4,
+    bottom: 4,
+    backgroundColor: palette.warning,
+    borderRadius: radii.sm,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  thumbTagUploaded: {
+    position: 'absolute' as const,
+    left: 4,
+    bottom: 4,
+    backgroundColor: palette.success,
+    borderRadius: radii.sm,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  thumbTagText: {
+    color: palette.inverse,
+    fontSize: 9,
+    fontWeight: '700' as const,
+  },
+  removeButton: {
+    position: 'absolute' as const,
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: palette.dangerSolid,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
   help: {
     marginVertical: spacing.lg,
     lineHeight: 18,

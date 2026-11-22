@@ -6,6 +6,7 @@ import {
   View,
 } from 'react-native';
 import type { MeterTypeDefinitionItem } from '@/api/meter-type-definitions.api';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   radii,
   spacing,
@@ -15,7 +16,7 @@ import {
 } from '@/theme/tokens';
 
 export function MeterTypePicker({
-  label = 'Tip brojila',
+  label,
   items,
   value,
   onChange,
@@ -30,19 +31,24 @@ export function MeterTypePicker({
   error?: boolean;
 }) {
   const { palette, type } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
 
   return (
     <View style={styles.wrap}>
-      <Text style={type.sectionLabel}>{label} *</Text>
+      <Text style={type.sectionLabel}>
+        {label ?? t('mobile.records.form.meterTypeLabel')} *
+      </Text>
       {loading ? (
         <ActivityIndicator color={palette.brandText} style={styles.loader} />
       ) : error ? (
         <Text style={styles.error}>
-          Nije moguće učitati tipove brojila. Provjerite mrežu.
+          {t('mobile.records.form.meterTypeLoadingError')}
         </Text>
       ) : !items.length ? (
-        <Text style={styles.empty}>Nema definisanih tipova brojila.</Text>
+        <Text style={styles.empty}>
+          {t('mobile.records.form.meterTypeEmpty')}
+        </Text>
       ) : (
         <ScrollView
           horizontal
@@ -54,6 +60,7 @@ export function MeterTypePicker({
             return (
               <Pressable
                 key={item.id}
+                testID={`meter-type-option-${item.id}`}
                 onPress={() => onChange(item.id)}
                 style={({ pressed }) => [
                   styles.item,

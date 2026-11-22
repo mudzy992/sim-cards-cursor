@@ -14,6 +14,7 @@ import {
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import { useAuthStore } from '@/store/auth.store';
 import { useConnectivity } from '@/hooks/useConnectivity';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   clearRecordDraft,
   hasMeaningfulDraftContent,
@@ -45,6 +46,7 @@ import { hapticError, hapticSuccess } from '@/utils/haptics';
 export default function CreateRecordReplacementScreen() {
   const router = useRouter();
   const { palette, type } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{
     simCardId?: string | string[];
@@ -133,7 +135,6 @@ export default function CreateRecordReplacementScreen() {
     }
   }, [pickedSerial, pickedSerialTarget]);
 
-  // Provjera spremljenog nacrta za novo brojilo / lokaciju
   useEffect(() => {
     if (!user || !simCardId || draftCheckedRef.current) return;
     draftCheckedRef.current = true;
@@ -144,7 +145,6 @@ export default function CreateRecordReplacementScreen() {
     });
   }, [user, simCardId, draftScope]);
 
-  // Debounced auto-save
   useEffect(() => {
     if (!user || !simCardId) return;
     const draftPayload = {
@@ -282,11 +282,12 @@ export default function CreateRecordReplacementScreen() {
 
   const dmValidation = useMemo(() => {
     const missing: string[] = [];
-    if (!dmMeterTypeId) missing.push('tip demontiranog brojila');
-    if (!dmSerialNumber.trim()) missing.push('serijski broj demontiranog brojila');
-    if (!dmYear.trim()) missing.push('godina proizvodnje demontiranog brojila');
+    if (!dmMeterTypeId) missing.push(t('mobile.records.form.reqOldMeterType'));
+    if (!dmSerialNumber.trim())
+      missing.push(t('mobile.records.form.reqOldSerial'));
+    if (!dmYear.trim()) missing.push(t('mobile.records.form.reqOldYear'));
     if (!dmCalibrationYear.trim())
-      missing.push('godina baždarenja demontiranog brojila');
+      missing.push(t('mobile.records.form.reqOldCalibration'));
     missing.push(...validateRequiredDynamicFields(dmFields, dmDynamic));
     return missing;
   }, [
@@ -296,21 +297,35 @@ export default function CreateRecordReplacementScreen() {
     dmCalibrationYear,
     dmFields,
     dmDynamic,
+    t,
   ]);
   const newValidation = useMemo(() => {
     const missing: string[] = [];
-    if (!meterTypeId) missing.push('tip novog brojila');
-    if (!serialNumber.trim()) missing.push('serijski broj novog brojila');
-    if (!year.trim()) missing.push('godina proizvodnje');
-    if (!calibrationYear.trim()) missing.push('godina baždarenja');
+    if (!meterTypeId) missing.push(t('mobile.records.form.reqNewMeterType'));
+    if (!serialNumber.trim())
+      missing.push(t('mobile.records.form.reqNewSerial'));
+    if (!year.trim()) missing.push(t('mobile.records.form.reqYear'));
+    if (!calibrationYear.trim())
+      missing.push(t('mobile.records.form.reqCalibration'));
     missing.push(...validateRequiredDynamicFields(fields, dynamicValues));
     return missing;
-  }, [meterTypeId, serialNumber, year, calibrationYear, fields, dynamicValues]);
+  }, [
+    meterTypeId,
+    serialNumber,
+    year,
+    calibrationYear,
+    fields,
+    dynamicValues,
+    t,
+  ]);
 
   const nextStep = () => {
     if (dmValidation.length) {
       hapticError();
-      Alert.alert('Nedostaju podaci', dmValidation.join(', '));
+      Alert.alert(
+        t('mobile.records.form.missingDataTitle'),
+        dmValidation.join(', '),
+      );
       return;
     }
     setStep(2);
@@ -320,11 +335,11 @@ export default function CreateRecordReplacementScreen() {
     localPhotoUris?: string[];
   } => {
     if (!user?.id || !simCardId) {
-      throw new Error('Nedostaje korisnik ili SIM kartica.');
+      throw new Error(t('mobile.records.form.missingUserOrSim'));
     }
     if (dmValidation.length || newValidation.length) {
       throw new Error(
-        `Obavezna polja: ${[...dmValidation, ...newValidation].join(', ')}`,
+        `${t('mobile.records.form.validationPrefix')} ${[...dmValidation, ...newValidation].join(', ')}`,
       );
     }
     const dmYearNumber = Number.parseInt(dmYear, 10);
@@ -336,7 +351,7 @@ export default function CreateRecordReplacementScreen() {
         Number.isFinite,
       )
     ) {
-      throw new Error('Godine moraju biti cijeli brojevi.');
+      throw new Error(t('mobile.records.form.yearsMustBeIntegers'));
     }
     return {
       kind: 'METER_REPLACEMENT',
@@ -383,11 +398,11 @@ export default function CreateRecordReplacementScreen() {
       hapticSuccess();
       if (created?.status === 'SEND_FAILED') {
         Alert.alert(
-          'Zapisnik je kreiran',
-          'Slanje emaila nije uspjelo. Pokušajte ponovo iz detalja.',
+          t('mobile.records.form.createdEmailFailedTitle'),
+          t('mobile.records.form.createdEmailFailedMessage'),
           [
             {
-              text: 'Detalji',
+              text: t('mobile.records.form.detailsButton'),
               onPress: () =>
                 router.replace({
                   pathname: '/(app)/record-details',
@@ -395,7 +410,7 @@ export default function CreateRecordReplacementScreen() {
                 }),
             },
             {
-              text: 'Kasnije',
+              text: t('mobile.records.form.laterButton'),
               onPress: () => router.replace('/(app)/(tabs)/records'),
             },
           ],
@@ -403,9 +418,14 @@ export default function CreateRecordReplacementScreen() {
         return;
       }
       Alert.alert(
-        'Uspjeh',
-        'Zapisnik o zamjeni je kreiran i poslan na email.',
-        [{ text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') }],
+        t('mobile.common.success'),
+        t('mobile.records.form.createdSuccessRep'),
+        [
+          {
+            text: t('mobile.common.ok'),
+            onPress: () => router.replace('/(app)/(tabs)/records'),
+          },
+        ],
       );
     },
     onError: async (error) => {
@@ -415,11 +435,11 @@ export default function CreateRecordReplacementScreen() {
           if (user && simCardId) void clearRecordDraft(user, draftScope);
           hapticSuccess();
           Alert.alert(
-            'Sačuvano offline',
-            'Zapisnik o zamjeni bit će poslan kada se veza uspostavi.',
+            t('mobile.records.form.savedOfflineTitle'),
+            t('mobile.records.form.savedOfflineRep'),
             [
               {
-                text: 'OK',
+                text: t('mobile.common.ok'),
                 onPress: () => router.replace('/(app)/(tabs)/records'),
               },
             ],
@@ -435,20 +455,23 @@ export default function CreateRecordReplacementScreen() {
           ? error.response.data.message
           : error instanceof Error
             ? error.message
-            : 'Kreiranje zapisnika nije uspjelo.';
-      Alert.alert('Greška', message);
+            : t('mobile.records.form.createFailed');
+      Alert.alert(t('mobile.common.error'), message);
     },
   });
 
   if (!simCardId) {
     return (
       <SafeAreaView style={styles.root} edges={['top']}>
-        <ScreenTitleBar title="Zamjena brojila" onBack={() => router.back()} />
+        <ScreenTitleBar
+          title={t('mobile.records.form.replacementTitle')}
+          onBack={() => router.back()}
+        />
         <EmptyState
           icon="alert-circle-outline"
-          title="Nedostaje SIM kartica"
-          description="Vratite se na skeniranje i odaberite zamjenu brojila."
-          actionLabel="Nazad"
+          title={t('mobile.records.form.missingSimTitle')}
+          description={t('mobile.records.form.missingSimRepDesc')}
+          actionLabel={t('mobile.common.back')}
           onAction={() => router.back()}
         />
       </SafeAreaView>
@@ -458,8 +481,8 @@ export default function CreateRecordReplacementScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title="Zamjena brojila"
-        subtitle={`Korak ${step} od 2`}
+        title={t('mobile.records.form.replacementTitle')}
+        subtitle={t('mobile.records.form.replacementSubtitle', { step })}
         onBack={() => router.back()}
       />
       <KeyboardAwareScrollView
@@ -468,21 +491,25 @@ export default function CreateRecordReplacementScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {pendingDraft ? (
-          <Panel tone="info" style={styles.draftBanner}>
-            <Text style={type.bodyStrong}>Pronađen nesačuvan nacrt</Text>
+          <Panel tone="info" style={styles.draftBanner} testID="draft-banner">
+            <Text style={type.bodyStrong}>
+              {t('mobile.records.form.draftFound')}
+            </Text>
             <Text style={[type.caption, styles.draftDesc]}>
-              Možete nastaviti gdje ste stali ili početi ispočetka.
+              {t('mobile.records.form.draftDesc')}
             </Text>
             <View style={styles.draftActions}>
               <ActionButton
-                title="Odbaci"
+                testID="draft-discard-btn"
+                title={t('mobile.records.form.draftDiscard')}
                 variant="ghost"
                 size="sm"
                 fullWidth={false}
                 onPress={discardDraft}
               />
               <ActionButton
-                title="Vrati nacrt"
+                testID="draft-restore-btn"
+                title={t('mobile.records.form.draftRestore')}
                 size="sm"
                 fullWidth={false}
                 onPress={restoreDraft}
@@ -492,29 +519,29 @@ export default function CreateRecordReplacementScreen() {
         ) : null}
 
         <WorkflowSteps
-          header="ZAMJENA · VOĐENI POSTUPAK"
+          header={t('mobile.records.form.replacementHeader')}
           steps={[
             {
               key: 'old',
-              label: 'Demontirano brojilo',
+              label: t('mobile.records.form.stepOldMeter'),
               state: step === 2 ? 'done' : 'current',
               detail: dmSerialNumber || undefined,
             },
             {
               key: 'new',
-              label: 'Novo brojilo i lokacija',
+              label: t('mobile.records.form.stepNewMeterLocation'),
               state: step === 2 ? 'current' : 'pending',
               detail: serialNumber || undefined,
             },
             {
               key: 'sim',
-              label: 'SIM kartica',
+              label: t('mobile.records.form.stepSim'),
               state: 'done',
               detail: simCardId,
             },
             {
               key: 'confirm',
-              label: 'Potvrda',
+              label: t('mobile.records.form.stepConfirm'),
               state: step === 2 && !newValidation.length ? 'current' : 'pending',
             },
           ]}
@@ -523,10 +550,10 @@ export default function CreateRecordReplacementScreen() {
         {step === 1 ? (
           <>
             <Text style={[type.sectionLabel, styles.sectionTitle]}>
-              Demontirano brojilo
+              {t('mobile.records.form.demountedSection')}
             </Text>
             <MeterTypePicker
-              label="Tip demontiranog brojila"
+              label={t('mobile.records.form.demountedTypeLabel')}
               items={types}
               value={dmMeterTypeId}
               onChange={setDmMeterTypeId}
@@ -534,35 +561,38 @@ export default function CreateRecordReplacementScreen() {
               error={typesError}
             />
             <Field
-              label="Serijski broj demontiranog"
+              testID="replacement-old-serial-input"
+              label={t('mobile.records.form.demountedSerialLabel')}
               required
               value={dmSerialNumber}
               onChangeText={setDmSerialNumber}
               autoCapitalize="characters"
               trailingAction={{
                 icon: 'barcode-outline',
-                accessibilityLabel: 'Skeniraj serijski broj demontiranog brojila',
+                accessibilityLabel: t(
+                  'mobile.records.form.scanDemountedAccessibility',
+                ),
                 onPress: () =>
                   router.push({
                     pathname: '/(app)/(tabs)/scan',
                     params: {
                       afterScan: 'meterSerial',
                       simCardId,
-                      target: 'demounted',
-                      returnRoute: 'create-record-replacement',
+                      serialTarget: 'demounted',
+                      returnTo: 'create-record-replacement',
                     },
                   }),
               }}
             />
             <Field
-              label="Godina proizvodnje"
+              label={t('mobile.records.form.yearLabel')}
               required
               value={dmYear}
               onChangeText={(v) => setDmYear(v.replace(/\D/g, ''))}
               keyboardType="number-pad"
             />
             <Field
-              label="Godina baždarenja"
+              label={t('mobile.records.form.calibrationLabel')}
               required
               value={dmCalibrationYear}
               onChangeText={(v) => setDmCalibrationYear(v.replace(/\D/g, ''))}
@@ -583,10 +613,10 @@ export default function CreateRecordReplacementScreen() {
               <View style={styles.switchRow}>
                 <View style={styles.switchBody}>
                   <Text style={type.bodyStrong}>
-                    Staro brojilo ima integrisanu SIM
+                    {t('mobile.records.form.integratedSimTitle')}
                   </Text>
                   <Text style={[type.caption, styles.switchHint]}>
-                    Označite kada se SIM ne može fizički izvaditi.
+                    {t('mobile.records.form.integratedSimHint')}
                   </Text>
                 </View>
                 <Switch
@@ -603,13 +633,13 @@ export default function CreateRecordReplacementScreen() {
               </View>
             </Panel>
             <Field
-              label="Napomena o SIM-u na starom brojilu"
+              label={t('mobile.records.form.oldMeterSimNote')}
               value={dmNoSimNote}
               onChangeText={setDmNoSimNote}
               multiline
             />
             <Field
-              label="Napomena o demontiranom brojilu"
+              label={t('mobile.records.form.oldMeterNote')}
               value={dmNotes}
               onChangeText={setDmNotes}
               multiline
@@ -620,14 +650,15 @@ export default function CreateRecordReplacementScreen() {
               </Panel>
             ) : null}
             <ActionButton
-              title="Dalje · novo brojilo"
+              testID="replacement-next-step-btn"
+              title={t('mobile.records.form.nextNewMeter')}
               icon="arrow-forward"
               size="lg"
               disabled={dmValidation.length > 0}
               onPress={nextStep}
             />
             <ActionButton
-              title="Odustani"
+              title={t('mobile.common.cancel')}
               variant="ghost"
               onPress={() => router.back()}
               style={styles.secondary}
@@ -636,17 +667,17 @@ export default function CreateRecordReplacementScreen() {
         ) : (
           <>
             <ActionButton
-              title="Nazad na demontirano brojilo"
+              title={t('mobile.records.form.backToDemounted')}
               icon="arrow-back"
               variant="ghost"
               onPress={() => setStep(1)}
               style={styles.back}
             />
             <Text style={[type.sectionLabel, styles.sectionTitle]}>
-              Novo brojilo
+              {t('mobile.records.form.newMeterSection')}
             </Text>
             <MeterTypePicker
-              label="Tip novog brojila"
+              label={t('mobile.records.form.newMeterTypeLabel')}
               items={types}
               value={meterTypeId}
               onChange={setMeterTypeId}
@@ -654,35 +685,38 @@ export default function CreateRecordReplacementScreen() {
               error={typesError}
             />
             <Field
-              label="Serijski broj novog brojila"
+              testID="replacement-new-serial-input"
+              label={t('mobile.records.form.newMeterSerialLabel')}
               required
               value={serialNumber}
               onChangeText={setSerialNumber}
               autoCapitalize="characters"
               trailingAction={{
                 icon: 'barcode-outline',
-                accessibilityLabel: 'Skeniraj serijski broj novog brojila',
+                accessibilityLabel: t(
+                  'mobile.records.form.scanNewSerialAccessibility',
+                ),
                 onPress: () =>
                   router.push({
                     pathname: '/(app)/(tabs)/scan',
                     params: {
                       afterScan: 'meterSerial',
                       simCardId,
-                      target: 'new',
-                      returnRoute: 'create-record-replacement',
+                      serialTarget: 'new',
+                      returnTo: 'create-record-replacement',
                     },
                   }),
               }}
             />
             <Field
-              label="Godina proizvodnje"
+              label={t('mobile.records.form.yearLabel')}
               required
               value={year}
               onChangeText={(v) => setYear(v.replace(/\D/g, ''))}
               keyboardType="number-pad"
             />
             <Field
-              label="Godina baždarenja"
+              label={t('mobile.records.form.calibrationLabel')}
               required
               value={calibrationYear}
               onChangeText={(v) => setCalibrationYear(v.replace(/\D/g, ''))}
@@ -700,27 +734,31 @@ export default function CreateRecordReplacementScreen() {
               />
             ) : null}
             <Text style={[type.sectionLabel, styles.sectionTitle]}>
-              Nova lokacija
+              {t('mobile.records.form.newLocationSection')}
             </Text>
             <Field
-              label="Adresa instalacije"
+              label={t('mobile.records.form.addressLabel')}
               value={installationAddress}
               onChangeText={setInstallationAddress}
-              placeholder="Ulica i broj"
+              placeholder={t('mobile.records.form.addressPlaceholder')}
             />
-            <Field label="Grad" value={city} onChangeText={setCity} />
             <Field
-              label="Općina"
+              label={t('mobile.records.form.cityLabel')}
+              value={city}
+              onChangeText={setCity}
+            />
+            <Field
+              label={t('mobile.records.form.municipalityLabel')}
               value={municipality}
               onChangeText={setMunicipality}
             />
             <Field
-              label="Mjerno mjesto"
+              label={t('mobile.records.form.measuringPointLabel')}
               value={measuringPoint}
               onChangeText={setMeasuringPoint}
             />
             <Field
-              label="Datum instalacije"
+              label={t('mobile.records.form.installDateLabel')}
               value={installationDate}
               onChangeText={setInstallationDate}
               placeholder="YYYY-MM-DD"
@@ -745,10 +783,10 @@ export default function CreateRecordReplacementScreen() {
               onLoading={setIsUploadingPhoto}
             />
             <Text style={[type.sectionLabel, styles.sectionTitle]}>
-              Završne informacije
+              {t('mobile.records.form.finalSection')}
             </Text>
             <Field
-              label="Napomena"
+              label={t('mobile.records.form.noteLabel')}
               value={notes}
               onChangeText={setNotes}
               multiline
@@ -759,7 +797,8 @@ export default function CreateRecordReplacementScreen() {
               </Panel>
             ) : null}
             <ActionButton
-              title="Kreiraj zapisnik zamjene"
+              testID="replacement-submit-btn"
+              title={t('mobile.records.form.createReplacementButton')}
               icon="checkmark"
               size="lg"
               loading={createMutation.isPending}
@@ -767,7 +806,7 @@ export default function CreateRecordReplacementScreen() {
               onPress={() => createMutation.mutate()}
             />
             <ActionButton
-              title="Odustani"
+              title={t('mobile.common.cancel')}
               variant="ghost"
               onPress={() => router.back()}
               style={styles.secondary}

@@ -120,6 +120,7 @@ export default function LoginScreen() {
                 {t('mobile.auth.login.emailOrUsernameLabel')}
               </Text>
               <TextInput
+                testID="login-email-input"
                 value={emailOrUsername}
                 onChangeText={(val) => {
                   setEmailOrUsername(val);
@@ -145,6 +146,7 @@ export default function LoginScreen() {
                 {t('mobile.auth.login.passwordLabel')}
               </Text>
               <TextInput
+                testID="login-password-input"
                 value={password}
                 onChangeText={(val) => {
                   setPassword(val);
@@ -167,6 +169,7 @@ export default function LoginScreen() {
             </View>
 
             <ActionButton
+              testID="login-submit-btn"
               title={t('mobile.auth.login.submitButton')}
               onPress={() => void submit()}
               loading={isLoading}

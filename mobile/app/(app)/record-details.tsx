@@ -11,6 +11,7 @@ import {
   meterTypeDefinitionsApi,
   type MeterTypeFieldItem,
 } from '@/api/meter-type-definitions.api';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   spacing,
   useTheme,
@@ -27,17 +28,18 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { openInExternalMaps } from '@/utils/geo';
 
-const statusMeta: Record<RecordStatus, { label: string; tone: StatusTone }> = {
-  DRAFT: { label: 'Nacrt', tone: 'neutral' },
-  SENT: { label: 'Poslano', tone: 'info' },
-  SEND_FAILED: { label: 'Greška pri slanju', tone: 'danger' },
-  SEP_ACTIVATED: { label: 'SEP aktiviran', tone: 'success' },
-  LEGACY_COMPLETED: { label: 'Završeno', tone: 'success' },
+const statusConfig: Record<RecordStatus, { key: string; tone: StatusTone }> = {
+  DRAFT: { key: 'mobile.records.statusDraft', tone: 'neutral' },
+  SENT: { key: 'mobile.records.statusSent', tone: 'info' },
+  SEND_FAILED: { key: 'mobile.records.statusSendFailed', tone: 'danger' },
+  SEP_ACTIVATED: { key: 'mobile.records.statusSepActivated', tone: 'success' },
+  LEGACY_COMPLETED: { key: 'mobile.records.statusCompleted', tone: 'success' },
 };
 
 export default function RecordDetailsScreen() {
   const router = useRouter();
   const { type } = useTheme();
+  const { t, language } = useTranslation();
   const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const recordId =
@@ -82,30 +84,41 @@ export default function RecordDetailsScreen() {
     mutationFn: () => installationRecordsApi.retrySend(recordId),
     onSuccess: async () => {
       await Promise.all([recordQuery.refetch(), permissionsQuery.refetch()]);
-      Alert.alert('Uspjeh', 'Zapisnik je ponovo poslan.');
+      Alert.alert(
+        t('mobile.common.success'),
+        t('mobile.records.details.retrySendSuccess'),
+      );
     },
     onError: (error) =>
-      Alert.alert('Greška', getMessage(error, 'Ponovno slanje nije uspjelo.')),
+      Alert.alert(
+        t('mobile.common.error'),
+        getMessage(error, t('mobile.records.details.retrySendError')),
+      ),
   });
   const markSep = useMutation({
     mutationFn: () => installationRecordsApi.markSepActivated(recordId),
     onSuccess: async () => {
       await Promise.all([recordQuery.refetch(), permissionsQuery.refetch()]);
-      Alert.alert('Uspjeh', 'Zapisnik je označen kao SEP aktiviran.');
+      Alert.alert(
+        t('mobile.common.success'),
+        t('mobile.records.details.markSepSuccess'),
+      );
     },
     onError: (error) =>
       Alert.alert(
-        'Greška',
-        getMessage(error, 'Ažuriranje statusa nije uspjelo.'),
+        t('mobile.common.error'),
+        getMessage(error, t('mobile.records.details.markSepError')),
       ),
   });
+
+  const locale = language === 'en' ? 'en-GB' : 'bs-BA';
 
   if (!recordId) {
     return (
       <SafeAreaView style={styles.root}>
         <EmptyState
           icon="alert-circle-outline"
-          title="Nedostaje ID zapisnika"
+          title={t('mobile.records.details.missingId')}
         />
       </SafeAreaView>
     );
@@ -113,7 +126,10 @@ export default function RecordDetailsScreen() {
   if (recordQuery.isLoading) {
     return (
       <SafeAreaView style={styles.root}>
-        <ScreenTitleBar title="Zapisnik" onBack={() => router.back()} />
+        <ScreenTitleBar
+          title={t('mobile.records.details.screenTitle')}
+          onBack={() => router.back()}
+        />
         <View style={styles.loading}>
           <SkeletonRows count={8} />
         </View>
@@ -123,22 +139,24 @@ export default function RecordDetailsScreen() {
   if (recordQuery.isError || !record) {
     return (
       <SafeAreaView style={styles.root}>
-        <ScreenTitleBar title="Zapisnik" onBack={() => router.back()} />
+        <ScreenTitleBar
+          title={t('mobile.records.details.screenTitle')}
+          onBack={() => router.back()}
+        />
         <EmptyState
           icon="cloud-offline-outline"
-          title="Detalji nisu dostupni"
-          description="Ne mogu učitati zapisnik."
-          actionLabel="Pokušaj ponovo"
+          title={t('mobile.records.details.unavailableTitle')}
+          description={t('mobile.records.details.unavailableDesc')}
+          actionLabel={t('mobile.common.retry')}
           onAction={() => void recordQuery.refetch()}
         />
       </SafeAreaView>
     );
   }
 
-  const status = statusMeta[record.status] ?? {
-    label: record.status,
-    tone: 'neutral' as const,
-  };
+  const cfg = statusConfig[record.status];
+  const statusLabel = cfg ? t(cfg.key) : record.status;
+  const statusTone: StatusTone = cfg ? cfg.tone : 'neutral';
   const showRetry =
     record.status === 'SEND_FAILED' &&
     Boolean(permissionsQuery.data?.canRetrySend);
@@ -162,18 +180,22 @@ export default function RecordDetailsScreen() {
     if (lat == null || lon == null) return;
     const label =
       record.meter?.installationAddress?.trim() ||
-      `Zapisnik ${record.recordNumber}`;
+      t('mobile.records.details.titleWithNumber', {
+        number: record.recordNumber,
+      });
     void openInExternalMaps({ latitude: lat, longitude: lon }, label);
   };
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title={`Zapisnik ${record.recordNumber}`}
+        title={t('mobile.records.details.titleWithNumber', {
+          number: record.recordNumber,
+        })}
         subtitle={
           record.kind === 'METER_REPLACEMENT'
-            ? 'Zamjena brojila'
-            : 'Novi priključak'
+            ? t('mobile.records.details.kindReplacement')
+            : t('mobile.records.details.kindNew')
         }
         onBack={() => router.back()}
       />
@@ -182,25 +204,25 @@ export default function RecordDetailsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.statusRow}>
-          <StatusBadge tone={status.tone} label={status.label} showDot />
+          <StatusBadge tone={statusTone} label={statusLabel} showDot />
         </View>
 
         {snapshot ? (
-          <Section label="Demontirano brojilo">
+          <Section label={t('mobile.records.details.demountedSection')}>
             <Panel padding="none">
               <View style={styles.panelInner}>
                 <ListRow
-                  title="Serijski broj"
+                  title={t('mobile.tasks.install.serialNumber')}
                   value={stringValue(snapshot.serialNumber)}
                   valueMono
                 />
                 <ListRow
-                  title="Tip"
+                  title={t('mobile.tasks.install.meterType')}
                   value={demountedTypeQuery.data?.name ?? '—'}
                   divider
                 />
                 <ListRow
-                  title="Proizvođač / model"
+                  title={t('mobile.records.details.manufacturerModel')}
                   value={
                     [
                       demountedTypeQuery.data?.manufacturer,
@@ -212,22 +234,22 @@ export default function RecordDetailsScreen() {
                   divider
                 />
                 <ListRow
-                  title="Godina"
+                  title={t('mobile.records.details.year')}
                   value={stringValue(snapshot.year)}
                   divider
                 />
                 <ListRow
-                  title="Baždarenje"
+                  title={t('mobile.records.details.calibration')}
                   value={stringValue(snapshot.calibrationYear)}
                   divider
                 />
                 <ListRow
-                  title="Integrisana SIM"
+                  title={t('mobile.records.details.integratedSim')}
                   value={
                     snapshot.hadIntegratedSim === true
-                      ? 'Da'
+                      ? t('mobile.common.yes')
                       : snapshot.hadIntegratedSim === false
-                        ? 'Ne'
+                        ? t('mobile.common.no')
                         : '—'
                   }
                   divider
@@ -239,26 +261,32 @@ export default function RecordDetailsScreen() {
                     value={formatDynamicValue(
                       field,
                       demountedValues[field.name],
+                      t,
+                      locale,
                     )}
                     divider
                   />
                 ))}
                 {typeof snapshot.noSimNote === 'string' && snapshot.noSimNote ? (
                   <ListRow
-                    title="Napomena SIM"
+                    title={t('mobile.records.details.simNote')}
                     value={snapshot.noSimNote}
                     divider
                   />
                 ) : null}
                 {typeof snapshot.notes === 'string' && snapshot.notes ? (
-                  <ListRow title="Napomena" value={snapshot.notes} divider />
+                  <ListRow
+                    title={t('mobile.records.details.note')}
+                    value={snapshot.notes}
+                    divider
+                  />
                 ) : null}
               </View>
             </Panel>
           </Section>
         ) : null}
 
-        <Section label="SIM kartica">
+        <Section label={t('mobile.records.details.simSection')}>
           <Panel padding="none">
             <View style={styles.panelInner}>
               <ListRow
@@ -273,7 +301,7 @@ export default function RecordDetailsScreen() {
                 divider
               />
               <ListRow
-                title="Status"
+                title={t('mobile.records.details.status')}
                 value={record.meter?.simCard?.status ?? '—'}
                 divider
               />
@@ -282,27 +310,31 @@ export default function RecordDetailsScreen() {
         </Section>
 
         <Section
-          label={record.kind === 'METER_REPLACEMENT' ? 'Novo brojilo' : 'Brojilo'}
+          label={
+            record.kind === 'METER_REPLACEMENT'
+              ? t('mobile.records.details.newMeterSection')
+              : t('mobile.records.details.meterSection')
+          }
         >
           <Panel padding="none">
             <View style={styles.panelInner}>
               <ListRow
-                title="Serijski broj"
+                title={t('mobile.tasks.install.serialNumber')}
                 value={record.meter?.serialNumber ?? '—'}
                 valueMono
               />
               <ListRow
-                title="Tip"
+                title={t('mobile.tasks.install.meterType')}
                 value={record.meter?.meterTypeDefinition?.name ?? '—'}
                 divider
               />
               <ListRow
-                title="Adresa"
+                title={t('mobile.tasks.install.address')}
                 value={record.meter?.installationAddress ?? '—'}
                 divider
               />
               <ListRow
-                title="Grad / općina"
+                title={t('mobile.records.details.cityMunicipality')}
                 value={
                   [record.meter?.city, record.meter?.municipality]
                     .filter(Boolean)
@@ -311,12 +343,12 @@ export default function RecordDetailsScreen() {
                 divider
               />
               <ListRow
-                title="Datum ugradnje"
+                title={t('mobile.records.details.installDate')}
                 value={
                   record.meter?.installationDate
                     ? new Date(
                         record.meter.installationDate,
-                      ).toLocaleDateString('bs-BA')
+                      ).toLocaleDateString(locale)
                     : '—'
                 }
                 divider
@@ -328,6 +360,8 @@ export default function RecordDetailsScreen() {
                   value={formatDynamicValue(
                     field,
                     (values as Record<string, unknown>)[field.name],
+                    t,
+                    locale,
                   )}
                   divider
                 />
@@ -336,11 +370,11 @@ export default function RecordDetailsScreen() {
           </Panel>
         </Section>
 
-        <Section label="Lokacija">
+        <Section label={t('mobile.records.details.locationSection')}>
           <Panel padding="none">
             <View style={styles.panelInner}>
               <ListRow
-                title="GPS širina"
+                title={t('mobile.records.details.gpsLat')}
                 value={
                   record.meter?.latitude != null
                     ? String(record.meter.latitude)
@@ -349,7 +383,7 @@ export default function RecordDetailsScreen() {
                 valueMono
               />
               <ListRow
-                title="GPS dužina"
+                title={t('mobile.records.details.gpsLon')}
                 value={
                   record.meter?.longitude != null
                     ? String(record.meter.longitude)
@@ -362,7 +396,8 @@ export default function RecordDetailsScreen() {
           </Panel>
           {record.meter?.latitude != null && record.meter?.longitude != null ? (
             <ActionButton
-              title="Otvori u Mapama"
+              testID="record-details-maps-btn"
+              title={t('mobile.records.details.openMaps')}
               icon="map-outline"
               variant="secondary"
               onPress={openMaps}
@@ -371,21 +406,27 @@ export default function RecordDetailsScreen() {
           ) : null}
         </Section>
 
-        <Section label="Evidencija">
+        <Section label={t('mobile.records.details.evidenceSection')}>
           <Panel padding="none">
             <View style={styles.panelInner}>
               <ListRow
-                title="Instalirao"
+                title={t('mobile.records.details.installedBy')}
                 value={
                   record.installedBy
                     ? `${record.installedBy.firstName} ${record.installedBy.lastName}`
                     : '—'
                 }
               />
-              <ListRow title="Napomena" value={record.notes ?? '—'} divider />
               <ListRow
-                title="Fotografije"
-                value={`${Array.isArray(record.photos) ? record.photos.length : 0} kom`}
+                title={t('mobile.records.details.note')}
+                value={record.notes ?? '—'}
+                divider
+              />
+              <ListRow
+                title={t('mobile.records.details.photos')}
+                value={t('mobile.records.details.photosCount', {
+                  count: Array.isArray(record.photos) ? record.photos.length : 0,
+                })}
                 divider
               />
             </View>
@@ -394,12 +435,15 @@ export default function RecordDetailsScreen() {
 
         {showRetry ? (
           <Panel tone="danger" style={styles.actionPanel}>
-            <Text style={type.bodyStrong}>Slanje emaila nije uspjelo</Text>
+            <Text style={type.bodyStrong}>
+              {t('mobile.records.details.emailFailedTitle')}
+            </Text>
             <Text style={[type.caption, styles.actionText]}>
-              Provjerite mrežu i pokušajte ponovo.
+              {t('mobile.records.details.emailFailedBody')}
             </Text>
             <ActionButton
-              title="Ponovo pošalji"
+              testID="record-details-retry-send-btn"
+              title={t('mobile.records.details.retrySend')}
               icon="mail-outline"
               onPress={() => retrySend.mutate()}
               loading={retrySend.isPending}
@@ -408,19 +452,29 @@ export default function RecordDetailsScreen() {
         ) : null}
         {showSep ? (
           <Panel tone="info" style={styles.actionPanel}>
-            <Text style={type.bodyStrong}>Potvrda SEP aktivacije</Text>
+            <Text style={type.bodyStrong}>
+              {t('mobile.records.details.sepTitle')}
+            </Text>
             <Text style={[type.caption, styles.actionText]}>
-              Nakon potvrde u SEP označite zapisnik aktiviranim.
+              {t('mobile.records.details.sepBody')}
             </Text>
             <ActionButton
-              title="Označi SEP aktiviranim"
+              testID="record-details-mark-sep-btn"
+              title={t('mobile.records.details.markSep')}
               icon="checkmark-circle-outline"
               loading={markSep.isPending}
               onPress={() =>
-                Alert.alert('Potvrda', 'Označiti SEP kao aktiviran?', [
-                  { text: 'Odustani', style: 'cancel' },
-                  { text: 'Označi', onPress: () => markSep.mutate() },
-                ])
+                Alert.alert(
+                  t('mobile.records.details.sepConfirmTitle'),
+                  t('mobile.records.details.sepConfirmMessage'),
+                  [
+                    { text: t('mobile.common.cancel'), style: 'cancel' },
+                    {
+                      text: t('mobile.records.details.markSepAction'),
+                      onPress: () => markSep.mutate(),
+                    },
+                  ],
+                )
               }
             />
           </Panel>
@@ -438,7 +492,12 @@ function getMessage(error: unknown, fallback: string): string {
     ? String(error.response.data.message)
     : fallback;
 }
-function formatDynamicValue(field: MeterTypeFieldItem, value: unknown): string {
+function formatDynamicValue(
+  field: MeterTypeFieldItem,
+  value: unknown,
+  t: (key: string) => string,
+  locale: string,
+): string {
   if (value == null) {
     return !field.isOperatorFillable && field.defaultValue
       ? field.defaultValue
@@ -446,16 +505,16 @@ function formatDynamicValue(field: MeterTypeFieldItem, value: unknown): string {
   }
   if (field.fieldType === 'BOOLEAN') {
     return value === true || value === 'true'
-      ? 'Da'
+      ? t('mobile.common.yes')
       : value === false || value === 'false'
-        ? 'Ne'
+        ? t('mobile.common.no')
         : '—';
   }
   if (field.fieldType === 'DATE') {
     const date = new Date(String(value));
     return Number.isNaN(date.getTime())
       ? String(value)
-      : date.toLocaleDateString('bs-BA');
+      : date.toLocaleDateString(locale);
   }
   const text = String(value).trim();
   return text || '—';

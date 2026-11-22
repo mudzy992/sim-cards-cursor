@@ -5,6 +5,7 @@ import { Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useConnectivity } from '@/hooks/useConnectivity';
+import { useTranslation } from '@/i18n/i18n.store';
 import { getOutboxCounts } from '@/offline/outbox';
 import { useAuthStore } from '@/store/auth.store';
 import {
@@ -21,6 +22,7 @@ export function OfflineBanner({
   onHeight?: (height: number) => void;
 }) {
   const { palette } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
   const { isOnline } = useConnectivity();
   const user = useAuthStore((s) => s.user);
@@ -66,6 +68,7 @@ export function OfflineBanner({
 
   return (
     <View
+      testID="offline-banner"
       style={[
         styles.banner,
         hasFailed ? styles.bannerDanger : undefined,
@@ -88,20 +91,26 @@ export function OfflineBanner({
       />
       <Text style={[styles.text, { color: accentColor }]} numberOfLines={2}>
         {isOffline
-          ? 'Offline režim · promjene će se poslati kada se mreža vrati'
+          ? t('mobile.offlineBanner.offlineMode')
           : hasFailed
-            ? `Outbox: ${counts.failed} neuspješno · ${counts.pending} na čekanju`
-            : `Outbox: ${counts.pending} na čekanju za sinhronizaciju`}
+            ? t('mobile.offlineBanner.failedAndPending', {
+                failed: counts.failed,
+                pending: counts.pending,
+              })
+            : t('mobile.offlineBanner.pendingOnly', {
+                pending: counts.pending,
+              })}
       </Text>
       {queuedTotal > 0 ? (
         <Pressable
+          testID="offline-banner-outbox-btn"
           onPress={() => router.push('/(app)/outbox')}
           style={[styles.pill, { borderColor: accentColor }]}
           accessibilityRole="button"
-          accessibilityLabel="Otvori outbox red"
+          accessibilityLabel={t('mobile.offlineBanner.openOutboxLabel')}
         >
           <Text style={[styles.pillText, { color: accentColor }]}>
-            Outbox ({queuedTotal})
+            {t('mobile.offlineBanner.outboxButton', { count: queuedTotal })}
           </Text>
         </Pressable>
       ) : null}

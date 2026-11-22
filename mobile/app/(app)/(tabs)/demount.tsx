@@ -15,6 +15,7 @@ import {
 } from '@/api/demount-tasks.api';
 import { simCardsApi } from '@/api/sim-cards.api';
 import { useAuthStore } from '@/store/auth.store';
+import { useTranslation } from '@/i18n/i18n.store';
 import { listOutbox } from '@/offline/outbox';
 import {
   spacing,
@@ -41,25 +42,25 @@ import {
 import { WorkflowModal } from '@/features/tasks/WorkflowModal';
 import { hapticSuccess } from '@/utils/haptics';
 
-const resolutionLabels: Record<DemountCompletionResolution, string> = {
-  FULL_DEMOUNT: 'Potpuna demontaža brojila i SIM-a',
-  REPLACE_SIM: 'Demontaža SIM-a i zamjena novom',
-  REMOVE_SIM_ONLY: 'Demontaža SIM-a bez zamjene',
+const resolutionLabelKeys: Record<DemountCompletionResolution, string> = {
+  FULL_DEMOUNT: 'mobile.tasks.demount.resFull',
+  REPLACE_SIM: 'mobile.tasks.demount.resReplace',
+  REMOVE_SIM_ONLY: 'mobile.tasks.demount.resRemoveOnly',
 };
-const resolutionDescriptions: Record<DemountCompletionResolution, string> = {
-  FULL_DEMOUNT: 'Brojilo se skida sa lokacije i ostaje bez aktivne SIM kartice.',
-  REPLACE_SIM: 'Stara SIM se uklanja, a nova kartica se odmah ugrađuje.',
-  REMOVE_SIM_ONLY: 'Brojilo ostaje na lokaciji bez SIM kartice.',
+const resolutionDescKeys: Record<DemountCompletionResolution, string> = {
+  FULL_DEMOUNT: 'mobile.tasks.demount.descFull',
+  REPLACE_SIM: 'mobile.tasks.demount.descReplace',
+  REMOVE_SIM_ONLY: 'mobile.tasks.demount.descRemoveOnly',
 };
-const removedSimLabels: Record<RemovedSimDisposition, string> = {
-  MARK_DEFECTIVE: 'Označi uklonjenu SIM kao neispravnu',
-  RETURN_TO_STOCK: 'Vrati uklonjenu SIM u zalihe',
+const removedSimLabelKeys: Record<RemovedSimDisposition, string> = {
+  MARK_DEFECTIVE: 'mobile.tasks.demount.dispDefective',
+  RETURN_TO_STOCK: 'mobile.tasks.demount.dispReturn',
 };
-const meterCategoryLabels: Record<MeterDemountCategory, string> = {
-  METER_FAULTY: 'Brojilo neispravno',
-  TEMPORARY_REMOVAL: 'Privremena demontaža SIM-a',
-  MAINTENANCE: 'Servis ili održavanje',
-  OTHER: 'Ostalo',
+const meterCategoryLabelKeys: Record<MeterDemountCategory, string> = {
+  METER_FAULTY: 'mobile.tasks.demount.catFaulty',
+  TEMPORARY_REMOVAL: 'mobile.tasks.demount.catTemp',
+  MAINTENANCE: 'mobile.tasks.demount.catMaintenance',
+  OTHER: 'mobile.tasks.demount.catOther',
 };
 
 type DemountWizard = {
@@ -78,6 +79,7 @@ type DemountWizard = {
 export default function DemountScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const { t } = useTranslation();
   const { palette, type } = useTheme();
   const styles = useThemedStyles(createStyles);
   const search = useLocalSearchParams<{
@@ -115,15 +117,15 @@ export default function DemountScreen() {
       } catch (err) {
         setError(
           axios.isAxiosError(err) && !err.response
-            ? 'Backend nije dostupan. Prikaz lokalnih zadataka nije uspio.'
-            : 'Nije moguće učitati zadatke demontaže.',
+            ? t('mobile.tasks.backendOfflineLocal')
+            : t('mobile.tasks.demount.loadError'),
         );
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
       }
     },
-    [user],
+    [user, t],
   );
 
   useFocusEffect(
@@ -160,8 +162,8 @@ export default function DemountScreen() {
       } catch {
         if (!cancelled) {
           Alert.alert(
-            'Skeniranje nije uspjelo',
-            'Skenirana SIM nije pronađena ili nije dostupna.',
+            t('mobile.tasks.demount.scanFailedTitle'),
+            t('mobile.tasks.demount.scanFailedMessage'),
           );
         }
       } finally {
@@ -171,7 +173,7 @@ export default function DemountScreen() {
     return () => {
       cancelled = true;
     };
-  }, [search.pickedIccid, search.wizardTaskId, router]);
+  }, [search.pickedIccid, search.wizardTaskId, router, t]);
 
   const filteredItems = useMemo(
     () => items.filter((item) => taskMatchesFilter(item.status, filter)),
@@ -191,8 +193,8 @@ export default function DemountScreen() {
       const message =
         axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
           ? err.response.data.message
-          : 'Ažuriranje statusa nije uspjelo.';
-      Alert.alert('Greška', message);
+          : t('mobile.tasks.statusUpdateFailed');
+      Alert.alert(t('mobile.common.error'), message);
     } finally {
       setUpdatingId(null);
     }
@@ -223,32 +225,41 @@ export default function DemountScreen() {
 
   const submitWizard = async () => {
     if (!wizard?.resolution) {
-      Alert.alert('Nedostaje izbor', 'Odaberite način završetka demontaže.');
+      Alert.alert(
+        t('mobile.tasks.demount.missingChoiceTitle'),
+        t('mobile.tasks.demount.missingResolution'),
+      );
       return;
     }
     if (!wizard.removedSimDisposition) {
-      Alert.alert('Nedostaje izbor', 'Odaberite ishod uklonjene SIM kartice.');
+      Alert.alert(
+        t('mobile.tasks.demount.missingChoiceTitle'),
+        t('mobile.tasks.demount.missingDisposition'),
+      );
       return;
     }
     const needsCategory =
       wizard.resolution === 'FULL_DEMOUNT' ||
       wizard.resolution === 'REMOVE_SIM_ONLY';
     if (needsCategory && !wizard.meterDemountCategory) {
-      Alert.alert('Nedostaje kategorija', 'Odaberite kategoriju demontaže.');
+      Alert.alert(
+        t('mobile.tasks.demount.missingCategoryTitle'),
+        t('mobile.tasks.demount.missingCategory'),
+      );
       return;
     }
     if (wizard.resolution === 'REPLACE_SIM' && !wizard.newSimCardId) {
       Alert.alert(
-        'Nedostaje nova SIM',
-        'Skenirajte karticu koja zamjenjuje staru.',
+        t('mobile.tasks.demount.missingNewSimTitle'),
+        t('mobile.tasks.demount.missingNewSim'),
       );
       return;
     }
     const reason = wizard.reason.trim();
     if (!reason) {
       Alert.alert(
-        'Nedostaje obrazloženje',
-        'Unesite razlog demontaže ili zamjene.',
+        t('mobile.tasks.demount.missingReasonTitle'),
+        t('mobile.tasks.demount.missingReason'),
       );
       return;
     }
@@ -273,8 +284,8 @@ export default function DemountScreen() {
       const message =
         axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
           ? err.response.data.message
-          : 'Završetak zadatka nije uspio.';
-      Alert.alert('Greška', message);
+          : t('mobile.tasks.completeFailed');
+      Alert.alert(t('mobile.common.error'), message);
     } finally {
       setWizardSubmitting(false);
     }
@@ -287,13 +298,14 @@ export default function DemountScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title="Demontaža"
-        subtitle={`${activeCount} aktivnih zadataka`}
+        title={t('mobile.tasks.demount.title')}
+        subtitle={t('mobile.tasks.activeCountSubtitle', { count: activeCount })}
         actionIcon="refresh"
-        actionLabel="Osvježi"
+        actionLabel={t('mobile.common.refresh')}
         onAction={() => void load(true)}
       />
       <TaskFilterBar
+        testID="demount-filter-bar"
         value={filter}
         onChange={setFilter}
         counts={{ active: activeCount }}
@@ -305,10 +317,12 @@ export default function DemountScreen() {
       ) : error ? (
         <View style={styles.stateWrap}>
           <Panel tone="danger">
-            <Text style={styles.errorTitle}>Zadaci nisu dostupni</Text>
+            <Text style={styles.errorTitle}>
+              {t('mobile.tasks.unavailableTitle')}
+            </Text>
             <Text style={styles.errorText}>{error}</Text>
             <ActionButton
-              title="Pokušaj ponovo"
+              title={t('mobile.common.retry')}
               icon="refresh"
               onPress={() => void load(true)}
             />
@@ -331,18 +345,19 @@ export default function DemountScreen() {
               icon="checkmark-done-circle-outline"
               title={
                 filter === 'ACTIVE'
-                  ? 'Sve je riješeno'
-                  : 'Nema zadataka u ovom prikazu'
+                  ? t('mobile.tasks.emptyAllDone')
+                  : t('mobile.tasks.emptyNoFilter')
               }
               description={
                 filter === 'ACTIVE'
-                  ? 'Trenutno nemate aktivnih zadataka demontaže.'
-                  : 'Promijenite filter ili osvježite listu.'
+                  ? t('mobile.tasks.demount.emptyDesc')
+                  : t('mobile.tasks.emptyFilterHint')
               }
             />
           }
           renderItem={({ item }) => (
             <TaskCard
+              testID={`demount-task-card-${item.id}`}
               title={item.meter?.serialNumber ?? item.meterId}
               status={item.status}
               createdAt={item.createdAt}
@@ -365,7 +380,7 @@ export default function DemountScreen() {
                 ...(item.meter?.meterTypeDefinition?.name
                   ? [
                       {
-                        label: 'Tip brojila',
+                        label: t('mobile.tasks.install.meterType'),
                         value: item.meter.meterTypeDefinition.name,
                       },
                     ]
@@ -373,8 +388,8 @@ export default function DemountScreen() {
                 ...(item.completionResolution && item.status === 'COMPLETED'
                   ? [
                       {
-                        label: 'Način',
-                        value: resolutionLabels[item.completionResolution],
+                        label: t('mobile.tasks.demount.resolutionMetaLabel'),
+                        value: t(resolutionLabelKeys[item.completionResolution]),
                       },
                     ]
                   : []),
@@ -382,9 +397,9 @@ export default function DemountScreen() {
               updating={updatingId === item.id}
               primaryLabel={
                 item.status === 'PENDING'
-                  ? 'Započni'
+                  ? t('mobile.tasks.startTask')
                   : item.status === 'IN_PROGRESS'
-                    ? 'Završi demontažu'
+                    ? t('mobile.tasks.demount.finishTask')
                     : undefined
               }
               onPrimary={
@@ -395,7 +410,9 @@ export default function DemountScreen() {
                     : undefined
               }
               secondaryLabel={
-                item.status === 'IN_PROGRESS' ? 'Vrati inicijatoru' : undefined
+                item.status === 'IN_PROGRESS'
+                  ? t('mobile.tasks.returnToInitiator')
+                  : undefined
               }
               onSecondary={
                 item.status === 'IN_PROGRESS'
@@ -409,17 +426,20 @@ export default function DemountScreen() {
 
       <WorkflowModal
         visible={Boolean(wizard)}
-        title="Završetak demontaže"
+        title={t('mobile.tasks.demount.wizardTitle')}
         subtitle={
           wizard
-            ? `Brojilo ${wizard.task.meter?.serialNumber ?? wizard.task.meterId}`
+            ? t('mobile.tasks.demount.wizardSubtitle', {
+                meter: wizard.task.meter?.serialNumber ?? wizard.task.meterId,
+              })
             : undefined
         }
         onClose={() => setWizard(null)}
         footer={
           wizard?.step === 2 ? (
             <ActionButton
-              title="Potvrdi završetak"
+              testID="demount-wizard-submit-btn"
+              title={t('mobile.tasks.demount.wizardConfirm')}
               icon="checkmark"
               onPress={() => void submitWizard()}
               loading={wizardSubmitting}
@@ -431,46 +451,50 @@ export default function DemountScreen() {
         {wizard ? (
           <>
             <WorkflowSteps
-              header="DEMONTAŽA · VOĐENI POSTUPAK"
+              header={t('mobile.tasks.demount.wizardHeader')}
               steps={[
                 {
                   key: 'task',
-                  label: 'Zadatak preuzet',
+                  label: t('mobile.tasks.demount.stepTask'),
                   state: 'done',
                   detail:
                     wizard.task.meter?.serialNumber ?? wizard.task.meterId,
                 },
                 {
                   key: 'resolution',
-                  label: 'Način završetka',
+                  label: t('mobile.tasks.demount.stepResolution'),
                   state: wizard.resolution ? 'done' : 'current',
                   detail: wizard.resolution
-                    ? resolutionLabels[wizard.resolution]
+                    ? t(resolutionLabelKeys[wizard.resolution])
                     : undefined,
                 },
                 {
                   key: 'details',
-                  label: 'Ishod i obrazloženje',
+                  label: t('mobile.tasks.demount.stepDetails'),
                   state: wizard.step === 2 ? 'current' : 'pending',
                 },
-                { key: 'confirm', label: 'Potvrda', state: 'pending' },
+                {
+                  key: 'confirm',
+                  label: t('mobile.tasks.demount.stepConfirm'),
+                  state: 'pending',
+                },
               ]}
             />
 
             {wizard.step === 1 ? (
               <>
                 <Text style={[type.sectionLabel, styles.sectionTitle]}>
-                  Odaberite način završetka
+                  {t('mobile.tasks.demount.selectResolution')}
                 </Text>
                 {(
                   Object.keys(
-                    resolutionLabels,
+                    resolutionLabelKeys,
                   ) as DemountCompletionResolution[]
                 ).map((key) => (
                   <ChoiceRow
                     key={key}
-                    label={resolutionLabels[key]}
-                    description={resolutionDescriptions[key]}
+                    label={t(resolutionLabelKeys[key])}
+                    description={t(resolutionDescKeys[key])}
                     selected={wizard.resolution === key}
                     onPress={() => updateWizard({ resolution: key, step: 2 })}
                   />
@@ -480,7 +504,7 @@ export default function DemountScreen() {
               <>
                 {!wizard.isLocked ? (
                   <ActionButton
-                    title="Promijeni način završetka"
+                    title={t('mobile.tasks.demount.changeResolution')}
                     variant="ghost"
                     icon="arrow-back"
                     onPress={() => updateWizard({ step: 1 })}
@@ -488,39 +512,39 @@ export default function DemountScreen() {
                   />
                 ) : null}
                 <Text style={[type.sectionLabel, styles.sectionTitle]}>
-                  Način završetka
+                  {t('mobile.tasks.demount.stepResolution')}
                 </Text>
                 <Panel tone="info">
                   <Text style={type.bodyStrong}>
                     {wizard.resolution
-                      ? resolutionLabels[wizard.resolution]
+                      ? t(resolutionLabelKeys[wizard.resolution])
                       : '—'}
                   </Text>
                   {wizard.isLocked ? (
                     <Text style={[type.caption, styles.lockedText]}>
-                      Definisao inicijator zadatka
+                      {t('mobile.tasks.demount.lockedByInitiator')}
                     </Text>
                   ) : null}
                 </Panel>
 
                 <Text style={[type.sectionLabel, styles.sectionTitle]}>
-                  Ishod uklonjene SIM
+                  {t('mobile.tasks.demount.removedSimDisposition')}
                 </Text>
                 {wizard.isLocked ? (
                   <Panel>
                     <Text style={type.bodyStrong}>
                       {wizard.removedSimDisposition
-                        ? removedSimLabels[wizard.removedSimDisposition]
+                        ? t(removedSimLabelKeys[wizard.removedSimDisposition])
                         : '—'}
                     </Text>
                   </Panel>
                 ) : (
                   (
-                    Object.keys(removedSimLabels) as RemovedSimDisposition[]
+                    Object.keys(removedSimLabelKeys) as RemovedSimDisposition[]
                   ).map((key) => (
                     <ChoiceRow
                       key={key}
-                      label={removedSimLabels[key]}
+                      label={t(removedSimLabelKeys[key])}
                       selected={wizard.removedSimDisposition === key}
                       onPress={() =>
                         updateWizard({ removedSimDisposition: key })
@@ -533,25 +557,29 @@ export default function DemountScreen() {
                 wizard.resolution === 'REMOVE_SIM_ONLY' ? (
                   <>
                     <Text style={[type.sectionLabel, styles.sectionTitle]}>
-                      Kategorija demontaže
+                      {t('mobile.tasks.demount.categoryLabel')}
                     </Text>
                     {wizard.isLocked ? (
                       <Panel>
                         <Text style={type.bodyStrong}>
                           {wizard.meterDemountCategory
-                            ? meterCategoryLabels[wizard.meterDemountCategory]
+                            ? t(
+                                meterCategoryLabelKeys[
+                                  wizard.meterDemountCategory
+                                ],
+                              )
                             : '—'}
                         </Text>
                       </Panel>
                     ) : (
                       (
                         Object.keys(
-                          meterCategoryLabels,
+                          meterCategoryLabelKeys,
                         ) as MeterDemountCategory[]
                       ).map((key) => (
                         <ChoiceRow
                           key={key}
-                          label={meterCategoryLabels[key]}
+                          label={t(meterCategoryLabelKeys[key])}
                           selected={wizard.meterDemountCategory === key}
                           onPress={() =>
                             updateWizard({ meterDemountCategory: key })
@@ -565,7 +593,7 @@ export default function DemountScreen() {
                 {wizard.resolution === 'REPLACE_SIM' ? (
                   <>
                     <Text style={[type.sectionLabel, styles.sectionTitle]}>
-                      Nova SIM kartica
+                      {t('mobile.tasks.demount.newSimSection')}
                     </Text>
                     <Panel tone={wizard.newSimCardId ? 'success' : 'info'}>
                       {wizard.newSimIccid ? (
@@ -579,14 +607,15 @@ export default function DemountScreen() {
                         </>
                       ) : (
                         <Text style={type.body}>
-                          Skenirajte karticu koja će zamijeniti staru.
+                          {t('mobile.tasks.demount.newSimPrompt')}
                         </Text>
                       )}
                       <ActionButton
+                        testID="demount-wizard-scan-sim-btn"
                         title={
                           wizard.newSimCardId
-                            ? 'Promijeni novu SIM'
-                            : 'Skeniraj novu SIM'
+                            ? t('mobile.tasks.demount.changeNewSim')
+                            : t('mobile.tasks.demount.scanNewSim')
                         }
                         icon="barcode-outline"
                         onPress={scanNewSim}
@@ -598,24 +627,24 @@ export default function DemountScreen() {
                 ) : null}
 
                 <Text style={[type.sectionLabel, styles.sectionTitle]}>
-                  Obrazloženje
+                  {t('mobile.tasks.demount.reasonSection')}
                 </Text>
                 <Field
-                  label="Razlog demontaže ili zamjene"
+                  label={t('mobile.tasks.demount.reasonLabel')}
                   required
                   value={wizard.reason}
                   onChangeText={(value) => updateWizard({ reason: value })}
-                  placeholder="Opišite razlog i izvedenu radnju"
+                  placeholder={t('mobile.tasks.demount.reasonPlaceholder')}
                   multiline
                 />
 
                 <Text style={[type.sectionLabel, styles.sectionTitle]}>
-                  Trenutno brojilo
+                  {t('mobile.tasks.demount.currentMeterSection')}
                 </Text>
                 <Panel padding="none">
                   <View style={styles.panelInner}>
                     <ListRow
-                      title="Serijski broj"
+                      title={t('mobile.tasks.install.serialNumber')}
                       value={
                         wizard.task.meter?.serialNumber ?? wizard.task.meterId
                       }
@@ -623,7 +652,7 @@ export default function DemountScreen() {
                     />
                     {wizard.task.meter?.simCard ? (
                       <ListRow
-                        title="Ugrađena SIM"
+                        title={t('mobile.tasks.demount.installedSim')}
                         value={wizard.task.meter.simCard.iccid}
                         valueMono
                         divider

@@ -20,6 +20,7 @@ import {
   type RecordStatus,
 } from '@/api/installation-records.api';
 import { useConnectivity } from '@/hooks/useConnectivity';
+import { useTranslation } from '@/i18n/i18n.store';
 import { OfflineRequiredNotice } from '@/components/common/OfflineRequiredNotice';
 import {
   radii,
@@ -40,24 +41,18 @@ import {
 
 type RecordFilter = 'ALL' | 'SENT' | 'SEND_FAILED' | 'DONE';
 
-const recordFilterOptions: Array<SegmentOption<RecordFilter>> = [
-  { key: 'ALL', label: 'Svi' },
-  { key: 'SENT', label: 'Poslano' },
-  { key: 'SEND_FAILED', label: 'Greška' },
-  { key: 'DONE', label: 'Završeno' },
-];
-
-const statusMeta: Record<RecordStatus, { label: string; tone: StatusTone }> = {
-  DRAFT: { label: 'Nacrt', tone: 'neutral' },
-  SENT: { label: 'Poslano', tone: 'info' },
-  SEND_FAILED: { label: 'Greška slanja', tone: 'danger' },
-  SEP_ACTIVATED: { label: 'SEP aktiviran', tone: 'success' },
-  LEGACY_COMPLETED: { label: 'Završeno', tone: 'success' },
+const statusConfig: Record<RecordStatus, { key: string; tone: StatusTone }> = {
+  DRAFT: { key: 'mobile.records.statusDraft', tone: 'neutral' },
+  SENT: { key: 'mobile.records.statusSent', tone: 'info' },
+  SEND_FAILED: { key: 'mobile.records.statusSendFailed', tone: 'danger' },
+  SEP_ACTIVATED: { key: 'mobile.records.statusSepActivated', tone: 'success' },
+  LEGACY_COMPLETED: { key: 'mobile.records.statusCompleted', tone: 'success' },
 };
 
 export default function RecordsScreen() {
   const router = useRouter();
   const { isOnline } = useConnectivity();
+  const { t } = useTranslation();
   const { palette, type } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,28 +62,41 @@ export default function RecordsScreen() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<RecordFilter>('ALL');
 
-  const load = useCallback(async (refresh = false) => {
-    if (refresh) setIsRefreshing(true);
-    else setIsLoading(true);
-    setError(null);
-    try {
-      await syncOfflineInstallationRecords();
-      const response = await installationRecordsApi.listMy({
-        page: 1,
-        limit: 50,
-      });
-      setItems(response.items ?? []);
-    } catch (err) {
-      setError(
-        axios.isAxiosError(err) && !err.response
-          ? 'Backend nije dostupan.'
-          : 'Ne mogu učitati zapisnike.',
-      );
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
+  const recordFilterOptions: Array<SegmentOption<RecordFilter>> = useMemo(
+    () => [
+      { key: 'ALL', label: t('mobile.records.filterAll') },
+      { key: 'SENT', label: t('mobile.records.filterSent') },
+      { key: 'SEND_FAILED', label: t('mobile.records.filterFailed') },
+      { key: 'DONE', label: t('mobile.records.filterDone') },
+    ],
+    [t],
+  );
+
+  const load = useCallback(
+    async (refresh = false) => {
+      if (refresh) setIsRefreshing(true);
+      else setIsLoading(true);
+      setError(null);
+      try {
+        await syncOfflineInstallationRecords();
+        const response = await installationRecordsApi.listMy({
+          page: 1,
+          limit: 50,
+        });
+        setItems(response.items ?? []);
+      } catch (err) {
+        setError(
+          axios.isAxiosError(err) && !err.response
+            ? t('mobile.common.backendUnavailable')
+            : t('mobile.records.loadError'),
+        );
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [t],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -119,8 +127,8 @@ export default function RecordsScreen() {
   if (!isOnline) {
     return (
       <OfflineRequiredNotice
-        title="Zapisnici"
-        message="Za pregled zapisnika potrebna je mreža. Offline kreirani zapisnici nalaze se u outbox redu."
+        title={t('mobile.records.title')}
+        message={t('mobile.records.offlineNotice')}
         onRetry={() => void load(true)}
       />
     );
@@ -129,18 +137,19 @@ export default function RecordsScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title="Zapisnici"
-        subtitle={`${items.length} zapisa`}
+        title={t('mobile.records.title')}
+        subtitle={t('mobile.records.subtitleCount', { count: items.length })}
         actionIcon="refresh"
-        actionLabel="Osvježi"
+        actionLabel={t('mobile.common.refresh')}
         onAction={() => void load(true)}
       />
       <View style={styles.searchWrap}>
         <Ionicons name="search" size={18} color={palette.textMuted} />
         <TextInput
+          testID="records-search-input"
           value={query}
           onChangeText={setQuery}
-          placeholder="Broj zapisnika, brojilo ili ICCID"
+          placeholder={t('mobile.records.searchPlaceholder')}
           placeholderTextColor={palette.textMuted}
           style={styles.search}
           autoCapitalize="none"
@@ -149,13 +158,14 @@ export default function RecordsScreen() {
           <Pressable
             onPress={() => setQuery('')}
             hitSlop={8}
-            accessibilityLabel="Očisti pretragu"
+            accessibilityLabel={t('mobile.records.clearSearch')}
           >
             <Ionicons name="close-circle" size={18} color={palette.textMuted} />
           </Pressable>
         ) : null}
       </View>
       <SegmentedFilter
+        testID="records-filter-bar"
         options={recordFilterOptions}
         value={filter}
         onChange={setFilter}
@@ -168,7 +178,10 @@ export default function RecordsScreen() {
       ) : error ? (
         <View style={styles.state}>
           <Text style={styles.error}>{error}</Text>
-          <ActionButton title="Pokušaj ponovo" onPress={() => void load(true)} />
+          <ActionButton
+            title={t('mobile.common.retry')}
+            onPress={() => void load(true)}
+          />
         </View>
       ) : (
         <FlatList
@@ -185,36 +198,39 @@ export default function RecordsScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="document-text-outline"
-              title="Nema zapisnika"
+              title={t('mobile.records.emptyTitle')}
               description={
                 query
-                  ? 'Nijedan zapis ne odgovara pretrazi.'
-                  : 'Kreirani zapisnici pojavit će se ovdje.'
+                  ? t('mobile.records.emptySearchDesc')
+                  : t('mobile.records.emptyDefaultDesc')
               }
             />
           }
           renderItem={({ item }) => {
-            const meta = statusMeta[item.status] ?? {
-              label: item.status,
-              tone: 'neutral' as const,
-            };
+            const cfg = statusConfig[item.status];
+            const label = cfg ? t(cfg.key) : item.status;
+            const tone: StatusTone = cfg ? cfg.tone : 'neutral';
             return (
-              <View style={styles.row}>
+              <View style={styles.row} testID={`record-row-${item.id}`}>
                 <View style={styles.rowTop}>
                   <View style={styles.rowBody}>
                     <Text style={type.dataLarge}>{item.recordNumber}</Text>
                     <Text style={[type.caption, styles.meta]}>
-                      {item.meter?.serialNumber ?? 'Brojilo —'} ·{' '}
-                      {item.meter?.meterTypeDefinition?.name ?? 'Tip —'}
+                      {item.meter?.serialNumber ??
+                        t('mobile.records.meterFallback')}{' '}
+                      ·{' '}
+                      {item.meter?.meterTypeDefinition?.name ??
+                        t('mobile.records.typeFallback')}
                     </Text>
                     <Text style={[type.dataSmall, styles.iccid]}>
                       SIM {item.meter?.simCard?.iccid ?? '—'}
                     </Text>
                   </View>
-                  <StatusBadge tone={meta.tone} label={meta.label} />
+                  <StatusBadge tone={tone} label={label} />
                 </View>
                 <ActionButton
-                  title="Otvori detalje"
+                  testID={`record-details-btn-${item.id}`}
+                  title={t('mobile.records.openDetails')}
                   icon="arrow-forward"
                   variant="ghost"
                   size="sm"

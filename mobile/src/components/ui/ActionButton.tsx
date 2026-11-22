@@ -22,6 +22,7 @@ export interface ActionButtonProps {
   disabled?: boolean;
   fullWidth?: boolean;
   style?: ViewStyle;
+  testID?: string;
 }
 
 export function ActionButton(props: ActionButtonProps) {
@@ -35,6 +36,7 @@ export function ActionButton(props: ActionButtonProps) {
     disabled = false,
     fullWidth = true,
     style,
+    testID,
   } = props;
 
   const { palette } = useTheme();
@@ -47,6 +49,7 @@ export function ActionButton(props: ActionButtonProps) {
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy: loading }}
       onPress={handlePress}

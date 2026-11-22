@@ -1,5 +1,6 @@
 import { ActivityIndicator, Switch, Text, View } from 'react-native';
 import type { MeterTypeFieldItem } from '@/api/meter-type-definitions.api';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   spacing,
   useTheme,
@@ -22,6 +23,7 @@ export function DynamicMeterFields({
   error?: boolean;
 }) {
   const { palette, type } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
 
   if (loading) {
@@ -32,7 +34,7 @@ export function DynamicMeterFields({
   if (error) {
     return (
       <Text style={styles.error}>
-        Nije moguće učitati dodatna polja za ovaj tip brojila.
+        {t('mobile.tasks.dynamicFieldsError')}
       </Text>
     );
   }
@@ -45,7 +47,7 @@ export function DynamicMeterFields({
   return (
     <View style={styles.wrap}>
       <Text style={[type.sectionLabel, styles.heading]}>
-        Dodatna polja brojila
+        {t('mobile.tasks.dynamicFieldsHeader')}
       </Text>
       {sorted.map((field) => {
         const raw = values[field.name];
@@ -69,6 +71,7 @@ export function DynamicMeterFields({
                 {field.isRequired ? ' *' : ''}
               </Text>
               <Switch
+                testID={`dynamic-field-switch-${field.name}`}
                 value={checked}
                 onValueChange={(value) => onChange(field.name, value)}
                 trackColor={{
@@ -84,6 +87,7 @@ export function DynamicMeterFields({
         return (
           <Field
             key={field.id}
+            testID={`dynamic-field-input-${field.name}`}
             label={field.label}
             required={field.isRequired}
             value={text}
@@ -91,8 +95,8 @@ export function DynamicMeterFields({
               field.fieldType === 'DATE'
                 ? 'YYYY-MM-DD'
                 : field.isRequired
-                  ? 'Obavezno'
-                  : 'Opcionalno'
+                  ? t('mobile.common.required')
+                  : t('mobile.common.optional')
             }
             keyboardType={
               field.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { installTasksApi } from '@/api/install-tasks.api';
 import { demountTasksApi } from '@/api/demount-tasks.api';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   useTheme,
   useThemedStyles,
@@ -24,6 +25,7 @@ function ScanTabIcon({ focused }: { focused: boolean }) {
 
 export default function TabsLayout() {
   const { palette, isDark } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
   const [installBadge, setInstallBadge] = useState<number | undefined>(
     undefined,
@@ -75,7 +77,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="home"
           options={{
-            title: 'Početna',
+            title: t('mobile.tabs.home'),
             tabBarIcon: ({ color, focused, size }) => (
               <Ionicons
                 name={focused ? 'home' : 'home-outline'}
@@ -89,7 +91,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="install"
           options={{
-            title: 'Ugradnja',
+            title: t('mobile.tabs.install'),
             tabBarBadge: installBadge,
             tabBarIcon: ({ color, focused, size }) => (
               <Ionicons
@@ -104,9 +106,9 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="scan"
           options={{
-            title: 'Skeniraj',
+            title: t('mobile.tabs.scan'),
             tabBarLabel: () => null,
-            tabBarAccessibilityLabel: 'Skeniraj SIM karticu',
+            tabBarAccessibilityLabel: t('mobile.tabs.scanAccessibility'),
             tabBarIcon: ({ focused }) => <ScanTabIcon focused={focused} />,
           }}
         />
@@ -114,7 +116,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="demount"
           options={{
-            title: 'Demontaža',
+            title: t('mobile.tabs.demount'),
             tabBarBadge: demountBadge,
             tabBarIcon: ({ color, focused, size }) => (
               <Ionicons
@@ -129,7 +131,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="records"
           options={{
-            title: 'Zapisnici',
+            title: t('mobile.tabs.records'),
             tabBarIcon: ({ color, focused, size }) => (
               <Ionicons
                 name={focused ? 'albums' : 'albums-outline'}
@@ -142,7 +144,7 @@ export default function TabsLayout() {
 
         <Tabs.Screen
           name="profile"
-          options={{ href: null, title: 'Profil' }}
+          options={{ href: null, title: t('mobile.tabs.profile') }}
         />
       </Tabs>
     </>

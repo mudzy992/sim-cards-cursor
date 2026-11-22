@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/auth.store';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   clearOutbox,
   listOutbox,
@@ -32,27 +33,28 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { Panel } from '@/components/ui/Panel';
 import { hapticSuccess, hapticWarning } from '@/utils/haptics';
 
-const kindLabel: Record<OutboxItem['kind'], string> = {
-  INSTALLATION_RECORD_CREATE: 'Kreiranje zapisnika',
-  SIM_CARD_CLAIM: 'Zaduživanje SIM kartice',
-  DEMOUNT_TASK_UPDATE_STATUS: 'Demontaža · status',
-  DEMOUNT_TASK_COMPLETE: 'Demontaža · završetak',
-  INSTALL_TASK_UPDATE_STATUS: 'Ugradnja · status',
-  INSTALL_TASK_COMPLETE: 'Ugradnja · završetak',
+const kindLabelKeys: Record<OutboxItem['kind'], string> = {
+  INSTALLATION_RECORD_CREATE: 'mobile.outbox.kindRecordCreate',
+  SIM_CARD_CLAIM: 'mobile.outbox.kindSimClaim',
+  DEMOUNT_TASK_UPDATE_STATUS: 'mobile.outbox.kindDemountStatus',
+  DEMOUNT_TASK_COMPLETE: 'mobile.outbox.kindDemountComplete',
+  INSTALL_TASK_UPDATE_STATUS: 'mobile.outbox.kindInstallStatus',
+  INSTALL_TASK_COMPLETE: 'mobile.outbox.kindInstallComplete',
 };
-const statusMeta: Record<
+const statusConfig: Record<
   OutboxItem['status'],
-  { label: string; tone: StatusTone }
+  { key: string; tone: StatusTone }
 > = {
-  PENDING: { label: 'Na čekanju', tone: 'warning' },
-  SENDING: { label: 'Šaljem', tone: 'info' },
-  FAILED: { label: 'Greška', tone: 'danger' },
-  SENT: { label: 'Poslano', tone: 'success' },
+  PENDING: { key: 'mobile.outbox.statusPending', tone: 'warning' },
+  SENDING: { key: 'mobile.outbox.statusSending', tone: 'info' },
+  FAILED: { key: 'mobile.outbox.statusFailed', tone: 'danger' },
+  SENT: { key: 'mobile.outbox.statusSent', tone: 'success' },
 };
 
 export default function OutboxScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const { t, language } = useTranslation();
   const { palette, type } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [loading, setLoading] = useState(true);
@@ -118,13 +120,16 @@ export default function OutboxScreen() {
 
   const handleRemoveItem = (item: OutboxItem) => {
     if (!user) return;
+    const label = kindLabelKeys[item.kind]
+      ? t(kindLabelKeys[item.kind])
+      : item.kind;
     Alert.alert(
-      'Ukloni stavku',
-      `Ukloniti "${kindLabel[item.kind] ?? item.kind}" iz outbox reda?`,
+      t('mobile.outbox.removeTitle'),
+      t('mobile.outbox.removeMessage', { kind: label }),
       [
-        { text: 'Odustani', style: 'cancel' },
+        { text: t('mobile.common.cancel'), style: 'cancel' },
         {
-          text: 'Ukloni',
+          text: t('mobile.common.remove'),
           style: 'destructive',
           onPress: () =>
             void removeOutboxItem(user, item.id).then(() => load(false)),
@@ -136,19 +141,24 @@ export default function OutboxScreen() {
   if (!user) {
     return (
       <SafeAreaView style={styles.root}>
-        <EmptyState icon="person-outline" title="Niste prijavljeni" />
+        <EmptyState
+          icon="person-outline"
+          title={t('mobile.outbox.notSignedIn')}
+        />
       </SafeAreaView>
     );
   }
 
+  const locale = language === 'en' ? 'en-GB' : 'bs-BA';
+
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title="Neposlato"
-        subtitle="Offline akcije i zahtjevi"
+        title={t('mobile.outbox.title')}
+        subtitle={t('mobile.outbox.subtitle')}
         onBack={() => router.back()}
         actionIcon="sync"
-        actionLabel="Pošalji"
+        actionLabel={t('mobile.outbox.sendAction')}
         onAction={() => void sync()}
       />
       <View style={styles.summary}>
@@ -159,13 +169,14 @@ export default function OutboxScreen() {
         >
           <Text style={type.bodyStrong}>
             {counts.failed
-              ? `${counts.failed} zahtjeva traži pažnju`
+              ? t('mobile.outbox.summaryFailed', { count: counts.failed })
               : counts.pending
-                ? `${counts.pending} zahtjeva čeka slanje`
-                : 'Sve je sinhronizovano'}
+                ? t('mobile.outbox.summaryPending', { count: counts.pending })
+                : t('mobile.outbox.summarySynced')}
           </Text>
           <ActionButton
-            title="Pošalji sada"
+            testID="outbox-sync-now-btn"
+            title={t('mobile.outbox.sendNow')}
             icon="cloud-upload-outline"
             onPress={() => void sync()}
             loading={syncing}
@@ -193,25 +204,27 @@ export default function OutboxScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="cloud-done-outline"
-              title="Nema neposlatih stavki"
-              description="Sve lokalne promjene su poslane."
+              title={t('mobile.outbox.emptyTitle')}
+              description={t('mobile.outbox.emptyDesc')}
             />
           }
           renderItem={({ item }) => {
-            const meta = statusMeta[item.status];
+            const meta = statusConfig[item.status];
             return (
-              <View style={styles.row}>
+              <View style={styles.row} testID={`outbox-row-${item.id}`}>
                 <View style={styles.rowTop}>
                   <View style={styles.rowBody}>
                     <Text style={type.bodyStrong}>
-                      {kindLabel[item.kind] ?? item.kind}
+                      {kindLabelKeys[item.kind]
+                        ? t(kindLabelKeys[item.kind])
+                        : item.kind}
                     </Text>
                     <Text style={[type.caption, styles.date]}>
-                      {new Date(item.createdAt).toLocaleString('bs-BA')} ·{' '}
-                      {`pokušaja: ${item.attemptCount}`}
+                      {new Date(item.createdAt).toLocaleString(locale)} ·{' '}
+                      {t('mobile.outbox.attempts', { count: item.attemptCount })}
                     </Text>
                   </View>
-                  <StatusBadge label={meta.label} tone={meta.tone} />
+                  <StatusBadge label={t(meta.key)} tone={meta.tone} />
                 </View>
                 {item.meta?.taskId ? (
                   <Text style={[type.dataSmall, styles.meta]}>
@@ -223,7 +236,7 @@ export default function OutboxScreen() {
                 ) : null}
                 <View style={styles.itemActions}>
                   <ActionButton
-                    title="Ukloni"
+                    title={t('mobile.common.remove')}
                     variant="ghost"
                     size="sm"
                     fullWidth={false}
@@ -231,7 +244,7 @@ export default function OutboxScreen() {
                   />
                   {item.status !== 'SENT' ? (
                     <ActionButton
-                      title="Pošalji ponovo"
+                      title={t('mobile.outbox.retryItem')}
                       icon="refresh"
                       variant="secondary"
                       size="sm"
@@ -247,16 +260,16 @@ export default function OutboxScreen() {
           ListFooterComponent={
             items.length ? (
               <ActionButton
-                title="Obriši sve lokalne stavke"
+                title={t('mobile.outbox.clearAllButton')}
                 variant="ghost"
                 onPress={() =>
                   Alert.alert(
-                    'Obriši neposlato',
-                    'Ova radnja se ne može poništiti.',
+                    t('mobile.outbox.clearAllTitle'),
+                    t('mobile.outbox.clearAllMessage'),
                     [
-                      { text: 'Odustani', style: 'cancel' },
+                      { text: t('mobile.common.cancel'), style: 'cancel' },
                       {
-                        text: 'Obriši',
+                        text: t('mobile.common.delete'),
                         style: 'destructive',
                         onPress: () =>
                           void clearOutbox(user).then(() => load(false)),

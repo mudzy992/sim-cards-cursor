@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { APP_ASSETS } from '@/constants/assets';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   radii,
   spacing,
@@ -42,6 +43,7 @@ function pickParam(value?: string | string[]): string | undefined {
 export default function ScanScreen() {
   const router = useRouter();
   const { palette } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
 
   const routeParams = useLocalSearchParams<{
@@ -127,7 +129,7 @@ export default function ScanScreen() {
       if (isMeterSerialMode) {
         const cleaned = rawValue.trim();
         if (cleaned.length < 3 || cleaned.length > 64) {
-          setScanError('Serijski broj brojila mora imati 3–64 znaka.');
+          setScanError(t('mobile.scan.invalidSerial'));
           return;
         }
         setHasScanned(true);
@@ -150,7 +152,7 @@ export default function ScanScreen() {
 
       const iccid = normalizeIccid(rawValue);
       if (!iccid || !isValidIccid(iccid)) {
-        setScanError('Unesite ispravan ICCID (10–30 cifara).');
+        setScanError(t('mobile.scan.invalidIccid'));
         return;
       }
       setHasScanned(true);
@@ -192,6 +194,7 @@ export default function ScanScreen() {
       returnTo,
       simCardId,
       serialTarget,
+      t,
     ],
   );
 
@@ -206,14 +209,14 @@ export default function ScanScreen() {
 
   const hasPermission = permission?.granted === true;
   const contextLabel = isMeterSerialMode
-    ? 'Skeniranje serijskog broja brojila'
+    ? t('mobile.scan.contextMeterSerial')
     : afterScan === 'install'
-      ? 'Skeniranje za ugradnju'
+      ? t('mobile.scan.contextInstall')
       : afterScan === 'demount'
-        ? 'Skeniranje zamjenske kartice'
+        ? t('mobile.scan.contextDemount')
         : afterScan === 'inventory'
-          ? 'Dodavanje u offline inventar'
-          : 'Skeniranje SIM kartice';
+          ? t('mobile.scan.contextInventory')
+          : t('mobile.scan.contextDefault');
 
   return (
     <View style={styles.root}>
@@ -240,15 +243,16 @@ export default function ScanScreen() {
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.title}>{contextLabel}</Text>
-            <Text style={styles.subtitle}>
-              Poravnajte barkod ili QR kod unutar okvira
-            </Text>
+            <Text style={styles.subtitle}>{t('mobile.scan.subtitle')}</Text>
           </View>
           {hasPermission ? (
             <Pressable
+              testID="scan-torch-btn"
               onPress={() => setTorch((value) => !value)}
               accessibilityRole="button"
-              accessibilityLabel={torch ? 'Ugasi svjetlo' : 'Upali svjetlo'}
+              accessibilityLabel={
+                torch ? t('mobile.scan.torchOff') : t('mobile.scan.torchOn')
+              }
               style={({ pressed }) => [
                 styles.torch,
                 torch && styles.torchOn,
@@ -266,7 +270,9 @@ export default function ScanScreen() {
 
         <View style={styles.center}>
           {!permission ? (
-            <Text style={styles.infoText}>Provjeravam dozvole kamere…</Text>
+            <Text style={styles.infoText}>
+              {t('mobile.scan.checkingPermission')}
+            </Text>
           ) : !hasPermission ? (
             <View style={styles.permissionCard}>
               <View style={styles.permissionIcon}>
@@ -277,13 +283,13 @@ export default function ScanScreen() {
                 />
               </View>
               <Text style={styles.permissionTitle}>
-                Pristup kameri nije odobren
+                {t('mobile.scan.noPermissionTitle')}
               </Text>
               <Text style={styles.permissionText}>
-                Za skeniranje barkoda potrebna je dozvola za kameru.
+                {t('mobile.scan.noPermissionBody')}
               </Text>
               <ActionButton
-                title="Dozvoli kameru"
+                title={t('mobile.scan.allowCamera')}
                 icon="checkmark"
                 onPress={() => void requestPermission()}
                 style={styles.permissionAction}
@@ -318,7 +324,9 @@ export default function ScanScreen() {
                     size={18}
                     color={palette.successBorder}
                   />
-                  <Text style={styles.scannedText}>Očitano</Text>
+                  <Text style={styles.scannedText}>
+                    {t('mobile.scan.scannedBadge')}
+                  </Text>
                 </View>
               )}
             </View>
@@ -353,6 +361,7 @@ export default function ScanScreen() {
 
           <View style={styles.footerActions}>
             <Pressable
+              testID="scan-manual-open-btn"
               onPress={() => {
                 setManualValue('');
                 setScanError(null);
@@ -369,11 +378,14 @@ export default function ScanScreen() {
                 size={18}
                 color={palette.cameraFg}
               />
-              <Text style={styles.footerButtonText}>Ručni unos</Text>
+              <Text style={styles.footerButtonText}>
+                {t('mobile.scan.manualButton')}
+              </Text>
             </Pressable>
 
             {hasScanned ? (
               <Pressable
+                testID="scan-again-btn"
                 onPress={() => {
                   setHasScanned(false);
                   setScanError(null);
@@ -390,7 +402,9 @@ export default function ScanScreen() {
                   size={18}
                   color={palette.cameraFg}
                 />
-                <Text style={styles.footerButtonText}>Skeniraj ponovo</Text>
+                <Text style={styles.footerButtonText}>
+                  {t('mobile.scan.scanAgain')}
+                </Text>
               </Pressable>
             ) : null}
           </View>
@@ -415,13 +429,12 @@ export default function ScanScreen() {
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>
               {isMeterSerialMode
-                ? 'Ručni unos serijskog broja'
-                : 'Ručni unos ICCID-a'}
+                ? t('mobile.scan.manualSerialTitle')
+                : t('mobile.scan.manualIccidTitle')}
             </Text>
-            <Text style={styles.sheetHint}>
-              Koristite kada je barkod oštećen ili nečitljiv.
-            </Text>
+            <Text style={styles.sheetHint}>{t('mobile.scan.manualHint')}</Text>
             <TextInput
+              testID="scan-manual-input"
               value={manualValue}
               onChangeText={(text) => {
                 setManualValue(
@@ -444,7 +457,12 @@ export default function ScanScreen() {
               <Text style={styles.sheetError}>{scanError}</Text>
             ) : null}
             <ActionButton
-              title={isMeterSerialMode ? 'Potvrdi serijski broj' : 'Provjeri ICCID'}
+              testID="scan-manual-submit-btn"
+              title={
+                isMeterSerialMode
+                  ? t('mobile.scan.confirmSerial')
+                  : t('mobile.scan.checkIccid')
+              }
               icon={isMeterSerialMode ? 'checkmark' : 'search'}
               size="lg"
               disabled={manualValue.trim().length === 0}
@@ -452,7 +470,7 @@ export default function ScanScreen() {
               style={styles.sheetAction}
             />
             <ActionButton
-              title="Odustani"
+              title={t('mobile.common.cancel')}
               variant="ghost"
               onPress={() => setManualOpen(false)}
             />
@@ -504,7 +522,12 @@ const createStyles = (palette: ThemePalette) => ({
     fontWeight: '700' as const,
     letterSpacing: -0.2,
   },
-  subtitle: { color: palette.cameraFg, opacity: 0.78, fontSize: 12.5, marginTop: 2 },
+  subtitle: {
+    color: palette.cameraFg,
+    opacity: 0.78,
+    fontSize: 12.5,
+    marginTop: 2,
+  },
   torch: {
     width: 44,
     height: 44,
@@ -623,8 +646,16 @@ const createStyles = (palette: ThemePalette) => ({
   },
   permissionAction: { marginTop: spacing.xl, alignSelf: 'stretch' as const },
 
-  footer: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md, gap: spacing.md },
-  historyRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm },
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+    gap: spacing.md,
+  },
+  historyRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: spacing.sm,
+  },
   chip: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
@@ -667,7 +698,10 @@ const createStyles = (palette: ThemePalette) => ({
   },
   pressed: { opacity: 0.72 },
 
-  sheetScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: palette.overlayScrim },
+  sheetScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: palette.overlayScrim,
+  },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' as const },
   sheet: {
     backgroundColor: palette.background,

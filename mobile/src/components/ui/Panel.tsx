@@ -7,6 +7,7 @@ export interface PanelProps {
   style?: ViewStyle;
   padding?: keyof typeof paddingMap;
   tone?: 'default' | 'warning' | 'danger' | 'info' | 'success';
+  testID?: string;
 }
 
 const paddingMap = {
@@ -21,6 +22,7 @@ export function Panel({
   style,
   padding = 'lg',
   tone = 'default',
+  testID,
 }: PanelProps) {
   const { palette } = useTheme();
   const toneMap = {
@@ -33,6 +35,7 @@ export function Panel({
 
   return (
     <View
+      testID={testID}
       style={[
         styles.panel,
         {

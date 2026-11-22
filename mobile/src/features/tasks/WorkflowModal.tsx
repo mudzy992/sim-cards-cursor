@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   radii,
   spacing,
@@ -35,6 +36,7 @@ export function WorkflowModal({
   footer?: React.ReactNode;
 }) {
   const { palette } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
 
   return (
@@ -55,8 +57,9 @@ export function WorkflowModal({
               {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
             </View>
             <Pressable
+              testID="workflow-modal-close"
               accessibilityRole="button"
-              accessibilityLabel="Zatvori"
+              accessibilityLabel={t('mobile.common.close')}
               onPress={onClose}
               style={styles.close}
               hitSlop={8}

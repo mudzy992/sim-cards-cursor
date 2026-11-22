@@ -17,6 +17,7 @@ import {
   type MeterTypeFieldItem,
 } from '@/api/meter-type-definitions.api';
 import { useAuthStore } from '@/store/auth.store';
+import { useTranslation } from '@/i18n/i18n.store';
 import { listOutbox } from '@/offline/outbox';
 import {
   spacing,
@@ -58,11 +59,6 @@ import { hapticSuccess } from '@/utils/haptics';
 
 type SortMode = 'RECENT' | 'NEAREST';
 
-const sortOptions: Array<SegmentOption<SortMode>> = [
-  { key: 'RECENT', label: 'Najnovije' },
-  { key: 'NEAREST', label: 'Najbliže' },
-];
-
 type InstallWizard = {
   task: InstallTaskItem;
   recordNotes: string;
@@ -83,6 +79,7 @@ type InstallWizard = {
 export default function InstallScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const { t } = useTranslation();
   const { palette, type } = useTheme();
   const styles = useThemedStyles(createStyles);
   const search = useLocalSearchParams<{
@@ -101,6 +98,14 @@ export default function InstallScreen() {
   const [wizardFields, setWizardFields] = useState<MeterTypeFieldItem[]>([]);
   const [wizard, setWizard] = useState<InstallWizard | null>(null);
   const [wizardSubmitting, setWizardSubmitting] = useState(false);
+
+  const sortOptions: Array<SegmentOption<SortMode>> = useMemo(
+    () => [
+      { key: 'RECENT', label: t('mobile.tasks.sortRecent') },
+      { key: 'NEAREST', label: t('mobile.tasks.sortNearest') },
+    ],
+    [t],
+  );
 
   const refreshLocation = useCallback(async () => {
     try {
@@ -139,15 +144,15 @@ export default function InstallScreen() {
       } catch (err) {
         setError(
           axios.isAxiosError(err) && !err.response
-            ? 'Backend nije dostupan. Prikaz lokalnih zadataka nije uspio.'
-            : 'Nije moguće učitati zadatke ugradnje.',
+            ? t('mobile.tasks.backendOfflineLocal')
+            : t('mobile.tasks.install.loadError'),
         );
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
       }
     },
-    [user],
+    [user, t],
   );
 
   useFocusEffect(
@@ -186,8 +191,8 @@ export default function InstallScreen() {
       } catch {
         if (!cancelled) {
           Alert.alert(
-            'Skeniranje nije uspjelo',
-            'SIM nije pronađena, nije dostupna za zaduživanje ili zaduživanje nije uspjelo.',
+            t('mobile.tasks.install.scanFailedTitle'),
+            t('mobile.tasks.install.scanFailedMessage'),
           );
         }
       } finally {
@@ -197,7 +202,7 @@ export default function InstallScreen() {
     return () => {
       cancelled = true;
     };
-  }, [search.pickedIccid, search.wizardTaskId, router]);
+  }, [search.pickedIccid, search.wizardTaskId, router, t]);
 
   useEffect(() => {
     const typeId = wizard?.task.meter?.meterTypeDefinitionId;
@@ -262,8 +267,8 @@ export default function InstallScreen() {
       const message =
         axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
           ? err.response.data.message
-          : 'Ažuriranje statusa nije uspjelo.';
-      Alert.alert('Greška', message);
+          : t('mobile.tasks.statusUpdateFailed');
+      Alert.alert(t('mobile.common.error'), message);
     } finally {
       setUpdatingId(null);
     }
@@ -307,7 +312,10 @@ export default function InstallScreen() {
 
   const submitWizard = async () => {
     if (!wizard?.pickedSimCardId) {
-      Alert.alert('SIM kartica', 'Skenirajte SIM karticu koju ugrađujete.');
+      Alert.alert(
+        t('mobile.tasks.install.missingSimTitle'),
+        t('mobile.tasks.install.missingSimMessage'),
+      );
       return;
     }
     const missing = validateRequiredDynamicFields(
@@ -315,7 +323,12 @@ export default function InstallScreen() {
       wizard.dynamicFieldValues,
     );
     if (missing.length) {
-      Alert.alert('Nedostaju podaci', `Obavezna polja: ${missing.join(', ')}`);
+      Alert.alert(
+        t('mobile.tasks.install.missingFieldsTitle'),
+        t('mobile.tasks.install.missingFieldsMessage', {
+          fields: missing.join(', '),
+        }),
+      );
       return;
     }
     const calibrationYear = parseOptionalInteger(wizard.calibrationYear);
@@ -323,8 +336,8 @@ export default function InstallScreen() {
     const longitude = parseOptionalFloat(wizard.longitude);
     if (wizard.calibrationYear.trim() && calibrationYear === undefined) {
       Alert.alert(
-        'Neispravan unos',
-        'Godina baždarenja mora biti cijeli broj.',
+        t('mobile.tasks.install.invalidInputTitle'),
+        t('mobile.tasks.install.invalidCalibrationYear'),
       );
       return;
     }
@@ -358,8 +371,8 @@ export default function InstallScreen() {
       const message =
         axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
           ? err.response.data.message
-          : 'Završetak zadatka nije uspio.';
-      Alert.alert('Greška', message);
+          : t('mobile.tasks.completeFailed');
+      Alert.alert(t('mobile.common.error'), message);
     } finally {
       setWizardSubmitting(false);
     }
@@ -380,21 +393,23 @@ export default function InstallScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title="Ugradnja"
-        subtitle={`${activeCount} aktivnih zadataka`}
+        title={t('mobile.tasks.install.title')}
+        subtitle={t('mobile.tasks.activeCountSubtitle', { count: activeCount })}
         actionIcon="refresh"
-        actionLabel="Osvježi"
+        actionLabel={t('mobile.common.refresh')}
         onAction={() => {
           void load(true);
           void refreshLocation();
         }}
       />
       <TaskFilterBar
+        testID="install-filter-bar"
         value={filter}
         onChange={setFilter}
         counts={{ active: activeCount }}
       />
       <SegmentedFilter
+        testID="install-sort-filter"
         options={sortOptions}
         value={sortMode}
         onChange={handleSortChange}
@@ -407,10 +422,12 @@ export default function InstallScreen() {
       ) : error ? (
         <View style={styles.stateWrap}>
           <Panel tone="danger">
-            <Text style={styles.errorTitle}>Zadaci nisu dostupni</Text>
+            <Text style={styles.errorTitle}>
+              {t('mobile.tasks.unavailableTitle')}
+            </Text>
             <Text style={styles.errorText}>{error}</Text>
             <ActionButton
-              title="Pokušaj ponovo"
+              title={t('mobile.common.retry')}
               icon="refresh"
               onPress={() => void load(true)}
             />
@@ -436,18 +453,19 @@ export default function InstallScreen() {
               icon="checkmark-done-circle-outline"
               title={
                 filter === 'ACTIVE'
-                  ? 'Sve je riješeno'
-                  : 'Nema zadataka u ovom prikazu'
+                  ? t('mobile.tasks.emptyAllDone')
+                  : t('mobile.tasks.emptyNoFilter')
               }
               description={
                 filter === 'ACTIVE'
-                  ? 'Trenutno nemate aktivnih zadataka ugradnje.'
-                  : 'Promijenite filter ili osvježite listu.'
+                  ? t('mobile.tasks.install.emptyDesc')
+                  : t('mobile.tasks.emptyFilterHint')
               }
             />
           }
           renderItem={({ item: { item, coords, distanceMeters } }) => (
             <TaskCard
+              testID={`install-task-card-${item.id}`}
               title={item.meter?.serialNumber ?? item.meterId}
               status={item.status}
               createdAt={item.createdAt}
@@ -473,7 +491,7 @@ export default function InstallScreen() {
                 ...(item.meter?.meterTypeDefinition?.name
                   ? [
                       {
-                        label: 'Tip brojila',
+                        label: t('mobile.tasks.install.meterType'),
                         value: item.meter.meterTypeDefinition.name,
                       },
                     ]
@@ -481,7 +499,7 @@ export default function InstallScreen() {
                 ...(item.meter?.installationAddress
                   ? [
                       {
-                        label: 'Adresa',
+                        label: t('mobile.tasks.install.address'),
                         value: item.meter.installationAddress,
                       },
                     ]
@@ -490,7 +508,7 @@ export default function InstallScreen() {
                 item.status === 'COMPLETED'
                   ? [
                       {
-                        label: 'Zapisnik',
+                        label: t('mobile.tasks.install.record'),
                         value: item.installationRecord.recordNumber,
                       },
                     ]
@@ -499,9 +517,9 @@ export default function InstallScreen() {
               updating={updatingId === item.id}
               primaryLabel={
                 item.status === 'PENDING'
-                  ? 'Započni'
+                  ? t('mobile.tasks.startTask')
                   : item.status === 'IN_PROGRESS'
-                    ? 'Završi ugradnju'
+                    ? t('mobile.tasks.install.finishTask')
                     : undefined
               }
               onPrimary={
@@ -512,7 +530,9 @@ export default function InstallScreen() {
                     : undefined
               }
               secondaryLabel={
-                item.status === 'IN_PROGRESS' ? 'Vrati na čekanje' : undefined
+                item.status === 'IN_PROGRESS'
+                  ? t('mobile.tasks.returnToPending')
+                  : undefined
               }
               onSecondary={
                 item.status === 'IN_PROGRESS'
@@ -526,16 +546,19 @@ export default function InstallScreen() {
 
       <WorkflowModal
         visible={Boolean(wizard)}
-        title="Završetak ugradnje"
+        title={t('mobile.tasks.install.wizardTitle')}
         subtitle={
           wizard
-            ? `Brojilo ${wizard.task.meter?.serialNumber ?? wizard.task.meterId}`
+            ? t('mobile.tasks.install.wizardSubtitle', {
+                meter: wizard.task.meter?.serialNumber ?? wizard.task.meterId,
+              })
             : undefined
         }
         onClose={() => setWizard(null)}
         footer={
           <ActionButton
-            title="Potvrdi ugradnju"
+            testID="install-wizard-submit-btn"
+            title={t('mobile.tasks.install.wizardConfirm')}
             icon="checkmark"
             onPress={() => void submitWizard()}
             loading={wizardSubmitting}
@@ -547,40 +570,46 @@ export default function InstallScreen() {
         {wizard ? (
           <>
             <WorkflowSteps
-              header="UGRADNJA · VOĐENI POSTUPAK"
+              header={t('mobile.tasks.install.wizardHeader')}
               steps={[
                 {
                   key: 'task',
-                  label: 'Zadatak preuzet',
+                  label: t('mobile.tasks.install.stepTask'),
                   state: 'done',
                   detail:
                     wizard.task.meter?.serialNumber ?? wizard.task.meterId,
                 },
                 {
                   key: 'sim',
-                  label: 'SIM kartica',
+                  label: t('mobile.tasks.install.stepSim'),
                   state: wizard.pickedSimCardId ? 'done' : 'current',
                   detail: wizard.pickedSimIccid,
                 },
                 {
                   key: 'data',
-                  label: 'Podaci ugradnje',
+                  label: t('mobile.tasks.install.stepData'),
                   state: wizard.pickedSimCardId ? 'current' : 'pending',
                 },
-                { key: 'confirm', label: 'Potvrda', state: 'pending' },
+                {
+                  key: 'confirm',
+                  label: t('mobile.tasks.install.stepConfirm'),
+                  state: 'pending',
+                },
               ]}
             />
-            <Text style={[type.sectionLabel, styles.sectionTitle]}>Brojilo</Text>
+            <Text style={[type.sectionLabel, styles.sectionTitle]}>
+              {t('mobile.tasks.install.meterSection')}
+            </Text>
             <Panel padding="none">
               <View style={styles.panelInner}>
                 <ListRow
-                  title="Serijski broj"
+                  title={t('mobile.tasks.install.serialNumber')}
                   value={wizard.task.meter?.serialNumber ?? wizard.task.meterId}
                   valueMono
                 />
                 {wizard.task.meter?.meterTypeDefinition?.name ? (
                   <ListRow
-                    title="Tip brojila"
+                    title={t('mobile.tasks.install.meterType')}
                     value={wizard.task.meter.meterTypeDefinition.name}
                     divider
                   />
@@ -588,7 +617,7 @@ export default function InstallScreen() {
               </View>
             </Panel>
             <Text style={[type.sectionLabel, styles.sectionTitle]}>
-              SIM kartica
+              {t('mobile.tasks.install.simSection')}
             </Text>
             <Panel tone={wizard.pickedSimCardId ? 'success' : 'info'}>
               {wizard.pickedSimIccid ? (
@@ -600,11 +629,16 @@ export default function InstallScreen() {
                 </>
               ) : (
                 <Text style={type.body}>
-                  Skenirajte karticu koja će biti ugrađena u brojilo.
+                  {t('mobile.tasks.install.simPrompt')}
                 </Text>
               )}
               <ActionButton
-                title={wizard.pickedSimCardId ? 'Promijeni SIM' : 'Skeniraj SIM'}
+                testID="install-wizard-scan-sim-btn"
+                title={
+                  wizard.pickedSimCardId
+                    ? t('mobile.tasks.install.changeSim')
+                    : t('mobile.tasks.install.scanSim')
+                }
                 icon="barcode-outline"
                 onPress={scanSim}
                 variant={wizard.pickedSimCardId ? 'secondary' : 'primary'}
@@ -612,56 +646,56 @@ export default function InstallScreen() {
               />
             </Panel>
             <Text style={[type.sectionLabel, styles.sectionTitle]}>
-              Podaci ugradnje
+              {t('mobile.tasks.install.dataSection')}
             </Text>
             <Field
-              label="Godina baždarenja"
+              label={t('mobile.tasks.install.calibrationYear')}
               value={wizard.calibrationYear}
               onChangeText={(value) =>
                 updateWizard({ calibrationYear: value.replace(/\D/g, '') })
               }
               keyboardType="number-pad"
-              placeholder="npr. 2026"
+              placeholder={t('mobile.tasks.install.calibrationPlaceholder')}
             />
             {wizard.task.meter?.isDemountedFromLocation ? (
               <>
                 <Panel tone="warning" style={styles.notice}>
                   <Text style={type.bodyStrong}>
-                    Brojilo je demontirano sa lokacije
+                    {t('mobile.tasks.install.demountedNoticeTitle')}
                   </Text>
                   <Text style={[type.caption, styles.noticeText]}>
-                    Unesite svježe podatke nove lokacije.
+                    {t('mobile.tasks.install.demountedNoticeBody')}
                   </Text>
                 </Panel>
                 <Field
-                  label="Adresa"
+                  label={t('mobile.tasks.install.address')}
                   value={wizard.installationAddress}
                   onChangeText={(value) =>
                     updateWizard({ installationAddress: value })
                   }
-                  placeholder="Ulica i broj"
+                  placeholder={t('mobile.tasks.install.addressPlaceholder')}
                 />
                 <Field
-                  label="Grad"
+                  label={t('mobile.tasks.install.city')}
                   value={wizard.city}
                   onChangeText={(value) => updateWizard({ city: value })}
                 />
                 <Field
-                  label="Općina"
+                  label={t('mobile.tasks.install.municipality')}
                   value={wizard.municipality}
                   onChangeText={(value) =>
                     updateWizard({ municipality: value })
                   }
                 />
                 <Field
-                  label="Mjerno mjesto"
+                  label={t('mobile.tasks.install.measuringPoint')}
                   value={wizard.measuringPoint}
                   onChangeText={(value) =>
                     updateWizard({ measuringPoint: value })
                   }
                 />
                 <Field
-                  label="Datum instalacije"
+                  label={t('mobile.tasks.install.installationDate')}
                   value={wizard.installationDate}
                   onChangeText={(value) =>
                     updateWizard({ installationDate: value })
@@ -669,13 +703,13 @@ export default function InstallScreen() {
                   placeholder="YYYY-MM-DD"
                 />
                 <Field
-                  label="Širina"
+                  label={t('mobile.tasks.install.latitude')}
                   value={wizard.latitude}
                   onChangeText={(value) => updateWizard({ latitude: value })}
                   keyboardType="decimal-pad"
                 />
                 <Field
-                  label="Dužina"
+                  label={t('mobile.tasks.install.longitude')}
                   value={wizard.longitude}
                   onChangeText={(value) => updateWizard({ longitude: value })}
                   keyboardType="decimal-pad"
@@ -695,10 +729,10 @@ export default function InstallScreen() {
               }
             />
             <Field
-              label="Napomena za zapisnik"
+              label={t('mobile.tasks.install.recordNotes')}
               value={wizard.recordNotes}
               onChangeText={(value) => updateWizard({ recordNotes: value })}
-              placeholder="Opcionalno"
+              placeholder={t('mobile.common.optional')}
               multiline
             />
           </>

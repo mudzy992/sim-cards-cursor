@@ -15,6 +15,7 @@ import {
   type Notification,
 } from '@/api/notifications.api';
 import { normalizeDeepLink } from '@/utils/deeplink';
+import { useTranslation } from '@/i18n/i18n.store';
 import {
   spacing,
   useTheme,
@@ -29,6 +30,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 export default function NotificationsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t, language } = useTranslation();
   const { palette, type } = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -58,13 +60,19 @@ export default function NotificationsScreen() {
     router.push((normalizeDeepLink(item.link) ?? '/notifications') as never);
   };
 
+  const locale = language === 'en' ? 'en-GB' : 'bs-BA';
+
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title="Notifikacije"
-        subtitle={unread ? `${unread} nepročitanih` : 'Sve je pročitano'}
+        title={t('mobile.notifications.title')}
+        subtitle={
+          unread
+            ? t('mobile.notifications.unreadSubtitle', { count: unread })
+            : t('mobile.notifications.allReadSubtitle')
+        }
         onBack={() => router.back()}
-        actionLabel={unread ? 'Pročitaj sve' : undefined}
+        actionLabel={unread ? t('mobile.notifications.readAllAction') : undefined}
         actionIcon={unread ? 'checkmark-done' : undefined}
         onAction={unread ? () => markAll.mutate() : undefined}
       />
@@ -74,11 +82,9 @@ export default function NotificationsScreen() {
         </View>
       ) : query.isError ? (
         <View style={styles.state}>
-          <Text style={styles.error}>
-            Notifikacije nije moguće učitati.
-          </Text>
+          <Text style={styles.error}>{t('mobile.notifications.loadError')}</Text>
           <ActionButton
-            title="Pokušaj ponovo"
+            title={t('mobile.common.retry')}
             onPress={() => void query.refetch()}
           />
         </View>
@@ -97,12 +103,13 @@ export default function NotificationsScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="notifications-off-outline"
-              title="Nema notifikacija"
-              description="Nova zaduženja i važne operativne poruke pojavit će se ovdje."
+              title={t('mobile.notifications.emptyTitle')}
+              description={t('mobile.notifications.emptyDesc')}
             />
           }
           renderItem={({ item }) => (
             <Pressable
+              testID={`notification-row-${item.id}`}
               onPress={() => open(item)}
               style={({ pressed }) => [
                 styles.row,
@@ -136,7 +143,7 @@ export default function NotificationsScreen() {
                   {item.message}
                 </Text>
                 <Text style={styles.date}>
-                  {new Date(item.createdAt).toLocaleString('bs-BA')}
+                  {new Date(item.createdAt).toLocaleString(locale)}
                 </Text>
               </View>
               <Ionicons
@@ -183,7 +190,11 @@ const createStyles = (palette: ThemePalette) => ({
   },
   iconUnread: { backgroundColor: palette.brandSoftStrong },
   rowBody: { flex: 1, minWidth: 0 },
-  titleRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.sm },
+  titleRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.sm,
+  },
   readTitle: { color: palette.textSecondary },
   unreadDot: {
     width: 7,

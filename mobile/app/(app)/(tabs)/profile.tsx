@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppVersion } from '@/hooks/useAppVersion';
+import { useAppUpdateCheck } from '@/hooks/useAppUpdateCheck';
 import { useTranslation } from '@/i18n/i18n.store';
 import type { SupportedLanguage } from '@/i18n/types';
 import type { ThemeMode } from '@/store/theme.store';
@@ -25,26 +26,76 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { versionName, buildNumber } = useAppVersion();
+  const update = useAppUpdateCheck();
   const { mode, setMode, type } = useTheme();
-  const { language, setLanguage } = useTranslation();
+  const { language, setLanguage, t } = useTranslation();
   const styles = useThemedStyles(createStyles);
 
   const confirmLogout = () =>
-    Alert.alert('Odjava', 'Želite li se odjaviti sa ovog uređaja?', [
-      { text: 'Odustani', style: 'cancel' },
-      {
-        text: 'Odjavi se',
-        style: 'destructive',
-        onPress: () =>
-          void logout().then(() => router.replace('/(auth)/login')),
-      },
-    ]);
+    Alert.alert(
+      t('mobile.profile.logoutConfirmTitle'),
+      t('mobile.profile.logoutConfirmMessage'),
+      [
+        { text: t('mobile.common.cancel'), style: 'cancel' },
+        {
+          text: t('mobile.profile.logoutButton'),
+          style: 'destructive',
+          onPress: () =>
+            void logout().then(() => router.replace('/(auth)/login')),
+        },
+      ],
+    );
+
+  const handleManualUpdateCheck = () => {
+    void (async () => {
+      try {
+        const result = await update.checkNow();
+        if (!result.release) {
+          Alert.alert(
+            t('mobile.common.error'),
+            t('mobile.update.checkFailed'),
+          );
+          return;
+        }
+        const versionLabel = `${result.release.versionName} (${result.release.versionCode})`;
+        if (result.hasUpdate) {
+          Alert.alert(
+            t('mobile.update.availableAlertTitle', { version: versionLabel }),
+            t('mobile.update.availableAlertMessage'),
+            [
+              { text: t('mobile.common.cancel'), style: 'cancel' },
+              {
+                text: t('mobile.update.downloadButton'),
+                onPress: () => {
+                  void update.openDownload().then((ok) => {
+                    if (!ok) {
+                      Alert.alert(
+                        t('mobile.common.error'),
+                        t('mobile.update.openFailed'),
+                      );
+                    }
+                  });
+                },
+              },
+            ],
+          );
+        } else {
+          Alert.alert(
+            t('mobile.update.upToDateTitle'),
+            t('mobile.update.upToDateMessage', { version: versionLabel }),
+          );
+        }
+      } catch {
+        Alert.alert(t('mobile.common.error'), t('mobile.update.checkFailed'));
+      }
+    })();
+  };
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenTitleBar
-        title="Profil"
-        subtitle="Korisnik i postavke uređaja"
+        title={t('mobile.profile.title')}
+        subtitle={t('mobile.profile.subtitle')}
         onBack={() => router.replace('/(app)/(tabs)/home')}
       />
       <ScrollView
@@ -67,46 +118,53 @@ export default function ProfileScreen() {
         </View>
 
         <Section
-          label="Izgled i jezik"
-          hint="Svijetla tema za rad na suncu · Tamna za slabo osvjetljenje"
+          label={t('mobile.profile.appearanceSection')}
+          hint={t('mobile.profile.appearanceHint')}
         >
           <Panel>
-            <Text style={styles.controlLabel}>Tema aplikacije</Text>
+            <Text style={styles.controlLabel}>
+              {t('mobile.profile.themeLabel')}
+            </Text>
             <SegmentedFilter<ThemeMode>
+              testID="profile-theme-filter"
               value={mode}
               onChange={(next) => {
                 hapticTap();
                 void setMode(next);
               }}
               options={[
-                { key: 'system', label: 'Sistem' },
-                { key: 'light', label: 'Svijetla' },
-                { key: 'dark', label: 'Tamna' },
+                { key: 'system', label: t('mobile.profile.themeSystem') },
+                { key: 'light', label: t('mobile.profile.themeLight') },
+                { key: 'dark', label: t('mobile.profile.themeDark') },
               ]}
             />
             <Text style={[styles.controlLabel, styles.controlLabelSpaced]}>
-              Jezik
+              {t('mobile.profile.languageLabel')}
             </Text>
             <SegmentedFilter<SupportedLanguage>
+              testID="profile-language-filter"
               value={language}
               onChange={(next) => {
                 hapticTap();
                 void setLanguage(next);
               }}
               options={[
-                { key: 'bs', label: 'Bosanski' },
-                { key: 'en', label: 'English' },
+                { key: 'bs', label: t('language.bs') },
+                { key: 'en', label: t('language.en') },
               ]}
             />
           </Panel>
         </Section>
 
-        <Section label="Organizacija">
+        <Section label={t('mobile.profile.organizationSection')}>
           <Panel padding="none">
             <View style={styles.panelInner}>
-              <ListRow title="Uloga" value={user?.role ?? '—'} />
               <ListRow
-                title="Poslovnica"
+                title={t('mobile.profile.roleLabel')}
+                value={user?.role ?? '—'}
+              />
+              <ListRow
+                title={t('mobile.profile.branchLabel')}
                 value={user?.branch?.name ?? '—'}
                 divider
               />
@@ -114,19 +172,19 @@ export default function ProfileScreen() {
           </Panel>
         </Section>
 
-        <Section label="Offline rad">
+        <Section label={t('mobile.profile.offlineSection')}>
           <Panel padding="none">
             <View style={styles.panelInner}>
               <ListRow
-                title="Offline inventar"
-                subtitle="SIM kartice dostupne bez interneta"
+                title={t('mobile.profile.offlineInventoryTitle')}
+                subtitle={t('mobile.profile.offlineInventorySubtitle')}
                 icon="archive-outline"
                 iconTone="info"
                 onPress={() => router.push('/(app)/offline-inventory')}
               />
               <ListRow
-                title="Neposlato"
-                subtitle="Akcije koje čekaju mrežu"
+                title={t('mobile.profile.outboxTitle')}
+                subtitle={t('mobile.profile.outboxSubtitle')}
                 icon="cloud-upload-outline"
                 iconTone="warning"
                 onPress={() => router.push('/(app)/outbox')}
@@ -136,15 +194,43 @@ export default function ProfileScreen() {
           </Panel>
         </Section>
 
-        <Section label="Aplikacija">
-          <ListRow
-            title="Verzija"
-            value={`${versionName} (${buildNumber})`}
+        <Section label={t('mobile.profile.appSection')}>
+          <Panel padding="none" style={styles.appPanel}>
+            <View style={styles.panelInner}>
+              <ListRow
+                title={t('mobile.profile.versionLabel')}
+                value={`${versionName} (${buildNumber})`}
+              />
+              {update.hasUpdate && update.release ? (
+                <ListRow
+                  title={t('mobile.update.availableBadge')}
+                  subtitle={`${update.release.versionName} (${update.release.versionCode})`}
+                  icon="download-outline"
+                  iconTone={update.isMandatory ? 'danger' : 'info'}
+                  onPress={() => void update.openDownload()}
+                  divider
+                />
+              ) : null}
+            </View>
+          </Panel>
+          <ActionButton
+            testID="profile-check-update-btn"
+            title={
+              update.isChecking
+                ? t('mobile.update.checking')
+                : t('mobile.update.checkButton')
+            }
+            icon="cloud-download-outline"
+            variant="secondary"
+            loading={update.isChecking}
+            onPress={handleManualUpdateCheck}
+            style={styles.updateButton}
           />
         </Section>
 
         <ActionButton
-          title="Odjavi se"
+          testID="profile-logout-btn"
+          title={t('mobile.profile.logoutButton')}
           icon="log-out-outline"
           variant="danger"
           onPress={confirmLogout}
@@ -194,4 +280,6 @@ const createStyles = (palette: ThemePalette) => ({
     marginTop: spacing.lg,
   },
   panelInner: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xs },
+  appPanel: { marginBottom: spacing.md },
+  updateButton: { marginBottom: spacing.lg },
 });

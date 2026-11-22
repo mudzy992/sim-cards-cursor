@@ -19,6 +19,8 @@ import { installationRecordsApi } from '@/api/installation-records.api';
 import { notificationsApi } from '@/api/notifications.api';
 import { useMiniTour } from '@/hooks/useMiniTour';
 import { useConnectivity } from '@/hooks/useConnectivity';
+import { useAppUpdateCheck } from '@/hooks/useAppUpdateCheck';
+import { useTranslation } from '@/i18n/i18n.store';
 import { offlineCache } from '@/offline/offline-cache';
 import { listOutbox } from '@/offline/outbox';
 import { syncMeterTypesOfflineCache } from '@/offline/meter-types-sync';
@@ -43,6 +45,8 @@ export default function HomeScreen() {
   const user = useAuthStore((state) => state.user);
   const miniTour = useMiniTour();
   const { isOnline } = useConnectivity();
+  const update = useAppUpdateCheck();
+  const { t, language } = useTranslation();
   const setBlocked = useGlobalBlockingStore((s) => s.setBlocked);
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -122,8 +126,8 @@ export default function HomeScreen() {
     if (!user) return;
     void (async () => {
       setBlocked({
-        title: 'Sync tipova brojila',
-        subtitle: 'Molimo sačekajte, preuzimamo definicije…',
+        title: t('mobile.home.syncTypesBlockingTitle'),
+        subtitle: t('mobile.home.syncTypesBlockingSubtitle'),
       });
       try {
         await syncMeterTypesOfflineCache(user);
@@ -132,11 +136,23 @@ export default function HomeScreen() {
         });
       } catch {
         Alert.alert(
-          'Sync nije uspio',
-          'Provjerite internet konekciju i pokušajte ponovo.',
+          t('mobile.home.syncTypesFailedTitle'),
+          t('mobile.home.syncTypesFailedMessage'),
         );
       } finally {
         setBlocked(null);
+      }
+    })();
+  };
+
+  const handleDownloadUpdate = () => {
+    void (async () => {
+      const opened = await update.openDownload();
+      if (!opened) {
+        Alert.alert(
+          t('mobile.common.error'),
+          t('mobile.update.openFailed'),
+        );
       }
     })();
   };
@@ -153,6 +169,9 @@ export default function HomeScreen() {
           queryClient.invalidateQueries({
             queryKey: ['notifications-unread-count'],
           }),
+          queryClient.invalidateQueries({
+            queryKey: ['android-latest-release'],
+          }),
         ]);
       } finally {
         setIsRefreshing(false);
@@ -162,9 +181,11 @@ export default function HomeScreen() {
 
   const connectionDetail = operatorStats
     ? operatorStats.isStale
-      ? 'Podaci možda nisu ažurni'
-      : 'Sve sinhronizovano'
+      ? t('mobile.home.staleDetail')
+      : t('mobile.home.syncedDetail')
     : undefined;
+
+  const dateLocale = language === 'en' ? 'en-GB' : 'bs-BA';
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -172,11 +193,13 @@ export default function HomeScreen() {
 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>
-            Zdravo{user?.firstName ? `, ${user.firstName}` : ''}
+          <Text style={styles.greeting} testID="home-greeting">
+            {user?.firstName
+              ? t('mobile.home.greetingNamed', { name: user.firstName })
+              : t('mobile.home.greeting')}
           </Text>
           <Text style={styles.dateLine}>
-            {new Date().toLocaleDateString('bs-BA', {
+            {new Date().toLocaleDateString(dateLocale, {
               weekday: 'long',
               day: 'numeric',
               month: 'long',
@@ -185,9 +208,10 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerActions}>
           <Pressable
+            testID="home-notifications-btn"
             onPress={() => router.push('/notifications')}
             accessibilityRole="button"
-            accessibilityLabel="Notifikacije"
+            accessibilityLabel={t('mobile.home.notificationsLabel')}
             style={({ pressed }) => [
               styles.iconButton,
               pressed && styles.pressedSoft,
@@ -207,9 +231,10 @@ export default function HomeScreen() {
             ) : null}
           </Pressable>
           <Pressable
+            testID="home-profile-btn"
             onPress={() => router.push('/(app)/(tabs)/profile')}
             accessibilityRole="button"
-            accessibilityLabel="Profil i postavke"
+            accessibilityLabel={t('mobile.home.profileLabel')}
             style={({ pressed }) => [
               styles.avatarButton,
               pressed && styles.pressedSoft,
@@ -237,6 +262,7 @@ export default function HomeScreen() {
       >
         <View style={styles.pillRow}>
           <ConnectionPill
+            testID="home-connection-pill"
             isOnline={isOnline}
             detail={connectionDetail}
             attention={Boolean(
@@ -245,22 +271,57 @@ export default function HomeScreen() {
           />
         </View>
 
+        {update.hasUpdate && update.release ? (
+          <Panel
+            tone={update.isMandatory ? 'danger' : 'info'}
+            style={styles.syncPanel}
+            testID="home-update-banner"
+          >
+            <View style={styles.syncHeader}>
+              <StatusBadge
+                tone={update.isMandatory ? 'danger' : 'info'}
+                label={
+                  update.isMandatory
+                    ? t('mobile.update.mandatoryBadge')
+                    : t('mobile.update.availableBadge')
+                }
+                showDot
+              />
+            </View>
+            <Text style={[type.body, styles.syncText]}>
+              {t('mobile.update.bannerBody', {
+                version: `${update.release.versionName} (${update.release.versionCode})`,
+              })}
+            </Text>
+            <ActionButton
+              testID="home-update-download-btn"
+              title={t('mobile.update.downloadButton')}
+              onPress={handleDownloadUpdate}
+              variant={update.isMandatory ? 'danger' : 'primary'}
+              size="md"
+              icon="download-outline"
+            />
+          </Panel>
+        ) : null}
+
         {operatorStats?.showMeterTypesSync ? (
           <Panel tone="warning" style={styles.syncPanel}>
             <View style={styles.syncHeader}>
               <StatusBadge
                 tone="warning"
-                label="Potrebna sinhronizacija"
+                label={t('mobile.home.syncRequiredBadge')}
                 showDot
               />
             </View>
             <Text style={[type.body, styles.syncText]}>
-              Tipovi brojila na uređaju ({operatorStats.offlineMeterTypeCount})
-              ne odgovaraju serveru ({operatorStats.serverMeterTypeCount}).
-              Sinhronizujte da biste radili sa ažurnim definicijama.
+              {t('mobile.home.syncRequiredText', {
+                local: operatorStats.offlineMeterTypeCount,
+                server: operatorStats.serverMeterTypeCount ?? 0,
+              })}
             </Text>
             <ActionButton
-              title="Sinhroniziraj tipove brojila"
+              testID="home-sync-types-btn"
+              title={t('mobile.home.syncTypesButton')}
               onPress={runMeterTypesSync}
               variant="primary"
               size="md"
@@ -270,8 +331,8 @@ export default function HomeScreen() {
         ) : null}
 
         <Section
-          label="Inventar na uređaju"
-          hint="lokalni podaci — dostupni i offline"
+          label={t('mobile.home.inventorySection')}
+          hint={t('mobile.home.inventoryHint')}
         >
           {isLoading ? (
             <SkeletonRows count={3} />
@@ -279,8 +340,8 @@ export default function HomeScreen() {
             <Panel padding="none">
               <View style={styles.panelInner}>
                 <ListRow
-                  title="Slobodne SIM kartice"
-                  subtitle="lokalni inventar za ugradnju"
+                  title={t('mobile.home.freeSimsTitle')}
+                  subtitle={t('mobile.home.freeSimsSubtitle')}
                   icon="card-outline"
                   iconTone="info"
                   value={operatorStats.offlineSimCount}
@@ -288,11 +349,14 @@ export default function HomeScreen() {
                   onPress={() => router.push('/(app)/offline-inventory')}
                 />
                 <ListRow
-                  title="Tipovi brojila"
+                  title={t('mobile.home.meterTypesTitle')}
                   subtitle={
                     operatorStats.serverMeterTypeCount != null
-                      ? `${operatorStats.offlineMeterTypeCount} od ${operatorStats.serverMeterTypeCount} sinhronizovano`
-                      : 'keširane definicije'
+                      ? t('mobile.home.meterTypesSyncedSubtitle', {
+                          local: operatorStats.offlineMeterTypeCount,
+                          server: operatorStats.serverMeterTypeCount,
+                        })
+                      : t('mobile.home.meterTypesCachedSubtitle')
                   }
                   icon="speedometer-outline"
                   iconTone={
@@ -303,11 +367,13 @@ export default function HomeScreen() {
                   divider
                 />
                 <ListRow
-                  title="Outbox red"
+                  title={t('mobile.home.outboxTitle')}
                   subtitle={
                     operatorStats.outboxFailed > 0
-                      ? `${operatorStats.outboxFailed} neuspjelih zahtjeva`
-                      : 'zahtjevi koji čekaju slanje'
+                      ? t('mobile.home.outboxFailedSubtitle', {
+                          count: operatorStats.outboxFailed,
+                        })
+                      : t('mobile.home.outboxPendingSubtitle')
                   }
                   icon={
                     operatorStats.outboxPending > 0
@@ -331,18 +397,18 @@ export default function HomeScreen() {
           ) : null}
         </Section>
 
-        <Section label="Aktivnost">
+        <Section label={t('mobile.home.activitySection')}>
           {isLoading ? (
             <SkeletonRow />
           ) : operatorStats ? (
             <Panel padding="none">
               <View style={styles.panelInner}>
                 <ListRow
-                  title="Moji zapisnici"
+                  title={t('mobile.home.myRecordsTitle')}
                   subtitle={
                     operatorStats.isStale
-                      ? 'status ažuriranja nepoznat (offline)'
-                      : 'ukupno evidentiranih ugradnja'
+                      ? t('mobile.home.myRecordsOfflineSubtitle')
+                      : t('mobile.home.myRecordsTotalSubtitle')
                   }
                   icon="document-text-outline"
                   iconTone="neutral"
@@ -355,27 +421,27 @@ export default function HomeScreen() {
           ) : null}
         </Section>
 
-        <Section label="Brze radnje">
+        <Section label={t('mobile.home.quickActionsSection')}>
           <Panel padding="none">
             <View style={styles.panelInner}>
               <ListRow
-                title="Nova ugradnja"
-                subtitle="pokreni postupak ugradnje kartice"
+                title={t('mobile.home.newInstallTitle')}
+                subtitle={t('mobile.home.newInstallSubtitle')}
                 icon="construct-outline"
                 iconTone="info"
                 onPress={() => router.push('/(app)/(tabs)/install')}
               />
               <ListRow
-                title="Demontaža kartice"
-                subtitle="skidanje kartice sa brojila"
+                title={t('mobile.home.demountTitle')}
+                subtitle={t('mobile.home.demountSubtitle')}
                 icon="remove-circle-outline"
                 iconTone="warning"
                 onPress={() => router.push('/(app)/(tabs)/demount')}
                 divider
               />
               <ListRow
-                title="Skeniraj karticu"
-                subtitle="kamera ili ručni unos ICCID-a"
+                title={t('mobile.home.scanTitle')}
+                subtitle={t('mobile.home.scanSubtitle')}
                 icon="barcode-outline"
                 iconTone="neutral"
                 onPress={() => router.push('/(app)/(tabs)/scan')}
@@ -388,14 +454,10 @@ export default function HomeScreen() {
         {!miniTour.loading && miniTour.visible ? (
           <Panel tone="info" style={styles.tourPanel}>
             <Text style={[type.bodyStrong, styles.tourTitle]}>
-              Kratki vodič kroz aplikaciju
+              {t('mobile.home.tourTitle')}
             </Text>
             <Text style={[type.body, styles.tourText]}>
-              • Tab „Skeniranje“ — skeniraj ili unesi ICCID za novi zapisnik.
-              {'\n'}• Tab „Ugradnja“ — vođeni postupak ugradnje.{'\n'}• Tab
-              „Zapisnici“ — pregledi tvojih zapisnika i statusa.{'\n'}• Tab
-              „Demontaža“ — zadaci za skidanje SIM kartica.{'\n'}• Profil —
-              tema (Svijetla za sunce / Tamna), jezik i odjava.
+              {t('mobile.home.tourBody')}
             </Text>
             <View style={styles.tourActions}>
               <Pressable
@@ -403,10 +465,12 @@ export default function HomeScreen() {
                 hitSlop={8}
                 style={styles.tourSecondary}
               >
-                <Text style={styles.tourSecondaryText}>Kasnije</Text>
+                <Text style={styles.tourSecondaryText}>
+                  {t('mobile.home.tourLater')}
+                </Text>
               </Pressable>
               <ActionButton
-                title="Razumjem"
+                title={t('mobile.home.tourGotIt')}
                 onPress={() => void miniTour.complete()}
                 variant="primary"
                 size="sm"
