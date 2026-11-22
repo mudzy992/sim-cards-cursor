@@ -73,12 +73,22 @@ export function MeterTypePicker({
                 >
                   {item.name}
                 </Text>
-                {item.manufacturer || item.model ? (
+                {item.manufacturer || item.model || item.serialNumberLength ? (
                   <Text
                     style={[styles.meta, selected && styles.selectedMeta]}
                     numberOfLines={1}
                   >
-                    {[item.manufacturer, item.model].filter(Boolean).join(' · ')}
+                    {[
+                      item.manufacturer,
+                      item.model,
+                      item.serialNumberLength
+                        ? t('mobile.records.form.meterTypeSerialHint', {
+                            count: item.serialNumberLength,
+                          })
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </Text>
                 ) : null}
               </Pressable>

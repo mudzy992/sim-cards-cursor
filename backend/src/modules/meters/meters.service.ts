@@ -19,6 +19,7 @@ import {
 } from 'src/common/utils/meter-years.util';
 import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
 import { ScopeContext, scopeWhere } from 'src/common/utils/scope-filter.util';
+import { validateMeterSerialLength } from '@sim-tracker/shared';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { AuthService } from '../auth/auth.service';
@@ -110,7 +111,8 @@ export class MetersService {
     }
 
     await this.assertBranchScope(createMeterDto.branchId, scope);
-    await this.assertMeterTypeExists(createMeterDto.meterTypeDefinitionId);
+    const typeDef = await this.assertMeterTypeExists(createMeterDto.meterTypeDefinitionId);
+    this.assertSerialLengthMatchesType(serialNumber, typeDef);
 
     const existingSerial = await this.prisma.meter.findUnique({
       where: { serialNumber },
@@ -334,11 +336,20 @@ export class MetersService {
     if (updateMeterDto.branchId) {
       await this.assertBranchScope(updateMeterDto.branchId, scope);
     }
+    const targetTypeId =
+      updateMeterDto.meterTypeDefinitionId ?? existing.meterTypeDefinitionId;
+    let targetTypeDef: { id: string; name?: string | null; serialNumberLength?: number | null } | null =
+      null;
     if (
       updateMeterDto.meterTypeDefinitionId &&
       updateMeterDto.meterTypeDefinitionId !== existing.meterTypeDefinitionId
     ) {
-      await this.assertMeterTypeExists(updateMeterDto.meterTypeDefinitionId);
+      targetTypeDef = await this.assertMeterTypeExists(updateMeterDto.meterTypeDefinitionId);
+    } else if (updateMeterDto.serialNumber !== undefined) {
+      targetTypeDef = await this.prisma.meterTypeDefinition.findUnique({
+        where: { id: targetTypeId },
+        select: { id: true, name: true, serialNumberLength: true },
+      });
     }
 
     const mergedYear =
@@ -353,8 +364,16 @@ export class MetersService {
     delete data.simCardId;
     delete data.simCardState;
 
+    const targetSerial =
+      updateMeterDto.serialNumber !== undefined
+        ? updateMeterDto.serialNumber.trim()
+        : existing.serialNumber;
+    if (targetTypeDef && (updateMeterDto.serialNumber !== undefined || updateMeterDto.meterTypeDefinitionId !== undefined)) {
+      this.assertSerialLengthMatchesType(targetSerial, targetTypeDef);
+    }
+
     if (updateMeterDto.serialNumber !== undefined) {
-      const trimmedSerial = updateMeterDto.serialNumber.trim();
+      const trimmedSerial = targetSerial;
       if (!trimmedSerial) {
         throw new BadRequestException('Serijski broj brojila ne smije biti prazan.');
       }
@@ -651,13 +670,31 @@ export class MetersService {
     }
   }
 
-  private async assertMeterTypeExists(meterTypeDefinitionId: string): Promise<void> {
+  private async assertMeterTypeExists(meterTypeDefinitionId: string): Promise<{
+    id: string;
+    name?: string | null;
+    serialNumberLength?: number | null;
+  }> {
     const def = await this.prisma.meterTypeDefinition.findUnique({
       where: { id: meterTypeDefinitionId },
-      select: { id: true },
+      select: { id: true, name: true, serialNumberLength: true },
     });
     if (!def) {
       throw new NotFoundException('Odabrani tip brojila nije pronađen.');
+    }
+    return def;
+  }
+
+  private assertSerialLengthMatchesType(
+    serialNumber: string,
+    typeDef: { name?: string | null; serialNumberLength?: number | null },
+  ): void {
+    const check = validateMeterSerialLength(serialNumber, typeDef.serialNumberLength);
+    if (!check.valid && check.expectedLength !== null) {
+      const typeLabel = typeDef.name ? ` "${typeDef.name}"` : '';
+      throw new BadRequestException(
+        `Serijski broj za tip brojila${typeLabel} mora imati tačno ${check.expectedLength} znakova (uneseno: ${check.actualLength}).`,
+      );
     }
   }
 

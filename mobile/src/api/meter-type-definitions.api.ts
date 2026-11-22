@@ -10,6 +10,7 @@ export type MeterTypeDefinitionItem = {
   model?: string | null;
   type: string;
   maxCurrent?: string | null;
+  serialNumberLength?: number | null;
   notes?: string | null;
   fields?: MeterTypeFieldItem[];
 };

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
+import { validateMeterSerialLength } from '@sim-tracker/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import {
@@ -203,9 +204,35 @@ export default function CreateRecordScreen() {
     queryFn: () => meterTypeDefinitionsApi.listFields(meterTypeId),
     enabled: Boolean(meterTypeId),
   });
-  const meterTypes = Array.isArray(meterTypesQuery.data)
-    ? meterTypesQuery.data
-    : [];
+  const meterTypes = useMemo(
+    () =>
+      Array.isArray(meterTypesQuery.data) ? meterTypesQuery.data : [],
+    [meterTypesQuery.data],
+  );
+  const selectedMeterType = useMemo(
+    () => meterTypes.find((item) => item.id === meterTypeId),
+    [meterTypes, meterTypeId],
+  );
+  const serialLengthCheck = useMemo(
+    () =>
+      validateMeterSerialLength(
+        serialNumber,
+        selectedMeterType?.serialNumberLength,
+      ),
+    [serialNumber, selectedMeterType?.serialNumberLength],
+  );
+  const serialLengthError =
+    serialNumber.trim().length > 0 && !serialLengthCheck.valid
+      ? t('mobile.records.form.serialLengthMismatchError', {
+          expected: serialLengthCheck.expectedLength ?? 0,
+        })
+      : null;
+  const serialLengthHelper = selectedMeterType?.serialNumberLength
+    ? t('mobile.records.form.serialLengthHelper', {
+        expected: selectedMeterType.serialNumberLength,
+        actual: serialNumber.trim().length,
+      })
+    : null;
   const dynamicFields = useMemo(
     () => (Array.isArray(fieldsQuery.data) ? fieldsQuery.data : []),
     [fieldsQuery.data],
@@ -219,7 +246,15 @@ export default function CreateRecordScreen() {
   const validation = useMemo(() => {
     const missing: string[] = [];
     if (!meterTypeId) missing.push(t('mobile.records.form.reqMeterType'));
-    if (!serialNumber.trim()) missing.push(t('mobile.records.form.reqSerial'));
+    if (!serialNumber.trim()) {
+      missing.push(t('mobile.records.form.reqSerial'));
+    } else if (!serialLengthCheck.valid && serialLengthCheck.expectedLength) {
+      missing.push(
+        t('mobile.records.form.serialLengthMismatch', {
+          expected: serialLengthCheck.expectedLength,
+        }),
+      );
+    }
     if (!year.trim()) missing.push(t('mobile.records.form.reqYear'));
     if (!calibrationYear.trim())
       missing.push(t('mobile.records.form.reqCalibration'));
@@ -230,6 +265,7 @@ export default function CreateRecordScreen() {
   }, [
     meterTypeId,
     serialNumber,
+    serialLengthCheck,
     year,
     calibrationYear,
     dynamicFields,
@@ -451,6 +487,8 @@ export default function CreateRecordScreen() {
           value={serialNumber}
           onChangeText={setSerialNumber}
           autoCapitalize="characters"
+          error={serialLengthError}
+          helper={serialLengthHelper}
           trailingAction={{
             icon: 'barcode-outline',
             accessibilityLabel: t('mobile.records.form.scanSerialAccessibility'),
@@ -462,6 +500,13 @@ export default function CreateRecordScreen() {
                   simCardId,
                   serialTarget: 'new',
                   returnTo: 'create-record',
+                  ...(selectedMeterType?.serialNumberLength
+                    ? {
+                        expectedSerialLength: String(
+                          selectedMeterType.serialNumberLength,
+                        ),
+                      }
+                    : {}),
                 },
               }),
           }}

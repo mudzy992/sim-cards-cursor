@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
 import { MeterType } from '@prisma/client';
 
 export class CreateMeterTypeDefinitionDto {
@@ -27,6 +28,14 @@ export class CreateMeterTypeDefinitionDto {
   @IsString()
   @IsOptional()
   maxCurrent?: string;
+
+  @ApiPropertyOptional({ example: 10, minimum: 1, maximum: 64 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(64)
+  serialNumberLength?: number;
 
   @ApiPropertyOptional()
   @IsString()

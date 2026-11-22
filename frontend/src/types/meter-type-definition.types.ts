@@ -7,6 +7,7 @@ export type MeterTypeDefinitionItem = {
   model?: string | null;
   type: MeterType;
   maxCurrent?: string | null;
+  serialNumberLength?: number | null;
   notes?: string | null;
   _count?: { meters: number };
   createdAt: string;
@@ -19,6 +20,7 @@ export type CreateMeterTypeDefinitionInput = {
   model?: string;
   type?: MeterType;
   maxCurrent?: string;
+  serialNumberLength?: number | null;
   notes?: string;
 };
 

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { scopeWhere, toScopeContext, ScopeContext } from 'src/common/utils/scope-filter.util';
 import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
+import { validateMeterSerialLength } from '@sim-tracker/shared';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateInstallationRecordDto } from './dto/create-installation-record.dto';
 import { UpdateInstallationRecordDto } from './dto/update-installation-record.dto';
@@ -144,6 +145,15 @@ export class InstallationRecordsService {
       if (!demountedType) {
         throw new BadRequestException('Tip demontiranog brojila nije pronađen.');
       }
+      const dmSerialCheck = validateMeterSerialLength(
+        dm.serialNumber,
+        demountedType.serialNumberLength,
+      );
+      if (!dmSerialCheck.valid && dmSerialCheck.expectedLength !== null) {
+        throw new BadRequestException(
+          `Serijski broj za tip brojila "${demountedType.name}" mora imati tačno ${dmSerialCheck.expectedLength} znakova (uneseno: ${dmSerialCheck.actualLength}).`,
+        );
+      }
       const validatedDemountedDynamic = await this.meterTypeFieldsService.validateDynamicValues(
         dm.meterTypeDefinitionId,
         dm.dynamicFieldValues ?? null,
@@ -269,6 +279,15 @@ export class InstallationRecordsService {
       });
       if (!typeDef) {
         throw new BadRequestException('Tip brojila nije pronađen.');
+      }
+      const serialCheck = validateMeterSerialLength(
+        createInstallationRecordDto.serialNumber,
+        typeDef.serialNumberLength,
+      );
+      if (!serialCheck.valid && serialCheck.expectedLength !== null) {
+        throw new BadRequestException(
+          `Serijski broj za tip brojila "${typeDef.name}" mora imati tačno ${serialCheck.expectedLength} znakova (uneseno: ${serialCheck.actualLength}).`,
+        );
       }
       assertMeterYearsRequired(
         createInstallationRecordDto.year,

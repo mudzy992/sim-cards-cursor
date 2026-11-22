@@ -44,6 +44,7 @@ type TypeFormValues = {
   model?: string
   type?: MeterType
   maxCurrent?: string
+  serialNumberLength?: number | null
   notes?: string
 }
 
@@ -96,12 +97,21 @@ export default function MeterTypeUpsertPage() {
 
   const upsertMutation = useMutation({
     mutationFn: async (values: TypeFormValues): Promise<MeterTypeDefinitionItem> => {
+      const parsedSerialLength =
+        typeof values.serialNumberLength === 'number' && Number.isInteger(values.serialNumberLength)
+          ? values.serialNumberLength
+          : null
       const payload: CreateMeterTypeDefinitionInput = {
         name: values.name.trim(),
         manufacturer: values.manufacturer?.trim() || undefined,
         model: values.model?.trim() || undefined,
         type: values.type,
         maxCurrent: values.maxCurrent?.trim() || undefined,
+        ...(definitionId
+          ? { serialNumberLength: parsedSerialLength }
+          : parsedSerialLength !== null
+            ? { serialNumberLength: parsedSerialLength }
+            : {}),
         notes: values.notes?.trim() || undefined,
       }
       if (definitionId) return meterTypeDefinitionsApi.update(definitionId, payload)
@@ -181,6 +191,7 @@ export default function MeterTypeUpsertPage() {
         model: typeQuery.data.model ?? '',
         type: typeQuery.data.type,
         maxCurrent: typeQuery.data.maxCurrent ?? '',
+        serialNumberLength: typeQuery.data.serialNumberLength ?? null,
         notes: typeQuery.data.notes ?? '',
       })
     }
@@ -319,6 +330,9 @@ export default function MeterTypeUpsertPage() {
               <Descriptions.Item label={t('meterTypes.manufacturer')}>{typeQuery.data.manufacturer ?? '–'}</Descriptions.Item>
               <Descriptions.Item label={t('meterTypes.model')}>{typeQuery.data.model ?? '–'}</Descriptions.Item>
               <Descriptions.Item label={t('meterTypes.maxCurrent')}>{typeQuery.data.maxCurrent ?? '–'}</Descriptions.Item>
+              <Descriptions.Item label={t('meterTypes.serialNumberLength')}>
+                {typeQuery.data.serialNumberLength ?? '–'}
+              </Descriptions.Item>
               <Descriptions.Item label={t('common.labels.notes')} span={{ xs: 1, sm: 1, md: 2 }}>
                 {typeQuery.data.notes ?? '–'}
               </Descriptions.Item>
@@ -351,6 +365,7 @@ export default function MeterTypeUpsertPage() {
               model: '',
               type: undefined,
               maxCurrent: '',
+              serialNumberLength: null,
               notes: '',
             }}
           >
@@ -369,6 +384,19 @@ export default function MeterTypeUpsertPage() {
               </Form.Item>
               <Form.Item name="maxCurrent" label={t('meterTypes.maxCurrent')}>
                 <Input placeholder={t('common.labels.optional')} />
+              </Form.Item>
+              <Form.Item
+                name="serialNumberLength"
+                label={t('meterTypes.serialNumberLength')}
+                extra={t('meterTypes.serialNumberLengthHint')}
+              >
+                <InputNumber
+                  min={1}
+                  max={64}
+                  precision={0}
+                  style={{ width: '100%' }}
+                  placeholder={t('meterTypes.serialNumberLengthPlaceholder')}
+                />
               </Form.Item>
             </div>
             <Form.Item name="notes" label={t('common.labels.notes')}>

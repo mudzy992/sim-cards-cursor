@@ -263,17 +263,18 @@ model Meter {
 }
 
 model MeterTypeDefinition {
-  id           String           @id @default(uuid())
-  name         String
-  manufacturer String?
-  model        String?
-  type         MeterType        @default(SINGLE_PHASE)
-  maxCurrent   String?          @map("max_current")
-  notes        String?          @db.Text
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
-  meters       Meter[]
-  fields       MeterTypeField[]
+  id                 String           @id @default(uuid())
+  name               String
+  manufacturer       String?
+  model              String?
+  type               MeterType        @default(SINGLE_PHASE)
+  maxCurrent         String?          @map("max_current")
+  serialNumberLength Int?             @map("serial_number_length")
+  notes              String?          @db.Text
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  meters             Meter[]
+  fields             MeterTypeField[]
 
   @@map("meter_type_definitions")
 }

@@ -18,6 +18,7 @@ export interface FieldProps extends TextInputProps {
   label: string;
   required?: boolean;
   error?: string | null;
+  helper?: string | null;
   trailingAction?: {
     icon: keyof typeof Ionicons.glyphMap;
     onPress: () => void;
@@ -29,6 +30,7 @@ export function Field({
   label,
   required,
   error,
+  helper,
   style,
   multiline,
   trailingAction,
@@ -74,7 +76,11 @@ export function Field({
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text style={styles.error}>{error}</Text>
+      ) : helper ? (
+        <Text style={styles.helper}>{helper}</Text>
+      ) : null}
     </View>
   );
 }
@@ -120,5 +126,10 @@ const createStyles = (palette: ThemePalette) => ({
     color: palette.danger,
     fontSize: 12,
     fontWeight: '600' as const,
+  },
+  helper: {
+    marginTop: spacing.xs,
+    color: palette.textMuted,
+    fontSize: 12,
   },
 });

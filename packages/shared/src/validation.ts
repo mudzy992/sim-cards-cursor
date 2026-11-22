@@ -31,3 +31,34 @@ export function isValidIpv4(value: string): boolean {
 export function isValidIccid(value: string): boolean {
   return ICCID_REGEX.test(normalizeIccid(value));
 }
+
+export type MeterSerialLengthCheck = {
+  valid: boolean;
+  actualLength: number;
+  expectedLength: number | null;
+};
+
+/**
+ * Validates a meter serial number against an optional expected character length
+ * configured on its MeterTypeDefinition.
+ */
+export function validateMeterSerialLength(
+  serialNumber: string,
+  expectedLength?: number | null,
+): MeterSerialLengthCheck {
+  const trimmed = serialNumber.trim();
+  const actualLength = trimmed.length;
+  if (
+    expectedLength === undefined ||
+    expectedLength === null ||
+    !Number.isInteger(expectedLength) ||
+    expectedLength <= 0
+  ) {
+    return { valid: actualLength > 0, actualLength, expectedLength: null };
+  }
+  return {
+    valid: actualLength === expectedLength,
+    actualLength,
+    expectedLength,
+  };
+}

@@ -23,6 +23,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { metersApi } from '@/api/meters.api';
 import { branchesApi } from '@/api/branches.api';
 import { usersApi } from '@/api/users.api';
+import { validateMeterSerialLength } from '@sim-tracker/shared';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import {
   demountTasksApi,
@@ -771,6 +772,13 @@ export default function MetersListPage() {
                         render: (v: string | null) => v ?? '–',
                       },
                       {
+                        title: t('meterTypes.serialNumberLengthShort'),
+                        dataIndex: 'serialNumberLength',
+                        key: 'serialNumberLength',
+                        width: 110,
+                        render: (v: number | null | undefined) => v ?? '–',
+                      },
+                      {
                         title: t('meters.columns.metersCount'),
                         key: 'metersCount',
                         width: 120,
@@ -974,7 +982,28 @@ export default function MetersListPage() {
             <Form.Item
               name="serialNumber"
               label={t('installationRecords.form.meterSerialLabel')}
-              rules={[{ required: true, message: t('installationRecords.form.serialNumberRequired') }]}
+              dependencies={['meterTypeDefinitionId']}
+              rules={[
+                { required: true, message: t('installationRecords.form.serialNumberRequired') },
+                ({ getFieldValue }) => ({
+                  validator(_, value: string | undefined) {
+                    const typeId = getFieldValue('meterTypeDefinitionId') as string | undefined;
+                    const selectedType = meterTypesQuery.data?.find((item) => item.id === typeId);
+                    if (!value?.trim() || !selectedType?.serialNumberLength) {
+                      return Promise.resolve();
+                    }
+                    const check = validateMeterSerialLength(value, selectedType.serialNumberLength);
+                    if (check.valid) return Promise.resolve();
+                    return Promise.reject(
+                      new Error(
+                        t('meterTypes.serialNumberLengthValidation', {
+                          count: selectedType.serialNumberLength,
+                        }),
+                      ),
+                    );
+                  },
+                }),
+              ]}
             >
               <Input placeholder={t('common.placeholders.meterSerialExample')} />
             </Form.Item>

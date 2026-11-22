@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Card, Divider, Form, Input, InputNumber, Radio, Select, Switch, message } from 'antd';
 import { installationRecordsApi } from '@/api/installation-records.api';
 import { metersApi } from '@/api/meters.api';
+import { validateMeterSerialLength } from '@sim-tracker/shared';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import { simCardsApi } from '@/api/sim-cards.api';
 import { branchesApi } from '@/api/branches.api';
@@ -307,7 +308,30 @@ export default function InstallationRecordCreateForm({
                 <Form.Item
                   name={['demountedMeter', 'serialNumber']}
                   label={t('installationRecords.form.demountedSerialLabel')}
-                  rules={[{ required: true, message: t('installationRecords.form.demountedSerialRequired') }]}
+                  dependencies={[['demountedMeter', 'meterTypeDefinitionId']]}
+                  rules={[
+                    { required: true, message: t('installationRecords.form.demountedSerialRequired') },
+                    ({ getFieldValue }) => ({
+                      validator(_, value: string | undefined) {
+                        const typeId = getFieldValue(['demountedMeter', 'meterTypeDefinitionId']) as
+                          | string
+                          | undefined;
+                        const selectedType = meterTypesQuery.data?.find((item) => item.id === typeId);
+                        if (!value?.trim() || !selectedType?.serialNumberLength) {
+                          return Promise.resolve();
+                        }
+                        const check = validateMeterSerialLength(value, selectedType.serialNumberLength);
+                        if (check.valid) return Promise.resolve();
+                        return Promise.reject(
+                          new Error(
+                            t('meterTypes.serialNumberLengthValidation', {
+                              count: selectedType.serialNumberLength,
+                            }),
+                          ),
+                        );
+                      },
+                    }),
+                  ]}
                 >
                   <Input placeholder={t('installationRecords.form.serialNumberPlaceholder')} />
                 </Form.Item>
@@ -390,7 +414,28 @@ export default function InstallationRecordCreateForm({
             <Form.Item
               name="serialNumber"
               label={t('installationRecords.form.meterSerialLabel')}
-              rules={[{ required: true, message: t('installationRecords.form.serialNumberRequired') }]}
+              dependencies={['meterTypeDefinitionId']}
+              rules={[
+                { required: true, message: t('installationRecords.form.serialNumberRequired') },
+                ({ getFieldValue }) => ({
+                  validator(_, value: string | undefined) {
+                    const typeId = getFieldValue('meterTypeDefinitionId') as string | undefined;
+                    const selectedType = meterTypesQuery.data?.find((item) => item.id === typeId);
+                    if (!value?.trim() || !selectedType?.serialNumberLength) {
+                      return Promise.resolve();
+                    }
+                    const check = validateMeterSerialLength(value, selectedType.serialNumberLength);
+                    if (check.valid) return Promise.resolve();
+                    return Promise.reject(
+                      new Error(
+                        t('meterTypes.serialNumberLengthValidation', {
+                          count: selectedType.serialNumberLength,
+                        }),
+                      ),
+                    );
+                  },
+                }),
+              ]}
             >
               <Input placeholder={t('installationRecords.form.meterSerialPlaceholder')} />
             </Form.Item>

@@ -35,3 +35,21 @@ test('isValidIpv4 validates dotted quads strictly', () => {
   assert.equal(esm.isValidIpv4('256.0.0.1'), false);
   assert.equal(esm.isValidIpv4('10.10.0'), false);
 });
+
+test('validateMeterSerialLength checks optional expectedLength strictly', () => {
+  assert.deepEqual(esm.validateMeterSerialLength('12345678', null), {
+    valid: true,
+    actualLength: 8,
+    expectedLength: null,
+  });
+  assert.deepEqual(esm.validateMeterSerialLength(' 12345678 ', 8), {
+    valid: true,
+    actualLength: 8,
+    expectedLength: 8,
+  });
+  assert.deepEqual(cjs.validateMeterSerialLength('1234567', 8), {
+    valid: false,
+    actualLength: 7,
+    expectedLength: 8,
+  });
+});
