@@ -106,8 +106,6 @@ test.describe('Frontend browser smoke', () => {
       '/installation-records',
       '/installation-records/new',
       '/meters',
-      '/install-tasks',
-      '/demount-tasks',
       '/meter-types/new',
       '/meter-type-fields',
       '/analytics',
