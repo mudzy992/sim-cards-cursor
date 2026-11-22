@@ -102,4 +102,41 @@ describe('MeterTypeDefinitionsService & MeterTypeFieldsService', () => {
       fieldsService.reorder('def-1', ['field-1', 'field-1']),
     ).rejects.toThrow(BadRequestException);
   });
+
+  it('persists and clears serialNumberLength on create and update', async () => {
+    const { prisma, defsService } = createMocks();
+    prisma.meterTypeDefinition.create.mockResolvedValueOnce({
+      id: 'def-new',
+      name: 'E650',
+      type: 'THREE_PHASE',
+      serialNumberLength: 10,
+    });
+    prisma.meterTypeDefinition.update.mockResolvedValueOnce({
+      id: 'def-new',
+      name: 'E650',
+      type: 'THREE_PHASE',
+      serialNumberLength: null,
+    });
+
+    const created = await defsService.create({
+      name: 'E650',
+      serialNumberLength: 10,
+    });
+    expect(created.serialNumberLength).toBe(10);
+    expect(prisma.meterTypeDefinition.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ serialNumberLength: 10 }),
+      }),
+    );
+
+    const updated = await defsService.update('def-new', {
+      serialNumberLength: null,
+    });
+    expect(updated.serialNumberLength).toBeNull();
+    expect(prisma.meterTypeDefinition.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ serialNumberLength: null }),
+      }),
+    );
+  });
 });

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Switch, Text, View } from 'react-native';
+import { validateMeterSerialLength } from '@sim-tracker/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import {
@@ -265,7 +266,58 @@ export default function CreateRecordReplacementScreen() {
     queryFn: () => meterTypeDefinitionsApi.listFields(meterTypeId),
     enabled: Boolean(meterTypeId) && step === 2,
   });
-  const types = Array.isArray(typesQuery.data) ? typesQuery.data : [];
+  const types = useMemo(
+    () => (Array.isArray(typesQuery.data) ? typesQuery.data : []),
+    [typesQuery.data],
+  );
+  const selectedDmMeterType = useMemo(
+    () => types.find((item) => item.id === dmMeterTypeId),
+    [types, dmMeterTypeId],
+  );
+  const selectedNewMeterType = useMemo(
+    () => types.find((item) => item.id === meterTypeId),
+    [types, meterTypeId],
+  );
+  const dmSerialLengthCheck = useMemo(
+    () =>
+      validateMeterSerialLength(
+        dmSerialNumber,
+        selectedDmMeterType?.serialNumberLength,
+      ),
+    [dmSerialNumber, selectedDmMeterType?.serialNumberLength],
+  );
+  const newSerialLengthCheck = useMemo(
+    () =>
+      validateMeterSerialLength(
+        serialNumber,
+        selectedNewMeterType?.serialNumberLength,
+      ),
+    [serialNumber, selectedNewMeterType?.serialNumberLength],
+  );
+  const dmSerialLengthError =
+    dmSerialNumber.trim().length > 0 && !dmSerialLengthCheck.valid
+      ? t('mobile.records.form.serialLengthMismatchError', {
+          expected: dmSerialLengthCheck.expectedLength ?? 0,
+        })
+      : null;
+  const dmSerialLengthHelper = selectedDmMeterType?.serialNumberLength
+    ? t('mobile.records.form.serialLengthHelper', {
+        expected: selectedDmMeterType.serialNumberLength,
+        actual: dmSerialNumber.trim().length,
+      })
+    : null;
+  const newSerialLengthError =
+    serialNumber.trim().length > 0 && !newSerialLengthCheck.valid
+      ? t('mobile.records.form.serialLengthMismatchError', {
+          expected: newSerialLengthCheck.expectedLength ?? 0,
+        })
+      : null;
+  const newSerialLengthHelper = selectedNewMeterType?.serialNumberLength
+    ? t('mobile.records.form.serialLengthHelper', {
+        expected: selectedNewMeterType.serialNumberLength,
+        actual: serialNumber.trim().length,
+      })
+    : null;
   const dmFields = useMemo(
     () => (Array.isArray(dmFieldsQuery.data) ? dmFieldsQuery.data : []),
     [dmFieldsQuery.data],
@@ -283,8 +335,18 @@ export default function CreateRecordReplacementScreen() {
   const dmValidation = useMemo(() => {
     const missing: string[] = [];
     if (!dmMeterTypeId) missing.push(t('mobile.records.form.reqOldMeterType'));
-    if (!dmSerialNumber.trim())
+    if (!dmSerialNumber.trim()) {
       missing.push(t('mobile.records.form.reqOldSerial'));
+    } else if (
+      !dmSerialLengthCheck.valid &&
+      dmSerialLengthCheck.expectedLength
+    ) {
+      missing.push(
+        t('mobile.records.form.serialLengthMismatch', {
+          expected: dmSerialLengthCheck.expectedLength,
+        }),
+      );
+    }
     if (!dmYear.trim()) missing.push(t('mobile.records.form.reqOldYear'));
     if (!dmCalibrationYear.trim())
       missing.push(t('mobile.records.form.reqOldCalibration'));
@@ -293,6 +355,7 @@ export default function CreateRecordReplacementScreen() {
   }, [
     dmMeterTypeId,
     dmSerialNumber,
+    dmSerialLengthCheck,
     dmYear,
     dmCalibrationYear,
     dmFields,
@@ -302,8 +365,18 @@ export default function CreateRecordReplacementScreen() {
   const newValidation = useMemo(() => {
     const missing: string[] = [];
     if (!meterTypeId) missing.push(t('mobile.records.form.reqNewMeterType'));
-    if (!serialNumber.trim())
+    if (!serialNumber.trim()) {
       missing.push(t('mobile.records.form.reqNewSerial'));
+    } else if (
+      !newSerialLengthCheck.valid &&
+      newSerialLengthCheck.expectedLength
+    ) {
+      missing.push(
+        t('mobile.records.form.serialLengthMismatch', {
+          expected: newSerialLengthCheck.expectedLength,
+        }),
+      );
+    }
     if (!year.trim()) missing.push(t('mobile.records.form.reqYear'));
     if (!calibrationYear.trim())
       missing.push(t('mobile.records.form.reqCalibration'));
@@ -312,6 +385,7 @@ export default function CreateRecordReplacementScreen() {
   }, [
     meterTypeId,
     serialNumber,
+    newSerialLengthCheck,
     year,
     calibrationYear,
     fields,
@@ -567,6 +641,8 @@ export default function CreateRecordReplacementScreen() {
               value={dmSerialNumber}
               onChangeText={setDmSerialNumber}
               autoCapitalize="characters"
+              error={dmSerialLengthError}
+              helper={dmSerialLengthHelper}
               trailingAction={{
                 icon: 'barcode-outline',
                 accessibilityLabel: t(
@@ -580,6 +656,13 @@ export default function CreateRecordReplacementScreen() {
                       simCardId,
                       serialTarget: 'demounted',
                       returnTo: 'create-record-replacement',
+                      ...(selectedDmMeterType?.serialNumberLength
+                        ? {
+                            expectedSerialLength: String(
+                              selectedDmMeterType.serialNumberLength,
+                            ),
+                          }
+                        : {}),
                     },
                   }),
               }}
@@ -691,6 +774,8 @@ export default function CreateRecordReplacementScreen() {
               value={serialNumber}
               onChangeText={setSerialNumber}
               autoCapitalize="characters"
+              error={newSerialLengthError}
+              helper={newSerialLengthHelper}
               trailingAction={{
                 icon: 'barcode-outline',
                 accessibilityLabel: t(
@@ -704,6 +789,13 @@ export default function CreateRecordReplacementScreen() {
                       simCardId,
                       serialTarget: 'new',
                       returnTo: 'create-record-replacement',
+                      ...(selectedNewMeterType?.serialNumberLength
+                        ? {
+                            expectedSerialLength: String(
+                              selectedNewMeterType.serialNumberLength,
+                            ),
+                          }
+                        : {}),
                     },
                   }),
               }}

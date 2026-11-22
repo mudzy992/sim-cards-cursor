@@ -53,6 +53,7 @@ export class MeterTypeDefinitionsService {
         model: dto.model?.trim() || undefined,
         type: dto.type ?? 'SINGLE_PHASE',
         maxCurrent: dto.maxCurrent?.trim() || undefined,
+        serialNumberLength: dto.serialNumberLength ?? undefined,
         notes: dto.notes?.trim() || undefined,
       },
     });
@@ -89,6 +90,9 @@ export class MeterTypeDefinitionsService {
         ...(dto.type !== undefined && { type: dto.type }),
         ...(dto.maxCurrent !== undefined && {
           maxCurrent: dto.maxCurrent?.trim() || null,
+        }),
+        ...(dto.serialNumberLength !== undefined && {
+          serialNumberLength: dto.serialNumberLength,
         }),
         ...(dto.notes !== undefined && { notes: dto.notes?.trim() || null }),
       },

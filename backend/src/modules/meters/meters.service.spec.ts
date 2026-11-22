@@ -178,6 +178,23 @@ describe('MetersService — Run 3 security, integrity & scope', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
+  it('rejects meter creation when serialNumber length does not match MeterTypeDefinition.serialNumberLength', async () => {
+    prisma.meterTypeDefinition.findUnique.mockResolvedValueOnce({
+      id: 'type-1',
+      name: 'Landis E650',
+      serialNumberLength: 8,
+    });
+
+    await expect(
+      service.create({
+        serialNumber: '1234567',
+        meterTypeDefinitionId: 'type-1',
+        year: 2025,
+        calibrationYear: 2026,
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('scopes BranchModerator reads strictly to moderated branches instead of whole distribution', async () => {
     const moderatorScope = {
       role: UserRole.USER,

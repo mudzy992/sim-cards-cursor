@@ -93,6 +93,9 @@ export const createDownloadResumable = jest.fn(
 );
 export const startActivityAsync = jest.fn(async () => ({ resultCode: -1 }));
 
+export const isSupported = true;
+export const extractTextFromImage = jest.fn(async (_uri: string) => [] as string[]);
+
 export default {
   expoConfig: { version: '1.0.0' },
   addEventListener,
@@ -101,4 +104,6 @@ export default {
   getContentUriAsync,
   createDownloadResumable,
   startActivityAsync,
+  isSupported,
+  extractTextFromImage,
 };

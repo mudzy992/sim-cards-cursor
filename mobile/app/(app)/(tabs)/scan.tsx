@@ -1,10 +1,17 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { isValidIccid, normalizeIccid } from '@sim-tracker/shared';
+import * as FileSystem from 'expo-file-system/legacy';
+import { extractTextFromImage, isSupported as isOcrSupported } from 'expo-text-extractor';
+import {
+  isValidIccid,
+  normalizeIccid,
+  validateMeterSerialLength,
+} from '@sim-tracker/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAudioPlayer } from 'expo-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Easing,
@@ -12,6 +19,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,7 +38,8 @@ import {
   type ThemePalette,
 } from '@/theme/tokens';
 import { ActionButton } from '@/components/ui/ActionButton';
-import { hapticSuccess } from '@/utils/haptics';
+import { hapticError, hapticSuccess } from '@/utils/haptics';
+import { extractOcrCandidates } from '@/utils/ocr-parser';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const FRAME_W = Math.min(SCREEN_W * 0.78, 320);
@@ -53,6 +62,7 @@ export default function ScanScreen() {
     returnTo?: string | string[];
     simCardId?: string | string[];
     serialTarget?: string | string[];
+    expectedSerialLength?: string | string[];
   }>();
 
   const afterScan = pickParam(routeParams.afterScan);
@@ -61,6 +71,14 @@ export default function ScanScreen() {
   const returnTo = pickParam(routeParams.returnTo);
   const simCardId = pickParam(routeParams.simCardId);
   const serialTarget = pickParam(routeParams.serialTarget);
+  const rawExpectedSerialLength = pickParam(routeParams.expectedSerialLength);
+  const parsedExpectedLength = rawExpectedSerialLength
+    ? Number.parseInt(rawExpectedSerialLength, 10)
+    : NaN;
+  const expectedSerialLength =
+    Number.isInteger(parsedExpectedLength) && parsedExpectedLength > 0
+      ? parsedExpectedLength
+      : null;
   const isMeterSerialMode = afterScan === 'meterSerial';
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -70,7 +88,12 @@ export default function ScanScreen() {
   const [hasScanned, setHasScanned] = useState(false);
   const [torch, setTorch] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrCandidates, setOcrCandidates] = useState<string[]>([]);
+  const [ocrTriggered, setOcrTriggered] = useState(false);
+  const [ocrNotice, setOcrNotice] = useState<string | null>(null);
   const beepPlayer = useAudioPlayer(APP_ASSETS.scanBeep);
+  const cameraRef = useRef<CameraView | null>(null);
 
   const flash = useRef(new Animated.Value(0)).current;
   const sweep = useRef(new Animated.Value(0)).current;
@@ -132,6 +155,18 @@ export default function ScanScreen() {
           setScanError(t('mobile.scan.invalidSerial'));
           return;
         }
+        const lengthCheck = validateMeterSerialLength(
+          cleaned,
+          expectedSerialLength,
+        );
+        if (!lengthCheck.valid && lengthCheck.expectedLength) {
+          setScanError(
+            t('mobile.records.form.serialLengthMismatchError', {
+              expected: lengthCheck.expectedLength,
+            }),
+          );
+          return;
+        }
         setHasScanned(true);
         setManualOpen(false);
         setTorch(false);
@@ -189,6 +224,7 @@ export default function ScanScreen() {
       router,
       afterScan,
       demountTaskId,
+      expectedSerialLength,
       installTaskId,
       isMeterSerialMode,
       returnTo,
@@ -200,12 +236,84 @@ export default function ScanScreen() {
 
   const handleBarcodeScanned = useCallback(
     ({ data }: { data: string }) => {
-      if (hasScanned) return;
+      if (hasScanned || ocrBusy || manualOpen) return;
       playFeedback();
       openResult(String(data));
     },
-    [hasScanned, openResult, playFeedback],
+    [hasScanned, manualOpen, ocrBusy, openResult, playFeedback],
   );
+
+  const handleOcrScan = useCallback(async () => {
+    if (ocrBusy) return;
+    if (permission?.granted !== true) {
+      await requestPermission();
+      return;
+    }
+    if (!isOcrSupported) {
+      hapticError();
+      setOcrCandidates([]);
+      setOcrTriggered(true);
+      setOcrNotice(t('mobile.scan.ocrNotSupported'));
+      setManualValue('');
+      setScanError(null);
+      setManualOpen(true);
+      return;
+    }
+
+    setOcrBusy(true);
+    setScanError(null);
+    setOcrNotice(null);
+    let capturedUri: string | undefined;
+    try {
+      const photo = await cameraRef.current?.takePictureAsync({
+        quality: 0.85,
+      });
+      capturedUri = photo?.uri;
+      if (!capturedUri) {
+        throw new Error('capture_failed');
+      }
+      const lines = await extractTextFromImage(capturedUri);
+      const candidates = extractOcrCandidates(lines, {
+        mode: isMeterSerialMode ? 'meterSerial' : 'iccid',
+        expectedSerialLength,
+      });
+      setOcrTriggered(true);
+      if (candidates.length > 0) {
+        playFeedback();
+        setOcrCandidates(candidates);
+        setManualValue(candidates[0] ?? '');
+        setOcrNotice(null);
+      } else {
+        hapticError();
+        setOcrCandidates([]);
+        setManualValue('');
+        setOcrNotice(t('mobile.scan.ocrNoMatch'));
+      }
+      setManualOpen(true);
+    } catch {
+      hapticError();
+      setOcrTriggered(true);
+      setOcrCandidates([]);
+      setManualValue('');
+      setOcrNotice(t('mobile.scan.ocrFailed'));
+      setManualOpen(true);
+    } finally {
+      if (capturedUri) {
+        void FileSystem.deleteAsync(capturedUri, { idempotent: true }).catch(
+          () => {},
+        );
+      }
+      setOcrBusy(false);
+    }
+  }, [
+    expectedSerialLength,
+    isMeterSerialMode,
+    ocrBusy,
+    permission?.granted,
+    playFeedback,
+    requestPermission,
+    t,
+  ]);
 
   const hasPermission = permission?.granted === true;
   const contextLabel = isMeterSerialMode
@@ -224,10 +332,15 @@ export default function ScanScreen() {
 
       {hasPermission ? (
         <CameraView
+          ref={cameraRef}
           style={StyleSheet.absoluteFill}
           facing="back"
           enableTorch={torch}
-          onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
+          onBarcodeScanned={
+            hasScanned || ocrBusy || manualOpen
+              ? undefined
+              : handleBarcodeScanned
+          }
           barcodeScannerSettings={{
             barcodeTypes: ['code128', 'code39', 'ean13', 'qr', 'datamatrix'],
           }}
@@ -360,11 +473,43 @@ export default function ScanScreen() {
           ) : null}
 
           <View style={styles.footerActions}>
+            {hasPermission ? (
+              <Pressable
+                testID="scan-ocr-btn"
+                disabled={ocrBusy}
+                onPress={() => void handleOcrScan()}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.footerButton,
+                  styles.footerButtonOcr,
+                  (pressed || ocrBusy) && styles.pressed,
+                ]}
+              >
+                {ocrBusy ? (
+                  <ActivityIndicator size="small" color={palette.cameraFg} />
+                ) : (
+                  <Ionicons
+                    name="text-outline"
+                    size={18}
+                    color={palette.cameraFg}
+                  />
+                )}
+                <Text style={styles.footerButtonText} numberOfLines={1}>
+                  {ocrBusy
+                    ? t('mobile.scan.ocrRunning')
+                    : t('mobile.scan.ocrButton')}
+                </Text>
+              </Pressable>
+            ) : null}
+
             <Pressable
               testID="scan-manual-open-btn"
               onPress={() => {
                 setManualValue('');
                 setScanError(null);
+                setOcrCandidates([]);
+                setOcrTriggered(false);
+                setOcrNotice(null);
                 setManualOpen(true);
               }}
               accessibilityRole="button"
@@ -378,7 +523,7 @@ export default function ScanScreen() {
                 size={18}
                 color={palette.cameraFg}
               />
-              <Text style={styles.footerButtonText}>
+              <Text style={styles.footerButtonText} numberOfLines={1}>
                 {t('mobile.scan.manualButton')}
               </Text>
             </Pressable>
@@ -402,7 +547,7 @@ export default function ScanScreen() {
                   size={18}
                   color={palette.cameraFg}
                 />
-                <Text style={styles.footerButtonText}>
+                <Text style={styles.footerButtonText} numberOfLines={1}>
                   {t('mobile.scan.scanAgain')}
                 </Text>
               </Pressable>
@@ -428,11 +573,65 @@ export default function ScanScreen() {
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>
-              {isMeterSerialMode
-                ? t('mobile.scan.manualSerialTitle')
-                : t('mobile.scan.manualIccidTitle')}
+              {ocrTriggered
+                ? isMeterSerialMode
+                  ? t('mobile.scan.ocrSerialTitle')
+                  : t('mobile.scan.ocrIccidTitle')
+                : isMeterSerialMode
+                  ? t('mobile.scan.manualSerialTitle')
+                  : t('mobile.scan.manualIccidTitle')}
             </Text>
-            <Text style={styles.sheetHint}>{t('mobile.scan.manualHint')}</Text>
+            <Text style={styles.sheetHint}>
+              {isMeterSerialMode && expectedSerialLength
+                ? t('mobile.scan.ocrExpectedLengthHint', {
+                    count: expectedSerialLength,
+                  })
+                : t('mobile.scan.manualHint')}
+            </Text>
+            {ocrNotice ? (
+              <Text style={styles.sheetNotice}>{ocrNotice}</Text>
+            ) : null}
+            {ocrCandidates.length > 0 ? (
+              <View style={styles.ocrCandidatesWrap}>
+                <Text style={styles.ocrCandidatesLabel}>
+                  {t('mobile.scan.ocrCandidatesLabel')}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.ocrCandidatesList}
+                >
+                  {ocrCandidates.map((candidate) => {
+                    const selected = manualValue.trim() === candidate;
+                    return (
+                      <Pressable
+                        key={candidate}
+                        testID={`ocr-candidate-${candidate}`}
+                        onPress={() => {
+                          setManualValue(candidate);
+                          if (scanError) setScanError(null);
+                        }}
+                        accessibilityRole="button"
+                        style={({ pressed }) => [
+                          styles.ocrCandidateChip,
+                          selected && styles.ocrCandidateChipSelected,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.ocrCandidateText,
+                            selected && styles.ocrCandidateTextSelected,
+                          ]}
+                        >
+                          {candidate}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : null}
             <TextInput
               testID="scan-manual-input"
               value={manualValue}
@@ -691,9 +890,13 @@ const createStyles = (palette: ThemePalette) => ({
     backgroundColor: palette.brand,
     borderColor: palette.brand,
   },
+  footerButtonOcr: {
+    backgroundColor: palette.graphite,
+    borderColor: palette.borderStrong,
+  },
   footerButtonText: {
     color: palette.cameraFg,
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '600' as const,
   },
   pressed: { opacity: 0.72 },
@@ -728,7 +931,51 @@ const createStyles = (palette: ThemePalette) => ({
     fontSize: 13,
     color: palette.textSecondary,
     marginTop: 4,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  sheetNotice: {
+    fontSize: 12.5,
+    color: palette.warning,
+    backgroundColor: palette.warningSoft,
+    borderColor: palette.warningBorder,
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  ocrCandidatesWrap: {
+    marginBottom: spacing.md,
+  },
+  ocrCandidatesLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: palette.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  ocrCandidatesList: {
+    gap: spacing.sm,
+  },
+  ocrCandidateChip: {
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: radii.sm,
+    backgroundColor: palette.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  ocrCandidateChipSelected: {
+    borderColor: palette.infoBorder,
+    backgroundColor: palette.brandSoft,
+  },
+  ocrCandidateText: {
+    fontFamily: 'monospace' as const,
+    fontSize: 13.5,
+    fontWeight: '600' as const,
+    color: palette.textPrimary,
+  },
+  ocrCandidateTextSelected: {
+    color: palette.brandText,
   },
   sheetInput: {
     borderWidth: 1.5,
