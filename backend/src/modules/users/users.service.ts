@@ -29,6 +29,8 @@ export type UserListItem = {
   status: UserStatus;
   distributionId: string | null;
   branchId: string | null;
+  distribution: { id: string; name: string; code: string } | null;
+  branch: { id: string; name: string; code: string } | null;
   createdAt: Date;
   updatedAt: Date;
   lastLoginAt: Date | null;
@@ -108,19 +110,35 @@ export class UsersService {
     const limit = filter.limit ?? 20;
 
     const scopeClause = scopeWhere(scope, { userScope: true });
+    const trimmedSearch = filter.search?.trim();
+    const andClauses: Prisma.UserWhereInput[] = [];
+    if (scopeClause) {
+      andClauses.push(scopeClause);
+    }
+    if (filter.distributionId) {
+      andClauses.push({
+        OR: [
+          { distributionId: filter.distributionId },
+          { branch: { distributionId: filter.distributionId } },
+        ],
+      });
+    }
+    if (trimmedSearch) {
+      andClauses.push({
+        OR: [
+          { email: { contains: trimmedSearch, mode: 'insensitive' } },
+          { username: { contains: trimmedSearch, mode: 'insensitive' } },
+          { firstName: { contains: trimmedSearch, mode: 'insensitive' } },
+          { lastName: { contains: trimmedSearch, mode: 'insensitive' } },
+        ],
+      });
+    }
+
     const where: Prisma.UserWhereInput = {
       ...(filter.role ? { role: filter.role } : {}),
       ...(filter.status ? { status: filter.status } : {}),
-      ...(filter.search
-        ? {
-            OR: [
-              { email: { contains: filter.search } },
-              { firstName: { contains: filter.search } },
-              { lastName: { contains: filter.search } },
-            ],
-          }
-        : {}),
-      ...(scopeClause ? { AND: [scopeClause] } : {}),
+      ...(filter.branchId ? { branchId: filter.branchId } : {}),
+      ...(andClauses.length ? { AND: andClauses } : {}),
     };
 
     const [items, total] = await this.prisma.$transaction([
@@ -281,6 +299,10 @@ export class UsersService {
           ...(password ? { password } : {}),
           ...(shouldClearRefreshToken ? { refreshToken: null } : {}),
         },
+        include: {
+          distribution: { select: { id: true, name: true, code: true } },
+          branch: { select: { id: true, name: true, code: true } },
+        },
       });
     });
 
@@ -299,6 +321,36 @@ export class UsersService {
 
   async remove(id: string, actorId?: string, scope?: ScopeContext | null): Promise<{ deleted: boolean }> {
     await this.ensureExists(id, scope);
+
+    const [
+      installedCount,
+      approvedCount,
+      simCount,
+      shipmentCount,
+      installTaskCount,
+      demountTaskCount,
+    ] = await Promise.all([
+      this.prisma.installationRecord.count({ where: { installedById: id } }),
+      this.prisma.installationRecord.count({ where: { approvedById: id } }),
+      this.prisma.simCard.count({ where: { assignedToId: id } }),
+      this.prisma.shipment.count({ where: { importedById: id } }),
+      this.prisma.installTask.count({ where: { OR: [{ assignedToId: id }, { createdById: id }] } }),
+      this.prisma.demountTask.count({ where: { OR: [{ assignedToId: id }, { createdById: id }] } }),
+    ]);
+
+    if (
+      installedCount +
+        approvedCount +
+        simCount +
+        shipmentCount +
+        installTaskCount +
+        demountTaskCount >
+      0
+    ) {
+      throw new ConflictException(
+        'Korisnik ima povezane zapisnike, SIM kartice, pošiljke ili zadatke. Umjesto brisanja deaktivirajte korisnika.',
+      );
+    }
 
     await this.prisma.user.delete({ where: { id } });
 
@@ -431,6 +483,20 @@ export class UsersService {
       status: user.status,
       distributionId: user.distributionId,
       branchId: user.branchId,
+      distribution: user.distribution
+        ? {
+            id: user.distribution.id,
+            name: user.distribution.name,
+            code: user.distribution.code,
+          }
+        : null,
+      branch: user.branch
+        ? {
+            id: user.branch.id,
+            name: user.branch.name,
+            code: user.branch.code,
+          }
+        : null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       lastLoginAt: user.lastLoginAt,

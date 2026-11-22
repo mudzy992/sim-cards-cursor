@@ -24,7 +24,15 @@ const unwrap = <T>(r: { data: { data?: T } | T }): T =>
   (r.data as { data?: T }).data ?? (r.data as T);
 
 export const usersApi = {
-  list: async (params?: { role?: string; limit?: number; page?: number; search?: string }): Promise<UsersResponse> => {
+  list: async (params?: {
+    role?: string;
+    status?: string;
+    distributionId?: string;
+    branchId?: string;
+    limit?: number;
+    page?: number;
+    search?: string;
+  }): Promise<UsersResponse> => {
     const response = await axiosInstance.get<ApiEnvelope<UsersResponse>>('/users', {
       params: params ?? {},
     });

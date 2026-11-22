@@ -12,7 +12,15 @@ import {
   Typography,
   message,
 } from 'antd';
-import { EmptyNotice, PageHeader, PageShell, StatusBadge, getUserRoleTone, getUserStatusTone } from '@/components/ui';
+import {
+  EmptyNotice,
+  FilterBar,
+  PageHeader,
+  PageShell,
+  StatusBadge,
+  getUserRoleTone,
+  getUserStatusTone,
+} from '@/components/ui';
 import { PlusOutlined, EditOutlined, UserOutlined, ApartmentOutlined, BankOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { usersApi, type CreateUserInput, type UpdateUserInput } from '@/api/users.api';
@@ -51,6 +59,9 @@ export default function UsersListPage() {
   const [activeTab, setActiveTab] = useState<string>('users');
   const [userPage, setUserPage] = useState(1);
   const [userLimit, setUserLimit] = useState(20);
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState<UserRole | undefined>();
+  const [userStatusFilter, setUserStatusFilter] = useState<string | undefined>();
   const [userDrawerOpen, setUserDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<UserListItem | null>(null);
   const [form] = Form.useForm<CreateUserInput & { confirmPassword?: string }>();
@@ -69,8 +80,23 @@ export default function UsersListPage() {
   } | null>(null)
 
   const usersQuery = useQuery({
-    queryKey: ['users', 'list', userPage, userLimit],
-    queryFn: () => usersApi.list({ page: userPage, limit: userLimit }),
+    queryKey: [
+      'users',
+      'list',
+      userPage,
+      userLimit,
+      userSearch,
+      userRoleFilter,
+      userStatusFilter,
+    ],
+    queryFn: () =>
+      usersApi.list({
+        page: userPage,
+        limit: userLimit,
+        search: userSearch.trim() || undefined,
+        role: userRoleFilter,
+        status: userStatusFilter,
+      }),
   });
 
   const distributionsQuery = useQuery({
@@ -369,6 +395,50 @@ export default function UsersListPage() {
               </Button>
             )}
           </div>
+          <FilterBar
+            hasActiveFilters={Boolean(
+              userSearch.trim() || userRoleFilter || userStatusFilter,
+            )}
+            onReset={() => {
+              setUserSearch('');
+              setUserRoleFilter(undefined);
+              setUserStatusFilter(undefined);
+              setUserPage(1);
+            }}
+          >
+            <Input.Search
+              allowClear
+              style={{ width: 260 }}
+              placeholder={t('common.actions.search')}
+              value={userSearch}
+              onChange={(e) => {
+                setUserSearch(e.target.value);
+                setUserPage(1);
+              }}
+            />
+            <Select
+              allowClear
+              style={{ width: 180 }}
+              placeholder={t('common.labels.role')}
+              options={ROLE_OPTIONS}
+              value={userRoleFilter}
+              onChange={(v) => {
+                setUserRoleFilter(v);
+                setUserPage(1);
+              }}
+            />
+            <Select
+              allowClear
+              style={{ width: 160 }}
+              placeholder={t('common.labels.status')}
+              options={STATUS_OPTIONS}
+              value={userStatusFilter}
+              onChange={(v) => {
+                setUserStatusFilter(v);
+                setUserPage(1);
+              }}
+            />
+          </FilterBar>
           <Table<UserListItem>
         rowKey="id"
         loading={usersQuery.isLoading}
@@ -408,9 +478,23 @@ export default function UsersListPage() {
             title: t('users.columns.distributionOrBranch'),
             render: (_, row) =>
               row.distributionId ? (
-                <StatusBadge tone="info" label={t('users.distributionTag')} />
+                <StatusBadge
+                  tone="info"
+                  label={
+                    row.distribution
+                      ? `${row.distribution.name} (${row.distribution.code})`
+                      : t('users.distributionTag')
+                  }
+                />
               ) : row.branchId ? (
-                <StatusBadge tone="success" label={t('users.branchTag')} />
+                <StatusBadge
+                  tone="success"
+                  label={
+                    row.branch
+                      ? `${row.branch.name} (${row.branch.code})`
+                      : t('users.branchTag')
+                  }
+                />
               ) : (
                 '-'
               ),

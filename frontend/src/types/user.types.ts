@@ -14,6 +14,8 @@ export type UserListItem = {
   status: UserStatus;
   distributionId: string | null;
   branchId: string | null;
+  distribution?: { id: string; name: string; code: string } | null;
+  branch?: { id: string; name: string; code: string } | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;

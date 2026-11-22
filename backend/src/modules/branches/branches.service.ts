@@ -11,7 +11,7 @@ import { UpdateBranchDto } from './dto/update-branch.dto';
 export class BranchesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateBranchDto) {
+  async create(dto: CreateBranchDto, actorId?: string) {
     await this.ensureDistributionExists(dto.distributionId);
     const existing = await this.prisma.branch.findUnique({
       where: {
@@ -26,7 +26,7 @@ export class BranchesService {
         `Podružnica sa kodom "${dto.code}" već postoji u ovoj distribuciji.`,
       );
     }
-    return this.prisma.branch.create({
+    const created = await this.prisma.branch.create({
       data: {
         distributionId: dto.distributionId,
         name: dto.name,
@@ -34,6 +34,20 @@ export class BranchesService {
       },
       include: { distribution: true },
     });
+    await this.prisma.activityLog.create({
+      data: {
+        userId: actorId,
+        action: 'CREATE',
+        entity: 'branch',
+        entityId: created.id,
+        details: {
+          distributionId: created.distributionId,
+          name: created.name,
+          code: created.code,
+        },
+      },
+    });
+    return created;
   }
 
   async findAll(distributionId?: string) {
@@ -62,7 +76,7 @@ export class BranchesService {
     return branch;
   }
 
-  async update(id: string, dto: UpdateBranchDto) {
+  async update(id: string, dto: UpdateBranchDto, actorId?: string) {
     const branch = await this.ensureExists(id);
     if (dto.code) {
       const existing = await this.prisma.branch.findFirst({
@@ -78,22 +92,52 @@ export class BranchesService {
         );
       }
     }
-    return this.prisma.branch.update({
+    const updated = await this.prisma.branch.update({
       where: { id },
       data: dto,
       include: { distribution: true },
     });
+    await this.prisma.activityLog.create({
+      data: {
+        userId: actorId,
+        action: 'UPDATE',
+        entity: 'branch',
+        entityId: id,
+        details: { fields: Object.keys(dto) },
+      },
+    });
+    return updated;
   }
 
-  async remove(id: string) {
+  async remove(id: string, actorId?: string) {
     await this.ensureExists(id);
-    const meterCount = await this.prisma.meter.count({ where: { branchId: id } });
+    const [meterCount, userCount, moderatorCount, recipientCount] =
+      await Promise.all([
+        this.prisma.meter.count({ where: { branchId: id } }),
+        this.prisma.user.count({ where: { branchId: id } }),
+        this.prisma.branchModerator.count({ where: { branchId: id } }),
+        this.prisma.branchEmailRecipient.count({ where: { branchId: id } }),
+      ]);
     if (meterCount > 0) {
       throw new ConflictException(
         'Ne možete obrisati podružnicu koja ima brojila. Prvo premjestite ili uklonite brojila.',
       );
     }
-    return this.prisma.branch.delete({ where: { id } });
+    if (userCount > 0 || moderatorCount > 0 || recipientCount > 0) {
+      throw new ConflictException(
+        'Ne možete obrisati podružnicu koja ima dodijeljene korisnike, moderatore ili primaoce emaila.',
+      );
+    }
+    const deleted = await this.prisma.branch.delete({ where: { id } });
+    await this.prisma.activityLog.create({
+      data: {
+        userId: actorId,
+        action: 'DELETE',
+        entity: 'branch',
+        entityId: id,
+      },
+    });
+    return deleted;
   }
 
   private async ensureExists(id: string) {

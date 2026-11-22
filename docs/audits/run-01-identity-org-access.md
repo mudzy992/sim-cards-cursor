@@ -2,12 +2,12 @@
 
 **Obuhvaćeni moduli:** `auth`, `users`, `distributions`, `branches`, `branch-moderators` + cross-cutting slojevi (`JwtStrategy`, `RolesGuard`, `BranchModeratorGuard`, `scopeWhere`, `PaginationDto`, web/mobile Axios refresh interceptori).  
 **Datum audita:** 2026-11-20 (branch `arena/015aa78f-sim-cards-cursor`)  
-**Status:** **Paket A (P0) implementiran i verifikovan**; Paket B (P1) i Paket C (P2) na čekanju za eventualno kasnije odobrenje.
+**Status:** **Paketi A (P0), B (P1) i C (P2) implementirani i verifikovani**.
 
-### Status implementacije Paketa A (P0)
-- **P0-1 (`BranchModeratorsPage` `limit: 100` + live search):** Implementirano u `frontend/src/api/users.api.ts` i `frontend/src/pages/branch-moderators/BranchModeratorsPage.tsx`.
-- **P0-2 (Hijerarhija uloga, čišćenje org polja & opoziv `refreshToken`):** Implementirano u `backend/src/modules/users/{users.service.ts,dto/update-user.dto.ts,users.service.spec.ts}` i `frontend/src/pages/users/UsersListPage.tsx`.
-- **P0-3 (Sigurno rukovanje `refresh` greškama):** Implementirano u `frontend/src/api/axios.instance.ts` i `mobile/src/api/axios.instance.ts` (`clearSession()` se poziva samo na HTTP `401`/`403` odbijanje refresh tokena, ne na mrežne prekide; `/auth/login` preskače refresh).
+### Status implementacije Paketa A + B + C
+- **Paket A (P0):** `BranchModeratorsPage` `limit: 100` + live search; hijerarhija uloga, čišćenje org polja & opoziv `refreshToken`; sigurno rukovanje `refresh` greškama u `axios.instance.ts`.
+- **Paket B (P1):** `AuthService` normalizuje username `.trim().toLowerCase()`, koristi brzi `HMAC-SHA256` refresh token hash sa legacy bcrypt fallbackom, `JwtStrategy.validate` spaja user + moderator query u 1 DB upit, `UsersService` + `UsersListPage` prikazuju stvarne nazive distribucija/poslovnica, case-insensitive pretragu po email/username/imenu/prezimenu i `FilterBar` filtere (`search`, `role`, `status`, `distributionId`, `branchId`), te sprječava brisanje korisnika sa povezanim zapisima/zadacima (`409 Conflict`).
+- **Paket C (P2):** Uklonjene mrtve strategije `LocalStrategy` i `JwtRefreshStrategy`; `DistributionsService`, `BranchesService` i `BranchModeratorsService` upisuju `ActivityLog` zapise, provjeravaju sve zavisnosti na `remove()` (`409 Conflict`), i podržavaju `distributionId` filter na `/branch-moderators`.
 
 ---
 

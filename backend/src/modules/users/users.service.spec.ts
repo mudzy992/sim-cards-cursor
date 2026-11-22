@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -33,6 +38,9 @@ describe('UsersService (Run 1 Package A security & integrity)', () => {
       user: {
         findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        delete: jest.fn().mockResolvedValue({}),
         create: jest.fn().mockImplementation(async ({ data }) => ({
           id: 'user-new',
           ...data,
@@ -62,10 +70,27 @@ describe('UsersService (Run 1 Package A security & integrity)', () => {
       branch: {
         findUnique: jest.fn(),
       },
+      installationRecord: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      simCard: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      shipment: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      installTask: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      demountTask: {
+        count: jest.fn().mockResolvedValue(0),
+      },
       activityLog: {
         create: jest.fn().mockResolvedValue({ id: 'log-1' }),
       },
-      $transaction: jest.fn(async (cb: (client: typeof tx) => Promise<unknown>) => cb(tx)),
+      $transaction: jest.fn(async (arg: unknown) =>
+        Array.isArray(arg) ? Promise.all(arg) : (arg as (client: typeof tx) => Promise<unknown>)(tx),
+      ),
     };
 
     const config = {
@@ -263,5 +288,75 @@ describe('UsersService (Run 1 Package A security & integrity)', () => {
       }),
     ).resolves.toEqual({ distributionId: null, branchId: 'branch-2' });
     expect(BadRequestException).toBeDefined();
+  });
+
+  it('performs case-insensitive search including username and returns distribution/branch summaries', async () => {
+    const { service, prisma } = createMocks();
+    prisma.user.findMany.mockResolvedValue([
+      {
+        id: 'u-10',
+        email: 'monter@test.local',
+        username: 'monter.ze',
+        firstName: 'Monter',
+        lastName: 'Zenica',
+        phone: null,
+        role: UserRole.USER,
+        status: UserStatus.ACTIVE,
+        distributionId: null,
+        branchId: 'b-1',
+        distribution: null,
+        branch: { id: 'b-1', name: 'Zenica', code: 'ZE' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastLoginAt: null,
+      },
+    ]);
+    prisma.user.count.mockResolvedValue(1);
+
+    const res = await service.findAll({
+      page: 1,
+      limit: 20,
+      search: '  monter.ze ',
+      distributionId: 'dist-1',
+    });
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            {
+              OR: [
+                { distributionId: 'dist-1' },
+                { branch: { distributionId: 'dist-1' } },
+              ],
+            },
+            {
+              OR: [
+                { email: { contains: 'monter.ze', mode: 'insensitive' } },
+                { username: { contains: 'monter.ze', mode: 'insensitive' } },
+                { firstName: { contains: 'monter.ze', mode: 'insensitive' } },
+                { lastName: { contains: 'monter.ze', mode: 'insensitive' } },
+              ],
+            },
+          ]),
+        }),
+      }),
+    );
+    expect(res.items[0].branch).toEqual({ id: 'b-1', name: 'Zenica', code: 'ZE' });
+  });
+
+  it('prevents deleting a user who has related installation records or tasks', async () => {
+    const { service, prisma } = createMocks();
+    prisma.user.findFirst.mockResolvedValue({ id: 'u-1', role: UserRole.USER });
+    prisma.installationRecord.count.mockResolvedValueOnce(2);
+
+    await expect(
+      service.remove('u-1', 'admin-1', {
+        role: UserRole.SYSTEM_ADMIN,
+        distributionId: null,
+        branchId: null,
+      }),
+    ).rejects.toThrow(ConflictException);
+    expect(prisma.user.delete).not.toHaveBeenCalled();
   });
 });

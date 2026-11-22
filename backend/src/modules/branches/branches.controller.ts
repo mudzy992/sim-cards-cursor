@@ -26,8 +26,8 @@ export class BranchesController {
 
   @Post()
   @Roles('SYSTEM_ADMIN')
-  create(@Body() dto: CreateBranchDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateBranchDto, @CurrentUser() user: { id: string }) {
+    return this.service.create(dto, user.id);
   }
 
   @Get()
@@ -66,13 +66,17 @@ export class BranchesController {
 
   @Patch(':id')
   @Roles('SYSTEM_ADMIN')
-  update(@Param('id') id: string, @Body() dto: UpdateBranchDto) {
-    return this.service.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateBranchDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.update(id, dto, user.id);
   }
 
   @Delete(':id')
   @Roles('SYSTEM_ADMIN')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.service.remove(id, user.id);
   }
 }

@@ -99,11 +99,18 @@ test.describe('Frontend browser smoke', () => {
     for (const route of [
       '/shipments',
       '/shipments/new',
+      '/sim-cards',
       '/installation-records',
       '/meters',
+      '/meter-types',
+      '/install-tasks',
+      '/demount-tasks',
       '/analytics',
       '/settings',
       '/users',
+      '/branch-moderators',
+      '/branch-email-recipients',
+      '/push-campaigns',
       '/activity-log',
       '/app-releases',
     ]) {

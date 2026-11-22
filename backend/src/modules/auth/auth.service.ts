@@ -41,22 +41,6 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  async validateUser(emailOrUsername: string, password: string): Promise<SafeUser | null> {
-    const user = await this.findUserByEmailOrUsername(emailOrUsername);
-
-    if (!user || user.status !== UserStatus.ACTIVE) {
-      return null;
-    }
-
-    const passwordMatches = await bcrypt.compare(password, user.password);
-    if (!passwordMatches) {
-      return null;
-    }
-
-    const modBranchIds = await this.loadBranchModeratorIds(user.id, user.role);
-    return this.sanitizeUser(user, modBranchIds);
-  }
-
   async login(loginDto: LoginDto, ipAddress?: string) {
     const user = await this.findUserWithBranch(loginDto.emailOrUsername);
 
@@ -319,35 +303,44 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
+  private computeHmacTokenDigest(token: string): string {
+    const secret = this.configService.getOrThrow<string>('JWT_REFRESH_SECRET');
+    return crypto.createHmac('sha256', secret).update(token).digest('hex');
+  }
+
   private preHashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   private async hashToken(token: string): Promise<string> {
-    const saltRounds = Number(this.configService.get('BCRYPT_SALT_ROUNDS', 12));
-    return bcrypt.hash(this.preHashToken(token), saltRounds);
+    return `hmac-sha256:${this.computeHmacTokenDigest(token)}`;
   }
 
   private async verifyTokenHash(token: string, storedHash: string): Promise<boolean> {
+    if (storedHash.startsWith('hmac-sha256:')) {
+      const actualHex = storedHash.slice('hmac-sha256:'.length);
+      const expectedHex = this.computeHmacTokenDigest(token);
+      if (actualHex.length !== expectedHex.length) {
+        return false;
+      }
+      return crypto.timingSafeEqual(
+        Buffer.from(actualHex, 'utf8'),
+        Buffer.from(expectedHex, 'utf8'),
+      );
+    }
+
+    // Fallback for legacy bcrypt refresh token hashes
     const shaMatches = await bcrypt.compare(this.preHashToken(token), storedHash);
     if (shaMatches) return true;
-    // Fallback for legacy tokens hashed directly before SHA-256 pre-hashing
     return bcrypt.compare(token, storedHash);
   }
 
-  private async findUserByEmailOrUsername(emailOrUsername: string) {
-    const isEmail = emailOrUsername.includes('@');
-    if (isEmail) {
-      return this.prisma.user.findUnique({ where: { email: normalizeEmail(emailOrUsername) } });
-    }
-    return this.prisma.user.findUnique({ where: { username: emailOrUsername } });
-  }
-
   private async findUserWithBranch(emailOrUsername: string) {
-    const isEmail = emailOrUsername.includes('@');
+    const trimmed = emailOrUsername.trim();
+    const isEmail = trimmed.includes('@');
     const where = isEmail
-      ? { email: normalizeEmail(emailOrUsername) }
-      : { username: emailOrUsername };
+      ? { email: normalizeEmail(trimmed) }
+      : { username: trimmed.toLowerCase() };
     return this.prisma.user.findUnique({
       where,
       include: {

@@ -25,8 +25,11 @@ export class DistributionsController {
 
   @Post()
   @Roles(UserRole.SYSTEM_ADMIN)
-  create(@Body() dto: CreateDistributionDto) {
-    return this.service.create(dto);
+  create(
+    @Body() dto: CreateDistributionDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.create(dto, user.id);
   }
 
   @Get()
@@ -58,13 +61,17 @@ export class DistributionsController {
 
   @Patch(':id')
   @Roles(UserRole.SYSTEM_ADMIN)
-  update(@Param('id') id: string, @Body() dto: UpdateDistributionDto) {
-    return this.service.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateDistributionDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.update(id, dto, user.id);
   }
 
   @Delete(':id')
   @Roles(UserRole.SYSTEM_ADMIN)
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.service.remove(id, user.id);
   }
 }

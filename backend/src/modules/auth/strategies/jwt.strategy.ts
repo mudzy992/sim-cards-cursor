@@ -32,6 +32,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         distributionId: true,
         branchId: true,
         branch: { select: { distributionId: true } },
+        branchModeratorRoles: {
+          select: {
+            branchId: true,
+            branch: { select: { distributionId: true } },
+          },
+        },
       },
     });
 
@@ -39,21 +45,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User is not active');
     }
 
-    let branchModeratorBranchIds: string[] = [];
-    let moderatorDistributionId: string | null = null;
-    if (user.role === UserRole.USER) {
-      const moderatorEntries = await this.prisma.branchModerator.findMany({
-        where: { userId: user.id },
-        select: {
-          branchId: true,
-          branch: { select: { distributionId: true } },
-        },
-      });
-      branchModeratorBranchIds = moderatorEntries.map((e) => e.branchId);
-      moderatorDistributionId = moderatorEntries[0]?.branch?.distributionId ?? null;
-    }
+    const branchModeratorBranchIds =
+      user.role === UserRole.USER
+        ? user.branchModeratorRoles.map((e) => e.branchId)
+        : [];
+    const moderatorDistributionId =
+      user.role === UserRole.USER
+        ? (user.branchModeratorRoles[0]?.branch?.distributionId ?? null)
+        : null;
 
-    const { branch, ...rest } = user;
+    const { branch, branchModeratorRoles: _ignored, ...rest } = user;
+    void _ignored;
     return {
       ...rest,
       distributionId: rest.distributionId ?? branch?.distributionId ?? moderatorDistributionId,
