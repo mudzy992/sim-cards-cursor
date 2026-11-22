@@ -1,0 +1,27 @@
+appId: ba.epbih.simtracker
+name: Login and Home Dashboard Smoke
+env:
+  MAESTRO_EMAIL: ${MAESTRO_EMAIL:-admin@simtracker.local}
+  MAESTRO_PASSWORD: ${MAESTRO_PASSWORD:-CiSeedPassword!123}
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "login-email-input"
+- tapOn:
+    id: "login-email-input"
+- inputText: ${MAESTRO_EMAIL}
+- tapOn:
+    id: "login-password-input"
+- inputText: ${MAESTRO_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "login-submit-btn"
+- extendedWaitUntil:
+    visible:
+      id: "home-greeting"
+    timeout: 15000
+- assertVisible:
+    id: "home-connection-pill"
+- assertVisible:
+    id: "home-profile-btn"

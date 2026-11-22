@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback } from 'react';
-import { Linking } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Linking, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
 import {
   appReleasesApi,
   type AndroidLatestRelease,
@@ -9,14 +11,22 @@ import { axiosInstance } from '@/api/axios.instance';
 import { useAppVersion } from '@/hooks/useAppVersion';
 import { useConnectivity } from '@/hooks/useConnectivity';
 
+const FLAG_GRANT_READ_URI_PERMISSION = 1;
+const FLAG_ACTIVITY_NEW_TASK = 268435456;
+
 export interface AppUpdateState {
   release: AndroidLatestRelease | null;
   hasUpdate: boolean;
   isMandatory: boolean;
   downloadUrl: string | null;
   isChecking: boolean;
+  isDownloading: boolean;
+  downloadProgress: number | null;
+  downloadError: string | null;
   checkNow: () => Promise<AppUpdateCheckResult>;
   openDownload: () => Promise<boolean>;
+  downloadAndInstall: () => Promise<boolean>;
+  cancelDownload: () => Promise<void>;
 }
 
 export interface AppUpdateCheckResult {
@@ -58,9 +68,29 @@ export function isMandatoryRelease(
   return Number.isFinite(target) && Date.now() >= target;
 }
 
+export function computeDownloadProgress(
+  totalBytesWritten: number,
+  totalBytesExpectedToWrite: number,
+): number | null {
+  if (
+    !Number.isFinite(totalBytesExpectedToWrite) ||
+    totalBytesExpectedToWrite <= 0 ||
+    !Number.isFinite(totalBytesWritten) ||
+    totalBytesWritten < 0
+  ) {
+    return null;
+  }
+  return Math.max(0, Math.min(1, totalBytesWritten / totalBytesExpectedToWrite));
+}
+
 export function useAppUpdateCheck(): AppUpdateState {
   const { isOnline } = useConnectivity();
   const { versionName, buildNumber } = useAppVersion();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const activeDownloadRef = useRef<FileSystem.DownloadResumable | null>(null);
+  const cancelledRef = useRef(false);
 
   const query = useQuery({
     queryKey: ['android-latest-release'],
@@ -85,15 +115,95 @@ export function useAppUpdateCheck(): AppUpdateState {
     };
   }, [query, versionName, buildNumber]);
 
-  const openDownload = useCallback(async (): Promise<boolean> => {
+  const cancelDownload = useCallback(async (): Promise<void> => {
+    cancelledRef.current = true;
+    const current = activeDownloadRef.current;
+    activeDownloadRef.current = null;
+    if (current) {
+      try {
+        await current.pauseAsync();
+      } catch {
+        // Ignore pause errors when cancelling an already finished stream
+      }
+    }
+    setIsDownloading(false);
+    setDownloadProgress(null);
+  }, []);
+
+  const downloadAndInstall = useCallback(async (): Promise<boolean> => {
     if (!downloadUrl) return false;
+    setDownloadError(null);
+
+    if (Platform.OS !== 'android' || !FileSystem.cacheDirectory) {
+      try {
+        await Linking.openURL(downloadUrl);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    const versionTag = release?.versionCode ?? 'latest';
+    const targetUri = `${FileSystem.cacheDirectory}sim-tracker-update-${versionTag}.apk`;
+
+    cancelledRef.current = false;
+    setIsDownloading(true);
+    setDownloadProgress(0);
+
+    const downloadResumable = FileSystem.createDownloadResumable(
+      downloadUrl,
+      targetUri,
+      {},
+      (progressData) => {
+        const nextProgress = computeDownloadProgress(
+          progressData.totalBytesWritten,
+          progressData.totalBytesExpectedToWrite,
+        );
+        if (nextProgress !== null) {
+          setDownloadProgress(nextProgress);
+        }
+      },
+    );
+    activeDownloadRef.current = downloadResumable;
+
     try {
-      await Linking.openURL(downloadUrl);
+      const result = await downloadResumable.downloadAsync();
+      if (cancelledRef.current) {
+        return false;
+      }
+      if (!result || (result.status !== undefined && result.status >= 400)) {
+        setDownloadError('download_failed');
+        return false;
+      }
+
+      setDownloadProgress(1);
+      const contentUri = await FileSystem.getContentUriAsync(result.uri);
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: contentUri,
+        flags: FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK,
+        type: 'application/vnd.android.package-archive',
+      });
       return true;
     } catch {
+      if (!cancelledRef.current) {
+        try {
+          await Linking.openURL(downloadUrl);
+          return true;
+        } catch {
+          setDownloadError('download_failed');
+        }
+      }
       return false;
+    } finally {
+      activeDownloadRef.current = null;
+      setIsDownloading(false);
+      setDownloadProgress(null);
     }
-  }, [downloadUrl]);
+  }, [downloadUrl, release?.versionCode]);
+
+  const openDownload = useCallback(async (): Promise<boolean> => {
+    return downloadAndInstall();
+  }, [downloadAndInstall]);
 
   return {
     release,
@@ -101,7 +211,12 @@ export function useAppUpdateCheck(): AppUpdateState {
     isMandatory,
     downloadUrl,
     isChecking: query.isFetching,
+    isDownloading,
+    downloadProgress,
+    downloadError,
     checkNow,
     openDownload,
+    downloadAndInstall,
+    cancelDownload,
   };
 }

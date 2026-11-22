@@ -1,0 +1,29 @@
+appId: ba.epbih.simtracker
+name: Manual ICCID Scan and Scan Result Navigation
+env:
+  MAESTRO_TEST_ICCID: ${MAESTRO_TEST_ICCID:-8938700000000000001}
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-greeting"
+    timeout: 10000
+- tapOn: "Skeniraj SIM karticu"
+- extendedWaitUntil:
+    visible:
+      id: "scan-manual-open-btn"
+    timeout: 10000
+- tapOn:
+    id: "scan-manual-open-btn"
+- assertVisible:
+    id: "scan-manual-input"
+- tapOn:
+    id: "scan-manual-input"
+- inputText: ${MAESTRO_TEST_ICCID}
+- hideKeyboard
+- tapOn:
+    id: "scan-manual-submit-btn"
+- extendedWaitUntil:
+    visible:
+      id: "scan-result-iccid"
+    timeout: 10000

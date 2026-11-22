@@ -70,8 +70,35 @@ export const fetch = jest.fn(async () => ({
   isInternetReachable: true,
 }));
 
+export const getContentUriAsync = jest.fn(
+  async (uri: string) => `content://ba.epbih.simtracker.fileprovider/${uri}`,
+);
+export const createDownloadResumable = jest.fn(
+  (
+    _url: string,
+    fileUri: string,
+    _options?: unknown,
+    onProgress?: (data: {
+      totalBytesWritten: number;
+      totalBytesExpectedToWrite: number;
+    }) => void,
+  ) => ({
+    downloadAsync: jest.fn(async () => {
+      onProgress?.({ totalBytesWritten: 50, totalBytesExpectedToWrite: 100 });
+      onProgress?.({ totalBytesWritten: 100, totalBytesExpectedToWrite: 100 });
+      return { uri: fileUri, status: 200 };
+    }),
+    pauseAsync: jest.fn(async () => ({})),
+  }),
+);
+export const startActivityAsync = jest.fn(async () => ({ resultCode: -1 }));
+
 export default {
   expoConfig: { version: '1.0.0' },
   addEventListener,
   fetch,
+  cacheDirectory,
+  getContentUriAsync,
+  createDownloadResumable,
+  startActivityAsync,
 };

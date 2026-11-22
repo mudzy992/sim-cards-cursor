@@ -1,0 +1,31 @@
+appId: ba.epbih.simtracker
+name: Offline Inventory and Outbox Inspection
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-profile-btn"
+    timeout: 10000
+- tapOn:
+    id: "home-profile-btn"
+- scrollUntilVisible:
+    element: "Offline inventar"
+    direction: DOWN
+- tapOn: "Offline inventar"
+- extendedWaitUntil:
+    visible:
+      id: "offline-inventory-search"
+    timeout: 10000
+- tapOn:
+    id: "offline-inventory-search"
+- inputText: "89387"
+- hideKeyboard
+- back
+- scrollUntilVisible:
+    element: "Red slanja (Outbox)"
+    direction: DOWN
+- tapOn: "Red slanja (Outbox)"
+- extendedWaitUntil:
+    visible:
+      id: "outbox-sync-now-btn"
+    timeout: 10000

@@ -1,0 +1,26 @@
+appId: ba.epbih.simtracker
+name: Theme and Language Switching
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-profile-btn"
+    timeout: 10000
+- tapOn:
+    id: "home-profile-btn"
+- assertVisible:
+    id: "profile-theme-filter-light"
+- tapOn:
+    id: "profile-theme-filter-light"
+- tapOn:
+    id: "profile-theme-filter-dark"
+- tapOn:
+    id: "profile-theme-filter-system"
+- tapOn:
+    id: "profile-language-filter-en"
+- assertVisible: "Check for updates"
+- tapOn:
+    id: "profile-language-filter-bs"
+- assertVisible: "Provjeri ažuriranja"
+- assertVisible:
+    id: "profile-check-update-btn"

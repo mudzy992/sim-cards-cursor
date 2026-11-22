@@ -37,6 +37,7 @@ export const TouchableOpacity = makeHostComponent('TouchableOpacity');
 export const ScrollView = makeHostComponent('ScrollView');
 export const Image = makeHostComponent('Image');
 export const ActivityIndicator = makeHostComponent('ActivityIndicator');
+export const KeyboardAvoidingView = makeHostComponent('KeyboardAvoidingView');
 export const Switch = makeHostComponent('Switch');
 export const Modal = makeHostComponent('Modal');
 export const RefreshControl = makeHostComponent('RefreshControl');

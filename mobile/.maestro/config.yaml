@@ -1,0 +1,6 @@
+appId: ba.epbih.simtracker
+tags:
+  - mobile
+  - e2e
+flows:
+  - "*-*.yaml"

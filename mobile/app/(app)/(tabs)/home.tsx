@@ -147,15 +147,17 @@ export default function HomeScreen() {
 
   const handleDownloadUpdate = () => {
     void (async () => {
-      const opened = await update.openDownload();
-      if (!opened) {
+      const opened = await update.downloadAndInstall();
+      if (!opened && update.downloadError) {
         Alert.alert(
           t('mobile.common.error'),
-          t('mobile.update.openFailed'),
+          t('mobile.update.downloadFailed'),
         );
       }
     })();
   };
+
+  const progressPercent = Math.round((update.downloadProgress ?? 0) * 100);
 
   const onRefresh = () => {
     if (!user) return;
@@ -293,14 +295,47 @@ export default function HomeScreen() {
                 version: `${update.release.versionName} (${update.release.versionCode})`,
               })}
             </Text>
-            <ActionButton
-              testID="home-update-download-btn"
-              title={t('mobile.update.downloadButton')}
-              onPress={handleDownloadUpdate}
-              variant={update.isMandatory ? 'danger' : 'primary'}
-              size="md"
-              icon="download-outline"
-            />
+            {update.isDownloading ? (
+              <View style={styles.progressBlock} testID="home-update-progress">
+                <View style={styles.progressHeader}>
+                  <Text style={[type.caption, styles.progressLabel]}>
+                    {t('mobile.update.downloadingProgress', {
+                      percent: progressPercent,
+                    })}
+                  </Text>
+                  <Text style={[type.caption, styles.progressPercent]}>
+                    {progressPercent}%
+                  </Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${progressPercent}%` as `${number}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <ActionButton
+                  testID="home-update-cancel-btn"
+                  title={t('mobile.update.cancelDownload')}
+                  onPress={() => void update.cancelDownload()}
+                  variant="secondary"
+                  size="sm"
+                  icon="close-outline"
+                />
+              </View>
+            ) : (
+              <ActionButton
+                testID="home-update-download-btn"
+                title={t('mobile.update.downloadButton')}
+                onPress={handleDownloadUpdate}
+                variant={update.isMandatory ? 'danger' : 'primary'}
+                size="md"
+                icon="download-outline"
+              />
+            )}
           </Panel>
         ) : null}
 
@@ -562,6 +597,26 @@ const createStyles = (palette: ThemePalette, type: ThemeTypography) => ({
   syncPanel: { marginBottom: spacing.xl },
   syncHeader: { marginBottom: spacing.sm },
   syncText: { lineHeight: 21, marginBottom: spacing.lg },
+  progressBlock: { gap: spacing.sm },
+  progressHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  progressLabel: { color: palette.textSecondary, fontWeight: '600' as const },
+  progressPercent: { color: palette.brandText, fontWeight: '700' as const },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: palette.surfaceMuted,
+    overflow: 'hidden' as const,
+    marginBottom: spacing.xs,
+  },
+  progressFill: {
+    height: '100%' as const,
+    borderRadius: 4,
+    backgroundColor: palette.brand,
+  },
 
   panelInner: { paddingVertical: spacing.xs, paddingHorizontal: spacing.lg },
 

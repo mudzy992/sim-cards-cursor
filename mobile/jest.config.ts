@@ -19,6 +19,7 @@ const config: Config = {
     '^expo-application$': '<rootDir>/src/test-utils/expo.mock.ts',
     '^expo-constants$': '<rootDir>/src/test-utils/expo.mock.ts',
     '^expo-file-system(.*)$': '<rootDir>/src/test-utils/expo.mock.ts',
+    '^expo-intent-launcher$': '<rootDir>/src/test-utils/expo.mock.ts',
     '^expo-haptics$': '<rootDir>/src/test-utils/expo.mock.ts',
     '^@react-native-community/netinfo$': '<rootDir>/src/test-utils/expo.mock.ts',
   },

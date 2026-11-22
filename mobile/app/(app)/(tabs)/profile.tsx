@@ -207,12 +207,45 @@ export default function ProfileScreen() {
                   subtitle={`${update.release.versionName} (${update.release.versionCode})`}
                   icon="download-outline"
                   iconTone={update.isMandatory ? 'danger' : 'info'}
-                  onPress={() => void update.openDownload()}
+                  onPress={() => {
+                    if (!update.isDownloading) {
+                      void update.downloadAndInstall();
+                    }
+                  }}
                   divider
                 />
               ) : null}
             </View>
           </Panel>
+          {update.isDownloading ? (
+            <Panel style={styles.progressPanel} testID="profile-update-progress">
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>
+                  {t('mobile.update.downloadingProgress', {
+                    percent: Math.round((update.downloadProgress ?? 0) * 100),
+                  })}
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${Math.round((update.downloadProgress ?? 0) * 100)}%` as `${number}%`,
+                    },
+                  ]}
+                />
+              </View>
+              <ActionButton
+                testID="profile-update-cancel-btn"
+                title={t('mobile.update.cancelDownload')}
+                icon="close-outline"
+                variant="secondary"
+                size="sm"
+                onPress={() => void update.cancelDownload()}
+              />
+            </Panel>
+          ) : null}
           <ActionButton
             testID="profile-check-update-btn"
             title={
@@ -223,6 +256,7 @@ export default function ProfileScreen() {
             icon="cloud-download-outline"
             variant="secondary"
             loading={update.isChecking}
+            disabled={update.isDownloading}
             onPress={handleManualUpdateCheck}
             style={styles.updateButton}
           />
@@ -281,5 +315,27 @@ const createStyles = (palette: ThemePalette) => ({
   },
   panelInner: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xs },
   appPanel: { marginBottom: spacing.md },
+  progressPanel: { marginBottom: spacing.md, gap: spacing.sm },
+  progressHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  progressLabel: {
+    color: palette.textSecondary,
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: palette.surfaceMuted,
+    overflow: 'hidden' as const,
+  },
+  progressFill: {
+    height: '100%' as const,
+    borderRadius: 4,
+    backgroundColor: palette.brand,
+  },
   updateButton: { marginBottom: spacing.lg },
 });

@@ -106,6 +106,8 @@ test.describe('Frontend browser smoke', () => {
       '/installation-records',
       '/installation-records/new',
       '/meters',
+      '/install-tasks',
+      '/demount-tasks',
       '/meter-types/new',
       '/meter-type-fields',
       '/analytics',
@@ -123,6 +125,9 @@ test.describe('Frontend browser smoke', () => {
       await expect(page.locator('#main-content')).toBeVisible({ timeout: 15_000 });
       await expect(page.locator('#main-content')).not.toBeEmpty();
     }
+
+    await page.goto('/meters');
+    await expect(page.locator('.ant-table-wrapper')).toBeVisible({ timeout: 15_000 });
 
     expect(errors).toEqual([]);
   });
