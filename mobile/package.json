@@ -14,6 +14,7 @@
     "check:wcag": "node scripts/check-wcag-aaa.mjs",
     "check:ui": "node scripts/check-ui-consistency.mjs",
     "test": "jest --ci --runInBand",
+    "eas-build-post-install": "npm --prefix .. run build --workspace=@sim-tracker/shared",
     "build:android:vm": "bash ../scripts/mobile-build-android.sh --target vm --mode local",
     "build:android:cloud": "bash ../scripts/mobile-build-android.sh --target cloud --mode local",
     "build:android:vm:eas": "bash ../scripts/mobile-build-android.sh --target vm --mode cloud",
