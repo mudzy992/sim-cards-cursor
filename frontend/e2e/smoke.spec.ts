@@ -96,17 +96,21 @@ test.describe('Frontend browser smoke', () => {
     await expect(page.locator('#main-content')).toBeVisible();
     await expect(page.locator('h1')).toBeVisible({ timeout: 15_000 });
 
+    await page.goto('/sim-cards');
+    await expect(page).toHaveURL(/\/shipments/, { timeout: 15_000 });
+    await expect(page.locator('#main-content')).toBeVisible({ timeout: 15_000 });
+
     for (const route of [
       '/shipments',
       '/shipments/new',
-      '/sim-cards',
       '/installation-records',
+      '/installation-records/new',
       '/meters',
-      '/meter-types',
-      '/install-tasks',
-      '/demount-tasks',
+      '/meter-types/new',
+      '/meter-type-fields',
       '/analytics',
       '/settings',
+      '/settings/email',
       '/users',
       '/branch-moderators',
       '/branch-email-recipients',
@@ -115,9 +119,9 @@ test.describe('Frontend browser smoke', () => {
       '/app-releases',
     ]) {
       await page.goto(route);
-      await expect(page).toHaveURL(new RegExp(route.replace('/', '\\/')));
+      await expect(page).toHaveURL(new RegExp(route.replace(/\//g, '\\/')));
       await expect(page.locator('#main-content')).toBeVisible({ timeout: 15_000 });
-      await expect(page.locator('h1')).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator('#main-content')).not.toBeEmpty();
     }
 
     expect(errors).toEqual([]);

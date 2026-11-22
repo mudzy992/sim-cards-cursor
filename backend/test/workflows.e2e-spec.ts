@@ -233,7 +233,6 @@ describe('Critical workflows (smoke e2e)', () => {
 
     const stamp = Date.now();
     const opEmail = `e2e.op.${stamp}@simtracker.local`;
-    const opUsername = `e2e.op.${stamp}`;
     const opPassword = 'E2eUserPass!123';
 
     const createUserRes = await request(app.getHttpServer())
@@ -241,7 +240,6 @@ describe('Critical workflows (smoke e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         email: opEmail,
-        username: opUsername,
         password: opPassword,
         firstName: 'E2E',
         lastName: 'Monter',
@@ -254,7 +252,7 @@ describe('Critical workflows (smoke e2e)', () => {
 
     try {
       const opLoginRes = await request(app.getHttpServer()).post('/auth/login').send({
-        emailOrUsername: opUsername.toUpperCase(),
+        emailOrUsername: opEmail.toUpperCase(),
         password: opPassword,
       });
       expect(opLoginRes.status).toBe(201);
