@@ -47,12 +47,14 @@ main_menu() {
   print_header
   echo "  1) Public (host, ima internet) — build & deploy"
   echo "  2) VM (zatvoreni sistem, bez interneta) — podmeni"
-  echo "  3) Izlaz"
-  read -r -p "Izbor [1-3]: " choice
+  echo "  3) Mobilna aplikacija — Android APK build (VM / Produkcija)"
+  echo "  4) Izlaz"
+  read -r -p "Izbor [1-4]: " choice
   case "$choice" in
     1) ./public-deploy.sh ;;
     2) vm_menu ;;
-    3) exit 0 ;;
+    3) ./mobile-build-android.sh ;;
+    4) exit 0 ;;
     *) warn "Nepoznat izbor." ;;
   esac
 }

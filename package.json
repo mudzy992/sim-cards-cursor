@@ -19,7 +19,11 @@
     "check:i18n": "turbo run check:i18n",
     "check:ui": "turbo run check:ui",
     "check:wcag": "turbo run check:wcag",
-    "format:check": "turbo run format:check"
+    "format:check": "turbo run format:check",
+    "version:status": "node scripts/bump-version.mjs status",
+    "version:bump": "node scripts/bump-version.mjs",
+    "mobile:build:vm": "bash scripts/mobile-build-android.sh --target vm --mode local",
+    "mobile:build:cloud": "bash scripts/mobile-build-android.sh --target cloud --mode local"
   },
   "devDependencies": {
     "turbo": "^2.11.13"

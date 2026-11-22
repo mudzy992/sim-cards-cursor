@@ -30,7 +30,10 @@ jobs:
         run: npm ci --workspace=@sim-tracker/shared --include-workspace-root
 
       - name: Build and test @sim-tracker/shared
-        run: npx turbo run build test --filter=@sim-tracker/shared
+        run: |
+          npx turbo run build test --filter=@sim-tracker/shared
+          node --test scripts/bump-version.test.mjs
+          bash -n scripts/mobile-build-android.sh scripts/deploy.sh
 
   backend:
     name: Backend (Lint, Typecheck, Build, Unit & E2E)

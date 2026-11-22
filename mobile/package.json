@@ -1,6 +1,6 @@
 {
   "name": "sim-tracker-mobile",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -13,7 +13,11 @@
     "check:i18n": "node scripts/check-i18n.mjs",
     "check:wcag": "node scripts/check-wcag-aaa.mjs",
     "check:ui": "node scripts/check-ui-consistency.mjs",
-    "test": "jest --ci --runInBand"
+    "test": "jest --ci --runInBand",
+    "build:android:vm": "bash ../scripts/mobile-build-android.sh --target vm --mode local",
+    "build:android:cloud": "bash ../scripts/mobile-build-android.sh --target cloud --mode local",
+    "build:android:vm:eas": "bash ../scripts/mobile-build-android.sh --target vm --mode cloud",
+    "build:android:cloud:eas": "bash ../scripts/mobile-build-android.sh --target cloud --mode cloud"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 1.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -15,7 +15,6 @@
         "buildType": "apk"
       }
     },
-
     "production-lan": {
       "distribution": "internal",
       "env": {
@@ -26,9 +25,8 @@
         "buildType": "apk"
       }
     },
-
     "production-cloud": {
-      "autoIncrement": true,
+      "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.simtracker.ba101.top",
         "NODE_ENV": "production"
@@ -38,7 +36,6 @@
       }
     }
   },
-
   "submit": {
     "production-cloud": {}
   }

@@ -35,6 +35,7 @@
     },
     "android": {
       "package": "ba.epbih.simtracker",
+      "versionCode": 40,
       "userInterfaceStyle": "dark",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "pan",
