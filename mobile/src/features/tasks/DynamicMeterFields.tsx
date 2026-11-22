@@ -1,6 +1,11 @@
-import { ActivityIndicator, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Switch, Text, View } from 'react-native';
 import type { MeterTypeFieldItem } from '@/api/meter-type-definitions.api';
-import { palette, spacing, type } from '@/theme/tokens';
+import {
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 import { Field } from '@/components/ui/Field';
 
 export function DynamicMeterFields({
@@ -16,34 +21,60 @@ export function DynamicMeterFields({
   loading?: boolean;
   error?: boolean;
 }) {
-  if (loading) return <ActivityIndicator color={palette.brand} style={styles.loader} />;
-  if (error) return <Text style={styles.error}>Nije moguće učitati dodatna polja za ovaj tip brojila.</Text>;
+  const { palette, type } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
-  const sorted = fields.slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  if (loading) {
+    return (
+      <ActivityIndicator color={palette.brandText} style={styles.loader} />
+    );
+  }
+  if (error) {
+    return (
+      <Text style={styles.error}>
+        Nije moguće učitati dodatna polja za ovaj tip brojila.
+      </Text>
+    );
+  }
+
+  const sorted = fields
+    .slice()
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   if (!sorted.length) return null;
 
   return (
     <View style={styles.wrap}>
-      <Text style={[type.sectionLabel, styles.heading]}>Dodatna polja brojila</Text>
+      <Text style={[type.sectionLabel, styles.heading]}>
+        Dodatna polja brojila
+      </Text>
       {sorted.map((field) => {
         const raw = values[field.name];
         if (!field.isOperatorFillable) {
           return (
             <View key={field.id} style={styles.readonlyRow}>
               <Text style={styles.readonlyLabel}>{field.label}</Text>
-              <Text style={styles.readonlyValue}>{field.defaultValue ?? '—'}</Text>
+              <Text style={styles.readonlyValue}>
+                {field.defaultValue ?? '—'}
+              </Text>
             </View>
           );
         }
         if (field.fieldType === 'BOOLEAN') {
-          const checked = raw === true || raw === 'true' || raw === 1 || raw === '1';
+          const checked =
+            raw === true || raw === 'true' || raw === 1 || raw === '1';
           return (
             <View key={field.id} style={styles.switchRow}>
-              <Text style={type.bodyStrong}>{field.label}{field.isRequired ? ' *' : ''}</Text>
+              <Text style={type.bodyStrong}>
+                {field.label}
+                {field.isRequired ? ' *' : ''}
+              </Text>
               <Switch
                 value={checked}
                 onValueChange={(value) => onChange(field.name, value)}
-                trackColor={{ false: palette.borderStrong, true: palette.brandSoftStrong }}
+                trackColor={{
+                  false: palette.borderStrong,
+                  true: palette.brandSoftStrong,
+                }}
                 thumbColor={checked ? palette.brand : palette.surface}
               />
             </View>
@@ -56,15 +87,27 @@ export function DynamicMeterFields({
             label={field.label}
             required={field.isRequired}
             value={text}
-            placeholder={field.fieldType === 'DATE' ? 'YYYY-MM-DD' : field.isRequired ? 'Obavezno' : 'Opcionalno'}
-            keyboardType={field.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'}
+            placeholder={
+              field.fieldType === 'DATE'
+                ? 'YYYY-MM-DD'
+                : field.isRequired
+                  ? 'Obavezno'
+                  : 'Opcionalno'
+            }
+            keyboardType={
+              field.fieldType === 'NUMBER' ? 'decimal-pad' : 'default'
+            }
             onChangeText={(value) => {
               if (field.fieldType === 'NUMBER') {
                 const normalized = value.replace(',', '.');
-                const number = normalized.length ? Number(normalized) : undefined;
+                const number = normalized.length
+                  ? Number(normalized)
+                  : undefined;
                 onChange(
                   field.name,
-                  typeof number === 'number' && Number.isFinite(number) ? number : value,
+                  typeof number === 'number' && Number.isFinite(number)
+                    ? number
+                    : value,
                 );
                 return;
               }
@@ -77,23 +120,44 @@ export function DynamicMeterFields({
   );
 }
 
-export function validateRequiredDynamicFields(fields: MeterTypeFieldItem[], values: Record<string, unknown>): string[] {
+export function validateRequiredDynamicFields(
+  fields: MeterTypeFieldItem[],
+  values: Record<string, unknown>,
+): string[] {
   return fields
     .filter((field) => field.isOperatorFillable && field.isRequired)
     .filter((field) => {
       const value = values[field.name];
-      return value == null || (typeof value === 'string' && value.trim().length === 0);
+      return (
+        value == null ||
+        (typeof value === 'string' && value.trim().length === 0)
+      );
     })
     .map((field) => field.label);
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   wrap: { marginTop: spacing.sm },
   heading: { marginBottom: spacing.md },
   loader: { marginVertical: spacing.xl },
   error: { color: palette.danger, fontSize: 13, marginBottom: spacing.lg },
-  readonlyRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.md },
+  readonlyRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
   readonlyLabel: { color: palette.textSecondary, fontSize: 13 },
-  readonlyValue: { color: palette.textPrimary, fontSize: 13, fontWeight: '600' },
-  switchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  readonlyValue: {
+    color: palette.textPrimary,
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
+  switchRow: {
+    minHeight: 52,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: spacing.md,
+  },
 });

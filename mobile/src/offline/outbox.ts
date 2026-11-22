@@ -116,6 +116,28 @@ export async function enqueueOutboxItem(
     request: input.request,
     meta: input.meta,
   }
+  if (input.meta?.taskId && input.kind !== 'INSTALLATION_RECORD_CREATE') {
+    const existingIdx = env.items.findIndex(
+      (i) =>
+        i.kind === input.kind &&
+        i.meta?.taskId === input.meta?.taskId &&
+        (i.status === 'PENDING' || i.status === 'FAILED'),
+    )
+    if (existingIdx !== -1) {
+      const updated: OutboxItem = {
+        ...env.items[existingIdx],
+        status: 'PENDING',
+        updatedAt: createdAt,
+        lastError: undefined,
+        request: input.request,
+        meta: input.meta,
+      }
+      env.items[existingIdx] = updated
+      await writeEnvelope(user, env)
+      return updated
+    }
+  }
+
   env.items.push(item)
   await writeEnvelope(user, env)
   return item
@@ -291,6 +313,41 @@ export async function syncOutbox(user: AuthUser, opts?: { maxItems?: number }): 
     sent,
     failed,
     remaining: updated.items.length,
+  }
+}
+
+export async function removeOutboxItem(user: AuthUser, id: string): Promise<void> {
+  await removeItem(user, id)
+}
+
+export async function retryOutboxItem(
+  user: AuthUser,
+  id: string,
+): Promise<'sent' | 'failed' | 'offline' | 'missing'> {
+  const env = await readEnvelope(user)
+  const item = env.items.find((i) => i.id === id)
+  if (!item) return 'missing'
+
+  await updateItem(user, id, { status: 'SENDING', lastError: undefined })
+  try {
+    await sendOne(user, item)
+    await removeItem(user, id)
+    return 'sent'
+  } catch (error) {
+    if (axios.isAxiosError(error) && !error.response) {
+      await updateItem(user, id, {
+        status: 'PENDING',
+        attemptCount: item.attemptCount + 1,
+        lastError: 'Offline / backend nedostupan',
+      })
+      return 'offline'
+    }
+    await updateItem(user, id, {
+      status: 'FAILED',
+      attemptCount: item.attemptCount + 1,
+      lastError: toErrorMessage(error),
+    })
+    return 'failed'
   }
 }
 

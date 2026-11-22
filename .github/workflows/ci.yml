@@ -143,8 +143,8 @@ jobs:
       - name: Install workspace dependencies
         run: npm ci --workspace=@sim-tracker/shared --workspace=sim-tracker-mobile --include-workspace-root
 
-      - name: Typecheck, Lint & Test (Turborepo)
-        run: npx turbo run typecheck lint test --filter=sim-tracker-mobile
+      - name: Typecheck, Lint, Guards & Test (Turborepo)
+        run: npx turbo run typecheck lint check:i18n check:wcag check:ui test --filter=sim-tracker-mobile
 
   browser-e2e:
     name: Browser Smoke E2E (Playwright Chromium)

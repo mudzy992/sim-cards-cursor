@@ -1,14 +1,11 @@
-/**
- * WorkflowSteps — vertikalni guided-procedure indikator
- * (instrukcije.md §13: instalacija/demontaza kao vodeni postupak).
- *
- * Korisnik uvijek zna: gdje je, sta je zavrseno, sta slijedi, sta nedostaje.
- * Namijenjen kao zajednicki gradivni blok za install/demount steppere
- * (Faza 3 unificija velikih ekrana).
- */
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, spacing, type } from '@/theme/tokens';
+import {
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 
 export type WorkflowStepState = 'done' | 'current' | 'pending' | 'error';
 
@@ -16,20 +13,23 @@ export interface WorkflowStep {
   key: string;
   label: string;
   state: WorkflowStepState;
-  /** kratak opis ili podatak koraka (npr. ICCID) — monospace prikaz */
   detail?: string;
 }
 
 export interface WorkflowStepsProps {
   steps: WorkflowStep[];
-  /** opcioni naslov bloka, npr. "UGRADNJA — korak 2 od 4" */
   header?: string;
 }
 
 export function WorkflowSteps({ steps, header }: WorkflowStepsProps) {
+  const { type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View>
-      {header ? <Text style={[type.sectionLabel, styles.header]}>{header}</Text> : null}
+      {header ? (
+        <Text style={[type.sectionLabel, styles.header]}>{header}</Text>
+      ) : null}
       {steps.map((step, index) => {
         const isLast = index === steps.length - 1;
         return (
@@ -61,7 +61,7 @@ export function WorkflowSteps({ steps, header }: WorkflowStepsProps) {
                   {step.detail}
                 </Text>
               ) : step.state === 'pending' ? (
-                <Text style={[type.caption, styles.detail]}>Ceka…</Text>
+                <Text style={[type.caption, styles.detail]}>Čeka…</Text>
               ) : null}
             </View>
           </View>
@@ -71,7 +71,16 @@ export function WorkflowSteps({ steps, header }: WorkflowStepsProps) {
   );
 }
 
-function StepMarker({ state, index }: { state: WorkflowStepState; index: number }) {
+function StepMarker({
+  state,
+  index,
+}: {
+  state: WorkflowStepState;
+  index: number;
+}) {
+  const { palette } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   switch (state) {
     case 'done':
       return (
@@ -100,27 +109,35 @@ function StepMarker({ state, index }: { state: WorkflowStepState; index: number 
   }
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   header: { marginBottom: spacing.md },
-  stepRow: { flexDirection: 'row', minHeight: 52 },
-  rail: { width: 32, alignItems: 'center' },
+  stepRow: { flexDirection: 'row' as const, minHeight: 52 },
+  rail: { width: 32, alignItems: 'center' as const },
   marker: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
-  markerDone: { backgroundColor: palette.success },
+  markerDone: { backgroundColor: palette.successBorder },
   markerCurrent: { backgroundColor: palette.brand },
-  markerError: { backgroundColor: palette.danger },
+  markerError: { backgroundColor: palette.dangerSolid },
   markerPending: {
     backgroundColor: palette.surfaceMuted,
     borderWidth: 1.5,
     borderColor: palette.borderStrong,
   },
-  markerCurrentText: { color: palette.inverse, fontWeight: '700', fontSize: 13 },
-  markerPendingText: { color: palette.textMuted, fontWeight: '600', fontSize: 13 },
+  markerCurrentText: {
+    color: palette.inverse,
+    fontWeight: '700' as const,
+    fontSize: 13,
+  },
+  markerPendingText: {
+    color: palette.textMuted,
+    fontWeight: '600' as const,
+    fontSize: 13,
+  },
   connector: {
     flex: 1,
     width: 2,

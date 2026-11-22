@@ -8,6 +8,7 @@ import { scopeWhere, ScopeContext } from 'src/common/utils/scope-filter.util';
 import { SAFE_USER_SELECT } from 'src/common/utils/safe-user-select';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateDemountTaskDto } from './dto/create-demount-task.dto';
+import { BulkCreateDemountTaskDto } from './dto/bulk-create-demount-task.dto';
 import { CompleteDemountTaskDto } from './dto/complete-demount-task.dto';
 import { DemountTaskFilterDto } from './dto/demount-task-filter.dto';
 import {
@@ -182,6 +183,50 @@ export class DemountTasksService {
     });
 
     return task;
+  }
+
+  async createBulk(
+    dto: BulkCreateDemountTaskDto,
+    createdById: string,
+    ipAddress?: string,
+    scope?: ScopeContext | null,
+  ) {
+    const uniqueMeterIds = Array.from(new Set(dto.meterIds));
+    const created: Array<Awaited<ReturnType<DemountTasksService['create']>>> = [];
+    const failed: Array<{ meterId: string; message: string }> = [];
+
+    for (const meterId of uniqueMeterIds) {
+      try {
+        const task = await this.create(
+          {
+            meterId,
+            assignedToId: dto.assignedToId,
+            taskType: dto.taskType,
+            requestedResolution: dto.requestedResolution,
+            requestedReason: dto.requestedReason,
+            requestedRemovedSimDisposition: dto.requestedRemovedSimDisposition,
+            requestedMeterDemountCategory: dto.requestedMeterDemountCategory,
+            notes: dto.notes,
+          },
+          createdById,
+          ipAddress,
+          scope,
+        );
+        created.push(task);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Kreiranje zadatka nije uspjelo.';
+        failed.push({ meterId, message });
+      }
+    }
+
+    return {
+      totalRequested: uniqueMeterIds.length,
+      createdCount: created.length,
+      failedCount: failed.length,
+      created,
+      failed,
+    };
   }
 
   async findAll(

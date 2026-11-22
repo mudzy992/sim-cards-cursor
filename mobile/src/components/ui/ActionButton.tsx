@@ -1,11 +1,13 @@
-/**
- * ActionButton — standardizovanu glavnu akciju u aplikaciji.
- * Varijante: primary (brand), secondary (obican), ghost, danger, dark.
- * Podrska: loading spinner, ikonu, disabled stanje, tri velicine.
- */
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HIT_TARGET, palette, radii, spacing } from '@/theme/tokens';
+import {
+  HIT_TARGET,
+  radii,
+  spacing,
+  useTheme,
+  type ThemePalette,
+} from '@/theme/tokens';
+import { hapticTap } from '@/utils/haptics';
 
 export type ActionButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dark';
 export type ActionButtonSize = 'sm' | 'md' | 'lg';
@@ -35,20 +37,26 @@ export function ActionButton(props: ActionButtonProps) {
     style,
   } = props;
 
+  const { palette } = useTheme();
   const inactive = disabled || loading;
+
+  const handlePress = () => {
+    hapticTap();
+    onPress();
+  };
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy: loading }}
-      onPress={onPress}
+      onPress={handlePress}
       disabled={inactive}
       style={({ pressed }) => [
         styles.base,
         sizeStyles[size],
         fullWidth && styles.fullWidth,
-        borderStyle(variant),
-        { backgroundColor: backgroundFor(variant, pressed, inactive) },
+        borderStyle(variant, palette),
+        { backgroundColor: backgroundFor(variant, pressed, inactive, palette) },
         inactive && styles.inactive,
         style,
       ]}
@@ -56,7 +64,11 @@ export function ActionButton(props: ActionButtonProps) {
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'secondary' || variant === 'ghost' ? palette.brand : palette.inverse}
+          color={
+            variant === 'secondary' || variant === 'ghost'
+              ? palette.brandText
+              : palette.inverse
+          }
         />
       ) : (
         <View style={styles.content}>
@@ -64,11 +76,17 @@ export function ActionButton(props: ActionButtonProps) {
             <Ionicons
               name={icon}
               size={size === 'sm' ? 16 : 18}
-              color={textColorFor(variant)}
+              color={textColorFor(variant, palette)}
               style={styles.icon}
             />
           ) : null}
-          <Text style={[styles.text, textSizeStyles[size], { color: textColorFor(variant) }]}>
+          <Text
+            style={[
+              styles.text,
+              textSizeStyles[size],
+              { color: textColorFor(variant, palette) },
+            ]}
+          >
             {title}
           </Text>
         </View>
@@ -77,7 +95,12 @@ export function ActionButton(props: ActionButtonProps) {
   );
 }
 
-function backgroundFor(variant: ActionButtonVariant, pressed: boolean, inactive: boolean): string {
+function backgroundFor(
+  variant: ActionButtonVariant,
+  pressed: boolean,
+  inactive: boolean,
+  palette: ThemePalette,
+): string {
   if (inactive) {
     switch (variant) {
       case 'secondary':
@@ -95,13 +118,13 @@ function backgroundFor(variant: ActionButtonVariant, pressed: boolean, inactive:
     case 'ghost':
       return pressed ? palette.surfaceMuted : 'transparent';
     case 'danger':
-      return pressed ? '#B72E43' : '#D63F55';
+      return pressed ? palette.dangerSolidPressed : palette.dangerSolid;
     case 'dark':
       return pressed ? palette.surface : palette.graphiteSoft;
   }
 }
 
-function borderStyle(variant: ActionButtonVariant): ViewStyle | null {
+function borderStyle(variant: ActionButtonVariant, palette: ThemePalette): ViewStyle | null {
   switch (variant) {
     case 'secondary':
     case 'dark':
@@ -111,7 +134,7 @@ function borderStyle(variant: ActionButtonVariant): ViewStyle | null {
   }
 }
 
-function textColorFor(variant: ActionButtonVariant): string {
+function textColorFor(variant: ActionButtonVariant, palette: ThemePalette): string {
   switch (variant) {
     case 'primary':
     case 'danger':
@@ -120,7 +143,7 @@ function textColorFor(variant: ActionButtonVariant): string {
     case 'secondary':
       return palette.textPrimary;
     case 'ghost':
-      return palette.brand;
+      return palette.brandText;
   }
 }
 

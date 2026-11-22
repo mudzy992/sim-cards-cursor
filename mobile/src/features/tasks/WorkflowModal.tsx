@@ -1,9 +1,23 @@
-/** Zajednicki modalni shell za vodjene operativne postupke. */
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radii, spacing, type } from '@/theme/tokens';
-import React from 'react';
+import {
+  radii,
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+  type ThemeTypography,
+} from '@/theme/tokens';
 
 export function WorkflowModal({
   visible,
@@ -20,16 +34,33 @@ export function WorkflowModal({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  const { palette } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.header}>
             <View style={styles.headerBody}>
               <Text style={styles.title}>{title}</Text>
               {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
             </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Zatvori" onPress={onClose} style={styles.close} hitSlop={8}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Zatvori"
+              onPress={onClose}
+              style={styles.close}
+              hitSlop={8}
+            >
               <Ionicons name="close" size={22} color={palette.textPrimary} />
             </Pressable>
           </View>
@@ -48,12 +79,12 @@ export function WorkflowModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette, type: ThemeTypography) => ({
   safe: { flex: 1, backgroundColor: palette.background },
   flex: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
     borderBottomWidth: 1,
@@ -67,8 +98,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     backgroundColor: palette.surfaceMuted,
   },
   content: { padding: spacing.xl, paddingBottom: spacing.xxl },

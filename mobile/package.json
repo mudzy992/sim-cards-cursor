@@ -10,6 +10,9 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check:wcag": "node scripts/check-wcag-aaa.mjs",
+    "check:ui": "node scripts/check-ui-consistency.mjs",
     "test": "jest --ci --runInBand"
   },
   "dependencies": {

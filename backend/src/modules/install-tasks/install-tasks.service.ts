@@ -21,6 +21,7 @@ import { MeterTypeFieldsService } from '../meter-type-definitions/meter-type-fie
 import { NotificationsService } from '../notifications/notifications.service'
 import { SimCardsService } from '../sim-cards/sim-cards.service'
 import { CreateInstallTaskDto } from './dto/create-install-task.dto'
+import { BulkCreateInstallTaskDto } from './dto/bulk-create-install-task.dto'
 import { CompleteInstallTaskDto } from './dto/complete-install-task.dto'
 import { InstallTaskFilterDto } from './dto/install-task-filter.dto'
 import { assertMeterYearsPairIfPartial } from 'src/common/utils/meter-years.util'
@@ -183,6 +184,45 @@ export class InstallTasksService {
     })
 
     return task
+  }
+
+  async createBulk(
+    dto: BulkCreateInstallTaskDto,
+    createdById: string,
+    scope: ScopeContext | null,
+    ipAddress?: string,
+  ) {
+    const uniqueMeterIds = Array.from(new Set(dto.meterIds))
+    const created: Array<Awaited<ReturnType<InstallTasksService['create']>>> = []
+    const failed: Array<{ meterId: string; message: string }> = []
+
+    for (const meterId of uniqueMeterIds) {
+      try {
+        const task = await this.create(
+          {
+            meterId,
+            assignedToId: dto.assignedToId,
+            notes: dto.notes,
+          },
+          createdById,
+          scope,
+          ipAddress,
+        )
+        created.push(task)
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Kreiranje zadatka nije uspjelo.'
+        failed.push({ meterId, message })
+      }
+    }
+
+    return {
+      totalRequested: uniqueMeterIds.length,
+      createdCount: created.length,
+      failedCount: failed.length,
+      created,
+      failed,
+    }
   }
 
   async findAll(

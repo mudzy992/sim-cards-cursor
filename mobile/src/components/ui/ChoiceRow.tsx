@@ -1,7 +1,12 @@
-/** Veliki izbor pogodan za rad na terenu i rukavice. */
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radii, spacing, type } from '@/theme/tokens';
+import {
+  radii,
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 
 export interface ChoiceRowProps {
   label: string;
@@ -11,7 +16,16 @@ export interface ChoiceRowProps {
   disabled?: boolean;
 }
 
-export function ChoiceRow({ label, description, selected, onPress, disabled }: ChoiceRowProps) {
+export function ChoiceRow({
+  label,
+  description,
+  selected,
+  onPress,
+  disabled,
+}: ChoiceRowProps) {
+  const { palette, type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <Pressable
       onPress={onPress}
@@ -30,17 +44,19 @@ export function ChoiceRow({ label, description, selected, onPress, disabled }: C
       </View>
       <View style={styles.body}>
         <Text style={[type.bodyStrong, selected && styles.selectedText]}>{label}</Text>
-        {description ? <Text style={[type.caption, styles.description]}>{description}</Text> : null}
+        {description ? (
+          <Text style={[type.caption, styles.description]}>{description}</Text>
+        ) : null}
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   row: {
     minHeight: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: spacing.md,
     borderWidth: 1,
     borderColor: palette.border,
@@ -58,11 +74,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: palette.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   radioSelected: { borderColor: palette.brand, backgroundColor: palette.brand },
   body: { flex: 1 },
-  selectedText: { color: palette.brandPressed },
+  selectedText: { color: palette.brandText },
   description: { marginTop: 2, lineHeight: 18 },
 });

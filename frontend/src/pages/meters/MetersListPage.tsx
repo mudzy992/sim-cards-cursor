@@ -106,6 +106,9 @@ export default function MetersListPage() {
   const [installMeter, setInstallMeter] = useState<MeterItem | null>(null);
   const [installOperatorId, setInstallOperatorId] = useState<string>('');
   const [installNotes, setInstallNotes] = useState('');
+  const [selectedMeters, setSelectedMeters] = useState<MeterItem[]>([]);
+  const [bulkInstallMode, setBulkInstallMode] = useState(false);
+  const [bulkDemountMode, setBulkDemountMode] = useState(false);
 
   const [meterForm] = Form.useForm<MeterFormValues>();
   const userRole = useAuthStore((s) => s.user?.role);
@@ -212,6 +215,71 @@ export default function MetersListPage() {
       setInstallMeter(null);
       setInstallOperatorId('');
       setInstallNotes('');
+    },
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('meters.taskCreateFailed')));
+    },
+  });
+
+  const bulkInstallMutation = useMutation({
+    mutationFn: (payload: { meterIds: string[]; assignedToId: string; notes?: string }) =>
+      installTasksApi.createBulk(payload),
+    onSuccess: (res) => {
+      if (res.failedCount > 0) {
+        messageApi.warning(
+          t('meters.bulk.resultPartial', {
+            created: res.createdCount,
+            total: res.totalRequested,
+            failed: res.failedCount,
+          }),
+        );
+      } else {
+        messageApi.success(t('meters.bulk.resultSuccess', { created: res.createdCount }));
+      }
+      setInstallDrawerOpen(false);
+      setBulkInstallMode(false);
+      setInstallOperatorId('');
+      setInstallNotes('');
+      setSelectedMeters([]);
+      void queryClient.invalidateQueries({ queryKey: ['meters', 'list'] });
+    },
+    onError: (err: unknown) => {
+      messageApi.error(getApiErrorMessage(err, t('meters.taskCreateFailed')));
+    },
+  });
+
+  const bulkDemountMutation = useMutation({
+    mutationFn: (payload: {
+      meterIds: string[];
+      assignedToId: string;
+      notes?: string;
+      requestedResolution: DemountCompletionResolution;
+      requestedReason: string;
+      requestedRemovedSimDisposition: RemovedSimDisposition;
+      requestedMeterDemountCategory?: MeterDemountCategory;
+    }) => demountTasksApi.createBulk(payload),
+    onSuccess: (res) => {
+      if (res.failedCount > 0) {
+        messageApi.warning(
+          t('meters.bulk.resultPartial', {
+            created: res.createdCount,
+            total: res.totalRequested,
+            failed: res.failedCount,
+          }),
+        );
+      } else {
+        messageApi.success(t('meters.bulk.resultSuccess', { created: res.createdCount }));
+      }
+      setDemountDrawerOpen(false);
+      setBulkDemountMode(false);
+      setDemountOperatorId('');
+      setDemountNotes('');
+      setDemountResolution('');
+      setDemountReason('');
+      setDemountRemovedSimDisposition('');
+      setDemountMeterDemountCategory('');
+      setSelectedMeters([]);
+      void queryClient.invalidateQueries({ queryKey: ['meters', 'list'] });
     },
     onError: (err: unknown) => {
       messageApi.error(getApiErrorMessage(err, t('meters.taskCreateFailed')));
@@ -329,6 +397,12 @@ export default function MetersListPage() {
 
   const meterRows = listQuery.data?.items ?? [];
   const typeRows = typesListQuery.data ?? [];
+  const eligibleInstallMeters = selectedMeters.filter(
+    (m) => m.simCardState === 'NO_SIM' && !m.simCard && (m.status ?? 'ACTIVE') === 'ACTIVE',
+  );
+  const eligibleDemountMeters = selectedMeters.filter(
+    (m) => m.simCardState === 'INSTALLED' && Boolean(m.simCard) && (m.status ?? 'ACTIVE') === 'ACTIVE',
+  );
   const renderType = (mt: MeterType) =>
     mt === 'SINGLE_PHASE' ? t('meterTypes.phaseSingle') : mt === 'THREE_PHASE' ? t('meterTypes.phaseThree') : mt;
 
@@ -472,11 +546,48 @@ export default function MetersListPage() {
                       ?.data?.message ?? t('meters.loadListFailed')}
                   </Typography.Text>
                 )}
+                {selectedMeters.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-muted px-4 py-2.5">
+                    <Typography.Text strong>
+                      {t('meters.bulk.selectedCount', { count: selectedMeters.length })}
+                    </Typography.Text>
+                    <Space wrap>
+                      <Button
+                        type="primary"
+                        disabled={eligibleInstallMeters.length === 0}
+                        onClick={() => {
+                          setInstallMeter(null);
+                          setBulkInstallMode(true);
+                          setInstallDrawerOpen(true);
+                        }}
+                      >
+                        {t('meters.bulk.assignInstall', { count: eligibleInstallMeters.length })}
+                      </Button>
+                      <Button
+                        disabled={eligibleDemountMeters.length === 0}
+                        onClick={() => {
+                          setDemountMeter(null);
+                          setBulkDemountMode(true);
+                          setDemountDrawerOpen(true);
+                        }}
+                      >
+                        {t('meters.bulk.assignDemount', { count: eligibleDemountMeters.length })}
+                      </Button>
+                      <Button type="text" onClick={() => setSelectedMeters([])}>
+                        {t('meters.bulk.clearSelection')}
+                      </Button>
+                    </Space>
+                  </div>
+                )}
                 <div className="-mx-4 overflow-x-auto px-4">
                   <Table<MeterItem>
                     rowKey="id"
                     loading={listQuery.isLoading}
                     dataSource={meterRows}
+                    rowSelection={{
+                      selectedRowKeys: selectedMeters.map((m) => m.id),
+                      onChange: (_keys, rows) => setSelectedMeters(rows),
+                    }}
                     pagination={{
                       current: listQuery.data?.page,
                       pageSize: listQuery.data?.limit,
@@ -957,11 +1068,16 @@ export default function MetersListPage() {
       </Drawer>
 
       <Drawer
-        title={t('meters.install.drawerTitle')}
+        title={
+          bulkInstallMode
+            ? t('meters.bulk.installDrawerTitle', { count: eligibleInstallMeters.length })
+            : t('meters.install.drawerTitle')
+        }
         open={installDrawerOpen}
         width={520}
         onClose={() => {
           setInstallDrawerOpen(false)
+          setBulkInstallMode(false)
           setInstallMeter(null)
           setInstallOperatorId('')
           setInstallNotes('')
@@ -972,6 +1088,7 @@ export default function MetersListPage() {
             <Button
               onClick={() => {
                 setInstallDrawerOpen(false)
+                setBulkInstallMode(false)
                 setInstallMeter(null)
                 setInstallOperatorId('')
                 setInstallNotes('')
@@ -981,9 +1098,22 @@ export default function MetersListPage() {
             </Button>
             <Button
               type="primary"
-              loading={createInstallMutation.isPending}
+              loading={createInstallMutation.isPending || bulkInstallMutation.isPending}
+              disabled={
+                !installOperatorId ||
+                (bulkInstallMode ? eligibleInstallMeters.length === 0 : !installMeter)
+              }
               onClick={() => {
-                if (!installMeter || !installOperatorId) return
+                if (!installOperatorId) return
+                if (bulkInstallMode) {
+                  bulkInstallMutation.mutate({
+                    meterIds: eligibleInstallMeters.map((m) => m.id),
+                    assignedToId: installOperatorId,
+                    notes: installNotes || undefined,
+                  })
+                  return
+                }
+                if (!installMeter) return
                 createInstallMutation.mutate({
                   meterId: installMeter.id,
                   assignedToId: installOperatorId,
@@ -996,12 +1126,18 @@ export default function MetersListPage() {
           </div>
         }
       >
-        {installMeter && (
+        {(installMeter || bulkInstallMode) && (
           <Space direction="vertical" className="w-full" size="middle">
-            <Typography.Text>
-              {t('meters.meterColonLabel')} {installMeter.serialNumber}
-              {installMeter.simCardState === 'NO_SIM' ? ` – ${t('meters.statusNoCardSuffix')}` : ''}
-            </Typography.Text>
+            {bulkInstallMode ? (
+              <Typography.Text>
+                {t('meters.bulk.eligibleMetersHint', { count: eligibleInstallMeters.length })}
+              </Typography.Text>
+            ) : installMeter ? (
+              <Typography.Text>
+                {t('meters.meterColonLabel')} {installMeter.serialNumber}
+                {installMeter.simCardState === 'NO_SIM' ? ` – ${t('meters.statusNoCardSuffix')}` : ''}
+              </Typography.Text>
+            ) : null}
             <Form.Item label={t('meters.operatorFieldLabel')} required>
               <Select
                 placeholder={t('meters.selectOperatorPlaceholder')}
@@ -1035,11 +1171,16 @@ export default function MetersListPage() {
       </Drawer>
 
       <Drawer
-        title={t('meters.demount.drawerTitle')}
+        title={
+          bulkDemountMode
+            ? t('meters.bulk.demountDrawerTitle', { count: eligibleDemountMeters.length })
+            : t('meters.demount.drawerTitle')
+        }
         open={demountDrawerOpen}
         width={520}
         onClose={() => {
           setDemountDrawerOpen(false)
+          setBulkDemountMode(false)
           setDemountMeter(null)
           setDemountOperatorId('')
           setDemountNotes('')
@@ -1054,6 +1195,7 @@ export default function MetersListPage() {
             <Button
               onClick={() => {
                 setDemountDrawerOpen(false)
+                setBulkDemountMode(false)
                 setDemountMeter(null)
                 setDemountOperatorId('')
                 setDemountNotes('')
@@ -1063,9 +1205,19 @@ export default function MetersListPage() {
             </Button>
             <Button
               type="primary"
-              loading={createDemountMutation.isPending}
+              loading={createDemountMutation.isPending || bulkDemountMutation.isPending}
+              disabled={
+                !demountOperatorId ||
+                !demountResolution ||
+                demountReason.trim().length < 3 ||
+                !demountRemovedSimDisposition ||
+                ((demountResolution === 'FULL_DEMOUNT' ||
+                  demountResolution === 'REMOVE_SIM_ONLY') &&
+                  !demountMeterDemountCategory) ||
+                (bulkDemountMode ? eligibleDemountMeters.length === 0 : !demountMeter)
+              }
               onClick={() => {
-                if (!demountMeter || !demountOperatorId) return
+                if (!demountOperatorId) return
                 if (!demountResolution) return
                 if (demountReason.trim().length < 3) return
                 if (!demountRemovedSimDisposition) return
@@ -1075,6 +1227,25 @@ export default function MetersListPage() {
                   !demountMeterDemountCategory
                 )
                   return
+                if (bulkDemountMode) {
+                  bulkDemountMutation.mutate({
+                    meterIds: eligibleDemountMeters.map((m) => m.id),
+                    assignedToId: demountOperatorId,
+                    notes: demountNotes || undefined,
+                    requestedResolution: demountResolution,
+                    requestedReason: demountReason.trim(),
+                    requestedRemovedSimDisposition: demountRemovedSimDisposition,
+                    ...(demountResolution === 'FULL_DEMOUNT' ||
+                    demountResolution === 'REMOVE_SIM_ONLY'
+                      ? {
+                          requestedMeterDemountCategory:
+                            demountMeterDemountCategory as MeterDemountCategory,
+                        }
+                      : {}),
+                  })
+                  return
+                }
+                if (!demountMeter) return
                 createDemountMutation.mutate({
                   meterId: demountMeter.id,
                   assignedToId: demountOperatorId,
@@ -1097,12 +1268,18 @@ export default function MetersListPage() {
           </div>
         }
       >
-        {demountMeter && (
+        {(demountMeter || bulkDemountMode) && (
           <Space direction="vertical" className="w-full" size="middle">
-            <Typography.Text>
-              {t('meters.meterColonLabel')} {demountMeter.serialNumber}
-              {demountMeter.simCard ? ` – SIM: ${demountMeter.simCard.iccid}` : ''}
-            </Typography.Text>
+            {bulkDemountMode ? (
+              <Typography.Text>
+                {t('meters.bulk.eligibleMetersHint', { count: eligibleDemountMeters.length })}
+              </Typography.Text>
+            ) : demountMeter ? (
+              <Typography.Text>
+                {t('meters.meterColonLabel')} {demountMeter.serialNumber}
+                {demountMeter.simCard ? ` – SIM: ${demountMeter.simCard.iccid}` : ''}
+              </Typography.Text>
+            ) : null}
             <Form.Item label={t('meters.operatorFieldLabel')} required>
               <Select
                 placeholder={t('meters.selectOperatorPlaceholder')}

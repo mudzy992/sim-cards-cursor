@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { pushTokensApi } from '@/api/push-tokens.api';
 import { settingsApi } from '@/api/settings.api';
 import { colors } from '@/theme/colors';
+import { palette } from '@/theme/tokens';
 import { useGlobalBlockingStore } from '@/store/global-blocking.store'
 import { normalizeDeepLink } from '@/utils/deeplink'
 import { useQueryClient } from '@tanstack/react-query'
@@ -63,7 +64,7 @@ async function configureChannels(
     name: 'Sistemske poruke',
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 300, 300, 300],
-    lightColor: '#b91c1c',
+    lightColor: palette.notificationAccent,
   });
 }
 

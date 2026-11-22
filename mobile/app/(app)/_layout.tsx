@@ -1,6 +1,13 @@
 import { Redirect, Stack, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, BackHandler, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -10,18 +17,29 @@ import { OfflineBanner } from '@/components/common/OfflineBanner';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { useGlobalBlockingStore } from '@/store/global-blocking.store';
 import { normalizeDeepLink } from '../../src/utils/deeplink';
-import { palette, radii, spacing, type } from '@/theme/tokens';
+import {
+  radii,
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+  type ThemeTypography,
+} from '@/theme/tokens';
 import { ActionButton } from '@/components/ui/ActionButton';
 
 const PrivateLayout = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const router = useRouter();
   const { isOnline } = useConnectivity();
+  const { palette, type, isDark } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [, setOfflineBannerHeight] = useState(0);
   const isBlocked = useGlobalBlockingStore((state) => state.isBlocked);
   const blockingTitle = useGlobalBlockingStore((state) => state.title);
   const blockingSubtitle = useGlobalBlockingStore((state) => state.subtitle);
-  const consumeQueuedDeepLink = useGlobalBlockingStore((state) => state.consumeQueuedDeepLink);
+  const consumeQueuedDeepLink = useGlobalBlockingStore(
+    (state) => state.consumeQueuedDeepLink,
+  );
   const blocking = {
     isBlocked,
     title: blockingTitle,
@@ -42,17 +60,20 @@ const PrivateLayout = () => {
       headerTitleAlign: 'center' as const,
       headerLargeTitle: false,
       headerShadowVisible: true,
-      statusBarStyle: 'light' as const,
+      statusBarStyle: (isDark ? 'light' : 'dark') as 'light' | 'dark',
       statusBarColor: palette.background,
       contentStyle: { backgroundColor: palette.background },
       gestureEnabled: !isBlocked,
     }),
-    [isBlocked],
+    [isBlocked, isDark, palette],
   );
 
   useEffect(() => {
     if (!isBlocked) return;
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => true,
+    );
     return () => subscription.remove();
   }, [isBlocked]);
 
@@ -120,8 +141,14 @@ const PrivateLayout = () => {
           <Stack.Screen name="record-details" options={{ headerShown: false }} />
           <Stack.Screen name="scan-result" options={{ headerShown: false }} />
           <Stack.Screen name="create-record" options={{ headerShown: false }} />
-          <Stack.Screen name="create-record-replacement" options={{ headerShown: false }} />
-          <Stack.Screen name="offline-inventory" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="create-record-replacement"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="offline-inventory"
+            options={{ headerShown: false }}
+          />
           <Stack.Screen name="outbox" options={{ headerShown: false }} />
           <Stack.Screen name="notifications" options={{ headerShown: false }} />
         </Stack>
@@ -130,12 +157,14 @@ const PrivateLayout = () => {
       {blocking.isBlocked ? (
         <View style={styles.blockingOverlay}>
           <View style={styles.blockingPanel}>
-            <ActivityIndicator size="large" color={palette.brand} />
+            <ActivityIndicator size="large" color={palette.brandText} />
             <Text style={[type.bodyStrong, styles.blockingTitle]}>
               {blocking.title ?? 'Obrada u toku'}
             </Text>
             {blocking.subtitle ? (
-              <Text style={[type.caption, styles.blockingSubtitle]}>{blocking.subtitle}</Text>
+              <Text style={[type.caption, styles.blockingSubtitle]}>
+                {blocking.subtitle}
+              </Text>
             ) : null}
           </View>
         </View>
@@ -159,6 +188,9 @@ function UpdateGateScreen({
   actionLabel: string;
   onAction: () => void;
 }) {
+  const { type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <SafeAreaView style={styles.gateSafe}>
       <View style={styles.gateContent}>
@@ -170,65 +202,95 @@ function UpdateGateScreen({
         {releaseNotes ? (
           <View style={styles.releaseNotes}>
             <Text style={type.sectionLabel}>Šta je novo</Text>
-            <Text style={[type.caption, styles.releaseText]}>{releaseNotes}</Text>
+            <Text style={[type.caption, styles.releaseText]}>
+              {releaseNotes}
+            </Text>
           </View>
         ) : null}
-        <ActionButton title={actionLabel} icon="download-outline" size="lg" onPress={onAction} />
+        <ActionButton
+          title={actionLabel}
+          icon="download-outline"
+          size="lg"
+          onPress={onAction}
+        />
         {footnote ? <Text style={styles.footnote}>{footnote}</Text> : null}
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette, type: ThemeTypography) => ({
   root: { flex: 1, backgroundColor: palette.background },
   stackWrap: { flex: 1 },
   offlineInset: { paddingTop: 24 },
   blockingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: palette.overlayScrim,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     padding: spacing.xl,
   },
   blockingPanel: {
-    width: '100%',
+    width: '100%' as const,
     maxWidth: 360,
     backgroundColor: palette.surface,
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: palette.borderStrong,
     padding: spacing.xl,
-    alignItems: 'center',
+    alignItems: 'center' as const,
   },
-  blockingTitle: { marginTop: spacing.md, textAlign: 'center' },
-  blockingSubtitle: { marginTop: spacing.sm, textAlign: 'center' },
+  blockingTitle: { marginTop: spacing.md, textAlign: 'center' as const },
+  blockingSubtitle: { marginTop: spacing.sm, textAlign: 'center' as const },
   gateSafe: { flex: 1, backgroundColor: palette.background },
   gateContent: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'center' as const,
     padding: spacing.xl,
     maxWidth: 520,
-    alignSelf: 'center',
-    width: '100%',
+    alignSelf: 'center' as const,
+    width: '100%' as const,
   },
   updateIcon: {
     width: 56,
     height: 56,
     borderRadius: radii.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     backgroundColor: palette.brandSoft,
     borderWidth: 1,
     borderColor: palette.infoBorder,
     marginBottom: spacing.xl,
   },
-  updateIconText: { color: palette.brand, fontSize: 28, fontWeight: '700' },
+  updateIconText: {
+    color: palette.brandText,
+    fontSize: 28,
+    fontWeight: '700' as const,
+  },
   gateTitle: { ...type.screenTitle, fontSize: 24 },
-  gateDescription: { ...type.body, color: palette.textSecondary, lineHeight: 22, marginTop: spacing.sm, marginBottom: spacing.xl },
-  releaseNotes: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radii.md, padding: spacing.lg, marginBottom: spacing.xl },
+  gateDescription: {
+    ...type.body,
+    color: palette.textSecondary,
+    lineHeight: 22,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xl,
+  },
+  releaseNotes: {
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
   releaseText: { marginTop: spacing.sm, lineHeight: 19 },
-  footnote: { color: palette.textMuted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: spacing.lg },
+  footnote: {
+    color: palette.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center' as const,
+    marginTop: spacing.lg,
+  },
 });
 
 export default PrivateLayout;

@@ -1,10 +1,11 @@
-/**
- * Section — strukturalno grupisanje sadrzaja BEZ kartice (anti "card soup"
- * prema instrukcije.md §7): maleni uppercase naslov + opcioni dodatak desno.
- */
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { palette, spacing, type } from '@/theme/tokens';
 import React from 'react';
+import { Pressable, Text, View, type ViewStyle } from 'react-native';
+import {
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 
 export interface SectionProps {
   label?: string;
@@ -25,7 +26,10 @@ export function Section({
   style,
   insetTop = false,
 }: SectionProps) {
+  const { type } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const hasHeader = Boolean(label || actionLabel);
+
   return (
     <View style={[styles.section, insetTop && styles.insetTop, style]}>
       {hasHeader ? (
@@ -46,13 +50,13 @@ export function Section({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   section: { marginBottom: spacing.xl },
   insetTop: { marginTop: spacing.xl },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+    flexDirection: 'row' as const,
+    alignItems: 'flex-end' as const,
+    justifyContent: 'space-between' as const,
     marginBottom: spacing.md,
     paddingHorizontal: 2,
   },
@@ -64,7 +68,7 @@ const styles = StyleSheet.create({
   },
   action: {
     fontSize: 13,
-    fontWeight: '600',
-    color: palette.brand,
+    fontWeight: '600' as const,
+    color: palette.brandText,
   },
 });

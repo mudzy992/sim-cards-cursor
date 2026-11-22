@@ -1,7 +1,8 @@
 import { ActivityIndicator, View } from 'react-native';
-import { palette } from '@/theme/tokens';
+import { useTheme } from '@/theme/tokens';
 
 export function LoadingScreen() {
+  const { palette } = useTheme();
   return (
     <View
       style={{
@@ -11,7 +12,7 @@ export function LoadingScreen() {
         backgroundColor: palette.background,
       }}
     >
-      <ActivityIndicator size="large" color={palette.brand} />
+      <ActivityIndicator size="large" color={palette.brandText} />
     </View>
   );
 }

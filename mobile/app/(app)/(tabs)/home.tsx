@@ -1,19 +1,14 @@
-/**
- * HomeScreen — REDIZAJN (Faza 2): operativni dashboard, ne BI panel
- * (instrukcije.md §10: odgovoriti u sekundi — online? sinhronizovano?
- * posao? inventar? problem?).
- *
- * Sva logika identicna prethodnoj verziji:
- *  - operator-offline-stats query (offline inventar + tipovi + zapisnici)
- *  - notifications-unread-count
- *  - syncMeterTypesOfflineCache sa global blocking overlayom
- *  - mini tour (useMiniTour)
- * Prezentacija: section/red struktura, ConnectionPill, Panel samo za grupe.
- */
 import axios from 'axios';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -28,7 +23,13 @@ import { offlineCache } from '@/offline/offline-cache';
 import { listOutbox } from '@/offline/outbox';
 import { syncMeterTypesOfflineCache } from '@/offline/meter-types-sync';
 import { useGlobalBlockingStore } from '@/store/global-blocking.store';
-import { palette, spacing, type } from '@/theme/tokens';
+import {
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+  type ThemeTypography,
+} from '@/theme/tokens';
 import { ConnectionPill } from '@/components/ui/ConnectionPill';
 import { Section } from '@/components/ui/Section';
 import { Panel } from '@/components/ui/Panel';
@@ -45,6 +46,8 @@ export default function HomeScreen() {
   const setBlocked = useGlobalBlockingStore((s) => s.setBlocked);
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { palette, type, isDark } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const { data: operatorStats, isLoading } = useQuery({
     queryKey: ['operator-offline-stats', user?.id, isOnline],
@@ -64,7 +67,8 @@ export default function HomeScreen() {
       }
 
       const offlineSims = await simCardsApi.listOfflineInventory();
-      const cachedTypes = (await offlineCache.meterTypeDefinitions.get(user))?.data ?? [];
+      const cachedTypes =
+        (await offlineCache.meterTypeDefinitions.get(user))?.data ?? [];
       const offlineMeterTypeCount = cachedTypes.length;
       const outboxItems = await listOutbox(user);
 
@@ -74,7 +78,10 @@ export default function HomeScreen() {
 
       if (isOnline) {
         try {
-          const resp = await installationRecordsApi.listMy({ page: 1, limit: 1 });
+          const resp = await installationRecordsApi.listMy({
+            page: 1,
+            limit: 1,
+          });
           installedTotal = resp.total ?? resp.items?.length ?? 0;
           const serverTypes = await (
             await import('@/api/meter-type-definitions.api')
@@ -87,15 +94,18 @@ export default function HomeScreen() {
       }
 
       const showMeterTypesSync =
-        isOnline && serverMeterTypeCount != null && offlineMeterTypeCount !== serverMeterTypeCount;
+        isOnline &&
+        serverMeterTypeCount != null &&
+        offlineMeterTypeCount !== serverMeterTypeCount;
 
       return {
         offlineSimCount: offlineSims.length,
         offlineMeterTypeCount,
         serverMeterTypeCount,
         installedSimCount: installedTotal,
-        outboxPending: outboxItems.filter((i) => i.status === 'PENDING' || i.status === 'SENDING')
-          .length,
+        outboxPending: outboxItems.filter(
+          (i) => i.status === 'PENDING' || i.status === 'SENDING',
+        ).length,
         outboxFailed: outboxItems.filter((i) => i.status === 'FAILED').length,
         isStale,
         showMeterTypesSync,
@@ -121,7 +131,10 @@ export default function HomeScreen() {
           queryKey: ['operator-offline-stats', user.id, isOnline],
         });
       } catch {
-        Alert.alert('Sync nije uspio', 'Provjerite internet konekciju i pokušajte ponovo.');
+        Alert.alert(
+          'Sync nije uspio',
+          'Provjerite internet konekciju i pokušajte ponovo.',
+        );
       } finally {
         setBlocked(null);
       }
@@ -134,8 +147,12 @@ export default function HomeScreen() {
       setIsRefreshing(true);
       try {
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['operator-offline-stats', user.id, isOnline] }),
-          queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] }),
+          queryClient.invalidateQueries({
+            queryKey: ['operator-offline-stats', user.id, isOnline],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ['notifications-unread-count'],
+          }),
         ]);
       } finally {
         setIsRefreshing(false);
@@ -151,9 +168,8 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
-      {/* ------------------------------- header ------------------------------- */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.greeting}>
@@ -172,21 +188,32 @@ export default function HomeScreen() {
             onPress={() => router.push('/notifications')}
             accessibilityRole="button"
             accessibilityLabel="Notifikacije"
-            style={({ pressed }) => [styles.iconButton, pressed && styles.pressedSoft]}
+            style={({ pressed }) => [
+              styles.iconButton,
+              pressed && styles.pressedSoft,
+            ]}
           >
-            <Ionicons name="notifications-outline" size={20} color={palette.textPrimary} />
+            <Ionicons
+              name="notifications-outline"
+              size={20}
+              color={palette.textPrimary}
+            />
             {unreadCount > 0 ? (
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
               </View>
             ) : null}
           </Pressable>
-          {/* Profil je uklonjen iz tab trake — pristup je ovdje */}
           <Pressable
             onPress={() => router.push('/(app)/(tabs)/profile')}
             accessibilityRole="button"
             accessibilityLabel="Profil i postavke"
-            style={({ pressed }) => [styles.avatarButton, pressed && styles.pressedSoft]}
+            style={({ pressed }) => [
+              styles.avatarButton,
+              pressed && styles.pressedSoft,
+            ]}
           >
             <Text style={styles.avatarText}>
               {(user?.firstName?.[0] ?? '').toUpperCase()}
@@ -199,27 +226,38 @@ export default function HomeScreen() {
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[palette.brand]} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[palette.brandText]}
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.pillRow}>
           <ConnectionPill
             isOnline={isOnline}
             detail={connectionDetail}
-            attention={Boolean(operatorStats?.isStale || operatorStats?.showMeterTypesSync)}
+            attention={Boolean(
+              operatorStats?.isStale || operatorStats?.showMeterTypesSync,
+            )}
           />
         </View>
 
-        {/* ------------------------- sync upozorenje ------------------------- */}
         {operatorStats?.showMeterTypesSync ? (
           <Panel tone="warning" style={styles.syncPanel}>
             <View style={styles.syncHeader}>
-              <StatusBadge tone="warning" label="Potrebna sinhronizacija" showDot />
+              <StatusBadge
+                tone="warning"
+                label="Potrebna sinhronizacija"
+                showDot
+              />
             </View>
             <Text style={[type.body, styles.syncText]}>
-              Tipovi brojila na uređaju ({operatorStats.offlineMeterTypeCount}) ne odgovaraju
-              serveru ({operatorStats.serverMeterTypeCount}). Sinkronizujte da biste radili sa
-              ažurnim definicijama.
+              Tipovi brojila na uređaju ({operatorStats.offlineMeterTypeCount})
+              ne odgovaraju serveru ({operatorStats.serverMeterTypeCount}).
+              Sinhronizujte da biste radili sa ažurnim definicijama.
             </Text>
             <ActionButton
               title="Sinhroniziraj tipove brojila"
@@ -231,8 +269,10 @@ export default function HomeScreen() {
           </Panel>
         ) : null}
 
-        {/* ------------------------------ inventar ------------------------------ */}
-        <Section label="Inventar na uređaju" hint="lokalni podaci — dostupni i offline">
+        <Section
+          label="Inventar na uređaju"
+          hint="lokalni podaci — dostupni i offline"
+        >
           {isLoading ? (
             <SkeletonRows count={3} />
           ) : operatorStats ? (
@@ -255,7 +295,9 @@ export default function HomeScreen() {
                       : 'keširane definicije'
                   }
                   icon="speedometer-outline"
-                  iconTone={operatorStats.showMeterTypesSync ? 'warning' : 'success'}
+                  iconTone={
+                    operatorStats.showMeterTypesSync ? 'warning' : 'success'
+                  }
                   value={operatorStats.offlineMeterTypeCount}
                   valueMono
                   divider
@@ -267,8 +309,18 @@ export default function HomeScreen() {
                       ? `${operatorStats.outboxFailed} neuspjelih zahtjeva`
                       : 'zahtjevi koji čekaju slanje'
                   }
-                  icon={operatorStats.outboxPending > 0 ? 'cloud-upload-outline' : 'checkmark-done-outline'}
-                  iconTone={operatorStats.outboxFailed > 0 ? 'danger' : operatorStats.outboxPending > 0 ? 'warning' : 'success'}
+                  icon={
+                    operatorStats.outboxPending > 0
+                      ? 'cloud-upload-outline'
+                      : 'checkmark-done-outline'
+                  }
+                  iconTone={
+                    operatorStats.outboxFailed > 0
+                      ? 'danger'
+                      : operatorStats.outboxPending > 0
+                        ? 'warning'
+                        : 'success'
+                  }
                   value={operatorStats.outboxPending}
                   valueMono
                   onPress={() => router.push('/(app)/outbox')}
@@ -279,7 +331,6 @@ export default function HomeScreen() {
           ) : null}
         </Section>
 
-        {/* ------------------------------ aktivnost ------------------------------ */}
         <Section label="Aktivnost">
           {isLoading ? (
             <SkeletonRow />
@@ -304,7 +355,6 @@ export default function HomeScreen() {
           ) : null}
         </Section>
 
-        {/* ----------------------------- brze radnje ----------------------------- */}
         <Section label="Brze radnje">
           <Panel padding="none">
             <View style={styles.panelInner}>
@@ -335,19 +385,24 @@ export default function HomeScreen() {
           </Panel>
         </Section>
 
-        {/* ------------------------------ mini tour ------------------------------ */}
         {!miniTour.loading && miniTour.visible ? (
           <Panel tone="info" style={styles.tourPanel}>
-            <Text style={[type.bodyStrong, styles.tourTitle]}>Kratki vodič kroz aplikaciju</Text>
+            <Text style={[type.bodyStrong, styles.tourTitle]}>
+              Kratki vodič kroz aplikaciju
+            </Text>
             <Text style={[type.body, styles.tourText]}>
-              • Tab „Skeniranje“ — skeniraj ili unesi ICCID za novi zapisnik.{'\n'}
-              • Tab „Ugradnja“ — vođeni postupak ugradnje.{'\n'}
-              • Tab „Zapisnici“ — pregledi tvojih zapisnika i statusa.{'\n'}
-              • Tab „Demontaža“ — zadaci za skidanje SIM kartica.{'\n'}
-              • Tab „Profil“ — osnovni podaci i odjava.
+              • Tab „Skeniranje“ — skeniraj ili unesi ICCID za novi zapisnik.
+              {'\n'}• Tab „Ugradnja“ — vođeni postupak ugradnje.{'\n'}• Tab
+              „Zapisnici“ — pregledi tvojih zapisnika i statusa.{'\n'}• Tab
+              „Demontaža“ — zadaci za skidanje SIM kartica.{'\n'}• Profil —
+              tema (Svijetla za sunce / Tamna), jezik i odjava.
             </Text>
             <View style={styles.tourActions}>
-              <Pressable onPress={() => miniTour.dismiss()} hitSlop={8} style={styles.tourSecondary}>
+              <Pressable
+                onPress={() => miniTour.dismiss()}
+                hitSlop={8}
+                style={styles.tourSecondary}
+              >
                 <Text style={styles.tourSecondaryText}>Kasnije</Text>
               </Pressable>
               <ActionButton
@@ -368,17 +423,15 @@ export default function HomeScreen() {
   );
 }
 
-/* -------------------------------- stilovi -------------------------------- */
-
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette, type: ThemeTypography) => ({
   root: { flex: 1, backgroundColor: palette.background },
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
 
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
@@ -388,11 +441,15 @@ const styles = StyleSheet.create({
   dateLine: {
     marginTop: 2,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '500' as const,
     color: palette.textMuted,
-    textTransform: 'capitalize',
+    textTransform: 'capitalize' as const,
   },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headerActions: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.sm,
+  },
   iconButton: {
     width: 44,
     height: 44,
@@ -400,37 +457,41 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   avatarButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: palette.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   avatarText: {
     color: palette.inverse,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '700' as const,
     letterSpacing: 0.4,
   },
   pressedSoft: { opacity: 0.75 },
   badge: {
-    position: 'absolute',
+    position: 'absolute' as const,
     top: -4,
     right: -4,
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: palette.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: palette.dangerSolid,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     paddingHorizontal: 4,
   },
-  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  badgeText: {
+    color: palette.inverse,
+    fontSize: 10,
+    fontWeight: '700' as const,
+  },
 
   pillRow: { marginBottom: spacing.xl },
 
@@ -444,14 +505,18 @@ const styles = StyleSheet.create({
   tourTitle: { marginBottom: spacing.sm },
   tourText: { lineHeight: 22 },
   tourActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'flex-end' as const,
     gap: spacing.md,
     marginTop: spacing.lg,
   },
   tourSecondary: { paddingVertical: spacing.sm },
-  tourSecondaryText: { color: palette.textSecondary, fontWeight: '600', fontSize: 14 },
+  tourSecondaryText: {
+    color: palette.textSecondary,
+    fontWeight: '600' as const,
+    fontSize: 14,
+  },
   tourPrimary: { minWidth: 120 },
 
   bottomPad: { height: spacing.xxl },

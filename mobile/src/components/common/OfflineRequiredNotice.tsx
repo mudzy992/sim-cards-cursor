@@ -1,6 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
-import { palette, spacing, type } from '@/theme/tokens';
+import { Text, View } from 'react-native';
+import {
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 import { ActionButton } from '@/components/ui/ActionButton';
 
 export function OfflineRequiredNotice({
@@ -12,10 +17,17 @@ export function OfflineRequiredNotice({
   message?: string;
   onRetry?: () => void;
 }) {
+  const { palette, type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.root}>
       <View style={styles.icon}>
-        <Ionicons name="cloud-offline-outline" size={28} color={palette.warning} />
+        <Ionicons
+          name="cloud-offline-outline"
+          size={28}
+          color={palette.warning}
+        />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={[type.caption, styles.message]}>{message}</Text>
@@ -32,26 +44,30 @@ export function OfflineRequiredNotice({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   root: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     padding: spacing.xl,
     backgroundColor: palette.background,
   },
   icon: {
     width: 58,
     height: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     backgroundColor: palette.warningSoft,
     borderWidth: 1,
     borderColor: palette.warningBorder,
     borderRadius: 16,
     marginBottom: spacing.lg,
   },
-  title: { color: palette.textPrimary, fontSize: 19, fontWeight: '700' },
-  message: { marginTop: spacing.sm, textAlign: 'center', lineHeight: 19 },
+  title: {
+    color: palette.textPrimary,
+    fontSize: 19,
+    fontWeight: '700' as const,
+  },
+  message: { marginTop: spacing.sm, textAlign: 'center' as const, lineHeight: 19 },
   action: { minWidth: 170, marginTop: spacing.xl },
 });

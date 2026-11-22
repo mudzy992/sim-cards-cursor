@@ -1,10 +1,12 @@
-/**
- * EmptyState — smisleno prazno stanje: ikonica, naslov, opis i akcija.
- * Instrukcije: empty state objasnjava stanje i predlaze sljedeci korak.
- */
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Text, View, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radii, spacing, type } from '@/theme/tokens';
+import {
+  radii,
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 import { ActionButton, type ActionButtonVariant } from './ActionButton';
 
 export interface EmptyStateProps {
@@ -26,13 +28,18 @@ export function EmptyState({
   actionVariant = 'secondary',
   style,
 }: EmptyStateProps) {
+  const { palette, type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={[styles.wrap, style]}>
       <View style={styles.iconWrap}>
         <Ionicons name={icon} size={28} color={palette.textMuted} />
       </View>
       <Text style={[type.bodyStrong, styles.title]}>{title}</Text>
-      {description ? <Text style={[type.caption, styles.description]}>{description}</Text> : null}
+      {description ? (
+        <Text style={[type.caption, styles.description]}>{description}</Text>
+      ) : null}
       {actionLabel && onAction ? (
         <View style={styles.actionWrap}>
           <ActionButton
@@ -49,9 +56,9 @@ export function EmptyState({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   wrap: {
-    alignItems: 'center',
+    alignItems: 'center' as const,
     paddingVertical: spacing.xxl,
     paddingHorizontal: spacing.xl,
   },
@@ -62,12 +69,12 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surfaceMuted,
     borderWidth: 1,
     borderColor: palette.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     marginBottom: spacing.lg,
   },
-  title: { textAlign: 'center' },
-  description: { marginTop: spacing.sm, textAlign: 'center', lineHeight: 19 },
+  title: { textAlign: 'center' as const },
+  description: { marginTop: spacing.sm, textAlign: 'center' as const, lineHeight: 19 },
   actionWrap: { marginTop: spacing.lg },
   action: { minWidth: 160 },
 });

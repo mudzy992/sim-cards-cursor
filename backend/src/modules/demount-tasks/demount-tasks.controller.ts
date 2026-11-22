@@ -12,6 +12,7 @@ import {
 import { Request } from 'express';
 import { DemountTasksService } from './demount-tasks.service';
 import { CreateDemountTaskDto } from './dto/create-demount-task.dto';
+import { BulkCreateDemountTaskDto } from './dto/bulk-create-demount-task.dto';
 import { CompleteDemountTaskDto } from './dto/complete-demount-task.dto';
 import { DemountTaskFilterDto } from './dto/demount-task-filter.dto';
 import { ReassignDemountTaskDto } from './dto/reassign-demount-task.dto';
@@ -50,6 +51,21 @@ export class DemountTasksController {
       req.socket?.remoteAddress;
     const scope = toScopeContext({ ...user, role: user.role });
     return this.demountTasksService.create(dto, user.id, ipAddress, scope);
+  }
+
+  @Post('bulk')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Masovno kreiraj zadatke demontaže za više brojila' })
+  createBulk(
+    @Body() dto: BulkCreateDemountTaskDto,
+    @CurrentUser() user: ScopedUser,
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress;
+    const scope = toScopeContext({ ...user, role: user.role });
+    return this.demountTasksService.createBulk(dto, user.id, ipAddress, scope);
   }
 
   @Get()

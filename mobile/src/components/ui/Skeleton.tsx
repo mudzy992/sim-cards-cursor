@@ -1,10 +1,11 @@
-/**
- * Skeleton — standardizovani loading placeholderi (umjesto ActivityIndicator
- * za strukturirane ekrane; instrukcije: "loading states vazni").
- */
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View, type ViewStyle } from 'react-native';
-import { palette, radii, spacing } from '@/theme/tokens';
+import { Animated, View, type ViewStyle } from 'react-native';
+import {
+  radii,
+  spacing,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 
 export interface SkeletonProps {
   width?: number | string;
@@ -13,14 +14,28 @@ export interface SkeletonProps {
   style?: ViewStyle;
 }
 
-export function Skeleton({ width = '100%', height = 16, radius = radii.sm, style }: SkeletonProps) {
+export function Skeleton({
+  width = '100%',
+  height = 16,
+  radius = radii.sm,
+  style,
+}: SkeletonProps) {
+  const styles = useThemedStyles(createStyles);
   const opacity = useRef(new Animated.Value(0.45)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.45, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.45,
+          duration: 700,
+          useNativeDriver: true,
+        }),
       ]),
     );
     loop.start();
@@ -31,15 +46,20 @@ export function Skeleton({ width = '100%', height = 16, radius = radii.sm, style
     <Animated.View
       style={[
         styles.base,
-        { width: width as ViewStyle['width'], height, borderRadius: radius, opacity },
+        {
+          width: width as ViewStyle['width'],
+          height,
+          borderRadius: radius,
+          opacity,
+        },
         style,
       ]}
     />
   );
 }
 
-/** Red obican za liste: kruzic + dvije linije. */
 export function SkeletonRow({ style }: { style?: ViewStyle }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={[styles.row, style]}>
       <Skeleton width={36} height={36} radius={radii.sm} />
@@ -51,7 +71,14 @@ export function SkeletonRow({ style }: { style?: ViewStyle }) {
   );
 }
 
-export function SkeletonRows({ count = 4, style }: { count?: number; style?: ViewStyle }) {
+export function SkeletonRows({
+  count = 4,
+  style,
+}: {
+  count?: number;
+  style?: ViewStyle;
+}) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={style}>
       {Array.from({ length: count }, (_, i) => (
@@ -61,9 +88,9 @@ export function SkeletonRows({ count = 4, style }: { count?: number; style?: Vie
   );
 }
 
-const styles = StyleSheet.create({
-  base: { backgroundColor: palette.surfaceMuted },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+const createStyles = (palette: ThemePalette) => ({
+  base: { backgroundColor: palette.surfaceSunken },
+  row: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md },
   rowBody: { flex: 1 },
   rowGap: { marginTop: spacing.sm },
   rowsGap: { marginBottom: spacing.lg },

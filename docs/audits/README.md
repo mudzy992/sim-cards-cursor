@@ -57,7 +57,7 @@ Ovaj direktorij sadrži sistematsku dokumentaciju sistema **modul po modul**, an
 
 | Run | Obuhvaćeni moduli | Status | Izvještaj |
 |---|---|---|---|
-| **Run 1** | `auth`, `users`, `distributions`, `branches`, `branch-moderators` | **Paket A (P0) implementiran (`8a5ab99`); Paket B/C na čekanju** | [`run-01-identity-org-access.md`](./run-01-identity-org-access.md) |
+| **Run 1** | `auth`, `users`, `distributions`, `branches`, `branch-moderators` | **Paketi A + B + C implementirani (`8a5ab99`, `f1b8f1f`)** | [`run-01-identity-org-access.md`](./run-01-identity-org-access.md) |
 | **Run 2** | `shipments`, `sim-cards` | **Paketi A + B + C implementirani (`sim-cards`, `shipments`, `prisma`, web, mobile)** | [`run-02-shipments-sim-cards.md`](./run-02-shipments-sim-cards.md) |
 | **Run 3** | `meters`, `meter-type-definitions`, `meter-type-fields` | **Paketi A + B + C implementirani (`meters`, `meter-type-definitions`, `prisma`, web, mobile)** | [`run-03-meters-types.md`](./run-03-meters-types.md) |
 | **Run 4** | `installation-records`, `photo-upload`, `files`, mobile `outbox` | **Paketi A + B + C implementirani (`installation-records`, `files`, `prisma`, web, mobile)** | [`run-04-records-files-outbox.md`](./run-04-records-files-outbox.md) |
@@ -65,3 +65,4 @@ Ovaj direktorij sadrži sistematsku dokumentaciju sistema **modul po modul**, an
 | **Run 6** | `mail`, `branch-email-recipients`, `notifications`, `push-tokens`, `push-campaigns` | **Paketi A + B + C implementirani (`mail`, `branch-email-recipients`, `notifications`, `push-tokens`, `push-campaigns`, `prisma`, web)** | [`run-06-mail-notifications-push.md`](./run-06-mail-notifications-push.md) |
 | **Run 7** | `dashboard`, `analytics` | **Paketi A + B + C implementirani (`dashboard`, `analytics`, `scope-filter`, web)** | [`run-07-dashboard-analytics.md`](./run-07-dashboard-analytics.md) |
 | **Run 8** | `settings`, `app-releases`, `activity-log`, `packages/shared`, globalna sigurnost | **Paketi A + B + C implementirani (`settings`, `app-releases`, `activity-log`, web/mobile tipovi)** | [`run-08-settings-releases-audit-global.md`](./run-08-settings-releases-audit-global.md) |
+| **Run 9** | `mobile/**` + Bulk Task Dispatch (`backend`/`frontend`) | **Paketi A + B + C implementirani (dual `light`/`dark` WCAG AAA, CI guardrails, offline draft, geo/SLA, barcode, bulk dispatch)** | [`run-09-mobile-field-app.md`](./run-09-mobile-field-app.md) |

@@ -1040,6 +1040,17 @@ const bs: TranslationDictionary = {
     statusNoCardSuffix: 'status: Bez kartice',
     operatorFieldLabel: 'Operator (kojem šaljete zadatak)',
     selectOperatorPlaceholder: 'Odaberite operatora',
+    bulk: {
+      selectedCount: 'Označeno brojila: {{count}}',
+      assignInstall: 'Masovna ugradnja SIM ({{count}})',
+      assignDemount: 'Masovna demontaža ({{count}})',
+      clearSelection: 'Poništi odabir',
+      installDrawerTitle: 'Masovno dodijeli zadatak ugradnje ({{count}})',
+      demountDrawerTitle: 'Masovno dodijeli zadatak demontaže ({{count}})',
+      eligibleMetersHint: 'Broj pogodnih brojila za ovu akciju: {{count}}',
+      resultPartial: 'Kreirano {{created}} od {{total}} zadataka (odbijeno: {{failed}}).',
+      resultSuccess: 'Uspješno kreirano {{created}} zadataka.',
+    },
     install: {
       drawerTitle: 'Zadatak ugradnje SIM kartice',
       taskCreated: 'Zadatak ugradnje SIM-a je kreiran.',

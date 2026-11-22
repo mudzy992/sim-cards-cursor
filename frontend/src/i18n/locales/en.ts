@@ -1040,6 +1040,17 @@ const en: TranslationDictionary = {
     statusNoCardSuffix: 'status: No card',
     operatorFieldLabel: 'Operator (to receive the task)',
     selectOperatorPlaceholder: 'Select an operator',
+    bulk: {
+      selectedCount: 'Selected meters: {{count}}',
+      assignInstall: 'Bulk SIM install ({{count}})',
+      assignDemount: 'Bulk demount ({{count}})',
+      clearSelection: 'Clear selection',
+      installDrawerTitle: 'Bulk assign install task ({{count}})',
+      demountDrawerTitle: 'Bulk assign demount task ({{count}})',
+      eligibleMetersHint: 'Eligible meters for this action: {{count}}',
+      resultPartial: 'Created {{created}} of {{total}} tasks (failed: {{failed}}).',
+      resultSuccess: 'Successfully created {{created}} tasks.',
+    },
     install: {
       drawerTitle: 'SIM installation task',
       taskCreated: 'SIM installation task created.',

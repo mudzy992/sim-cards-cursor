@@ -1,15 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { getOutboxCounts } from '@/offline/outbox';
 import { useAuthStore } from '@/store/auth.store';
-import { palette, radii, spacing } from '@/theme/tokens';
+import {
+  radii,
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 
-export function OfflineBanner({ onHeight }: { onHeight?: (height: number) => void }) {
+export function OfflineBanner({
+  onHeight,
+}: {
+  onHeight?: (height: number) => void;
+}) {
+  const { palette } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { isOnline } = useConnectivity();
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
@@ -44,7 +56,9 @@ export function OfflineBanner({ onHeight }: { onHeight?: (height: number) => voi
   if (isOnline && queuedTotal === 0) return null;
 
   const contentTopPadding =
-    Platform.OS === 'ios' ? Math.max(insets.top, 10) : Math.max(insets.top, 0) + 6;
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 10)
+      : Math.max(insets.top, 0) + 6;
 
   const hasFailed = counts.failed > 0;
   const isOffline = !isOnline;
@@ -57,10 +71,18 @@ export function OfflineBanner({ onHeight }: { onHeight?: (height: number) => voi
         hasFailed ? styles.bannerDanger : undefined,
         { paddingTop: contentTopPadding },
       ]}
-      onLayout={(event: LayoutChangeEvent) => onHeight?.(event.nativeEvent.layout.height)}
+      onLayout={(event: LayoutChangeEvent) =>
+        onHeight?.(event.nativeEvent.layout.height)
+      }
     >
       <Ionicons
-        name={isOffline ? 'cloud-offline-outline' : hasFailed ? 'alert-circle-outline' : 'sync-outline'}
+        name={
+          isOffline
+            ? 'cloud-offline-outline'
+            : hasFailed
+              ? 'alert-circle-outline'
+              : 'sync-outline'
+        }
         size={17}
         color={accentColor}
       />
@@ -78,23 +100,25 @@ export function OfflineBanner({ onHeight }: { onHeight?: (height: number) => voi
           accessibilityRole="button"
           accessibilityLabel="Otvori outbox red"
         >
-          <Text style={[styles.pillText, { color: accentColor }]}>Outbox ({queuedTotal})</Text>
+          <Text style={[styles.pillText, { color: accentColor }]}>
+            Outbox ({queuedTotal})
+          </Text>
         </Pressable>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   banner: {
-    position: 'absolute',
+    position: 'absolute' as const,
     top: 0,
     left: 0,
     right: 0,
     zIndex: 50,
     minHeight: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: spacing.sm,
     backgroundColor: palette.warningSoft,
     borderBottomWidth: 1,
@@ -106,12 +130,12 @@ const styles = StyleSheet.create({
     backgroundColor: palette.dangerSoft,
     borderBottomColor: palette.dangerBorder,
   },
-  text: { flex: 1, fontWeight: '700', fontSize: 12 },
+  text: { flex: 1, fontWeight: '700' as const, fontSize: 12 },
   pill: {
     borderWidth: 1,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
-  pillText: { fontSize: 11, fontWeight: '700' },
+  pillText: { fontSize: 11, fontWeight: '700' as const },
 });

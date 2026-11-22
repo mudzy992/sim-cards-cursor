@@ -1,16 +1,32 @@
-/** Novi priključak — vođeni zapisnik ugradnje, produkcijski payload 1:1. */
+/** Novi priključak — vođeni zapisnik ugradnje sa auto-save nacrtom i skeniranjem serijskog broja. */
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { installationRecordsApi, queueInstallationRecord, type CreateInstallationRecordPayload } from '@/api/installation-records.api';
+import {
+  installationRecordsApi,
+  queueInstallationRecord,
+  type CreateInstallationRecordPayload,
+} from '@/api/installation-records.api';
 import { meterTypeDefinitionsApi } from '@/api/meter-type-definitions.api';
 import { useAuthStore } from '@/store/auth.store';
 import { useConnectivity } from '@/hooks/useConnectivity';
-import { palette, spacing, type } from '@/theme/tokens';
+import {
+  clearRecordDraft,
+  hasMeaningfulDraftContent,
+  loadRecordDraft,
+  saveRecordDraft,
+  type RecordFormDraft,
+} from '@/offline/draft-store';
+import {
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 import { ScreenTitleBar } from '@/components/ui/ScreenTitleBar';
 import { WorkflowSteps } from '@/components/ui/WorkflowSteps';
 import { Field } from '@/components/ui/Field';
@@ -18,16 +34,35 @@ import { Panel } from '@/components/ui/Panel';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MeterTypePicker } from '@/features/records/MeterTypePicker';
-import { DynamicMeterFields, validateRequiredDynamicFields } from '@/features/tasks/DynamicMeterFields';
+import {
+  DynamicMeterFields,
+  validateRequiredDynamicFields,
+} from '@/features/tasks/DynamicMeterFields';
 import { LocationFields } from '@/features/records/LocationFields';
 import { PhotoCapture } from '@/features/records/PhotoCapture';
+import { hapticError, hapticSuccess } from '@/utils/haptics';
 
 export default function CreateRecordScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ simCardId?: string | string[] }>();
-  const simCardId = (typeof params.simCardId === 'string' ? params.simCardId : params.simCardId?.[0])?.trim() ?? '';
+  const { type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const params = useLocalSearchParams<{
+    simCardId?: string | string[];
+    pickedSerial?: string | string[];
+  }>();
+  const simCardId =
+    (typeof params.simCardId === 'string'
+      ? params.simCardId
+      : params.simCardId?.[0]
+    )?.trim() ?? '';
+  const pickedSerial =
+    (typeof params.pickedSerial === 'string'
+      ? params.pickedSerial
+      : params.pickedSerial?.[0]
+    )?.trim() ?? '';
   const user = useAuthStore((state) => state.user);
   const { isOnline } = useConnectivity();
+  const draftScope = `new:${simCardId}`;
 
   const [meterTypeId, setMeterTypeId] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -37,7 +72,9 @@ export default function CreateRecordScreen() {
   const [city, setCity] = useState('');
   const [municipality, setMunicipality] = useState('');
   const [measuringPoint, setMeasuringPoint] = useState('');
-  const [installationDate, setInstallationDate] = useState(new Date().toISOString().slice(0, 10));
+  const [installationDate, setInstallationDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [notes, setNotes] = useState('');
@@ -45,13 +82,116 @@ export default function CreateRecordScreen() {
   const [localPhotoUris, setLocalPhotoUris] = useState<string[]>([]);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [dynamicFieldValues, setDynamicFieldValues] = useState<Record<string, unknown>>({});
-  const [clientRequestId] = useState(() => `crid_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  const [dynamicFieldValues, setDynamicFieldValues] = useState<
+    Record<string, unknown>
+  >({});
+  const [clientRequestId] = useState(
+    () => `crid_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+  );
+  const [pendingDraft, setPendingDraft] = useState<RecordFormDraft | null>(
+    null,
+  );
+  const draftCheckedRef = useRef(false);
 
   useEffect(() => {
-    if (user?.role === 'USER' && user.branch?.name) setMunicipality(user.branch.name);
+    if (user?.role === 'USER' && user.branch?.name) {
+      setMunicipality(user.branch.name);
+    }
   }, [user?.role, user?.branch?.name]);
-  useEffect(() => { setDynamicFieldValues({}); }, [meterTypeId]);
+
+  useEffect(() => {
+    setDynamicFieldValues({});
+  }, [meterTypeId]);
+
+  useEffect(() => {
+    if (pickedSerial) {
+      setSerialNumber(pickedSerial);
+    }
+  }, [pickedSerial]);
+
+  // Provjeri postoji li spremljeni nacrt
+  useEffect(() => {
+    if (!user || !simCardId || draftCheckedRef.current) return;
+    draftCheckedRef.current = true;
+    void loadRecordDraft(user, draftScope).then((draft) => {
+      if (draft && hasMeaningfulDraftContent(draft)) {
+        setPendingDraft(draft);
+      }
+    });
+  }, [user, simCardId, draftScope]);
+
+  // Debounced auto-save nacrta
+  useEffect(() => {
+    if (!user || !simCardId) return;
+    const draftPayload = {
+      meterTypeId,
+      serialNumber,
+      year,
+      calibrationYear,
+      installationAddress,
+      city,
+      municipality,
+      measuringPoint,
+      installationDate,
+      latitude,
+      longitude,
+      notes,
+      dynamicFieldValues,
+    };
+    const timer = setTimeout(() => {
+      void saveRecordDraft(user, draftScope, draftPayload);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [
+    user,
+    simCardId,
+    draftScope,
+    meterTypeId,
+    serialNumber,
+    year,
+    calibrationYear,
+    installationAddress,
+    city,
+    municipality,
+    measuringPoint,
+    installationDate,
+    latitude,
+    longitude,
+    notes,
+    dynamicFieldValues,
+  ]);
+
+  const restoreDraft = () => {
+    if (!pendingDraft) return;
+    if (pendingDraft.meterTypeId) setMeterTypeId(pendingDraft.meterTypeId);
+    if (pendingDraft.serialNumber) setSerialNumber(pendingDraft.serialNumber);
+    if (pendingDraft.year) setYear(pendingDraft.year);
+    if (pendingDraft.calibrationYear)
+      setCalibrationYear(pendingDraft.calibrationYear);
+    if (pendingDraft.installationAddress)
+      setInstallationAddress(pendingDraft.installationAddress);
+    if (pendingDraft.city) setCity(pendingDraft.city);
+    if (pendingDraft.municipality) setMunicipality(pendingDraft.municipality);
+    if (pendingDraft.measuringPoint)
+      setMeasuringPoint(pendingDraft.measuringPoint);
+    if (pendingDraft.installationDate)
+      setInstallationDate(pendingDraft.installationDate);
+    if (pendingDraft.latitude) setLatitude(pendingDraft.latitude);
+    if (pendingDraft.longitude) setLongitude(pendingDraft.longitude);
+    if (pendingDraft.notes) setNotes(pendingDraft.notes);
+    if (pendingDraft.dynamicFieldValues) {
+      setDynamicFieldValues(pendingDraft.dynamicFieldValues);
+    }
+    setPendingDraft(null);
+    hapticSuccess();
+  };
+
+  const discardDraft = () => {
+    setPendingDraft(null);
+    if (user && simCardId) {
+      void clearRecordDraft(user, draftScope);
+    }
+  };
 
   const meterTypesQuery = useQuery({
     queryKey: ['meter-type-definitions', 'list'],
@@ -63,12 +203,18 @@ export default function CreateRecordScreen() {
     queryFn: () => meterTypeDefinitionsApi.listFields(meterTypeId),
     enabled: Boolean(meterTypeId),
   });
-  const meterTypes = Array.isArray(meterTypesQuery.data) ? meterTypesQuery.data : [];
+  const meterTypes = Array.isArray(meterTypesQuery.data)
+    ? meterTypesQuery.data
+    : [];
   const dynamicFields = useMemo(
     () => (Array.isArray(fieldsQuery.data) ? fieldsQuery.data : []),
     [fieldsQuery.data],
   );
-  const typesError = meterTypesQuery.isError || (meterTypesQuery.isFetched && !meterTypesQuery.isLoading && meterTypesQuery.data === undefined);
+  const typesError =
+    meterTypesQuery.isError ||
+    (meterTypesQuery.isFetched &&
+      !meterTypesQuery.isLoading &&
+      meterTypesQuery.data === undefined);
 
   const validation = useMemo(() => {
     const missing: string[] = [];
@@ -76,16 +222,26 @@ export default function CreateRecordScreen() {
     if (!serialNumber.trim()) missing.push('serijski broj');
     if (!year.trim()) missing.push('godina proizvodnje');
     if (!calibrationYear.trim()) missing.push('godina baždarenja');
-    missing.push(...validateRequiredDynamicFields(dynamicFields, dynamicFieldValues));
+    missing.push(
+      ...validateRequiredDynamicFields(dynamicFields, dynamicFieldValues),
+    );
     return missing;
   }, [meterTypeId, serialNumber, year, calibrationYear, dynamicFields, dynamicFieldValues]);
 
-  const buildPayload = (): CreateInstallationRecordPayload & { localPhotoUris?: string[] } => {
-    if (!user?.id || !simCardId) throw new Error('Nedostaje korisnik ili SIM kartica.');
-    if (validation.length) throw new Error(`Obavezna polja: ${validation.join(', ')}`);
+  const buildPayload = (): CreateInstallationRecordPayload & {
+    localPhotoUris?: string[];
+  } => {
+    if (!user?.id || !simCardId) {
+      throw new Error('Nedostaje korisnik ili SIM kartica.');
+    }
+    if (validation.length) {
+      throw new Error(`Obavezna polja: ${validation.join(', ')}`);
+    }
     const yearNumber = Number.parseInt(year, 10);
     const calibrationNumber = Number.parseInt(calibrationYear, 10);
-    if (!Number.isFinite(yearNumber) || !Number.isFinite(calibrationNumber)) throw new Error('Godine moraju biti cijeli brojevi.');
+    if (!Number.isFinite(yearNumber) || !Number.isFinite(calibrationNumber)) {
+      throw new Error('Godine moraju biti cijeli brojevi.');
+    }
     const lat = parseOptionalFloat(latitude);
     const lon = parseOptionalFloat(longitude);
     return {
@@ -104,7 +260,9 @@ export default function CreateRecordScreen() {
       measuringPoint: measuringPoint.trim() || undefined,
       latitude: lat,
       longitude: lon,
-      dynamicFieldValues: Object.keys(dynamicFieldValues).length ? dynamicFieldValues : undefined,
+      dynamicFieldValues: Object.keys(dynamicFieldValues).length
+        ? dynamicFieldValues
+        : undefined,
       notes: notes.trim() || undefined,
       photos: photoPaths.length ? photoPaths : undefined,
       ...(localPhotoUris.length ? { localPhotoUris } : {}),
@@ -114,11 +272,27 @@ export default function CreateRecordScreen() {
   const createMutation = useMutation({
     mutationFn: () => installationRecordsApi.create(buildPayload()),
     onSuccess: (created) => {
+      if (user && simCardId) void clearRecordDraft(user, draftScope);
+      hapticSuccess();
       if (created?.status === 'SEND_FAILED') {
-        Alert.alert('Zapisnik je kreiran', 'Slanje emaila nije uspjelo. Pokušajte ponovo iz detalja zapisnika.', [
-          { text: 'Detalji', onPress: () => router.replace({ pathname: '/(app)/record-details', params: { id: created.id } }) },
-          { text: 'Kasnije', onPress: () => router.replace('/(app)/(tabs)/records') },
-        ]);
+        Alert.alert(
+          'Zapisnik je kreiran',
+          'Slanje emaila nije uspjelo. Pokušajte ponovo iz detalja zapisnika.',
+          [
+            {
+              text: 'Detalji',
+              onPress: () =>
+                router.replace({
+                  pathname: '/(app)/record-details',
+                  params: { id: created.id },
+                }),
+            },
+            {
+              text: 'Kasnije',
+              onPress: () => router.replace('/(app)/(tabs)/records'),
+            },
+          ],
+        );
         return;
       }
       Alert.alert('Uspjeh', 'Zapisnik je kreiran i poslan na email.', [
@@ -129,72 +303,253 @@ export default function CreateRecordScreen() {
       if (axios.isAxiosError(error) && !error.response) {
         try {
           await queueInstallationRecord(buildPayload());
-          Alert.alert('Sačuvano offline', 'Zapisnik će biti automatski poslan kada se veza uspostavi.', [
-            { text: 'OK', onPress: () => router.replace('/(app)/(tabs)/records') },
-          ]);
+          if (user && simCardId) void clearRecordDraft(user, draftScope);
+          hapticSuccess();
+          Alert.alert(
+            'Sačuvano offline',
+            'Zapisnik će biti automatski poslan kada se veza uspostavi.',
+            [
+              {
+                text: 'OK',
+                onPress: () => router.replace('/(app)/(tabs)/records'),
+              },
+            ],
+          );
           return;
-        } catch { /* nastavi na standardnu poruku */ }
+        } catch {
+          /* nastavi na standardnu poruku */
+        }
       }
-      const message = axios.isAxiosError(error) && typeof error.response?.data?.message === 'string'
-        ? error.response.data.message : error instanceof Error ? error.message : 'Kreiranje zapisnika nije uspjelo.';
+      hapticError();
+      const message =
+        axios.isAxiosError(error) && typeof error.response?.data?.message === 'string'
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : 'Kreiranje zapisnika nije uspjelo.';
       Alert.alert('Greška', message);
     },
   });
 
   if (!simCardId) {
-    return <SafeAreaView style={styles.root} edges={['top']}>
-      <ScreenTitleBar title="Novi priključak" onBack={() => router.back()} />
-      <EmptyState icon="alert-circle-outline" title="Nedostaje SIM kartica"
-        description="Vratite se na skeniranje, zadužite karticu i odaberite kreiranje zapisnika."
-        actionLabel="Nazad" onAction={() => router.back()} />
-    </SafeAreaView>;
+    return (
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <ScreenTitleBar title="Novi priključak" onBack={() => router.back()} />
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Nedostaje SIM kartica"
+          description="Vratite se na skeniranje, zadužite karticu i odaberite kreiranje zapisnika."
+          actionLabel="Nazad"
+          onAction={() => router.back()}
+        />
+      </SafeAreaView>
+    );
   }
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScreenTitleBar title="Novi priključak" subtitle="Zapisnik ugradnje SIM kartice" onBack={() => router.back()} />
-      <KeyboardAwareScrollView contentContainerStyle={styles.content} bottomOffset={24} keyboardShouldPersistTaps="handled">
-        <WorkflowSteps header="NOVI PRIKLJUČAK · PODACI" steps={[
-          { key: 'sim', label: 'SIM kartica', state: 'done', detail: simCardId },
-          { key: 'meter', label: 'Brojilo', state: meterTypeId && serialNumber ? 'done' : 'current' },
-          { key: 'location', label: 'Lokacija', state: meterTypeId && serialNumber ? 'current' : 'pending' },
-          { key: 'confirm', label: 'Potvrda', state: validation.length ? 'pending' : 'current' },
-        ]} />
+      <ScreenTitleBar
+        title="Novi priključak"
+        subtitle="Zapisnik ugradnje SIM kartice"
+        onBack={() => router.back()}
+      />
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.content}
+        bottomOffset={24}
+        keyboardShouldPersistTaps="handled"
+      >
+        {pendingDraft ? (
+          <Panel tone="info" style={styles.draftBanner}>
+            <Text style={type.bodyStrong}>Pronađen nesačuvan nacrt</Text>
+            <Text style={[type.caption, styles.draftDesc]}>
+              Možete nastaviti gdje ste stali ili početi ispočetka.
+            </Text>
+            <View style={styles.draftActions}>
+              <ActionButton
+                title="Odbaci"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onPress={discardDraft}
+              />
+              <ActionButton
+                title="Vrati nacrt"
+                size="sm"
+                fullWidth={false}
+                onPress={restoreDraft}
+              />
+            </View>
+          </Panel>
+        ) : null}
+
+        <WorkflowSteps
+          header="NOVI PRIKLJUČAK · PODACI"
+          steps={[
+            {
+              key: 'sim',
+              label: 'SIM kartica',
+              state: 'done',
+              detail: simCardId,
+            },
+            {
+              key: 'meter',
+              label: 'Brojilo',
+              state: meterTypeId && serialNumber ? 'done' : 'current',
+            },
+            {
+              key: 'location',
+              label: 'Lokacija',
+              state: meterTypeId && serialNumber ? 'current' : 'pending',
+            },
+            {
+              key: 'confirm',
+              label: 'Potvrda',
+              state: validation.length ? 'pending' : 'current',
+            },
+          ]}
+        />
 
         <Text style={[type.sectionLabel, styles.sectionTitle]}>Brojilo</Text>
-        <MeterTypePicker items={meterTypes} value={meterTypeId} onChange={setMeterTypeId}
-          loading={meterTypesQuery.isLoading} error={typesError} />
-        <Field label="Serijski broj brojila" required value={serialNumber} onChangeText={setSerialNumber} autoCapitalize="characters" />
+        <MeterTypePicker
+          items={meterTypes}
+          value={meterTypeId}
+          onChange={setMeterTypeId}
+          loading={meterTypesQuery.isLoading}
+          error={typesError}
+        />
+        <Field
+          label="Serijski broj brojila"
+          required
+          value={serialNumber}
+          onChangeText={setSerialNumber}
+          autoCapitalize="characters"
+          trailingAction={{
+            icon: 'barcode-outline',
+            accessibilityLabel: 'Skeniraj serijski broj brojila',
+            onPress: () =>
+              router.push({
+                pathname: '/(app)/(tabs)/scan',
+                params: {
+                  afterScan: 'meterSerial',
+                  simCardId,
+                  target: 'new',
+                  returnRoute: 'create-record',
+                },
+              }),
+          }}
+        />
         <View style={styles.twoFields}>
-          <Field label="Godina proizvodnje" required value={year} onChangeText={(v) => setYear(v.replace(/\D/g, ''))} keyboardType="number-pad" style={styles.flexField} />
-          <Field label="Godina baždarenja" required value={calibrationYear} onChangeText={(v) => setCalibrationYear(v.replace(/\D/g, ''))} keyboardType="number-pad" style={styles.flexField} />
+          <Field
+            label="Godina proizvodnje"
+            required
+            value={year}
+            onChangeText={(v) => setYear(v.replace(/\D/g, ''))}
+            keyboardType="number-pad"
+            style={styles.flexField}
+          />
+          <Field
+            label="Godina baždarenja"
+            required
+            value={calibrationYear}
+            onChangeText={(v) => setCalibrationYear(v.replace(/\D/g, ''))}
+            keyboardType="number-pad"
+            style={styles.flexField}
+          />
         </View>
-        {meterTypeId ? <DynamicMeterFields fields={dynamicFields} values={dynamicFieldValues}
-          loading={fieldsQuery.isLoading} error={fieldsQuery.isError}
-          onChange={(name, value) => setDynamicFieldValues((current) => ({ ...current, [name]: value }))} /> : null}
+        {meterTypeId ? (
+          <DynamicMeterFields
+            fields={dynamicFields}
+            values={dynamicFieldValues}
+            loading={fieldsQuery.isLoading}
+            error={fieldsQuery.isError}
+            onChange={(name, value) =>
+              setDynamicFieldValues((current) => ({
+                ...current,
+                [name]: value,
+              }))
+            }
+          />
+        ) : null}
 
-        <Text style={[type.sectionLabel, styles.sectionTitle]}>Lokacija ugradnje</Text>
-        <Field label="Adresa instalacije" value={installationAddress} onChangeText={setInstallationAddress} placeholder="Ulica i broj" />
+        <Text style={[type.sectionLabel, styles.sectionTitle]}>
+          Lokacija ugradnje
+        </Text>
+        <Field
+          label="Adresa instalacije"
+          value={installationAddress}
+          onChangeText={setInstallationAddress}
+          placeholder="Ulica i broj"
+        />
         <Field label="Grad" value={city} onChangeText={setCity} />
-        <Field label="Općina" value={municipality} onChangeText={setMunicipality} />
-        <Field label="Mjerno mjesto" value={measuringPoint} onChangeText={setMeasuringPoint} />
-        <Field label="Datum instalacije" value={installationDate} onChangeText={setInstallationDate} placeholder="YYYY-MM-DD" />
-        <LocationFields latitude={latitude} longitude={longitude} onLatitude={setLatitude} onLongitude={setLongitude}
-          loading={isFetchingLocation} onLoading={setIsFetchingLocation} />
+        <Field
+          label="Općina"
+          value={municipality}
+          onChangeText={setMunicipality}
+        />
+        <Field
+          label="Mjerno mjesto"
+          value={measuringPoint}
+          onChangeText={setMeasuringPoint}
+        />
+        <Field
+          label="Datum instalacije"
+          value={installationDate}
+          onChangeText={setInstallationDate}
+          placeholder="YYYY-MM-DD"
+        />
+        <LocationFields
+          latitude={latitude}
+          longitude={longitude}
+          onLatitude={setLatitude}
+          onLongitude={setLongitude}
+          loading={isFetchingLocation}
+          onLoading={setIsFetchingLocation}
+        />
 
-        <PhotoCapture isOnline={isOnline} serialNumber={serialNumber} year={year}
-          uploadedPaths={photoPaths} localUris={localPhotoUris} onUploaded={setPhotoPaths} onLocal={setLocalPhotoUris}
-          loading={isUploadingPhoto} onLoading={setIsUploadingPhoto} />
+        <PhotoCapture
+          isOnline={isOnline}
+          serialNumber={serialNumber}
+          year={year}
+          uploadedPaths={photoPaths}
+          localUris={localPhotoUris}
+          onUploaded={setPhotoPaths}
+          onLocal={setLocalPhotoUris}
+          loading={isUploadingPhoto}
+          onLoading={setIsUploadingPhoto}
+        />
 
-        <Text style={[type.sectionLabel, styles.sectionTitle]}>Završne informacije</Text>
-        <Field label="Napomena" value={notes} onChangeText={setNotes} placeholder="Opcionalno" multiline />
-        {validation.length ? <Panel tone="warning" style={styles.validation}>
-          <Text style={type.bodyStrong}>Za potvrdu popunite:</Text>
-          <Text style={[type.caption, styles.validationText]}>{validation.join(', ')}</Text>
-        </Panel> : null}
-        <ActionButton title="Kreiraj zapisnik" icon="checkmark" size="lg" loading={createMutation.isPending}
-          disabled={validation.length > 0} onPress={() => createMutation.mutate()} />
-        <ActionButton title="Odustani" variant="ghost" onPress={() => router.back()} style={styles.cancel} />
+        <Text style={[type.sectionLabel, styles.sectionTitle]}>
+          Završne informacije
+        </Text>
+        <Field
+          label="Napomena"
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Opcionalno"
+          multiline
+        />
+        {validation.length ? (
+          <Panel tone="warning" style={styles.validation}>
+            <Text style={type.bodyStrong}>Za potvrdu popunite:</Text>
+            <Text style={[type.caption, styles.validationText]}>
+              {validation.join(', ')}
+            </Text>
+          </Panel>
+        ) : null}
+        <ActionButton
+          title="Kreiraj zapisnik"
+          icon="checkmark"
+          size="lg"
+          loading={createMutation.isPending}
+          disabled={validation.length > 0}
+          onPress={() => createMutation.mutate()}
+        />
+        <ActionButton
+          title="Odustani"
+          variant="ghost"
+          onPress={() => router.back()}
+          style={styles.cancel}
+        />
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );
@@ -206,11 +561,19 @@ function parseOptionalFloat(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   root: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+  draftBanner: { marginBottom: spacing.lg },
+  draftDesc: { marginTop: spacing.xs },
+  draftActions: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
   sectionTitle: { marginTop: spacing.xl, marginBottom: spacing.md },
-  twoFields: { flexDirection: 'row', gap: spacing.md },
+  twoFields: { flexDirection: 'row' as const, gap: spacing.md },
   flexField: { flex: 1 },
   validation: { marginBottom: spacing.lg },
   validationText: { marginTop: spacing.xs },

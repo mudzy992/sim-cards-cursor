@@ -1,15 +1,14 @@
-/**
- * SegmentedFilter — kompaktna segmentirana kontrola (iOS-style).
- * Zamjenjuje razvucene "chip" filtere: segmenti dijele jednaku sirinu,
- * traka je niska (~38pt), a brojaci su male oznake uz labelu.
- */
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { palette, radii, spacing } from '@/theme/tokens';
+import { Pressable, Text, View, type ViewStyle } from 'react-native';
+import {
+  radii,
+  spacing,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 
 export interface SegmentOption<T extends string> {
   key: T;
   label: string;
-  /** opcioni brojac; 0 i undefined se ne prikazuju */
   count?: number;
 }
 
@@ -26,6 +25,8 @@ export function SegmentedFilter<T extends string>({
   onChange,
   style,
 }: SegmentedFilterProps<T>) {
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={[styles.track, style]}>
       {options.map((option) => {
@@ -44,12 +45,17 @@ export function SegmentedFilter<T extends string>({
               pressed && !active ? styles.pressed : null,
             ]}
           >
-            <Text numberOfLines={1} style={[styles.label, active && styles.labelActive]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.label, active && styles.labelActive]}
+            >
               {option.label}
             </Text>
             {showCount ? (
               <View style={[styles.badge, active && styles.badgeActive]}>
-                <Text style={[styles.badgeText, active && styles.badgeTextActive]}>
+                <Text
+                  style={[styles.badgeText, active && styles.badgeTextActive]}
+                >
                   {count > 99 ? '99+' : count}
                 </Text>
               </View>
@@ -61,20 +67,22 @@ export function SegmentedFilter<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   track: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
     backgroundColor: palette.surfaceSunken,
     borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
     padding: 3,
     gap: 2,
   },
   segment: {
     flex: 1,
-    minHeight: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    minHeight: 34,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     gap: 5,
     borderRadius: radii.sm - 2,
     paddingHorizontal: spacing.sm,
@@ -87,7 +95,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.6 },
   label: {
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: '600' as const,
     color: palette.textMuted,
     flexShrink: 1,
   },
@@ -97,11 +105,15 @@ const styles = StyleSheet.create({
     height: 17,
     borderRadius: 8.5,
     paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.borderStrong,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: palette.surfaceMuted,
   },
   badgeActive: { backgroundColor: palette.brand },
-  badgeText: { fontSize: 10, fontWeight: '700', color: palette.textSecondary },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    color: palette.textPrimary,
+  },
   badgeTextActive: { color: palette.inverse },
 });

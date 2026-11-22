@@ -1,26 +1,20 @@
-/**
- * TabsLayout — REDIZAJN tab navigacije.
- *
- * Izmjene u odnosu na prethodnu verziju:
- *  1) 6 tabova -> 5. "Profil" je uklonjen iz trake (href: null) jer je rijetko
- *     koristen; ostaje dostupan preko avatara u headeru Pocetne. Ruta i dalje
- *     postoji, pa svi router.push('/(app)/(tabs)/profile') pozivi rade.
- *  2) Redoslijed prati stvarni terenski tok i stavlja skeniranje u centar:
- *     Pocetna · Ugradnja · [SKEN] · Demontaza · Zapisnici
- *  3) Skeniranje je vizuelno dominantno (brand krug), bez labele — primarna
- *     akcija aplikacije prema instrukcije.md §11.
- *  4) Badge logika za install/demount ostaje IDENTICNA (PENDING, refresh 45s).
- */
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { installTasksApi } from '@/api/install-tasks.api';
 import { demountTasksApi } from '@/api/demount-tasks.api';
-import { palette } from '@/theme/tokens';
+import {
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 
 function ScanTabIcon({ focused }: { focused: boolean }) {
+  const { palette } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={[styles.scanButton, focused && styles.scanButtonActive]}>
       <Ionicons name="barcode-outline" size={26} color={palette.inverse} />
@@ -29,8 +23,14 @@ function ScanTabIcon({ focused }: { focused: boolean }) {
 }
 
 export default function TabsLayout() {
-  const [installBadge, setInstallBadge] = useState<number | undefined>(undefined);
-  const [demountBadge, setDemountBadge] = useState<number | undefined>(undefined);
+  const { palette, isDark } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const [installBadge, setInstallBadge] = useState<number | undefined>(
+    undefined,
+  );
+  const [demountBadge, setDemountBadge] = useState<number | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     let alive = true;
@@ -60,11 +60,11 @@ export default function TabsLayout() {
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: palette.brand,
+          tabBarActiveTintColor: palette.brandText,
           tabBarInactiveTintColor: palette.textMuted,
           tabBarLabelStyle: styles.tabLabel,
           tabBarStyle: styles.tabBar,
@@ -72,18 +72,20 @@ export default function TabsLayout() {
           tabBarBadgeStyle: styles.badge,
         }}
       >
-        {/* 1 — Početna */}
         <Tabs.Screen
           name="home"
           options={{
             title: 'Početna',
             tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={size - 2} color={color} />
+              <Ionicons
+                name={focused ? 'home' : 'home-outline'}
+                size={size - 2}
+                color={color}
+              />
             ),
           }}
         />
 
-        {/* 2 — Ugradnja */}
         <Tabs.Screen
           name="install"
           options={{
@@ -99,7 +101,6 @@ export default function TabsLayout() {
           }}
         />
 
-        {/* 3 — Skeniranje (centralna primarna akcija) */}
         <Tabs.Screen
           name="scan"
           options={{
@@ -110,7 +111,6 @@ export default function TabsLayout() {
           }}
         />
 
-        {/* 4 — Demontaža */}
         <Tabs.Screen
           name="demount"
           options={{
@@ -126,25 +126,30 @@ export default function TabsLayout() {
           }}
         />
 
-        {/* 5 — Zapisnici */}
         <Tabs.Screen
           name="records"
           options={{
             title: 'Zapisnici',
             tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'albums' : 'albums-outline'} size={size - 2} color={color} />
+              <Ionicons
+                name={focused ? 'albums' : 'albums-outline'}
+                size={size - 2}
+                color={color}
+              />
             ),
           }}
         />
 
-        {/* Profil — ruta ostaje aktivna, ali van tab trake */}
-        <Tabs.Screen name="profile" options={{ href: null, title: 'Profil' }} />
+        <Tabs.Screen
+          name="profile"
+          options={{ href: null, title: 'Profil' }}
+        />
       </Tabs>
     </>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   tabBar: {
     backgroundColor: palette.surface,
     borderTopWidth: 1,
@@ -157,14 +162,14 @@ const styles = StyleSheet.create({
   tabItem: { paddingVertical: 0 },
   tabLabel: {
     fontSize: 10.5,
-    fontWeight: '600',
+    fontWeight: '600' as const,
     marginTop: 2,
   },
   badge: {
-    backgroundColor: palette.danger,
-    color: '#FFFFFF',
+    backgroundColor: palette.dangerSolid,
+    color: palette.inverse,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '700' as const,
     minWidth: 17,
     height: 17,
     lineHeight: 16,
@@ -174,8 +179,8 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 12,
     backgroundColor: palette.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   scanButtonActive: { backgroundColor: palette.brandPressed },
 });

@@ -1,18 +1,3 @@
-/**
- * ScanScreen — REDIZAJN (camera-first).
- *
- * Izmjene u odnosu na prethodnu verziju:
- *  1) Kamera je full-bleed preko cijelog ekrana; nema stalnog panela ispod
- *     koji joj je ranije oduzimao ~40% prostora.
- *  2) Rucni unos se otvara kao bottom sheet (dugme u donjoj traci), pa ne
- *     zauzima prostor dok se skenira.
- *  3) Dodano svjetlo (torch) — rad u mracnim ormaricima i podrumima.
- *  4) Animirana linija skeniranja + success flash + haptika/zvuk.
- *  5) Historija zadnja 3 skena kao kompaktni cipovi.
- *
- * Logika je NEPROMIJENJENA: expo-camera dozvole, barcode handler, ruta
- * afterScan (demount/install/inventory), beep + vibracija, validacija unosa.
- */
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { isValidIccid, normalizeIccid } from '@sim-tracker/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,40 +15,54 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  Vibration,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { APP_ASSETS } from '@/constants/assets';
-import { palette, radii, spacing } from '@/theme/tokens';
+import {
+  radii,
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 import { ActionButton } from '@/components/ui/ActionButton';
+import { hapticSuccess } from '@/utils/haptics';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const FRAME_W = Math.min(SCREEN_W * 0.78, 320);
 const FRAME_H = Math.round(FRAME_W / 2.1);
 
+function pickParam(value?: string | string[]): string | undefined {
+  return typeof value === 'string' ? value : value?.[0];
+}
+
 export default function ScanScreen() {
   const router = useRouter();
+  const { palette } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   const routeParams = useLocalSearchParams<{
     afterScan?: string | string[];
     demountTaskId?: string | string[];
     installTaskId?: string | string[];
+    returnTo?: string | string[];
+    simCardId?: string | string[];
+    serialTarget?: string | string[];
   }>();
-  const afterScan =
-    typeof routeParams.afterScan === 'string' ? routeParams.afterScan : routeParams.afterScan?.[0];
-  const demountTaskId =
-    typeof routeParams.demountTaskId === 'string'
-      ? routeParams.demountTaskId
-      : routeParams.demountTaskId?.[0];
-  const installTaskId =
-    typeof routeParams.installTaskId === 'string'
-      ? routeParams.installTaskId
-      : routeParams.installTaskId?.[0];
+
+  const afterScan = pickParam(routeParams.afterScan);
+  const demountTaskId = pickParam(routeParams.demountTaskId);
+  const installTaskId = pickParam(routeParams.installTaskId);
+  const returnTo = pickParam(routeParams.returnTo);
+  const simCardId = pickParam(routeParams.simCardId);
+  const serialTarget = pickParam(routeParams.serialTarget);
+  const isMeterSerialMode = afterScan === 'meterSerial';
 
   const [permission, requestPermission] = useCameraPermissions();
-  const [manualIccid, setManualIccid] = useState('');
+  const [manualValue, setManualValue] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [hasScanned, setHasScanned] = useState(false);
@@ -82,7 +81,6 @@ export default function ScanScreen() {
     }, []),
   );
 
-  /* animirana linija skeniranja — pauzira se nakon uspjesnog skena */
   useEffect(() => {
     if (hasScanned) {
       sweep.stopAnimation();
@@ -109,20 +107,48 @@ export default function ScanScreen() {
   }, [hasScanned, sweep]);
 
   const playFeedback = useCallback(() => {
-    Vibration.vibrate(50);
+    hapticSuccess();
     try {
       beepPlayer.seekTo(0);
       void beepPlayer.play();
     } catch {
-      // fallback samo na vibraciju
+      // fallback only to vibration
     }
     flash.setValue(1);
-    Animated.timing(flash, { toValue: 0, duration: 420, useNativeDriver: true }).start();
+    Animated.timing(flash, {
+      toValue: 0,
+      duration: 420,
+      useNativeDriver: true,
+    }).start();
   }, [beepPlayer, flash]);
 
   const openResult = useCallback(
-    (rawIccid: string) => {
-      const iccid = normalizeIccid(rawIccid);
+    (rawValue: string) => {
+      if (isMeterSerialMode) {
+        const cleaned = rawValue.trim();
+        if (cleaned.length < 3 || cleaned.length > 64) {
+          setScanError('Serijski broj brojila mora imati 3–64 znaka.');
+          return;
+        }
+        setHasScanned(true);
+        setManualOpen(false);
+        setTorch(false);
+        const targetPath =
+          returnTo === 'create-record-replacement'
+            ? '/(app)/create-record-replacement'
+            : '/(app)/create-record';
+        router.replace({
+          pathname: targetPath,
+          params: {
+            ...(simCardId ? { simCardId } : {}),
+            pickedSerial: cleaned,
+            ...(serialTarget ? { pickedSerialTarget: serialTarget } : {}),
+          },
+        });
+        return;
+      }
+
+      const iccid = normalizeIccid(rawValue);
       if (!iccid || !isValidIccid(iccid)) {
         setScanError('Unesite ispravan ICCID (10–30 cifara).');
         return;
@@ -130,7 +156,9 @@ export default function ScanScreen() {
       setHasScanned(true);
       setManualOpen(false);
       setTorch(false);
-      setHistory((prev) => [iccid, ...prev.filter((value) => value !== iccid)].slice(0, 3));
+      setHistory((prev) =>
+        [iccid, ...prev.filter((value) => value !== iccid)].slice(0, 3),
+      );
 
       if (afterScan === 'demount' && demountTaskId) {
         router.replace({
@@ -147,12 +175,24 @@ export default function ScanScreen() {
         return;
       }
       if (afterScan === 'inventory') {
-        router.replace({ pathname: '/(app)/offline-inventory', params: { pickedIccid: iccid } });
+        router.replace({
+          pathname: '/(app)/offline-inventory',
+          params: { pickedIccid: iccid },
+        });
         return;
       }
       router.push({ pathname: '/(app)/scan-result', params: { iccid } });
     },
-    [router, afterScan, demountTaskId, installTaskId],
+    [
+      router,
+      afterScan,
+      demountTaskId,
+      installTaskId,
+      isMeterSerialMode,
+      returnTo,
+      simCardId,
+      serialTarget,
+    ],
   );
 
   const handleBarcodeScanned = useCallback(
@@ -165,8 +205,9 @@ export default function ScanScreen() {
   );
 
   const hasPermission = permission?.granted === true;
-  const contextLabel =
-    afterScan === 'install'
+  const contextLabel = isMeterSerialMode
+    ? 'Skeniranje serijskog broja brojila'
+    : afterScan === 'install'
       ? 'Skeniranje za ugradnju'
       : afterScan === 'demount'
         ? 'Skeniranje zamjenske kartice'
@@ -184,19 +225,24 @@ export default function ScanScreen() {
           facing="back"
           enableTorch={torch}
           onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
-          barcodeScannerSettings={{ barcodeTypes: ['code128', 'code39', 'ean13', 'qr'] }}
+          barcodeScannerSettings={{
+            barcodeTypes: ['code128', 'code39', 'ean13', 'qr', 'datamatrix'],
+          }}
         />
       ) : null}
 
-      {/* success flash */}
-      <Animated.View pointerEvents="none" style={[styles.flash, { opacity: flash }]} />
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.flash, { opacity: flash }]}
+      />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        {/* ------------------------------ header ------------------------------ */}
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.title}>{contextLabel}</Text>
-            <Text style={styles.subtitle}>Poravnajte barkod unutar okvira</Text>
+            <Text style={styles.subtitle}>
+              Poravnajte barkod ili QR kod unutar okvira
+            </Text>
           </View>
           {hasPermission ? (
             <Pressable
@@ -212,24 +258,29 @@ export default function ScanScreen() {
               <Ionicons
                 name={torch ? 'flashlight' : 'flashlight-outline'}
                 size={20}
-                color={torch ? palette.graphite : '#FFFFFF'}
+                color={torch ? palette.graphite : palette.cameraFg}
               />
             </Pressable>
           ) : null}
         </View>
 
-        {/* ------------------------------- centar ------------------------------ */}
         <View style={styles.center}>
           {!permission ? (
             <Text style={styles.infoText}>Provjeravam dozvole kamere…</Text>
           ) : !hasPermission ? (
             <View style={styles.permissionCard}>
               <View style={styles.permissionIcon}>
-                <Ionicons name="camera-outline" size={26} color="#FFFFFF" />
+                <Ionicons
+                  name="camera-outline"
+                  size={26}
+                  color={palette.cameraFg}
+                />
               </View>
-              <Text style={styles.permissionTitle}>Pristup kameri nije odobren</Text>
+              <Text style={styles.permissionTitle}>
+                Pristup kameri nije odobren
+              </Text>
               <Text style={styles.permissionText}>
-                Za skeniranje barkoda sa SIM kartice potrebna je dozvola za kameru.
+                Za skeniranje barkoda potrebna je dozvola za kameru.
               </Text>
               <ActionButton
                 title="Dozvoli kameru"
@@ -262,7 +313,11 @@ export default function ScanScreen() {
                 />
               ) : (
                 <View style={styles.scannedBadge}>
-                  <Ionicons name="checkmark-circle" size={18} color={palette.success} />
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={18}
+                    color={palette.successBorder}
+                  />
                   <Text style={styles.scannedText}>Očitano</Text>
                 </View>
               )}
@@ -270,18 +325,24 @@ export default function ScanScreen() {
           )}
         </View>
 
-        {/* ------------------------------- footer ------------------------------ */}
         <View style={styles.footer}>
-          {history.length > 0 ? (
+          {!isMeterSerialMode && history.length > 0 ? (
             <View style={styles.historyRow}>
               {history.map((iccid) => (
                 <Pressable
                   key={iccid}
                   onPress={() => openResult(iccid)}
                   accessibilityRole="button"
-                  style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.75)" />
+                  <Ionicons
+                    name="time-outline"
+                    size={12}
+                    color={palette.cameraFg}
+                  />
                   <Text style={styles.chipText} numberOfLines={1}>
                     {iccid.length > 12 ? `…${iccid.slice(-10)}` : iccid}
                   </Text>
@@ -293,14 +354,21 @@ export default function ScanScreen() {
           <View style={styles.footerActions}>
             <Pressable
               onPress={() => {
-                setManualIccid('');
+                setManualValue('');
                 setScanError(null);
                 setManualOpen(true);
               }}
               accessibilityRole="button"
-              style={({ pressed }) => [styles.footerButton, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.footerButton,
+                pressed && styles.pressed,
+              ]}
             >
-              <Ionicons name="keypad-outline" size={18} color="#FFFFFF" />
+              <Ionicons
+                name="keypad-outline"
+                size={18}
+                color={palette.cameraFg}
+              />
               <Text style={styles.footerButtonText}>Ručni unos</Text>
             </Pressable>
 
@@ -317,7 +385,11 @@ export default function ScanScreen() {
                   pressed && styles.pressed,
                 ]}
               >
-                <Ionicons name="refresh" size={18} color="#FFFFFF" />
+                <Ionicons
+                  name="refresh"
+                  size={18}
+                  color={palette.cameraFg}
+                />
                 <Text style={styles.footerButtonText}>Skeniraj ponovo</Text>
               </Pressable>
             ) : null}
@@ -325,46 +397,58 @@ export default function ScanScreen() {
         </View>
       </SafeAreaView>
 
-      {/* --------------------------- ručni unos sheet --------------------------- */}
       <Modal
         visible={manualOpen}
         transparent
         animationType="slide"
         onRequestClose={() => setManualOpen(false)}
       >
-        <Pressable style={styles.sheetScrim} onPress={() => setManualOpen(false)} />
+        <Pressable
+          style={styles.sheetScrim}
+          onPress={() => setManualOpen(false)}
+        />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.sheetWrap}
         >
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Ručni unos ICCID-a</Text>
+            <Text style={styles.sheetTitle}>
+              {isMeterSerialMode
+                ? 'Ručni unos serijskog broja'
+                : 'Ručni unos ICCID-a'}
+            </Text>
             <Text style={styles.sheetHint}>
               Koristite kada je barkod oštećen ili nečitljiv.
             </Text>
             <TextInput
-              value={manualIccid}
+              value={manualValue}
               onChangeText={(text) => {
-                setManualIccid(text.replace(/\D/g, ''));
+                setManualValue(
+                  isMeterSerialMode ? text : text.replace(/\D/g, ''),
+                );
                 if (scanError) setScanError(null);
               }}
-              placeholder="npr. 89387012345678901234"
+              placeholder={
+                isMeterSerialMode ? 'npr. AMM-123456' : 'npr. 89387012345678901234'
+              }
               placeholderTextColor={palette.textMuted}
-              keyboardType="number-pad"
-              inputMode="numeric"
+              keyboardType={isMeterSerialMode ? 'default' : 'number-pad'}
+              autoCapitalize={isMeterSerialMode ? 'characters' : 'none'}
               returnKeyType="done"
               autoFocus
-              onSubmitEditing={() => openResult(manualIccid)}
+              onSubmitEditing={() => openResult(manualValue)}
               style={styles.sheetInput}
             />
-            {scanError ? <Text style={styles.sheetError}>{scanError}</Text> : null}
+            {scanError ? (
+              <Text style={styles.sheetError}>{scanError}</Text>
+            ) : null}
             <ActionButton
-              title="Provjeri ICCID"
-              icon="search"
+              title={isMeterSerialMode ? 'Potvrdi serijski broj' : 'Provjeri ICCID'}
+              icon={isMeterSerialMode ? 'checkmark' : 'search'}
               size="lg"
-              disabled={manualIccid.trim().length === 0}
-              onPress={() => openResult(manualIccid)}
+              disabled={manualValue.trim().length === 0}
+              onPress={() => openResult(manualValue)}
               style={styles.sheetAction}
             />
             <ActionButton
@@ -380,6 +464,7 @@ export default function ScanScreen() {
 }
 
 function FrameCorner({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View
       style={[
@@ -396,130 +481,194 @@ function FrameCorner({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
 const CORNER = 28;
 const CORNER_W = 3.5;
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000000' },
-  safe: { flex: 1, justifyContent: 'space-between' },
+const createStyles = (palette: ThemePalette) => ({
+  root: { flex: 1, backgroundColor: palette.cameraBg },
+  safe: { flex: 1, justifyContent: 'space-between' as const },
   flash: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(21, 128, 61, 0.35)',
+    backgroundColor: palette.successSoft,
   },
 
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
   },
   headerText: { flex: 1, minWidth: 0 },
-  title: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
-  subtitle: { color: 'rgba(255,255,255,0.62)', fontSize: 12.5, marginTop: 2 },
+  title: {
+    color: palette.cameraFg,
+    fontSize: 17,
+    fontWeight: '700' as const,
+    letterSpacing: -0.2,
+  },
+  subtitle: { color: palette.cameraFg, opacity: 0.78, fontSize: 12.5, marginTop: 2 },
   torch: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(15,23,42,0.55)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: palette.overlayScrim,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: palette.border,
   },
-  torchOn: { backgroundColor: '#FBBF24', borderColor: '#FBBF24' },
+  torchOn: {
+    backgroundColor: palette.cameraTorchActive,
+    borderColor: palette.cameraTorchActive,
+  },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
-  infoText: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
+  center: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: spacing.xl,
+  },
+  infoText: { color: palette.cameraFg, fontSize: 14 },
 
   frame: { width: FRAME_W, height: FRAME_H },
-  corner: { position: 'absolute', width: CORNER, height: CORNER, borderColor: '#FFFFFF' },
-  cornerTL: { top: 0, left: 0, borderTopWidth: CORNER_W, borderLeftWidth: CORNER_W, borderTopLeftRadius: 6 },
-  cornerTR: { top: 0, right: 0, borderTopWidth: CORNER_W, borderRightWidth: CORNER_W, borderTopRightRadius: 6 },
-  cornerBL: { bottom: 0, left: 0, borderBottomWidth: CORNER_W, borderLeftWidth: CORNER_W, borderBottomLeftRadius: 6 },
-  cornerBR: { bottom: 0, right: 0, borderBottomWidth: CORNER_W, borderRightWidth: CORNER_W, borderBottomRightRadius: 6 },
+  corner: {
+    position: 'absolute' as const,
+    width: CORNER,
+    height: CORNER,
+    borderColor: palette.cameraFg,
+  },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderTopWidth: CORNER_W,
+    borderLeftWidth: CORNER_W,
+    borderTopLeftRadius: 6,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderTopWidth: CORNER_W,
+    borderRightWidth: CORNER_W,
+    borderTopRightRadius: 6,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: CORNER_W,
+    borderLeftWidth: CORNER_W,
+    borderBottomLeftRadius: 6,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: CORNER_W,
+    borderRightWidth: CORNER_W,
+    borderBottomRightRadius: 6,
+  },
   sweep: {
-    position: 'absolute',
+    position: 'absolute' as const,
     left: 10,
     right: 10,
     height: 2,
     borderRadius: 2,
-    backgroundColor: '#60A5FA',
+    backgroundColor: palette.cameraSweep,
   },
   scannedBadge: {
-    position: 'absolute',
-    alignSelf: 'center',
-    top: '50%',
+    position: 'absolute' as const,
+    alignSelf: 'center' as const,
+    top: '50%' as const,
     marginTop: -14,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 6,
-    backgroundColor: 'rgba(15,23,42,0.82)',
+    backgroundColor: palette.overlayScrim,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
   },
-  scannedText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' },
+  scannedText: {
+    color: palette.cameraFg,
+    fontSize: 12.5,
+    fontWeight: '700' as const,
+  },
 
   permissionCard: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(15,23,42,0.75)',
+    alignItems: 'center' as const,
+    backgroundColor: palette.overlayScrim,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: palette.border,
     padding: spacing.xl,
   },
   permissionIcon: {
     width: 54,
     height: 54,
     borderRadius: radii.md,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: palette.graphiteSoft,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     marginBottom: spacing.lg,
   },
-  permissionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  permissionTitle: {
+    color: palette.cameraFg,
+    fontSize: 16,
+    fontWeight: '700' as const,
+    textAlign: 'center' as const,
+  },
   permissionText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: palette.cameraFg,
+    opacity: 0.8,
     fontSize: 13,
     lineHeight: 19,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     marginTop: spacing.sm,
   },
-  permissionAction: { marginTop: spacing.xl, alignSelf: 'stretch' },
+  permissionAction: { marginTop: spacing.xl, alignSelf: 'stretch' as const },
 
   footer: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md, gap: spacing.md },
-  historyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  historyRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm },
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 5,
-    backgroundColor: 'rgba(15,23,42,0.7)',
+    backgroundColor: palette.overlayScrim,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: palette.border,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
   },
-  chipText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '600', fontFamily: 'monospace' },
+  chipText: {
+    color: palette.cameraFg,
+    fontSize: 11.5,
+    fontWeight: '600' as const,
+    fontFamily: 'monospace' as const,
+  },
 
-  footerActions: { flexDirection: 'row', gap: spacing.md },
+  footerActions: { flexDirection: 'row' as const, gap: spacing.md },
   footerButton: {
     flex: 1,
     minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     gap: spacing.sm,
     borderRadius: radii.md,
-    backgroundColor: 'rgba(15,23,42,0.72)',
+    backgroundColor: palette.overlayScrim,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: palette.border,
   },
-  footerButtonPrimary: { backgroundColor: palette.brand, borderColor: palette.brand },
-  footerButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  footerButtonPrimary: {
+    backgroundColor: palette.brand,
+    borderColor: palette.brand,
+  },
+  footerButtonText: {
+    color: palette.cameraFg,
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
   pressed: { opacity: 0.72 },
 
   sheetScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: palette.overlayScrim },
-  sheetWrap: { flex: 1, justifyContent: 'flex-end' },
+  sheetWrap: { flex: 1, justifyContent: 'flex-end' as const },
   sheet: {
     backgroundColor: palette.background,
     borderTopLeftRadius: radii.xl,
@@ -529,28 +678,42 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   sheetHandle: {
-    alignSelf: 'center',
+    alignSelf: 'center' as const,
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: palette.borderStrong,
     marginBottom: spacing.lg,
   },
-  sheetTitle: { fontSize: 18, fontWeight: '700', color: palette.textPrimary },
-  sheetHint: { fontSize: 13, color: palette.textSecondary, marginTop: 4, marginBottom: spacing.lg },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: palette.textPrimary,
+  },
+  sheetHint: {
+    fontSize: 13,
+    color: palette.textSecondary,
+    marginTop: 4,
+    marginBottom: spacing.lg,
+  },
   sheetInput: {
     borderWidth: 1.5,
-    borderColor: palette.border,
+    borderColor: palette.borderStrong,
     borderRadius: radii.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: palette.surface,
     color: palette.textPrimary,
     fontSize: 17,
-    fontWeight: '700',
-    fontFamily: 'monospace',
+    fontWeight: '700' as const,
+    fontFamily: 'monospace' as const,
     letterSpacing: 1,
   },
-  sheetError: { marginTop: spacing.sm, color: palette.danger, fontSize: 13, fontWeight: '600' },
+  sheetError: {
+    marginTop: spacing.sm,
+    color: palette.danger,
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
   sheetAction: { marginTop: spacing.lg, marginBottom: spacing.sm },
 });

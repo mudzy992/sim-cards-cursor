@@ -1,28 +1,32 @@
-import type { ReactNode } from 'react'
-import type { ScrollViewProps, StyleProp, ViewStyle } from 'react-native'
-import { ScrollView, View } from 'react-native'
-import { colors } from '@/theme/colors'
+import type { ReactNode } from 'react';
+import type { ScrollViewProps, StyleProp, ViewStyle } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { useTheme } from '@/theme/tokens';
 
 type ScreenBaseProps = {
-  children: ReactNode
-  backgroundColor?: string
-  style?: StyleProp<ViewStyle>
-  contentStyle?: StyleProp<ViewStyle>
-  paddingHorizontal?: number
-}
+  children: ReactNode;
+  backgroundColor?: string;
+  style?: StyleProp<ViewStyle>;
+  contentStyle?: StyleProp<ViewStyle>;
+  paddingHorizontal?: number;
+};
 
 type ScreenScrollProps = ScreenBaseProps & {
-  scroll: true
-  scrollProps?: Omit<ScrollViewProps, 'contentContainerStyle' | 'style' | 'children'>
-}
+  scroll: true;
+  scrollProps?: Omit<
+    ScrollViewProps,
+    'contentContainerStyle' | 'style' | 'children'
+  >;
+};
 
 type ScreenStaticProps = ScreenBaseProps & {
-  scroll?: false
-}
+  scroll?: false;
+};
 
 export function Screen(props: ScreenScrollProps | ScreenStaticProps) {
-  const paddingHorizontal = props.paddingHorizontal ?? 16
-  const backgroundColor = props.backgroundColor ?? colors.background
+  const { colors } = useTheme();
+  const paddingHorizontal = props.paddingHorizontal ?? 16;
+  const backgroundColor = props.backgroundColor ?? colors.background;
 
   if ('scroll' in props && props.scroll) {
     return (
@@ -41,13 +45,17 @@ export function Screen(props: ScreenScrollProps | ScreenStaticProps) {
       >
         {props.children}
       </ScrollView>
-    )
+    );
   }
 
   return (
-    <View style={[{ flex: 1, backgroundColor, paddingHorizontal, paddingBottom: 20 }, props.style]}>
+    <View
+      style={[
+        { flex: 1, backgroundColor, paddingHorizontal, paddingBottom: 20 },
+        props.style,
+      ]}
+    >
       {props.children}
     </View>
-  )
+  );
 }
-

@@ -18,6 +18,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard'
 import { RolesGuard } from 'src/common/guards/roles.guard'
 import { toScopeContext } from 'src/common/utils/scope-filter.util'
 import { CreateInstallTaskDto } from './dto/create-install-task.dto'
+import { BulkCreateInstallTaskDto } from './dto/bulk-create-install-task.dto'
 import { CompleteInstallTaskDto } from './dto/complete-install-task.dto'
 import { InstallTaskFilterDto } from './dto/install-task-filter.dto'
 import { ReassignInstallTaskDto } from './dto/reassign-install-task.dto'
@@ -50,6 +51,21 @@ export class InstallTasksController {
       req.socket?.remoteAddress
     const scope = toScopeContext({ ...user, role: user.role })
     return this.installTasksService.create(dto, user.id, scope, ipAddress)
+  }
+
+  @Post('bulk')
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.DIST_ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Masovno kreiraj zadatke ugradnje SIM-a za više brojila' })
+  createBulk(
+    @Body() dto: BulkCreateInstallTaskDto,
+    @CurrentUser() user: ScopedUser,
+    @Req() req: Request,
+  ) {
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress
+    const scope = toScopeContext({ ...user, role: user.role })
+    return this.installTasksService.createBulk(dto, user.id, scope, ipAddress)
   }
 
   @Get()

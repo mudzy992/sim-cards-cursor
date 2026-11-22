@@ -1,29 +1,38 @@
 import { SHARED_THEME_COLORS } from '@sim-tracker/shared';
+import type { ResolvedThemeScheme } from '@/store/theme.store';
 
-const dark = SHARED_THEME_COLORS.dark;
+export function buildThemeColors(scheme: ResolvedThemeScheme) {
+  const base = SHARED_THEME_COLORS[scheme];
+  return {
+    primary: base.accentPrimary,
+    primaryPressed: base.accentHover,
+    primaryDark: base.accentPrimary,
+    onPrimary: base.accentOnPrimary,
+    link: base.accentLink,
+    disabled: base.borderDefault,
+
+    background: base.canvas,
+    surface: base.surface,
+    surfaceMuted: base.surfaceRaised,
+    border: base.borderSubtle,
+    text: base.textPrimary,
+    textMuted: base.textMuted,
+
+    danger: base.status.danger.border,
+    warningSurface: base.status.warning.bg,
+    warningBorder: base.status.warning.border,
+  } as const;
+}
+
+export type ThemeColors = ReturnType<typeof buildThemeColors>;
+
+export const colorThemes: Record<ResolvedThemeScheme, ThemeColors> = {
+  light: buildThemeColors('light'),
+  dark: buildThemeColors('dark'),
+};
 
 /**
- * SIM Tracker legacy/global boje — DARK ONLY.
- *
- * Bazne površine i semantičke statusne boje sinhronizovane sa
- * `@sim-tracker/shared` WCAG AAA tokenima.
+ * Default static fallback colors (dark scheme) for non-component callers.
+ * Components and screens should use `useTheme().colors`.
  */
-export const colors = {
-  primary: '#4D82E6',
-  primaryPressed: '#376CC9',
-  primaryDark: dark.accentPrimary,
-  onPrimary: dark.accentOnPrimary,
-  link: dark.accentLink,
-  disabled: '#566275',
-
-  background: dark.canvas,
-  surface: dark.surface,
-  surfaceMuted: dark.surfaceRaised,
-  border: dark.borderSubtle,
-  text: dark.textPrimary,
-  textMuted: dark.textMuted,
-
-  danger: dark.status.danger.border,
-  warningSurface: dark.status.warning.bg,
-  warningBorder: dark.status.warning.border,
-} as const;
+export const colors = colorThemes.dark;

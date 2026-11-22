@@ -1,9 +1,15 @@
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import * as Location from 'expo-location';
-import { spacing, type } from '@/theme/tokens';
+import {
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 import { Field } from '@/components/ui/Field';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { Panel } from '@/components/ui/Panel';
+import { hapticSuccess, hapticWarning } from '@/utils/haptics';
 
 export function LocationFields({
   latitude,
@@ -20,19 +26,33 @@ export function LocationFields({
   loading: boolean;
   onLoading: (v: boolean) => void;
 }) {
+  const { type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   const fetchLocation = async () => {
     onLoading(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Dozvola za lokaciju', 'Za automatski unos GPS koordinata omogućite lokaciju u postavkama uređaja.');
+        hapticWarning();
+        Alert.alert(
+          'Dozvola za lokaciju',
+          'Za automatski unos GPS koordinata omogućite lokaciju u postavkama uređaja.',
+        );
         return;
       }
-      const result = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const result = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
       onLatitude(result.coords.latitude.toFixed(6));
       onLongitude(result.coords.longitude.toFixed(6));
+      hapticSuccess();
     } catch {
-      Alert.alert('GPS nije dostupan', 'Provjerite da je lokacija uključena i pokušajte ponovo.');
+      hapticWarning();
+      Alert.alert(
+        'GPS nije dostupan',
+        'Provjerite da je lokacija uključena i pokušajte ponovo.',
+      );
     } finally {
       onLoading(false);
     }
@@ -41,24 +61,45 @@ export function LocationFields({
   return (
     <View>
       <Text style={[type.sectionLabel, styles.heading]}>GPS lokacija</Text>
-      <Panel tone={latitude && longitude ? 'success' : 'default'} style={styles.panel}>
+      <Panel
+        tone={latitude && longitude ? 'success' : 'default'}
+        style={styles.panel}
+      >
         <Text style={type.caption}>
-          Automatski dohvat je preporučen radi tačne evidencije terenske lokacije.
+          Automatski dohvat je preporučen radi tačne evidencije terenske
+          lokacije.
         </Text>
         <View style={styles.fields}>
-          <Field label="Širina" value={latitude} onChangeText={onLatitude} keyboardType="decimal-pad" style={styles.field} />
-          <Field label="Dužina" value={longitude} onChangeText={onLongitude} keyboardType="decimal-pad" style={styles.field} />
+          <Field
+            label="Širina"
+            value={latitude}
+            onChangeText={onLatitude}
+            keyboardType="decimal-pad"
+            style={styles.field}
+          />
+          <Field
+            label="Dužina"
+            value={longitude}
+            onChangeText={onLongitude}
+            keyboardType="decimal-pad"
+            style={styles.field}
+          />
         </View>
-        <ActionButton title={latitude && longitude ? 'Osvježi GPS' : 'Dohvati GPS'} icon="location-outline"
-          onPress={() => void fetchLocation()} loading={loading} variant="secondary" />
+        <ActionButton
+          title={latitude && longitude ? 'Osvježi GPS' : 'Dohvati GPS'}
+          icon="location-outline"
+          onPress={() => void fetchLocation()}
+          loading={loading}
+          variant="secondary"
+        />
       </Panel>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (_palette: ThemePalette) => ({
   heading: { marginBottom: spacing.md },
   panel: { marginBottom: spacing.xl },
   fields: { marginTop: spacing.lg },
-  field: { fontFamily: 'monospace' },
+  field: { fontFamily: 'monospace' as const },
 });

@@ -473,5 +473,29 @@ describe('InstallTasksService — lifecycle & atomic locks', () => {
         }),
       );
     });
+
+    it('createBulk deduplicates meterIds and collects partial successes and failures', async () => {
+      const { service } = createMocks();
+      const createSpy = jest
+        .spyOn(service, 'create')
+        .mockResolvedValueOnce({ id: 'it-1', meterId: 'm-1' } as never)
+        .mockRejectedValueOnce(new BadRequestException('Already has open install task'));
+
+      const res = await service.createBulk(
+        {
+          meterIds: ['m-1', 'm-1', 'm-2'],
+          assignedToId: 'op-1',
+          notes: 'Batch route',
+        },
+        'admin-1',
+        adminScope,
+      );
+
+      expect(createSpy).toHaveBeenCalledTimes(2);
+      expect(res.totalRequested).toBe(2);
+      expect(res.createdCount).toBe(1);
+      expect(res.failedCount).toBe(1);
+      expect(res.failed[0].meterId).toBe('m-2');
+    });
   });
 });

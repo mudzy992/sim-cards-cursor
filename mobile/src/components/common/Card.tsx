@@ -1,15 +1,16 @@
-import type { ReactNode } from 'react'
-import type { StyleProp, ViewStyle } from 'react-native'
-import { View } from 'react-native'
-import { colors } from '@/theme/colors'
+import type { ReactNode } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { View } from 'react-native';
+import { useTheme } from '@/theme/tokens';
 
 export function Card({
   children,
   style,
 }: {
-  children: ReactNode
-  style?: StyleProp<ViewStyle>
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
 }) {
+  const { colors } = useTheme();
   return (
     <View
       style={[
@@ -26,6 +27,5 @@ export function Card({
     >
       {children}
     </View>
-  )
+  );
 }
-

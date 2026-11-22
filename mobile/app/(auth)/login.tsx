@@ -1,13 +1,3 @@
-/**
- * LoginScreen — REDIZAJN (Faza 2)
- * Logika identična prethodnoj verziji:
- *  - useAuth().login({ emailOrUsername, password })
- *  - 401 → "Pogrešan email/korisničko ime ili lozinka."
- *  - ostale greške → getApiErrorMessage
- *  - useServerHealth + ručna provjera servera
- *  - uspjeh → router.replace('/(app)/(tabs)/home')
- * Prezentacija: brand header + neutral form (instrukcije: plava selektivno).
- */
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { useState } from 'react';
@@ -17,7 +7,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -29,7 +18,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { getApiErrorMessage } from '@/utils/error.utils';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { useServerHealth } from '@/hooks/useServerHealth';
-import { palette, radii, spacing, type } from '@/theme/tokens';
+import {
+  radii,
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { StatusBadge, type StatusTone } from '@/components/ui/StatusBadge';
 import { useTranslation } from '@/i18n/i18n.store';
@@ -38,12 +33,18 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
   const { t } = useTranslation();
-  const { status: serverStatus, check: checkServer } = useServerHealth({ timeoutMs: 2500 });
+  const { palette, type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const { status: serverStatus, check: checkServer } = useServerHealth({
+    timeoutMs: 2500,
+  });
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [focusedField, setFocusedField] = useState<'user' | 'pass' | null>(null);
+  const [focusedField, setFocusedField] = useState<'user' | 'pass' | null>(
+    null,
+  );
 
   const submit = async () => {
     setIsLoading(true);
@@ -62,7 +63,8 @@ export default function LoginScreen() {
     }
   };
 
-  const canSubmit = !isLoading && emailOrUsername.trim().length > 0 && password.length > 0;
+  const canSubmit =
+    !isLoading && emailOrUsername.trim().length > 0 && password.length > 0;
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
@@ -77,32 +79,46 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ------------------------------ brand header ------------------------------ */}
           <View style={styles.brandBlock}>
-            <ServerStatusChip status={serverStatus} onRetry={() => void checkServer()} t={t} />
+            <ServerStatusChip
+              status={serverStatus}
+              onRetry={() => void checkServer()}
+              t={t}
+            />
             <View style={styles.logoRow}>
               <LogoWatermark />
-              <Text style={styles.appName}>{t('mobile.auth.login.appName')}</Text>
-              <Text style={styles.appNameSub}>{t('mobile.auth.login.appTagline')}</Text>
+              <Text style={styles.appName}>
+                {t('mobile.auth.login.appName')}
+              </Text>
+              <Text style={styles.appNameSub}>
+                {t('mobile.auth.login.appTagline')}
+              </Text>
             </View>
           </View>
 
-          {/* --------------------------------- forma --------------------------------- */}
           <View style={styles.formBlock}>
-            <Text style={type.screenTitle}>{t('mobile.auth.login.title')}</Text>
+            <Text style={type.screenTitle}>
+              {t('mobile.auth.login.title')}
+            </Text>
             <Text style={[type.caption, styles.formIntro]}>
               {t('mobile.auth.login.intro')}
             </Text>
 
             {error ? (
               <View style={styles.errorBox}>
-                <Ionicons name="alert-circle" size={18} color={palette.danger} />
+                <Ionicons
+                  name="alert-circle"
+                  size={18}
+                  color={palette.danger}
+                />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : null}
 
             <View style={styles.fieldGroup}>
-              <Text style={type.sectionLabel}>{t('mobile.auth.login.emailOrUsernameLabel')}</Text>
+              <Text style={type.sectionLabel}>
+                {t('mobile.auth.login.emailOrUsernameLabel')}
+              </Text>
               <TextInput
                 value={emailOrUsername}
                 onChangeText={(val) => {
@@ -117,12 +133,17 @@ export default function LoginScreen() {
                 returnKeyType="next"
                 onFocus={() => setFocusedField('user')}
                 onBlur={() => setFocusedField(null)}
-                style={[styles.input, focusedField === 'user' && styles.inputFocused]}
+                style={[
+                  styles.input,
+                  focusedField === 'user' && styles.inputFocused,
+                ]}
               />
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={type.sectionLabel}>{t('mobile.auth.login.passwordLabel')}</Text>
+              <Text style={type.sectionLabel}>
+                {t('mobile.auth.login.passwordLabel')}
+              </Text>
               <TextInput
                 value={password}
                 onChangeText={(val) => {
@@ -138,7 +159,10 @@ export default function LoginScreen() {
                 }}
                 onFocus={() => setFocusedField('pass')}
                 onBlur={() => setFocusedField(null)}
-                style={[styles.input, focusedField === 'pass' && styles.inputFocused]}
+                style={[
+                  styles.input,
+                  focusedField === 'pass' && styles.inputFocused,
+                ]}
               />
             </View>
 
@@ -162,8 +186,6 @@ export default function LoginScreen() {
   );
 }
 
-/* ---------------------------- statusni chip ----------------------------- */
-
 function ServerStatusChip({
   status,
   onRetry,
@@ -173,8 +195,14 @@ function ServerStatusChip({
   onRetry: () => void;
   t: (key: string) => string;
 }) {
+  const { palette } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const tone: StatusTone =
-    status === 'online' ? 'success' : status === 'offline' ? 'danger' : 'neutral';
+    status === 'online'
+      ? 'success'
+      : status === 'offline'
+        ? 'danger'
+        : 'neutral';
   const label =
     status === 'online'
       ? t('mobile.auth.login.serverOnline')
@@ -185,19 +213,32 @@ function ServerStatusChip({
   return (
     <View style={styles.chipRow}>
       {status === 'checking' ? (
-        <ActivityIndicator size="small" color="rgba(255,255,255,0.8)" style={styles.chipSpinner} />
+        <ActivityIndicator
+          size="small"
+          color={palette.cameraFg}
+          style={styles.chipSpinner}
+        />
       ) : null}
-      <StatusBadge tone={tone} label={label} showDot={status !== 'checking'} />
-      <Pressable onPress={onRetry} hitSlop={8} accessibilityRole="button" style={styles.retry}>
-        <Text style={styles.retryText}>{t('mobile.auth.login.retryCheck')}</Text>
+      <StatusBadge
+        tone={tone}
+        label={label}
+        showDot={status !== 'checking'}
+      />
+      <Pressable
+        onPress={onRetry}
+        hitSlop={8}
+        accessibilityRole="button"
+        style={styles.retry}
+      >
+        <Text style={styles.retryText}>
+          {t('mobile.auth.login.retryCheck')}
+        </Text>
       </Pressable>
     </View>
   );
 }
 
-/* -------------------------------- stilovi -------------------------------- */
-
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   root: { flex: 1, backgroundColor: palette.graphite },
   flex: { flex: 1 },
   scrollContent: { flexGrow: 1 },
@@ -209,9 +250,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl + spacing.lg,
   },
   chipRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'flex-end' as const,
     marginBottom: spacing.xl,
     gap: spacing.md,
   },
@@ -221,23 +262,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    backgroundColor: palette.graphite0050,
+    borderColor: palette.borderStrong,
+    backgroundColor: palette.graphiteSoft,
   },
-  retryText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
-  logoRow: { alignItems: 'flex-start' },
+  retryText: {
+    color: palette.cameraFg,
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+  logoRow: { alignItems: 'flex-start' as const },
   appName: {
     marginTop: spacing.lg,
     fontSize: 30,
-    fontWeight: '800',
+    fontWeight: '800' as const,
     letterSpacing: -0.5,
-    color: '#FFFFFF',
+    color: palette.cameraFg,
   },
   appNameSub: {
     marginTop: spacing.xs,
     fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.55)',
+    fontWeight: '500' as const,
+    color: palette.textMuted,
     letterSpacing: 0.2,
   },
 
@@ -251,11 +296,15 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxl,
     paddingBottom: spacing.xxl,
   },
-  formIntro: { marginTop: spacing.xs, marginBottom: spacing.xl, lineHeight: 19 },
+  formIntro: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.xl,
+    lineHeight: 19,
+  },
 
   errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: spacing.sm,
     backgroundColor: palette.dangerSoft,
     borderWidth: 1,
@@ -265,13 +314,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     marginBottom: spacing.lg,
   },
-  errorText: { flex: 1, color: palette.danger, fontSize: 13, fontWeight: '600' },
+  errorText: {
+    flex: 1,
+    color: palette.danger,
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
 
   fieldGroup: { marginBottom: spacing.lg },
   input: {
     marginTop: spacing.sm,
     borderWidth: 1.5,
-    borderColor: palette.border,
+    borderColor: palette.borderStrong,
     borderRadius: radii.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -284,7 +338,7 @@ const styles = StyleSheet.create({
   submit: { marginTop: spacing.sm },
   footerHint: {
     marginTop: spacing.xl,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     color: palette.textMuted,
   },
 });

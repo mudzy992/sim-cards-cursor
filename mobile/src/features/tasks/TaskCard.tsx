@@ -1,18 +1,47 @@
-/** Zajednicki prikaz instalacijskog/demontaznog zadatka. */
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radii, spacing, type } from '@/theme/tokens';
+import {
+  radii,
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 import { StatusBadge, type StatusTone } from '@/components/ui/StatusBadge';
 import { ActionButton } from '@/components/ui/ActionButton';
+import { formatDistance } from '@/utils/geo';
 
-export type OperationalTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type OperationalTaskStatus =
+  | 'PENDING'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'CANCELLED';
 
-const statusMeta: Record<OperationalTaskStatus, { label: string; tone: StatusTone }> = {
+const statusMeta: Record<
+  OperationalTaskStatus,
+  { label: string; tone: StatusTone }
+> = {
   PENDING: { label: 'Čeka', tone: 'warning' },
   IN_PROGRESS: { label: 'U toku', tone: 'info' },
   COMPLETED: { label: 'Završeno', tone: 'success' },
   CANCELLED: { label: 'Otkazano', tone: 'neutral' },
 };
+
+function getSlaBadge(
+  status: OperationalTaskStatus,
+  createdAt?: string,
+): { label: string; tone: 'warning' | 'danger' } | null {
+  if (!createdAt || status === 'COMPLETED' || status === 'CANCELLED') {
+    return null;
+  }
+  const ageHours = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
+  if (!Number.isFinite(ageHours) || ageHours < 48) return null;
+  const days = Math.floor(ageHours / 24);
+  if (ageHours >= 120) {
+    return { label: `Hitno · ${days}d`, tone: 'danger' };
+  }
+  return { label: `SLA · ${days}d`, tone: 'warning' };
+}
 
 export interface TaskCardProps {
   title: string;
@@ -23,6 +52,8 @@ export interface TaskCardProps {
   metadata?: Array<{ label: string; value: string }>;
   pendingOffline?: boolean;
   updating?: boolean;
+  distanceMeters?: number | null;
+  onNavigate?: () => void;
   primaryLabel?: string;
   onPrimary?: () => void;
   secondaryLabel?: string;
@@ -30,12 +61,18 @@ export interface TaskCardProps {
 }
 
 export function TaskCard(props: TaskCardProps) {
+  const { palette, type } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const meta = statusMeta[props.status];
+  const sla = getSlaBadge(props.status, props.createdAt);
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.titleWrap}>
-          <Text style={type.dataLarge} numberOfLines={1}>{props.title}</Text>
+          <Text style={type.dataLarge} numberOfLines={1}>
+            {props.title}
+          </Text>
           {props.createdAt ? (
             <Text style={[type.caption, styles.created]} numberOfLines={1}>
               {new Date(props.createdAt).toLocaleString('bs-BA')}
@@ -43,12 +80,57 @@ export function TaskCard(props: TaskCardProps) {
             </Text>
           ) : null}
         </View>
-        <StatusBadge tone={meta.tone} label={meta.label} showDot={props.status === 'IN_PROGRESS'} />
+        <View style={styles.badgesCol}>
+          <StatusBadge
+            tone={meta.tone}
+            label={meta.label}
+            showDot={props.status === 'IN_PROGRESS'}
+          />
+          {sla ? <StatusBadge tone={sla.tone} label={sla.label} /> : null}
+        </View>
       </View>
+
+      {props.distanceMeters != null || props.onNavigate ? (
+        <View style={styles.geoBar}>
+          {props.distanceMeters != null ? (
+            <View style={styles.distanceChip}>
+              <Ionicons
+                name="navigate-outline"
+                size={14}
+                color={palette.info}
+              />
+              <Text style={styles.distanceText}>
+                {formatDistance(props.distanceMeters)}
+              </Text>
+            </View>
+          ) : null}
+          {props.onNavigate ? (
+            <Pressable
+              onPress={props.onNavigate}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.mapButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons
+                name="map-outline"
+                size={14}
+                color={palette.brandText}
+              />
+              <Text style={styles.mapButtonText}>Navigacija</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       {props.pendingOffline ? (
         <View style={styles.offlineRow}>
-          <Ionicons name="cloud-offline-outline" size={14} color={palette.warning} />
+          <Ionicons
+            name="cloud-offline-outline"
+            size={14}
+            color={palette.warning}
+          />
           <Text style={styles.offlineText}>Promjena čeka slanje</Text>
         </View>
       ) : null}
@@ -56,9 +138,14 @@ export function TaskCard(props: TaskCardProps) {
       {props.metadata?.length ? (
         <View style={styles.metadata}>
           {props.metadata.map((item, index) => (
-            <View key={`${item.label}-${index}`} style={[styles.metaRow, index > 0 && styles.metaDivider]}>
+            <View
+              key={`${item.label}-${index}`}
+              style={[styles.metaRow, index > 0 && styles.metaDivider]}
+            >
               <Text style={styles.metaLabel}>{item.label}</Text>
-              <Text style={styles.metaValue} numberOfLines={2}>{item.value}</Text>
+              <Text style={styles.metaValue} numberOfLines={2}>
+                {item.value}
+              </Text>
             </View>
           ))}
         </View>
@@ -96,14 +183,16 @@ export function TaskCard(props: TaskCardProps) {
               style={styles.actionPrimary}
             />
           ) : null}
-          {props.updating && !props.primaryLabel ? <ActivityIndicator color={palette.brand} /> : null}
+          {props.updating && !props.primaryLabel ? (
+            <ActivityIndicator color={palette.brandText} />
+          ) : null}
         </View>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   card: {
     borderWidth: 1,
     borderColor: palette.border,
@@ -112,29 +201,109 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.md,
   },
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  header: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, gap: spacing.md },
   titleWrap: { flex: 1, minWidth: 0 },
   created: { marginTop: 3 },
+  badgesCol: { alignItems: 'flex-end' as const, gap: spacing.xs },
+  geoBar: {
+    marginTop: spacing.md,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.sm,
+    flexWrap: 'wrap' as const,
+  },
+  distanceChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+    backgroundColor: palette.infoSoft,
+    borderWidth: 1,
+    borderColor: palette.infoBorder,
+  },
+  distanceText: {
+    color: palette.info,
+    fontSize: 12,
+    fontWeight: '700' as const,
+    fontFamily: 'monospace' as const,
+  },
+  mapButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+    backgroundColor: palette.brandSoft,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+  },
+  mapButtonText: {
+    color: palette.brandText,
+    fontSize: 12,
+    fontWeight: '700' as const,
+  },
+  pressed: { opacity: 0.7 },
   offlineRow: {
     marginTop: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 6,
     backgroundColor: palette.warningSoft,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 7,
   },
-  offlineText: { color: palette.warning, fontSize: 12, fontWeight: '600' },
-  metadata: { marginTop: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border },
-  metaRow: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.sm },
-  metaDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border },
-  metaLabel: { width: 90, color: palette.textMuted, fontSize: 12, fontWeight: '600' },
-  metaValue: { flex: 1, color: palette.textPrimary, fontSize: 13, fontWeight: '600', fontFamily: 'monospace' },
-  note: { marginTop: spacing.md, padding: spacing.md, backgroundColor: palette.surfaceMuted, borderRadius: radii.sm },
-  noteLabel: { color: palette.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
-  noteText: { marginTop: 3, color: palette.textSecondary, fontSize: 13, lineHeight: 18 },
-  actions: { marginTop: spacing.lg, flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
+  offlineText: { color: palette.warning, fontSize: 12, fontWeight: '600' as const },
+  metadata: {
+    marginTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: palette.border,
+  },
+  metaRow: { flexDirection: 'row' as const, gap: spacing.md, paddingVertical: spacing.sm },
+  metaDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: palette.border,
+  },
+  metaLabel: {
+    width: 90,
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+  metaValue: {
+    flex: 1,
+    color: palette.textPrimary,
+    fontSize: 13,
+    fontWeight: '600' as const,
+    fontFamily: 'monospace' as const,
+  },
+  note: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: palette.surfaceSunken,
+    borderRadius: radii.sm,
+  },
+  noteLabel: {
+    color: palette.textMuted,
+    fontSize: 10,
+    fontWeight: '700' as const,
+    letterSpacing: 0.8,
+  },
+  noteText: {
+    marginTop: 3,
+    color: palette.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  actions: {
+    marginTop: spacing.lg,
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    gap: spacing.sm,
+  },
   action: { minWidth: 100 },
   actionPrimary: { minWidth: 112 },
 });

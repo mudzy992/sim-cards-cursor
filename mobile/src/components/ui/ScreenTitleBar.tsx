@@ -1,7 +1,11 @@
-/** Jedinstven naslov tab ekrana, sa opcionom desnom akcijom. */
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, spacing, type } from '@/theme/tokens';
+import {
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 
 export function ScreenTitleBar({
   title,
@@ -13,12 +17,14 @@ export function ScreenTitleBar({
 }: {
   title: string;
   subtitle?: string;
-  /** prikazuje kompaktno back dugme na stack ekranima */
   onBack?: () => void;
   actionIcon?: keyof typeof Ionicons.glyphMap;
   actionLabel?: string;
   onAction?: () => void;
 }) {
+  const { palette, type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.row}>
       {onBack ? (
@@ -34,23 +40,34 @@ export function ScreenTitleBar({
       ) : null}
       <View style={styles.body}>
         <Text style={type.screenTitle}>{title}</Text>
-        {subtitle ? <Text style={[type.caption, styles.subtitle]}>{subtitle}</Text> : null}
+        {subtitle ? (
+          <Text style={[type.caption, styles.subtitle]}>{subtitle}</Text>
+        ) : null}
       </View>
       {onAction ? (
-        <Pressable onPress={onAction} accessibilityRole="button" style={styles.action} hitSlop={6}>
-          {actionIcon ? <Ionicons name={actionIcon} size={18} color={palette.brand} /> : null}
-          {actionLabel ? <Text style={styles.actionText}>{actionLabel}</Text> : null}
+        <Pressable
+          onPress={onAction}
+          accessibilityRole="button"
+          style={styles.action}
+          hitSlop={6}
+        >
+          {actionIcon ? (
+            <Ionicons name={actionIcon} size={18} color={palette.brandText} />
+          ) : null}
+          {actionLabel ? (
+            <Text style={styles.actionText}>{actionLabel}</Text>
+          ) : null}
         </Pressable>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
@@ -59,11 +76,21 @@ const styles = StyleSheet.create({
   back: {
     width: 40,
     height: 44,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+    alignItems: 'flex-start' as const,
+    justifyContent: 'center' as const,
   },
   pressed: { opacity: 0.55 },
   subtitle: { marginTop: 2 },
-  action: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: spacing.md },
-  actionText: { color: palette.brand, fontSize: 14, fontWeight: '600' },
+  action: {
+    minHeight: 44,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    paddingLeft: spacing.md,
+  },
+  actionText: {
+    color: palette.brandText,
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
 });

@@ -1,23 +1,20 @@
-/**
- * ConnectionPill — trajni indikator povezanosti/sinhronizacije
- * (instrukcije.md §10: "Jesam li online? Jesu li podaci sinhronizovani?"
- * mora biti jasno u par sekundi). Neutralna/amber tonacija po stanju.
- */
 import { StyleSheet, Text, View } from 'react-native';
-import { palette, radii, spacing } from '@/theme/tokens';
+import { radii, spacing, useTheme } from '@/theme/tokens';
 
 export interface ConnectionPillProps {
   isOnline: boolean;
-  /** npr. "Sve sinhronizovano" ili "Podaci mozda nisu azurni" */
   detail?: string | null;
-  /** amber upozorenje npr. kad su podaci zastarjjeli */
   attention?: boolean;
 }
 
-export function ConnectionPill({ isOnline, detail, attention = false }: ConnectionPillProps) {
+export function ConnectionPill({
+  isOnline,
+  detail,
+  attention = false,
+}: ConnectionPillProps) {
+  const { palette } = useTheme();
   const tone = !isOnline || attention ? 'attention' : 'ok';
-  const dotColor =
-    tone === 'ok' ? palette.success : palette.warning;
+  const dotColor = tone === 'ok' ? palette.success : palette.warning;
   const bg = tone === 'ok' ? palette.successSoft : palette.warningSoft;
   const border = tone === 'ok' ? palette.successBorder : palette.warningBorder;
   const textColor = tone === 'ok' ? palette.success : palette.warning;

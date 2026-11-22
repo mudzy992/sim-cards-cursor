@@ -1,6 +1,18 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import type { MeterTypeDefinitionItem } from '@/api/meter-type-definitions.api';
-import { palette, radii, spacing, type } from '@/theme/tokens';
+import {
+  radii,
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 
 export function MeterTypePicker({
   label = 'Tip brojila',
@@ -17,26 +29,48 @@ export function MeterTypePicker({
   loading?: boolean;
   error?: boolean;
 }) {
+  const { palette, type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.wrap}>
       <Text style={type.sectionLabel}>{label} *</Text>
-      {loading ? <ActivityIndicator color={palette.brand} style={styles.loader} /> : error ? (
-        <Text style={styles.error}>Nije moguće učitati tipove brojila. Provjerite mrežu.</Text>
+      {loading ? (
+        <ActivityIndicator color={palette.brandText} style={styles.loader} />
+      ) : error ? (
+        <Text style={styles.error}>
+          Nije moguće učitati tipove brojila. Provjerite mrežu.
+        </Text>
       ) : !items.length ? (
         <Text style={styles.empty}>Nema definisanih tipova brojila.</Text>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.row}
+        >
           {items.map((item) => {
             const selected = item.id === value;
             return (
               <Pressable
                 key={item.id}
                 onPress={() => onChange(item.id)}
-                style={({ pressed }) => [styles.item, selected && styles.selected, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.item,
+                  selected && styles.selected,
+                  pressed && styles.pressed,
+                ]}
               >
-                <Text style={[styles.label, selected && styles.selectedLabel]}>{item.name}</Text>
+                <Text
+                  style={[styles.label, selected && styles.selectedLabel]}
+                >
+                  {item.name}
+                </Text>
                 {item.manufacturer || item.model ? (
-                  <Text style={[styles.meta, selected && styles.selectedMeta]} numberOfLines={1}>
+                  <Text
+                    style={[styles.meta, selected && styles.selectedMeta]}
+                    numberOfLines={1}
+                  >
                     {[item.manufacturer, item.model].filter(Boolean).join(' · ')}
                   </Text>
                 ) : null}
@@ -49,7 +83,7 @@ export function MeterTypePicker({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   wrap: { marginBottom: spacing.lg },
   loader: { marginVertical: spacing.xl },
   row: { gap: spacing.sm, paddingTop: spacing.sm, paddingRight: spacing.xl },
@@ -64,10 +98,14 @@ const styles = StyleSheet.create({
   },
   selected: { borderColor: palette.brand, backgroundColor: palette.brandSoft },
   pressed: { opacity: 0.72 },
-  label: { color: palette.textPrimary, fontSize: 14, fontWeight: '600' },
-  selectedLabel: { color: palette.brandPressed },
+  label: {
+    color: palette.textPrimary,
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  selectedLabel: { color: palette.brandText },
   meta: { marginTop: 3, color: palette.textMuted, fontSize: 11 },
-  selectedMeta: { color: palette.brand },
+  selectedMeta: { color: palette.brandText },
   error: { marginTop: spacing.sm, color: palette.danger, fontSize: 13 },
   empty: { marginTop: spacing.sm, color: palette.textMuted, fontSize: 13 },
 });

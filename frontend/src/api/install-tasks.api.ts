@@ -61,6 +61,29 @@ export const installTasksApi = {
     return response.data.data
   },
 
+  createBulk: async (payload: {
+    meterIds: string[]
+    assignedToId: string
+    notes?: string
+  }): Promise<{
+    totalRequested: number
+    createdCount: number
+    failedCount: number
+    created: InstallTaskItem[]
+    failed: Array<{ meterId: string; message: string }>
+  }> => {
+    const response = await axiosInstance.post<
+      ApiEnvelope<{
+        totalRequested: number
+        createdCount: number
+        failedCount: number
+        created: InstallTaskItem[]
+        failed: Array<{ meterId: string; message: string }>
+      }>
+    >('/install-tasks/bulk', payload)
+    return response.data.data
+  },
+
   updateStatus: async (id: string, status: InstallTaskStatus): Promise<InstallTaskItem> => {
     const response = await axiosInstance.patch<ApiEnvelope<InstallTaskItem>>(
       `/install-tasks/${id}/status`,

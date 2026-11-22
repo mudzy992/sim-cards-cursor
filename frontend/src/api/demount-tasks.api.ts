@@ -103,6 +103,34 @@ export const demountTasksApi = {
     return response.data.data;
   },
 
+  createBulk: async (payload: {
+    meterIds: string[];
+    assignedToId: string;
+    notes?: string;
+    taskType?: DemountTaskType;
+    requestedResolution: DemountCompletionResolution;
+    requestedReason: string;
+    requestedRemovedSimDisposition: RemovedSimDisposition;
+    requestedMeterDemountCategory?: MeterDemountCategory;
+  }): Promise<{
+    totalRequested: number;
+    createdCount: number;
+    failedCount: number;
+    created: DemountTaskItem[];
+    failed: Array<{ meterId: string; message: string }>;
+  }> => {
+    const response = await axiosInstance.post<
+      ApiEnvelope<{
+        totalRequested: number;
+        createdCount: number;
+        failedCount: number;
+        created: DemountTaskItem[];
+        failed: Array<{ meterId: string; message: string }>;
+      }>
+    >('/demount-tasks/bulk', payload);
+    return response.data.data;
+  },
+
   updateStatus: async (
     id: string,
     status: DemountTaskStatus,

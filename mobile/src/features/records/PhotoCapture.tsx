@@ -1,11 +1,17 @@
 import axios from 'axios';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { installationRecordsApi } from '@/api/installation-records.api';
-import { palette, spacing, type } from '@/theme/tokens';
+import {
+  spacing,
+  useTheme,
+  useThemedStyles,
+  type ThemePalette,
+} from '@/theme/tokens';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { Panel } from '@/components/ui/Panel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { hapticSuccess } from '@/utils/haptics';
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const CAPTURE_OPTIONS: ImagePicker.ImagePickerOptions = {
@@ -36,7 +42,12 @@ export function PhotoCapture({
   loading: boolean;
   onLoading: (v: boolean) => void;
 }) {
-  const handleAsset = async (asset: ImagePicker.ImagePickerAsset | undefined) => {
+  const { type } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
+  const handleAsset = async (
+    asset: ImagePicker.ImagePickerAsset | undefined,
+  ) => {
     const uri = asset?.uri;
     if (!uri) return;
     if (typeof asset.fileSize === 'number' && asset.fileSize > MAX_PHOTO_BYTES) {
@@ -50,17 +61,23 @@ export function PhotoCapture({
     try {
       if (!isOnline) {
         onLocal([...localUris, uri]);
+        hapticSuccess();
         return;
       }
       const parsedYear = year ? Number.parseInt(year, 10) : undefined;
       const path = await installationRecordsApi.uploadPhoto(uri, {
         serialNumber: serialNumber.trim(),
-        year: typeof parsedYear === 'number' && Number.isFinite(parsedYear) ? parsedYear : undefined,
+        year:
+          typeof parsedYear === 'number' && Number.isFinite(parsedYear)
+            ? parsedYear
+            : undefined,
       });
       onUploaded([...uploadedPaths, path]);
+      hapticSuccess();
     } catch (error) {
       if (axios.isAxiosError(error) && !error.response) {
         onLocal([...localUris, uri]);
+        hapticSuccess();
         return;
       }
       const message =
@@ -76,7 +93,10 @@ export function PhotoCapture({
   const captureFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Dozvola za kameru', 'Za snimanje fotografija potrebna je dozvola za kameru.');
+      Alert.alert(
+        'Dozvola za kameru',
+        'Za snimanje fotografija potrebna je dozvola za kameru.',
+      );
       return;
     }
     const result = await ImagePicker.launchCameraAsync(CAPTURE_OPTIONS);
@@ -86,7 +106,10 @@ export function PhotoCapture({
   const pickFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Dozvola za galeriju', 'Za odabir fotografije potrebna je dozvola za galeriju.');
+      Alert.alert(
+        'Dozvola za galeriju',
+        'Za odabir fotografije potrebna je dozvola za galeriju.',
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync(CAPTURE_OPTIONS);
@@ -99,10 +122,14 @@ export function PhotoCapture({
       <Panel>
         <View style={styles.statuses}>
           <StatusBadge tone="success" label={`Poslano ${uploadedPaths.length}`} />
-          <StatusBadge tone={localUris.length ? 'warning' : 'neutral'} label={`Čeka ${localUris.length}`} />
+          <StatusBadge
+            tone={localUris.length ? 'warning' : 'neutral'}
+            label={`Čeka ${localUris.length}`}
+          />
         </View>
         <Text style={[type.caption, styles.help]}>
-          Fotografije su opcionalne (kompresija 70%). Offline snimci šalju se iz outbox reda kada se veza vrati.
+          Fotografije su opcionalne (kompresija 70%). Offline snimci šalju se iz
+          outbox reda kada se veza vrati.
         </Text>
         <View style={styles.actions}>
           <ActionButton
@@ -125,9 +152,13 @@ export function PhotoCapture({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => ({
   heading: { marginBottom: spacing.md },
-  statuses: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  help: { marginVertical: spacing.lg, lineHeight: 18, color: palette.textSecondary },
+  statuses: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.sm },
+  help: {
+    marginVertical: spacing.lg,
+    lineHeight: 18,
+    color: palette.textSecondary,
+  },
   actions: { gap: spacing.sm },
 });
