@@ -101,6 +101,8 @@ export const Platform = {
     spec.android ?? spec.default,
 };
 
+export const NativeModules: Record<string, unknown> = {};
+
 export const Dimensions = {
   get: () => ({ width: 390, height: 844, scale: 2, fontScale: 1 }),
 };

@@ -278,11 +278,23 @@ export default function ScanScreen() {
         setOcrCandidates([]);
         setManualValue('');
         if (classified.kind === 'missing_native_module') {
-          setOcrNotice(t('mobile.scan.ocrMissingNativeModule'));
+          setOcrNotice(
+            classified.detail
+              ? `${t('mobile.scan.ocrMissingNativeModule')} (${classified.detail})`
+              : t('mobile.scan.ocrMissingNativeModule'),
+          );
         } else if (classified.kind === 'unsupported') {
-          setOcrNotice(t('mobile.scan.ocrNotSupported'));
+          setOcrNotice(
+            classified.detail
+              ? `${t('mobile.scan.ocrNotSupported')} (${classified.detail})`
+              : t('mobile.scan.ocrNotSupported'),
+          );
         } else if (classified.kind === 'model_downloading') {
-          setOcrNotice(t('mobile.scan.ocrModelDownloading'));
+          setOcrNotice(
+            classified.detail
+              ? `${t('mobile.scan.ocrModelDownloading')} (${classified.detail})`
+              : t('mobile.scan.ocrModelDownloading'),
+          );
         } else if (classified.detail) {
           setOcrNotice(
             t('mobile.scan.ocrFailedDetail', { detail: classified.detail }),
@@ -727,7 +739,7 @@ export default function ScanScreen() {
                     setManualOpen(false);
                     setTimeout(() => {
                       void handleOcrScan();
-                    }, 120);
+                    }, 250);
                   }}
                   accessibilityRole="button"
                   style={({ pressed }) => [
