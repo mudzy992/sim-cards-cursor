@@ -95,6 +95,17 @@ export const startActivityAsync = jest.fn(async () => ({ resultCode: -1 }));
 
 export const isSupported = true;
 export const extractTextFromImage = jest.fn(async (_uri: string) => [] as string[]);
+export function requireOptionalNativeModule<ModuleType = unknown>(
+  moduleName: string,
+): ModuleType | null {
+  if (moduleName === 'ExpoTextExtractor') {
+    return {
+      isSupported,
+      extractTextFromImage,
+    } as unknown as ModuleType;
+  }
+  return null;
+}
 
 export default {
   expoConfig: { version: '1.0.0' },
@@ -106,4 +117,5 @@ export default {
   startActivityAsync,
   isSupported,
   extractTextFromImage,
+  requireOptionalNativeModule,
 };

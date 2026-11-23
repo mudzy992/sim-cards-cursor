@@ -1,3 +1,4 @@
+import * as expoMock from 'expo-modules-core';
 import * as textExtractor from 'expo-text-extractor';
 import {
   classifyOcrError,
@@ -10,14 +11,25 @@ describe('ocr-native', () => {
     jest.clearAllMocks();
   });
 
-  it('returns recognized lines from expo-text-extractor', async () => {
+  it('strips file:// prefix and returns recognized lines from ExpoTextExtractor native module', async () => {
     const spy = jest
       .spyOn(textExtractor, 'extractTextFromImage')
       .mockResolvedValueOnce(['S/N: 48201944', '230V 50Hz']);
 
     const lines = await runNativeOcr('file:///tmp/meter.jpg');
-    expect(spy).toHaveBeenCalledWith('file:///tmp/meter.jpg');
+    expect(spy).toHaveBeenCalledWith('/tmp/meter.jpg');
     expect(lines).toEqual(['S/N: 48201944', '230V 50Hz']);
+  });
+
+  it('throws missing_native_module when ExpoTextExtractor is absent from binary', async () => {
+    const reqSpy = jest
+      .spyOn(expoMock, 'requireOptionalNativeModule')
+      .mockReturnValueOnce(null);
+
+    await expect(runNativeOcr('file:///tmp/meter.jpg')).rejects.toMatchObject({
+      kind: 'missing_native_module',
+    });
+    expect(reqSpy).toHaveBeenCalledWith('ExpoTextExtractor');
   });
 
   it('classifies native module, ML Kit model download, and file errors cleanly', () => {

@@ -1,3 +1,5 @@
+import { requireOptionalNativeModule } from 'expo-modules-core';
+
 export type OcrErrorKind =
   | 'missing_native_module'
   | 'unsupported'
@@ -17,21 +19,18 @@ export class OcrExecutionError extends Error {
   }
 }
 
-interface TextExtractorApi {
+interface ExpoTextExtractorNative {
   isSupported?: boolean;
   extractTextFromImage?: (uri: string) => Promise<string[]>;
 }
 
-async function loadModule(): Promise<TextExtractorApi | null> {
-  try {
-    const mod: TextExtractorApi = await import('expo-text-extractor');
-    if (typeof mod?.extractTextFromImage !== 'function') {
-      return null;
-    }
-    return mod;
-  } catch {
-    return null;
+function getNativeTextExtractor(): ExpoTextExtractorNative | null {
+  const nativeMod =
+    requireOptionalNativeModule<ExpoTextExtractorNative>('ExpoTextExtractor');
+  if (nativeMod && typeof nativeMod.extractTextFromImage === 'function') {
+    return nativeMod;
   }
+  return null;
 }
 
 export function classifyOcrError(error: unknown): OcrExecutionError {
@@ -55,7 +54,7 @@ export function classifyOcrError(error: unknown): OcrExecutionError {
   }
   if (
     lower.includes('optional module') ||
-    lower.includes('model') && lower.includes('download') ||
+    (lower.includes('model') && lower.includes('download')) ||
     lower.includes('waiting for the text')
   ) {
     return new OcrExecutionError('model_downloading', message);
@@ -67,7 +66,7 @@ export function classifyOcrError(error: unknown): OcrExecutionError {
 }
 
 export async function runNativeOcr(uri: string): Promise<string[]> {
-  const mod = await loadModule();
+  const mod = getNativeTextExtractor();
   if (!mod || typeof mod.extractTextFromImage !== 'function') {
     throw new OcrExecutionError(
       'missing_native_module',
@@ -81,7 +80,10 @@ export async function runNativeOcr(uri: string): Promise<string[]> {
     );
   }
   try {
-    const result = await mod.extractTextFromImage(uri);
+    const processedUri = uri.startsWith('file://')
+      ? uri.slice('file://'.length)
+      : uri;
+    const result = await mod.extractTextFromImage(processedUri);
     return Array.isArray(result) ? result.map(String) : [];
   } catch (error) {
     throw classifyOcrError(error);
