@@ -21,6 +21,7 @@ const config: Config = {
     '^expo-file-system(.*)$': '<rootDir>/src/test-utils/expo.mock.ts',
     '^expo-intent-launcher$': '<rootDir>/src/test-utils/expo.mock.ts',
     '^expo-haptics$': '<rootDir>/src/test-utils/expo.mock.ts',
+    '^expo-modules-core$': '<rootDir>/src/test-utils/expo.mock.ts',
     '^expo-text-extractor$': '<rootDir>/src/test-utils/expo.mock.ts',
     '^@react-native-community/netinfo$': '<rootDir>/src/test-utils/expo.mock.ts',
   },
