@@ -1,3 +1,4 @@
+import { NativeModules } from 'react-native';
 import * as expoMock from 'expo-modules-core';
 import * as textExtractor from 'expo-text-extractor';
 import {
@@ -9,9 +10,22 @@ import {
 describe('ocr-native', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    delete NativeModules.OfflineOcr;
   });
 
-  it('strips file:// prefix and returns recognized lines from ExpoTextExtractor native module', async () => {
+  it('prefers bundled OfflineOcr native module when available and strips file://', async () => {
+    const extractMock = jest.fn(async () => ['89387012345678901234']);
+    NativeModules.OfflineOcr = {
+      isSupported: true,
+      extractTextFromImage: extractMock,
+    };
+
+    const lines = await runNativeOcr('file:///tmp/sim.jpg');
+    expect(extractMock).toHaveBeenCalledWith('/tmp/sim.jpg');
+    expect(lines).toEqual(['89387012345678901234']);
+  });
+
+  it('falls back to ExpoTextExtractor when OfflineOcr is absent', async () => {
     const spy = jest
       .spyOn(textExtractor, 'extractTextFromImage')
       .mockResolvedValueOnce(['S/N: 48201944', '230V 50Hz']);
@@ -21,13 +35,28 @@ describe('ocr-native', () => {
     expect(lines).toEqual(['S/N: 48201944', '230V 50Hz']);
   });
 
-  it('throws missing_native_module when ExpoTextExtractor is absent from binary', async () => {
+  it('preserves content:// URIs without stripping scheme', async () => {
+    const extractMock = jest.fn(async () => ['S/N 12345678']);
+    NativeModules.OfflineOcr = {
+      isSupported: true,
+      extractTextFromImage: extractMock,
+    };
+
+    const lines = await runNativeOcr('content://media/external/images/media/42');
+    expect(extractMock).toHaveBeenCalledWith(
+      'content://media/external/images/media/42',
+    );
+    expect(lines).toEqual(['S/N 12345678']);
+  });
+
+  it('throws missing_native_module with diagnostics when neither module is present', async () => {
     const reqSpy = jest
       .spyOn(expoMock, 'requireOptionalNativeModule')
       .mockReturnValueOnce(null);
 
     await expect(runNativeOcr('file:///tmp/meter.jpg')).rejects.toMatchObject({
       kind: 'missing_native_module',
+      detail: expect.stringContaining('offlineOcr=false'),
     });
     expect(reqSpy).toHaveBeenCalledWith('ExpoTextExtractor');
   });
@@ -46,6 +75,10 @@ describe('ocr-native', () => {
 
     expect(
       classifyOcrError(new Error('File not found: /tmp/missing.jpg')).kind,
+    ).toBe('file_missing');
+
+    expect(
+      classifyOcrError(new Error('OCR_FILE_NOT_FOUND: /tmp/missing.jpg')).kind,
     ).toBe('file_missing');
 
     const unknown = classifyOcrError(new Error('Camera busy'));

@@ -1,3 +1,4 @@
+import { NativeModules, Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
 export type OcrErrorKind =
@@ -19,18 +20,30 @@ export class OcrExecutionError extends Error {
   }
 }
 
-interface ExpoTextExtractorNative {
+export interface NativeTextExtractor {
   isSupported?: boolean;
   extractTextFromImage?: (uri: string) => Promise<string[]>;
 }
 
-function getNativeTextExtractor(): ExpoTextExtractorNative | null {
-  const nativeMod =
-    requireOptionalNativeModule<ExpoTextExtractorNative>('ExpoTextExtractor');
-  if (nativeMod && typeof nativeMod.extractTextFromImage === 'function') {
-    return nativeMod;
+function getNativeTextExtractor(): {
+  mod: NativeTextExtractor | null;
+  diagnostics: string;
+} {
+  const offlineMod = NativeModules?.OfflineOcr as
+    | NativeTextExtractor
+    | undefined;
+  if (offlineMod && typeof offlineMod.extractTextFromImage === 'function') {
+    return { mod: offlineMod, diagnostics: 'OfflineOcr' };
   }
-  return null;
+
+  const expoMod =
+    requireOptionalNativeModule<NativeTextExtractor>('ExpoTextExtractor');
+  if (expoMod && typeof expoMod.extractTextFromImage === 'function') {
+    return { mod: expoMod, diagnostics: 'ExpoTextExtractor' };
+  }
+
+  const diagnostics = `OS=${Platform.OS}, offlineOcr=${Boolean(offlineMod)}, expoTextExtractor=${Boolean(expoMod)}`;
+  return { mod: null, diagnostics };
 }
 
 export function classifyOcrError(error: unknown): OcrExecutionError {
@@ -48,6 +61,7 @@ export function classifyOcrError(error: unknown): OcrExecutionError {
   if (
     lower.includes('cannot find native module') ||
     lower.includes('expotextextractor') ||
+    lower.includes('offlineocr') ||
     lower.includes('missing_native_module')
   ) {
     return new OcrExecutionError('missing_native_module', message);
@@ -59,24 +73,28 @@ export function classifyOcrError(error: unknown): OcrExecutionError {
   ) {
     return new OcrExecutionError('model_downloading', message);
   }
-  if (lower.includes('file not found') || lower.includes('enoent')) {
+  if (
+    lower.includes('ocr_file_not_found') ||
+    lower.includes('file not found') ||
+    lower.includes('enoent')
+  ) {
     return new OcrExecutionError('file_missing', message);
   }
   return new OcrExecutionError('unknown', message);
 }
 
 export async function runNativeOcr(uri: string): Promise<string[]> {
-  const mod = getNativeTextExtractor();
+  const { mod, diagnostics } = getNativeTextExtractor();
   if (!mod || typeof mod.extractTextFromImage !== 'function') {
     throw new OcrExecutionError(
       'missing_native_module',
-      'ExpoTextExtractor native module is unavailable in this build.',
+      `Native OCR unavailable (${diagnostics})`,
     );
   }
   if (mod.isSupported === false) {
     throw new OcrExecutionError(
       'unsupported',
-      'On-device OCR is not supported on this device.',
+      `On-device OCR is not supported on this device (${diagnostics}).`,
     );
   }
   try {
