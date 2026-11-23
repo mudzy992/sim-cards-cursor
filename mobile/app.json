@@ -2,7 +2,7 @@
   "expo": {
     "name": "SIM Tracker",
     "slug": "sim-tracker",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "orientation": "portrait",
     "scheme": "simtracker",
     "userInterfaceStyle": "dark",
@@ -37,7 +37,7 @@
     },
     "android": {
       "package": "ba.epbih.simtracker",
-      "versionCode": 47,
+      "versionCode": 48,
       "userInterfaceStyle": "dark",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "pan",
