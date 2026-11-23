@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system/legacy';
-import { extractTextFromImage, isSupported as isOcrSupported } from 'expo-text-extractor';
+import * as ImagePicker from 'expo-image-picker';
 import {
   isValidIccid,
   normalizeIccid,
@@ -39,7 +39,8 @@ import {
 } from '@/theme/tokens';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { hapticError, hapticSuccess } from '@/utils/haptics';
-import { extractOcrCandidates } from '@/utils/ocr-parser';
+import { classifyOcrError, runNativeOcr } from '@/utils/ocr-native';
+import { analyzeOcrText } from '@/utils/ocr-parser';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const FRAME_W = Math.min(SCREEN_W * 0.78, 320);
@@ -243,77 +244,131 @@ export default function ScanScreen() {
     [hasScanned, manualOpen, ocrBusy, openResult, playFeedback],
   );
 
+  const processOcrImageUri = useCallback(
+    async (imageUri: string) => {
+      try {
+        const lines = await runNativeOcr(imageUri);
+        const { candidates, rawPreview } = analyzeOcrText(lines, {
+          mode: isMeterSerialMode ? 'meterSerial' : 'iccid',
+          expectedSerialLength,
+        });
+        setOcrTriggered(true);
+        if (candidates.length > 0) {
+          playFeedback();
+          setOcrCandidates(candidates);
+          setManualValue(candidates[0] ?? '');
+          setOcrNotice(null);
+        } else {
+          hapticError();
+          setOcrCandidates([]);
+          setManualValue('');
+          setOcrNotice(
+            rawPreview.length > 0
+              ? t('mobile.scan.ocrNoMatchWithPreview', {
+                  preview: rawPreview.slice(0, 2).join(' · '),
+                })
+              : t('mobile.scan.ocrNoMatch'),
+          );
+        }
+        setManualOpen(true);
+      } catch (error) {
+        const classified = classifyOcrError(error);
+        hapticError();
+        setOcrTriggered(true);
+        setOcrCandidates([]);
+        setManualValue('');
+        if (classified.kind === 'missing_native_module') {
+          setOcrNotice(t('mobile.scan.ocrMissingNativeModule'));
+        } else if (classified.kind === 'unsupported') {
+          setOcrNotice(t('mobile.scan.ocrNotSupported'));
+        } else if (classified.kind === 'model_downloading') {
+          setOcrNotice(t('mobile.scan.ocrModelDownloading'));
+        } else if (classified.detail) {
+          setOcrNotice(
+            t('mobile.scan.ocrFailedDetail', { detail: classified.detail }),
+          );
+        } else {
+          setOcrNotice(t('mobile.scan.ocrFailed'));
+        }
+        setManualOpen(true);
+      } finally {
+        void FileSystem.deleteAsync(imageUri, { idempotent: true }).catch(
+          () => {},
+        );
+      }
+    },
+    [expectedSerialLength, isMeterSerialMode, playFeedback, t],
+  );
+
   const handleOcrScan = useCallback(async () => {
     if (ocrBusy) return;
     if (permission?.granted !== true) {
       await requestPermission();
       return;
     }
-    if (!isOcrSupported) {
-      hapticError();
-      setOcrCandidates([]);
-      setOcrTriggered(true);
-      setOcrNotice(t('mobile.scan.ocrNotSupported'));
-      setManualValue('');
-      setScanError(null);
-      setManualOpen(true);
-      return;
-    }
 
     setOcrBusy(true);
     setScanError(null);
     setOcrNotice(null);
-    let capturedUri: string | undefined;
     try {
       const photo = await cameraRef.current?.takePictureAsync({
-        quality: 0.85,
+        quality: 0.9,
+        shutterSound: false,
       });
-      capturedUri = photo?.uri;
-      if (!capturedUri) {
-        throw new Error('capture_failed');
+      if (!photo?.uri) {
+        throw new Error('Camera capture returned no image.');
       }
-      const lines = await extractTextFromImage(capturedUri);
-      const candidates = extractOcrCandidates(lines, {
-        mode: isMeterSerialMode ? 'meterSerial' : 'iccid',
-        expectedSerialLength,
-      });
-      setOcrTriggered(true);
-      if (candidates.length > 0) {
-        playFeedback();
-        setOcrCandidates(candidates);
-        setManualValue(candidates[0] ?? '');
-        setOcrNotice(null);
-      } else {
-        hapticError();
-        setOcrCandidates([]);
-        setManualValue('');
-        setOcrNotice(t('mobile.scan.ocrNoMatch'));
-      }
-      setManualOpen(true);
-    } catch {
+      await processOcrImageUri(photo.uri);
+    } catch (error) {
+      const classified = classifyOcrError(error);
       hapticError();
       setOcrTriggered(true);
       setOcrCandidates([]);
       setManualValue('');
-      setOcrNotice(t('mobile.scan.ocrFailed'));
+      setOcrNotice(
+        classified.detail
+          ? t('mobile.scan.ocrFailedDetail', { detail: classified.detail })
+          : t('mobile.scan.ocrFailed'),
+      );
       setManualOpen(true);
     } finally {
-      if (capturedUri) {
-        void FileSystem.deleteAsync(capturedUri, { idempotent: true }).catch(
-          () => {},
-        );
-      }
       setOcrBusy(false);
     }
-  }, [
-    expectedSerialLength,
-    isMeterSerialMode,
-    ocrBusy,
-    permission?.granted,
-    playFeedback,
-    requestPermission,
-    t,
-  ]);
+  }, [ocrBusy, permission?.granted, processOcrImageUri, requestPermission, t]);
+
+  const handleMacroCameraOcr = useCallback(async () => {
+    if (ocrBusy) return;
+    setOcrBusy(true);
+    setScanError(null);
+    try {
+      const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+      if (camPerm.status !== 'granted') {
+        setOcrNotice(t('mobile.scan.noPermissionBody'));
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.9,
+        exif: true,
+      });
+      if (res.canceled || !res.assets?.[0]?.uri) {
+        return;
+      }
+      await processOcrImageUri(res.assets[0].uri);
+    } catch (error) {
+      const classified = classifyOcrError(error);
+      hapticError();
+      setOcrTriggered(true);
+      setOcrNotice(
+        classified.detail
+          ? t('mobile.scan.ocrFailedDetail', { detail: classified.detail })
+          : t('mobile.scan.ocrFailed'),
+      );
+    } finally {
+      setOcrBusy(false);
+    }
+  }, [ocrBusy, processOcrImageUri, t]);
 
   const hasPermission = permission?.granted === true;
   const contextLabel = isMeterSerialMode
@@ -335,6 +390,7 @@ export default function ScanScreen() {
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
           facing="back"
+          autofocus="on"
           enableTorch={torch}
           onBarcodeScanned={
             hasScanned || ocrBusy || manualOpen
@@ -582,11 +638,19 @@ export default function ScanScreen() {
                   : t('mobile.scan.manualIccidTitle')}
             </Text>
             <Text style={styles.sheetHint}>
-              {isMeterSerialMode && expectedSerialLength
-                ? t('mobile.scan.ocrExpectedLengthHint', {
-                    count: expectedSerialLength,
-                  })
-                : t('mobile.scan.manualHint')}
+              {ocrTriggered
+                ? ocrCandidates.length > 0
+                  ? isMeterSerialMode && expectedSerialLength
+                    ? t('mobile.scan.ocrExpectedLengthHint', {
+                        count: expectedSerialLength,
+                      })
+                    : t('mobile.scan.ocrFoundHint')
+                  : t('mobile.scan.ocrRetryHint')
+                : isMeterSerialMode && expectedSerialLength
+                  ? t('mobile.scan.ocrExpectedLengthHint', {
+                      count: expectedSerialLength,
+                    })
+                  : t('mobile.scan.manualHint')}
             </Text>
             {ocrNotice ? (
               <Text style={styles.sheetNotice}>{ocrNotice}</Text>
@@ -648,12 +712,58 @@ export default function ScanScreen() {
               keyboardType={isMeterSerialMode ? 'default' : 'number-pad'}
               autoCapitalize={isMeterSerialMode ? 'characters' : 'none'}
               returnKeyType="done"
-              autoFocus
+              autoFocus={!ocrTriggered}
               onSubmitEditing={() => openResult(manualValue)}
               style={styles.sheetInput}
             />
             {scanError ? (
               <Text style={styles.sheetError}>{scanError}</Text>
+            ) : null}
+            {ocrTriggered ? (
+              <View style={styles.ocrQuickActions}>
+                <Pressable
+                  testID="scan-ocr-retry-btn"
+                  onPress={() => {
+                    setManualOpen(false);
+                    setTimeout(() => {
+                      void handleOcrScan();
+                    }, 120);
+                  }}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.ocrQuickBtn,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Ionicons
+                    name="refresh-outline"
+                    size={16}
+                    color={palette.textPrimary}
+                  />
+                  <Text style={styles.ocrQuickBtnText}>
+                    {t('mobile.scan.ocrRetryButton')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  testID="scan-ocr-macro-btn"
+                  disabled={ocrBusy}
+                  onPress={() => void handleMacroCameraOcr()}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.ocrQuickBtn,
+                    (pressed || ocrBusy) && styles.pressed,
+                  ]}
+                >
+                  <Ionicons
+                    name="camera-outline"
+                    size={16}
+                    color={palette.textPrimary}
+                  />
+                  <Text style={styles.ocrQuickBtnText}>
+                    {t('mobile.scan.ocrMacroCameraButton')}
+                  </Text>
+                </Pressable>
+              </View>
             ) : null}
             <ActionButton
               testID="scan-manual-submit-btn"
@@ -995,6 +1105,29 @@ const createStyles = (palette: ThemePalette) => ({
     color: palette.danger,
     fontSize: 13,
     fontWeight: '600' as const,
+  },
+  ocrQuickActions: {
+    flexDirection: 'row' as const,
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  ocrQuickBtn: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: radii.md,
+    backgroundColor: palette.surface,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  ocrQuickBtnText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: palette.textPrimary,
   },
   sheetAction: { marginTop: spacing.lg, marginBottom: spacing.sm },
 });

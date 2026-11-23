@@ -111,7 +111,8 @@
       ],
       "expo-asset",
       "expo-font",
-      "expo-audio"
+      "expo-audio",
+      "./plugins/withOfflineOcr"
     ],
     "updates": {
       "fallbackToCacheTimeout": 0

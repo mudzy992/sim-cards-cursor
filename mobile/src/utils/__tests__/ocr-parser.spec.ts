@@ -1,4 +1,4 @@
-import { extractOcrCandidates } from '@/utils/ocr-parser';
+import { analyzeOcrText, extractOcrCandidates } from '@/utils/ocr-parser';
 
 describe('extractOcrCandidates', () => {
   it('extracts and prioritizes valid SIM ICCID across spaced or split lines', () => {
@@ -12,8 +12,14 @@ describe('extractOcrCandidates', () => {
     expect(result[0]).toBe('89387020000012345672');
   });
 
-  it('recovers SIM ICCID when OCR confuses O/I/S with digits', () => {
-    const lines = ['ICCID: 89387O2000OOI2345672'];
+  it('extracts SIM ICCID split across 4 short plastic rows and optional trailing F', () => {
+    const lines = ['89387', '02000', '00123', '4567F'];
+    const result = extractOcrCandidates(lines, { mode: 'iccid' });
+    expect(result[0]).toBe('8938702000001234567');
+  });
+
+  it('recovers SIM ICCID when OCR confuses O/I/S with digits across multiple rows', () => {
+    const lines = ['ICCID: 89387O2000', 'OOI2345672'];
     const result = extractOcrCandidates(lines, { mode: 'iccid' });
     expect(result).toContain('89387020000012345672');
   });
@@ -36,6 +42,15 @@ describe('extractOcrCandidates', () => {
     expect(result).not.toContain('50Hz');
   });
 
+  it('handles spaced serial numbers and attached SN prefixes', () => {
+    const lines = ['SN:00 4820 1944', '230V 50Hz'];
+    const result = extractOcrCandidates(lines, {
+      mode: 'meterSerial',
+      expectedSerialLength: 10,
+    });
+    expect(result[0]).toBe('0048201944');
+  });
+
   it('prefers exact expectedSerialLength match over other numeric strings', () => {
     const lines = [
       'Type AMM 3.0',
@@ -54,5 +69,13 @@ describe('extractOcrCandidates', () => {
     const lines = ['MID M24', 'Ser.No. LGZ99887766', '230V 50Hz'];
     const result = extractOcrCandidates(lines, { mode: 'meterSerial' });
     expect(result[0]).toBe('LGZ99887766');
+  });
+
+  it('returns rawPreview alongside empty candidates when no numeric match exists', () => {
+    const analysis = analyzeOcrText(['Landis+Gyr', 'Made in Switzerland'], {
+      mode: 'iccid',
+    });
+    expect(analysis.candidates).toEqual([]);
+    expect(analysis.rawPreview).toEqual(['Landis+Gyr', 'Made in Switzerland']);
   });
 });
