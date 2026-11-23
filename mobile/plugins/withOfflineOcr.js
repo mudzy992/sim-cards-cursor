@@ -2,7 +2,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   withAndroidManifest,
-  withProjectBuildGradle,
   withAppBuildGradle,
   withMainApplication,
   withDangerousMod,
@@ -12,17 +11,6 @@ const {
 const MLKIT_META_NAME = 'com.google.mlkit.vision.DEPENDENCIES';
 const MLKIT_META_VALUE = 'barcode_ui,ocr';
 const BUNDLED_OCR_DEPENDENCY = "implementation 'com.google.mlkit:text-recognition:16.0.1'";
-const EXCLUDE_THIN_MLKIT =
-  "    exclude group: 'com.google.android.gms', module: 'play-services-mlkit-text-recognition'";
-
-const ROOT_GRADLE_OCR_BLOCK = `
-// Offline ML Kit OCR: exclude thin Play Services client across all modules
-allprojects {
-  configurations.all {
-    exclude group: 'com.google.android.gms', module: 'play-services-mlkit-text-recognition'
-  }
-}
-`;
 
 function buildOfflineOcrModuleKt(androidPackage) {
   return `package ${androidPackage}.ocr
@@ -161,12 +149,11 @@ class OfflineOcrPackage : BaseReactPackage() {
 
 function buildProguardRules(androidPackage) {
   return `
-# Offline ML Kit OCR (${androidPackage}.ocr + expo-text-extractor + bundled text-recognition)
+# Offline ML Kit OCR (${androidPackage}.ocr + bundled text-recognition)
 -keep class ${androidPackage}.ocr.** { *; }
 -keep class com.google.mlkit.** { *; }
 -dontwarn com.google.mlkit.**
 -keep class com.google.android.gms.vision.** { *; }
--keep class expo.modules.textextractor.** { *; }
 `;
 }
 
@@ -190,28 +177,8 @@ function withOfflineOcr(config) {
     return cfg;
   });
 
-  config = withProjectBuildGradle(config, (cfg) => {
-    let contents = cfg.modResults.contents;
-    if (!contents.includes('Offline ML Kit OCR:')) {
-      contents = `${contents}\n${ROOT_GRADLE_OCR_BLOCK}`;
-    }
-    cfg.modResults.contents = contents;
-    return cfg;
-  });
-
   config = withAppBuildGradle(config, (cfg) => {
     let contents = cfg.modResults.contents;
-
-    if (!contents.includes('play-services-mlkit-text-recognition')) {
-      const excludeBlock = [
-        '',
-        'configurations.all {',
-        EXCLUDE_THIN_MLKIT,
-        '}',
-        '',
-      ].join('\n');
-      contents = `${contents}\n${excludeBlock}`;
-    }
 
     if (!contents.includes('com.google.mlkit:text-recognition:')) {
       contents = contents.replace(
