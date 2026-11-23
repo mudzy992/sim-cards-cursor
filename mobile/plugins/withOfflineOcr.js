@@ -8,7 +8,7 @@ const {
 } = require('expo/config-plugins');
 
 const MLKIT_META_NAME = 'com.google.mlkit.vision.DEPENDENCIES';
-const MLKIT_META_VALUE = 'ocr';
+const MLKIT_META_VALUE = 'barcode_ui,ocr';
 const BUNDLED_OCR_DEPENDENCY = "implementation 'com.google.mlkit:text-recognition:16.0.1'";
 const EXCLUDE_THIN_MLKIT =
   "    exclude group: 'com.google.android.gms', module: 'play-services-mlkit-text-recognition'";
@@ -23,12 +23,19 @@ const PROGUARD_RULES = `
 
 function withOfflineOcr(config) {
   config = withAndroidManifest(config, (cfg) => {
+    AndroidConfig.Manifest.ensureToolsAvailable(cfg.modResults);
     const app = AndroidConfig.Manifest.getMainApplicationOrThrow(cfg.modResults);
     AndroidConfig.Manifest.addMetaDataItemToMainApplication(
       app,
       MLKIT_META_NAME,
       MLKIT_META_VALUE,
     );
+    const metaItem = (app['meta-data'] || []).find(
+      (item) => item?.$?.['android:name'] === MLKIT_META_NAME,
+    );
+    if (metaItem?.$) {
+      metaItem.$['tools:replace'] = 'android:value';
+    }
     return cfg;
   });
 
