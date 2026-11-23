@@ -16,17 +16,10 @@ const EXCLUDE_THIN_MLKIT =
   "    exclude group: 'com.google.android.gms', module: 'play-services-mlkit-text-recognition'";
 
 const ROOT_GRADLE_OCR_BLOCK = `
-// Offline ML Kit OCR: exclude thin Play Services client across all modules and use bundled model
+// Offline ML Kit OCR: exclude thin Play Services client across all modules
 allprojects {
   configurations.all {
     exclude group: 'com.google.android.gms', module: 'play-services-mlkit-text-recognition'
-  }
-}
-subprojects { subproj ->
-  subproj.plugins.withId('com.android.library') {
-    if (subproj.name == 'expo-text-extractor') {
-      subproj.dependencies.add('implementation', 'com.google.mlkit:text-recognition:16.0.1')
-    }
   }
 }
 `;
@@ -35,7 +28,6 @@ function buildOfflineOcrModuleKt(androidPackage) {
   return `package ${androidPackage}.ocr
 
 import android.net.Uri
-import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -47,7 +39,6 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 
-@DoNotStrip
 @ReactModule(name = OfflineOcrModule.NAME)
 class OfflineOcrModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -60,7 +51,6 @@ class OfflineOcrModule(reactContext: ReactApplicationContext) :
       "engine" to "mlkit-bundled-16.0.1"
     )
 
-  @DoNotStrip
   @ReactMethod
   fun extractTextFromImage(uriString: String, promise: Promise) {
     try {
@@ -136,14 +126,12 @@ class OfflineOcrModule(reactContext: ReactApplicationContext) :
 function buildOfflineOcrPackageKt(androidPackage) {
   return `package ${androidPackage}.ocr
 
-import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.BaseReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
 
-@DoNotStrip
 class OfflineOcrPackage : BaseReactPackage() {
   override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
     return if (name == OfflineOcrModule.NAME) {
