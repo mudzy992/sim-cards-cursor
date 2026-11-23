@@ -45,6 +45,15 @@ import { analyzeOcrText } from '@/utils/ocr-parser';
 const { width: SCREEN_W } = Dimensions.get('window');
 const FRAME_W = Math.min(SCREEN_W * 0.78, 320);
 const FRAME_H = Math.round(FRAME_W / 2.1);
+const BARCODE_SCANNER_SETTINGS = {
+  barcodeTypes: ['code128', 'code39', 'ean13', 'qr', 'datamatrix'] as (
+    | 'code128'
+    | 'code39'
+    | 'ean13'
+    | 'qr'
+    | 'datamatrix'
+  )[],
+};
 
 function pickParam(value?: string | string[]): string | undefined {
   return typeof value === 'string' ? value : value?.[0];
@@ -95,6 +104,8 @@ export default function ScanScreen() {
   const [ocrNotice, setOcrNotice] = useState<string | null>(null);
   const beepPlayer = useAudioPlayer(APP_ASSETS.scanBeep);
   const cameraRef = useRef<CameraView | null>(null);
+  const ocrBusyRef = useRef(false);
+  const cameraReadyRef = useRef(false);
 
   const flash = useRef(new Animated.Value(0)).current;
   const sweep = useRef(new Animated.Value(0)).current;
@@ -103,7 +114,10 @@ export default function ScanScreen() {
     useCallback(() => {
       setHasScanned(false);
       setScanError(null);
-      return () => setTorch(false);
+      return () => {
+        setTorch(false);
+        cameraReadyRef.current = false;
+      };
     }, []),
   );
 
@@ -237,7 +251,7 @@ export default function ScanScreen() {
 
   const handleBarcodeScanned = useCallback(
     ({ data }: { data: string }) => {
-      if (hasScanned || ocrBusy || manualOpen) return;
+      if (hasScanned || ocrBusy || ocrBusyRef.current || manualOpen) return;
       playFeedback();
       openResult(String(data));
     },
@@ -312,23 +326,60 @@ export default function ScanScreen() {
     [expectedSerialLength, isMeterSerialMode, playFeedback, t],
   );
 
+  const captureViaMacroCamera = useCallback(async () => {
+    const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+    if (camPerm.status !== 'granted') {
+      setOcrNotice(t('mobile.scan.noPermissionBody'));
+      setManualOpen(true);
+      return;
+    }
+    const res = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 0.9,
+      exif: true,
+    });
+    if (res.canceled || !res.assets?.[0]?.uri) {
+      return;
+    }
+    await processOcrImageUri(res.assets[0].uri);
+  }, [processOcrImageUri, t]);
+
   const handleOcrScan = useCallback(async () => {
-    if (ocrBusy) return;
+    if (ocrBusy || ocrBusyRef.current) return;
     if (permission?.granted !== true) {
       await requestPermission();
       return;
     }
 
+    ocrBusyRef.current = true;
     setOcrBusy(true);
     setScanError(null);
     setOcrNotice(null);
     try {
-      const photo = await cameraRef.current?.takePictureAsync({
-        quality: 0.9,
-        shutterSound: false,
-      });
+      if (!cameraReadyRef.current) {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+      let photo = await cameraRef.current
+        ?.takePictureAsync({
+          quality: 0.9,
+          shutterSound: false,
+        })
+        .catch(() => null);
+
       if (!photo?.uri) {
-        throw new Error('Camera capture returned no image.');
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        photo = await cameraRef.current
+          ?.takePictureAsync({
+            quality: 0.85,
+            shutterSound: false,
+          })
+          .catch(() => null);
+      }
+
+      if (!photo?.uri) {
+        await captureViaMacroCamera();
+        return;
       }
       await processOcrImageUri(photo.uri);
     } catch (error) {
@@ -344,30 +395,25 @@ export default function ScanScreen() {
       );
       setManualOpen(true);
     } finally {
+      ocrBusyRef.current = false;
       setOcrBusy(false);
     }
-  }, [ocrBusy, permission?.granted, processOcrImageUri, requestPermission, t]);
+  }, [
+    captureViaMacroCamera,
+    ocrBusy,
+    permission?.granted,
+    processOcrImageUri,
+    requestPermission,
+    t,
+  ]);
 
   const handleMacroCameraOcr = useCallback(async () => {
-    if (ocrBusy) return;
+    if (ocrBusy || ocrBusyRef.current) return;
+    ocrBusyRef.current = true;
     setOcrBusy(true);
     setScanError(null);
     try {
-      const camPerm = await ImagePicker.requestCameraPermissionsAsync();
-      if (camPerm.status !== 'granted') {
-        setOcrNotice(t('mobile.scan.noPermissionBody'));
-        return;
-      }
-      const res = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.9,
-        exif: true,
-      });
-      if (res.canceled || !res.assets?.[0]?.uri) {
-        return;
-      }
-      await processOcrImageUri(res.assets[0].uri);
+      await captureViaMacroCamera();
     } catch (error) {
       const classified = classifyOcrError(error);
       hapticError();
@@ -377,10 +423,12 @@ export default function ScanScreen() {
           ? t('mobile.scan.ocrFailedDetail', { detail: classified.detail })
           : t('mobile.scan.ocrFailed'),
       );
+      setManualOpen(true);
     } finally {
+      ocrBusyRef.current = false;
       setOcrBusy(false);
     }
-  }, [ocrBusy, processOcrImageUri, t]);
+  }, [captureViaMacroCamera, ocrBusy, t]);
 
   const hasPermission = permission?.granted === true;
   const contextLabel = isMeterSerialMode
@@ -404,14 +452,11 @@ export default function ScanScreen() {
           facing="back"
           autofocus="on"
           enableTorch={torch}
-          onBarcodeScanned={
-            hasScanned || ocrBusy || manualOpen
-              ? undefined
-              : handleBarcodeScanned
-          }
-          barcodeScannerSettings={{
-            barcodeTypes: ['code128', 'code39', 'ean13', 'qr', 'datamatrix'],
+          onCameraReady={() => {
+            cameraReadyRef.current = true;
           }}
+          onBarcodeScanned={handleBarcodeScanned}
+          barcodeScannerSettings={BARCODE_SCANNER_SETTINGS}
         />
       ) : null}
 
